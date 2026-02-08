@@ -1,0 +1,92 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "import": "Import",
+    "settings": "Settings"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "signInWith": "Sign in with {provider}"
+  },
+  "nav": {
+    "home": "Home",
+    "projects": "Projects",
+    "settings": "Settings",
+    "help": "Help"
+  },
+  "ontology": {
+    "title": "Ontology",
+    "classes": "Classes",
+    "properties": "Properties",
+    "individuals": "Individuals",
+    "annotations": "Annotations",
+    "imports": "Imports",
+    "hierarchy": "Hierarchy",
+    "search": "Search ontology...",
+    "noResults": "No results found",
+    "addClass": "Add Class",
+    "addProperty": "Add Property",
+    "addIndividual": "Add Individual"
+  },
+  "class": {
+    "label": "Label",
+    "comment": "Comment",
+    "iri": "IRI",
+    "parent": "Parent Class",
+    "children": "Subclasses",
+    "instances": "Instances",
+    "equivalent": "Equivalent To",
+    "disjoint": "Disjoint With",
+    "deprecated": "Deprecated"
+  },
+  "property": {
+    "domain": "Domain",
+    "range": "Range",
+    "type": "Type",
+    "objectProperty": "Object Property",
+    "dataProperty": "Data Property",
+    "annotationProperty": "Annotation Property",
+    "functional": "Functional",
+    "inverseFunctional": "Inverse Functional",
+    "transitive": "Transitive",
+    "symmetric": "Symmetric",
+    "asymmetric": "Asymmetric",
+    "reflexive": "Reflexive",
+    "irreflexive": "Irreflexive",
+    "inverseOf": "Inverse Of"
+  },
+  "collab": {
+    "users": "Users",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "reconnecting": "Reconnecting...",
+    "userJoined": "{name} joined",
+    "userLeft": "{name} left"
+  },
+  "git": {
+    "history": "History",
+    "commit": "Commit",
+    "push": "Push",
+    "pull": "Pull",
+    "branch": "Branch",
+    "merge": "Merge",
+    "diff": "View Changes"
+  },
+  "errors": {
+    "notFound": "Not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Access denied",
+    "serverError": "Server error",
+    "networkError": "Network error"
+  }
+}

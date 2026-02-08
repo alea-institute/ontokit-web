@@ -1,0 +1,83 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 250, 250, 250;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 15, 23, 42;
+    --background-end-rgb: 30, 41, 59;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  min-height: 100vh;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(203 213 225);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(148 163 184);
+}
+
+@media (prefers-color-scheme: dark) {
+  ::-webkit-scrollbar-thumb {
+    background: rgb(71 85 105);
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(100 116 139);
+  }
+}
+
+/* Class tree item styling */
+.tree-item {
+  @apply flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer transition-colors;
+}
+
+.tree-item:hover {
+  @apply bg-slate-100 dark:bg-slate-800;
+}
+
+.tree-item.selected {
+  @apply bg-primary-100 dark:bg-primary-900/30;
+}
+
+/* Collaboration cursor colors */
+.collab-cursor {
+  @apply absolute pointer-events-none z-50;
+}
+
+.collab-cursor-caret {
+  @apply w-0.5 h-5 rounded-full;
+}
+
+.collab-cursor-label {
+  @apply absolute -top-5 left-0 px-1.5 py-0.5 text-xs text-white rounded whitespace-nowrap;
+}
