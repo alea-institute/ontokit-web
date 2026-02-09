@@ -4,13 +4,16 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, Search, FileCode } from "lucide-react";
+import { ArrowLeft, Settings, Search, FileCode, GitPullRequest } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel } from "@/components/editor/ClassDetailPanel";
+import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
+import { BranchProvider } from "@/lib/context/BranchContext";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 import { projectApi, type Project } from "@/lib/api/projects";
+import { pullRequestsApi } from "@/lib/api/pullRequests";
 
 export default function EditorPage() {
   const { data: session, status } = useSession();
@@ -20,6 +23,8 @@ export default function EditorPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [openPRCount, setOpenPRCount] = useState(0);
 
   // Ontology tree state
   const {
@@ -44,6 +49,21 @@ export default function EditorPage() {
       try {
         const data = await projectApi.get(projectId, session?.accessToken);
         setProject(data);
+
+        // Fetch open PR count
+        try {
+          const prResponse = await pullRequestsApi.list(
+            projectId,
+            session?.accessToken,
+            "open",
+            undefined,
+            0,
+            1
+          );
+          setOpenPRCount(prResponse.total);
+        } catch {
+          // Ignore PR count errors
+        }
       } catch (err) {
         if (err instanceof Error && err.message.includes("403")) {
           setError("You don't have access to this project");
@@ -62,7 +82,7 @@ export default function EditorPage() {
     }
   }, [projectId, session?.accessToken, status]);
 
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin";
+  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
   const hasOntology = project?.source_file_path;
 
   if (isLoading || status === "loading") {
@@ -162,7 +182,7 @@ export default function EditorPage() {
   }
 
   return (
-    <>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken}>
       <Header />
       <main className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {/* Editor Header */}
@@ -183,8 +203,31 @@ export default function EditorPage() {
               <span className="text-sm text-slate-500 dark:text-slate-400">
                 {totalClasses} classes
               </span>
+              <BranchBadge />
             </div>
             <div className="flex items-center gap-2">
+              {/* Branch Selector */}
+              <BranchSelector />
+
+              {/* History Button */}
+              <HistoryButton
+                onClick={() => setShowHistory(!showHistory)}
+                isOpen={showHistory}
+              />
+
+              {/* PR Link */}
+              <Link href={`/projects/${projectId}/pull-requests`}>
+                <Button variant="ghost" size="sm" className="gap-2">
+                  <GitPullRequest className="h-4 w-4" />
+                  <span className="hidden sm:inline">PRs</span>
+                  {openPRCount > 0 && (
+                    <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                      {openPRCount}
+                    </span>
+                  )}
+                </Button>
+              </Link>
+
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm">
@@ -197,7 +240,7 @@ export default function EditorPage() {
         </div>
 
         {/* Main Editor Layout */}
-        <div className="flex h-[calc(100vh-4rem-3.5rem)]">
+        <div className="relative flex h-[calc(100vh-4rem-3.5rem)]">
           {/* Left Panel - Class Tree */}
           <div className="w-80 flex-shrink-0 border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
             {/* Tree Header */}
@@ -242,7 +285,7 @@ export default function EditorPage() {
             </div>
           </div>
 
-          {/* Right Panel - Class Details */}
+          {/* Center Panel - Class Details */}
           <div className="flex-1 bg-white dark:bg-slate-800">
             <ClassDetailPanel
               projectId={projectId}
@@ -251,8 +294,16 @@ export default function EditorPage() {
               onNavigateToClass={selectNode}
             />
           </div>
+
+          {/* Right Panel - Revision History (slide-out) */}
+          <RevisionHistoryPanel
+            projectId={projectId}
+            accessToken={session?.accessToken}
+            isOpen={showHistory}
+            onClose={() => setShowHistory(false)}
+          />
         </div>
       </main>
-    </>
+    </BranchProvider>
   );
 }

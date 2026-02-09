@@ -24,6 +24,7 @@ export interface Project {
   updated_at?: string;
   member_count: number;
   user_role?: ProjectRole;
+  is_superadmin?: boolean;  // Whether the current user is a superadmin
   // Import-related fields (optional, only set when project was created via import)
   source_file_path?: string;
   ontology_iri?: string;
