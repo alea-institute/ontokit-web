@@ -60,6 +60,50 @@ async function request<T>(
   return JSON.parse(text);
 }
 
+/**
+ * Upload a file using multipart/form-data
+ */
+async function uploadFile<T>(
+  endpoint: string,
+  formData: FormData,
+  options: Omit<RequestOptions, "body"> = {}
+): Promise<T> {
+  const { params, ...fetchOptions } = options;
+
+  // Build URL with query params
+  const url = new URL(`${API_BASE}${endpoint}`);
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined) {
+        url.searchParams.append(key, String(value));
+      }
+    });
+  }
+
+  // Don't set Content-Type - browser will set it with boundary for FormData
+  const headers = new Headers(fetchOptions.headers);
+  headers.delete("Content-Type");
+
+  const response = await fetch(url.toString(), {
+    ...fetchOptions,
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new ApiError(response.status, response.statusText, message);
+  }
+
+  const text = await response.text();
+  if (!text) {
+    return undefined as T;
+  }
+
+  return JSON.parse(text);
+}
+
 export const api = {
   get: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: "GET" }),
@@ -87,6 +131,9 @@ export const api = {
 
   delete: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: "DELETE" }),
+
+  upload: <T>(endpoint: string, formData: FormData, options?: Omit<RequestOptions, "body">) =>
+    uploadFile<T>(endpoint, formData, options),
 };
 
 // Type-safe API methods for specific endpoints

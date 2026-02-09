@@ -1,0 +1,231 @@
+"use client";
+
+import { useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Plus, Upload } from "lucide-react";
+import { Header } from "@/components/layout/header";
+import { Button } from "@/components/ui/button";
+import { FileUpload } from "@/components/ui/file-upload";
+import { ProjectForm } from "@/components/projects/project-form";
+import { projectApi, type ProjectCreate, type ProjectImportData } from "@/lib/api/projects";
+import { cn } from "@/lib/utils";
+
+type TabType = "create" | "import";
+
+export default function NewProjectPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<TabType>("create");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+
+  const isAuthenticated = status === "authenticated";
+  const isLoading = status === "loading";
+
+  const handleCreateSubmit = async (data: {
+    name: string;
+    description?: string;
+    is_public: boolean;
+  }) => {
+    if (!session?.accessToken) {
+      throw new Error("You must be signed in to create a project");
+    }
+
+    setIsSubmitting(true);
+    try {
+      const project = await projectApi.create(data as ProjectCreate, session.accessToken);
+      router.push(`/projects/${project.id}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleImportSubmit = async (data: {
+    name: string;
+    description?: string;
+    is_public: boolean;
+  }) => {
+    if (!session?.accessToken) {
+      throw new Error("You must be signed in to import a project");
+    }
+
+    if (!selectedFile) {
+      throw new Error("Please select a file to import");
+    }
+
+    setIsSubmitting(true);
+    setImportError(null);
+    try {
+      const importData: ProjectImportData = {
+        file: selectedFile,
+        is_public: data.is_public,
+        name: data.name || undefined,
+        description: data.description || undefined,
+      };
+      const project = await projectApi.import(importData, session.accessToken);
+      router.push(`/projects/${project.id}`);
+    } catch (err) {
+      if (err instanceof Error) {
+        // Try to parse the error message as JSON (API error format)
+        try {
+          const errorData = JSON.parse(err.message);
+          setImportError(errorData.detail || err.message);
+        } catch {
+          setImportError(err.message);
+        }
+      } else {
+        setImportError("An error occurred while importing the file");
+      }
+      throw err;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancel = () => {
+    router.push("/projects");
+  };
+
+  // Show loading state while checking auth
+  if (isLoading) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+          <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="flex h-64 items-center justify-center">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // Redirect to sign in if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <>
+        <Header />
+        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+          <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="rounded-lg border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                Sign in required
+              </h2>
+              <p className="mt-2 text-slate-600 dark:text-slate-400">
+                You need to be signed in to create a project.
+              </p>
+              <Link href="/auth/signin" className="mt-4 inline-block">
+                <Button>Sign In</Button>
+              </Link>
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <Header />
+      <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
+          {/* Back link */}
+          <Link
+            href="/projects"
+            className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to projects
+          </Link>
+
+          {/* Page Header */}
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+              Create a new project
+            </h1>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              Projects help you organize ontologies and collaborate with others.
+            </p>
+          </div>
+
+          {/* Tabs */}
+          <div className="mb-6 flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+            <button
+              type="button"
+              onClick={() => setActiveTab("create")}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
+                activeTab === "create"
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              )}
+            >
+              <Plus className="h-4 w-4" />
+              Create Empty
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("import")}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
+                activeTab === "import"
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              )}
+            >
+              <Upload className="h-4 w-4" />
+              Import from File
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+            {activeTab === "create" ? (
+              <ProjectForm
+                onSubmit={handleCreateSubmit}
+                onCancel={handleCancel}
+                submitLabel="Create Project"
+                isLoading={isSubmitting}
+              />
+            ) : (
+              <div className="space-y-6">
+                {/* File Upload */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Ontology File <span className="text-red-500">*</span>
+                  </label>
+                  <FileUpload
+                    onFileSelect={setSelectedFile}
+                    selectedFile={selectedFile}
+                    disabled={isSubmitting}
+                    error={importError}
+                  />
+                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                    The project name and description will be extracted from the ontology metadata.
+                    You can override them below.
+                  </p>
+                </div>
+
+                {/* Project Form (for overrides and visibility) */}
+                <ProjectForm
+                  onSubmit={handleImportSubmit}
+                  onCancel={handleCancel}
+                  submitLabel="Import Project"
+                  isLoading={isSubmitting}
+                  nameRequired={false}
+                  namePlaceholder="Leave empty to use name from ontology"
+                  descriptionPlaceholder="Leave empty to use description from ontology"
+                />
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+    </>
+  );
+}
