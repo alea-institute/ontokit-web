@@ -4,16 +4,18 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, Search, FileCode, GitPullRequest } from "lucide-react";
+import { ArrowLeft, Settings, Search, FileCode, GitPullRequest, Activity } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel } from "@/components/editor/ClassDetailPanel";
+import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
 import { BranchProvider } from "@/lib/context/BranchContext";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 import { projectApi, type Project } from "@/lib/api/projects";
 import { pullRequestsApi } from "@/lib/api/pullRequests";
+import { lintApi, type LintSummary } from "@/lib/api/lint";
 
 export default function EditorPage() {
   const { data: session, status } = useSession();
@@ -24,7 +26,9 @@ export default function EditorPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showHealthCheck, setShowHealthCheck] = useState(false);
   const [openPRCount, setOpenPRCount] = useState(0);
+  const [lintSummary, setLintSummary] = useState<LintSummary | null>(null);
 
   // Ontology tree state
   const {
@@ -63,6 +67,14 @@ export default function EditorPage() {
           setOpenPRCount(prResponse.total);
         } catch {
           // Ignore PR count errors
+        }
+
+        // Fetch lint summary
+        try {
+          const summary = await lintApi.getStatus(projectId, session?.accessToken);
+          setLintSummary(summary);
+        } catch {
+          // Ignore lint errors
         }
       } catch (err) {
         if (err instanceof Error && err.message.includes("403")) {
@@ -215,6 +227,28 @@ export default function EditorPage() {
                 isOpen={showHistory}
               />
 
+              {/* Health Check Button */}
+              <Button
+                variant={showHealthCheck ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setShowHealthCheck(!showHealthCheck)}
+                className="gap-2"
+              >
+                <Activity className="h-4 w-4" />
+                <span className="hidden sm:inline">Health</span>
+                {lintSummary && lintSummary.total_issues > 0 && (
+                  <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${
+                    lintSummary.error_count > 0
+                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                      : lintSummary.warning_count > 0
+                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                  }`}>
+                    {lintSummary.total_issues}
+                  </span>
+                )}
+              </Button>
+
               {/* PR Link */}
               <Link href={`/projects/${projectId}/pull-requests`}>
                 <Button variant="ghost" size="sm" className="gap-2">
@@ -302,6 +336,19 @@ export default function EditorPage() {
             isOpen={showHistory}
             onClose={() => setShowHistory(false)}
           />
+
+          {/* Right Panel - Health Check (slide-out) */}
+          {showHealthCheck && (
+            <div className="w-96 flex-shrink-0">
+              <HealthCheckPanel
+                projectId={projectId}
+                accessToken={session?.accessToken}
+                isOpen={showHealthCheck}
+                onClose={() => setShowHealthCheck(false)}
+                onNavigateToClass={selectNode}
+              />
+            </div>
+          )}
         </div>
       </main>
     </BranchProvider>
