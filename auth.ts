@@ -34,7 +34,7 @@ export const authConfig: NextAuthConfig = {
     },
   },
   callbacks: {
-    async jwt({ token, account, user }: { token: JWT; account?: Record<string, unknown> | null; user?: User }) {
+    async jwt({ token, account, user }) {
       // Initial sign in
       if (account && user) {
         return {
@@ -86,11 +86,12 @@ export const authConfig: NextAuthConfig = {
 
       return token;
     },
-    async session({ session, token }: { session: Session; token: JWT }) {
+    async session({ session, token }) {
       session.accessToken = token.accessToken as string;
       session.error = token.error as string | undefined;
       if (token.user) {
-        session.user = token.user as Session["user"];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        session.user = token.user as any;
       }
       return session;
     },

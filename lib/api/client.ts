@@ -310,6 +310,17 @@ export const projectOntologyApi = {
     ),
 
   /**
+   * Get ancestor path from root to a specific class
+   */
+  getClassAncestors: (projectId: string, classIri: string, token?: string) =>
+    api.get<OWLClassTreeResponse>(
+      `/api/v1/projects/${projectId}/ontology/tree/${encodeURIComponent(classIri)}/ancestors`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      }
+    ),
+
+  /**
    * Get details of a specific class
    */
   getClassDetail: (projectId: string, classIri: string, token?: string) =>

@@ -17,6 +17,7 @@ import {
   lintApi,
   createLintWebSocket,
   type LintIssue,
+  type LintIssueType,
   type LintSummary,
   type LintWebSocketMessage,
 } from "@/lib/api/lint";
@@ -67,10 +68,10 @@ export function HealthCheckPanel({
 
     try {
       // Build issue fetch options based on filter
-      const issueOptions: { issue_type?: string; limit: number } = { limit: 500 };
+      const issueOptions: { issue_type?: LintIssueType; limit: number } = { limit: 500 };
       const activeFilter = issueFilter ?? filter;
       if (activeFilter !== "all") {
-        issueOptions.issue_type = activeFilter;
+        issueOptions.issue_type = activeFilter as LintIssueType;
       }
 
       const [summaryData, issuesData] = await Promise.all([

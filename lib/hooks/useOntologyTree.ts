@@ -19,6 +19,7 @@ interface UseOntologyTreeReturn {
   expandNode: (iri: string) => Promise<void>;
   collapseNode: (iri: string) => void;
   selectNode: (iri: string) => void;
+  navigateToNode: (iri: string) => Promise<void>;
 }
 
 /**
@@ -150,6 +151,33 @@ export function useOntologyTree({
     setSelectedIri(iri);
   }, []);
 
+  /**
+   * Navigate to a node by expanding its ancestors and selecting it
+   */
+  const navigateToNode = useCallback(
+    async (iri: string) => {
+      try {
+        // Fetch the ancestor path
+        const response = await projectOntologyApi.getClassAncestors(projectId, iri, accessToken);
+        const ancestorNodes = response.nodes;
+
+        // Expand each ancestor in sequence
+        // We always expand to ensure children are loaded, even if already expanded
+        for (const ancestor of ancestorNodes) {
+          await expandNode(ancestor.iri);
+        }
+
+        // Select the target node
+        setSelectedIri(iri);
+      } catch (err) {
+        console.error("Failed to navigate to node:", err);
+        // Still try to select the node even if navigation failed
+        setSelectedIri(iri);
+      }
+    },
+    [projectId, accessToken, expandNode]
+  );
+
   // Load root classes on mount
   useEffect(() => {
     loadRootClasses();
@@ -165,5 +193,6 @@ export function useOntologyTree({
     expandNode,
     collapseNode,
     selectNode,
+    navigateToNode,
   };
 }

@@ -40,6 +40,7 @@ export default function EditorPage() {
     expandNode,
     collapseNode,
     selectNode,
+    navigateToNode,
   } = useOntologyTree({
     projectId,
     accessToken: session?.accessToken,
@@ -325,7 +326,7 @@ export default function EditorPage() {
               projectId={projectId}
               classIri={selectedIri}
               accessToken={session?.accessToken}
-              onNavigateToClass={selectNode}
+              onNavigateToClass={navigateToNode}
             />
           </div>
 
@@ -345,7 +346,7 @@ export default function EditorPage() {
                 accessToken={session?.accessToken}
                 isOpen={showHealthCheck}
                 onClose={() => setShowHealthCheck(false)}
-                onNavigateToClass={selectNode}
+                onNavigateToClass={navigateToNode}
               />
             </div>
           )}
