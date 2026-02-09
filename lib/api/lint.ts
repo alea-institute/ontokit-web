@@ -139,6 +139,7 @@ export const lintApi = {
     options?: {
       issue_type?: LintIssueType;
       rule_id?: string;
+      subject_iri?: string;
       include_resolved?: boolean;
       skip?: number;
       limit?: number;

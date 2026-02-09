@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp, FileText } from "lucide-react";
+import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp, FileText, XCircle } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
+import { lintApi, type LintIssue } from "@/lib/api/lint";
 import { cn, getLocalName, getPreferredLabel } from "@/lib/utils";
 
 interface ClassDetailPanelProps {
@@ -19,32 +20,40 @@ export function ClassDetailPanel({
   onNavigateToClass,
 }: ClassDetailPanelProps) {
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
+  const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!classIri) {
       setClassDetail(null);
+      setClassIssues([]);
       return;
     }
 
-    const fetchClassDetail = async () => {
+    const fetchClassData = async () => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const detail = await projectOntologyApi.getClassDetail(projectId, classIri, accessToken);
+        // Fetch class details and issues in parallel
+        const [detail, issuesResponse] = await Promise.all([
+          projectOntologyApi.getClassDetail(projectId, classIri, accessToken),
+          lintApi.getIssues(projectId, accessToken, { subject_iri: classIri, limit: 50 }).catch(() => ({ items: [] })),
+        ]);
         setClassDetail(detail);
+        setClassIssues(issuesResponse.items);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Failed to load class details";
         setError(message);
         setClassDetail(null);
+        setClassIssues([]);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchClassDetail();
+    fetchClassData();
   }, [projectId, classIri, accessToken]);
 
   if (!classIri) {
@@ -112,6 +121,21 @@ export function ClassDetailPanel({
 
       {/* Content */}
       <div className="p-4 space-y-6">
+        {/* Lint Issues */}
+        {classIssues.length > 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/10">
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-amber-800 dark:text-amber-300">
+              <AlertTriangle className="h-4 w-4" />
+              Health Issues ({classIssues.length})
+            </h3>
+            <div className="space-y-2">
+              {classIssues.map((issue) => (
+                <IssueItem key={issue.id} issue={issue} />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Labels */}
         {classDetail.labels.length > 0 && (
           <Section title="Labels" icon={<Tag className="h-4 w-4" />}>
@@ -278,6 +302,36 @@ function StatItem({ label, value }: StatItemProps) {
     <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
       <p className="text-2xl font-semibold text-slate-900 dark:text-white">{value}</p>
       <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
+    </div>
+  );
+}
+
+interface IssueItemProps {
+  issue: LintIssue;
+}
+
+const issueIcons = {
+  error: <XCircle className="h-3.5 w-3.5 text-red-500" />,
+  warning: <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />,
+  info: <Info className="h-3.5 w-3.5 text-blue-500" />,
+};
+
+const issueColors = {
+  error: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300",
+  warning: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+  info: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+};
+
+function IssueItem({ issue }: IssueItemProps) {
+  return (
+    <div className={cn("rounded-md px-2.5 py-1.5 text-xs", issueColors[issue.issue_type])}>
+      <div className="flex items-start gap-1.5">
+        <span className="mt-0.5 shrink-0">{issueIcons[issue.issue_type]}</span>
+        <div>
+          <span className="font-medium">{issue.rule_id}:</span>{" "}
+          <span>{issue.message}</span>
+        </div>
+      </div>
     </div>
   );
 }
