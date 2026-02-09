@@ -1,9 +1,12 @@
 import Link from "next/link";
+import { Header } from "@/components/layout/header";
 
 export default function HomePage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="text-center">
+    <>
+      <Header />
+      <main className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center p-24">
+        <div className="text-center">
         <h1 className="text-5xl font-bold tracking-tight text-slate-900 dark:text-white">
           Axigraph
         </h1>
@@ -58,5 +61,6 @@ export default function HomePage() {
         </div>
       </div>
     </main>
+    </>
   );
 }
