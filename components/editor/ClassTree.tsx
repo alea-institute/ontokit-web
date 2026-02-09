@@ -7,9 +7,10 @@ import type { ClassTreeNode } from "@/lib/ontology/types";
 
 interface ClassTreeProps {
   nodes: ClassTreeNode[];
-  selectedIri?: string;
+  selectedIri?: string | null;
   onSelect: (iri: string) => void;
   onExpand: (iri: string) => void;
+  onCollapse: (iri: string) => void;
   onAddChild?: (parentIri: string) => void;
 }
 
@@ -18,6 +19,7 @@ export function ClassTree({
   selectedIri,
   onSelect,
   onExpand,
+  onCollapse,
   onAddChild,
 }: ClassTreeProps) {
   return (
@@ -30,6 +32,7 @@ export function ClassTree({
           selectedIri={selectedIri}
           onSelect={onSelect}
           onExpand={onExpand}
+          onCollapse={onCollapse}
           onAddChild={onAddChild}
         />
       ))}
@@ -40,9 +43,10 @@ export function ClassTree({
 interface ClassTreeItemProps {
   node: ClassTreeNode;
   depth: number;
-  selectedIri?: string;
+  selectedIri?: string | null;
   onSelect: (iri: string) => void;
   onExpand: (iri: string) => void;
+  onCollapse: (iri: string) => void;
   onAddChild?: (parentIri: string) => void;
 }
 
@@ -52,6 +56,7 @@ function ClassTreeItem({
   selectedIri,
   onSelect,
   onExpand,
+  onCollapse,
   onAddChild,
 }: ClassTreeItemProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -60,7 +65,11 @@ function ClassTreeItem({
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onExpand(node.iri);
+    if (node.isExpanded) {
+      onCollapse(node.iri);
+    } else {
+      onExpand(node.iri);
+    }
   };
 
   const handleAddChild = (e: React.MouseEvent) => {
@@ -130,6 +139,7 @@ function ClassTreeItem({
               selectedIri={selectedIri}
               onSelect={onSelect}
               onExpand={onExpand}
+              onCollapse={onCollapse}
               onAddChild={onAddChild}
             />
           ))}

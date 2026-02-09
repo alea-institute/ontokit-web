@@ -252,3 +252,64 @@ export interface CommitHistory {
   author: string;
   timestamp: string;
 }
+
+// Project ontology tree types
+export interface OWLClassTreeNode {
+  iri: string;
+  label: string;
+  child_count: number;
+  deprecated: boolean;
+}
+
+export interface OWLClassTreeResponse {
+  nodes: OWLClassTreeNode[];
+  total_classes: number;
+}
+
+export interface OWLClassDetail {
+  iri: string;
+  labels: LocalizedString[];
+  comments: LocalizedString[];
+  deprecated: boolean;
+  parent_iris: string[];
+  parent_labels: Record<string, string>;  // Map of IRI to resolved label
+  equivalent_iris: string[];
+  disjoint_iris: string[];
+  child_count: number;
+  instance_count: number;
+  is_defined: boolean;
+  source_ontology?: string;
+}
+
+// Project ontology tree API
+export const projectOntologyApi = {
+  /**
+   * Get the root classes of the ontology tree
+   */
+  getRootClasses: (projectId: string, token?: string) =>
+    api.get<OWLClassTreeResponse>(`/api/v1/projects/${projectId}/ontology/tree`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }),
+
+  /**
+   * Get children of a specific class
+   */
+  getClassChildren: (projectId: string, classIri: string, token?: string) =>
+    api.get<OWLClassTreeResponse>(
+      `/api/v1/projects/${projectId}/ontology/tree/${encodeURIComponent(classIri)}/children`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      }
+    ),
+
+  /**
+   * Get details of a specific class
+   */
+  getClassDetail: (projectId: string, classIri: string, token?: string) =>
+    api.get<OWLClassDetail>(
+      `/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      }
+    ),
+};

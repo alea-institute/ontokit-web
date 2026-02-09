@@ -24,6 +24,11 @@ export interface Project {
   updated_at?: string;
   member_count: number;
   user_role?: ProjectRole;
+  // Import-related fields (optional, only set when project was created via import)
+  source_file_path?: string;
+  ontology_iri?: string;
+  // Label preferences for ontology display
+  label_preferences?: string[];
 }
 
 export interface ProjectListResponse {
@@ -43,6 +48,7 @@ export interface ProjectUpdate {
   name?: string;
   description?: string;
   is_public?: boolean;
+  label_preferences?: string[];
 }
 
 export interface MemberUser {
