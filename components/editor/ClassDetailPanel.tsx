@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp } from "lucide-react";
+import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp, FileText } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
 import { cn, getLocalName, getPreferredLabel } from "@/lib/utils";
 
@@ -136,6 +136,35 @@ export function ClassDetailPanel({
                 <div key={index}>
                   <p className="text-sm text-slate-600 dark:text-slate-400">{comment.value}</p>
                   <span className="text-xs text-slate-400 dark:text-slate-500">({comment.lang})</span>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Annotations (DC, SKOS, etc.) */}
+        {classDetail.annotations && classDetail.annotations.length > 0 && (
+          <Section title="Annotations" icon={<FileText className="h-4 w-4" />}>
+            <div className="space-y-4">
+              {classDetail.annotations.map((annotation, index) => (
+                <div key={index}>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    {annotation.property_label}
+                  </p>
+                  <div className="mt-1 space-y-1">
+                    {annotation.values.map((val, vIndex) => (
+                      <div key={vIndex} className="flex items-center gap-2">
+                        <span className="text-sm text-slate-700 dark:text-slate-300">
+                          {val.value}
+                        </span>
+                        {val.lang && (
+                          <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                            {val.lang}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>

@@ -266,6 +266,12 @@ export interface OWLClassTreeResponse {
   total_classes: number;
 }
 
+export interface AnnotationProperty {
+  property_iri: string;
+  property_label: string;
+  values: LocalizedString[];
+}
+
 export interface OWLClassDetail {
   iri: string;
   labels: LocalizedString[];
@@ -279,6 +285,7 @@ export interface OWLClassDetail {
   instance_count: number;
   is_defined: boolean;
   source_ontology?: string;
+  annotations: AnnotationProperty[];  // DC, SKOS, and other annotation properties
 }
 
 // Project ontology tree API
