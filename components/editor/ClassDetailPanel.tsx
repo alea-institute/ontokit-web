@@ -44,7 +44,18 @@ export function ClassDetailPanel({
         setClassDetail(detail);
         setClassIssues(issuesResponse.items);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to load class details";
+        let message = "Failed to load class details";
+        if (err instanceof Error) {
+          // Check for "Class not found" error and provide friendlier message
+          if (err.message.includes("Class not found") || err.message.includes("404")) {
+            const localName = classIri.includes('#')
+              ? classIri.split('#').pop()
+              : classIri.split('/').pop();
+            message = `"${localName}" is not an OWL Class. It may be an individual, property, or other entity type.`;
+          } else {
+            message = err.message;
+          }
+        }
         setError(message);
         setClassDetail(null);
         setClassIssues([]);
