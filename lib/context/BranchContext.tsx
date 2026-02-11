@@ -37,12 +37,14 @@ const BranchContext = createContext<BranchContextValue | null>(null);
 interface BranchProviderProps {
   projectId: string;
   accessToken?: string;
+  initialBranch?: string;
   children: ReactNode;
 }
 
 export function BranchProvider({
   projectId,
   accessToken,
+  initialBranch,
   children,
 }: BranchProviderProps) {
   const [branches, setBranches] = useState<BranchInfo[]>([]);
@@ -141,6 +143,34 @@ export function BranchProvider({
   useEffect(() => {
     loadBranches();
   }, [loadBranches]);
+
+  // Switch to initial branch if specified and different from current
+  const [initialBranchHandled, setInitialBranchHandled] = useState(false);
+  useEffect(() => {
+    if (
+      initialBranch &&
+      !initialBranchHandled &&
+      !isLoading &&
+      branches.length > 0 &&
+      accessToken
+    ) {
+      // Check if the initial branch exists and is different from current
+      const branchExists = branches.some((b) => b.name === initialBranch);
+      if (branchExists && initialBranch !== currentBranch) {
+        branchesApi.switch(projectId, initialBranch, accessToken)
+          .then(() => {
+            setCurrentBranch(initialBranch);
+            setInitialBranchHandled(true);
+          })
+          .catch((err) => {
+            console.error("Failed to switch to initial branch:", err);
+            setInitialBranchHandled(true);
+          });
+      } else {
+        setInitialBranchHandled(true);
+      }
+    }
+  }, [initialBranch, initialBranchHandled, isLoading, branches, currentBranch, projectId, accessToken]);
 
   const value: BranchContextValue = {
     branches,

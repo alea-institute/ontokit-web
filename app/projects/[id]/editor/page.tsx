@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Settings, Search, FileCode, GitPullRequest, Activity, TreePine, Code } from "lucide-react";
@@ -45,7 +45,9 @@ type EditorView = "tree" | "source";
 export default function EditorPage() {
   const { data: session, status } = useSession();
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params.id as string;
+  const initialBranch = searchParams.get("branch") || undefined;
 
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -528,7 +530,7 @@ export default function EditorPage() {
   }
 
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch}>
       <Header />
       <main className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {/* Editor Header */}
