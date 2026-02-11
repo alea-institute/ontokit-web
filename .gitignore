@@ -45,3 +45,6 @@ next-env.d.ts
 # PWA
 public/sw.js
 public/workbox-*.js
+
+.axigraph-web.log
+.axigraph-web.pid
