@@ -13,6 +13,8 @@ export interface RevisionCommit {
   author_name: string;
   author_email: string;
   timestamp: string;
+  is_merge?: boolean;
+  merged_branch?: string;
 }
 
 export interface RevisionHistoryResponse {

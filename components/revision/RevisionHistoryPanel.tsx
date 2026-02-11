@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronRight,
   GitCommit,
+  GitMerge,
   User,
   Calendar,
   X,
@@ -145,12 +146,18 @@ export function RevisionHistoryPanel({
                     <div
                       className={cn(
                         "flex h-6 w-6 items-center justify-center rounded-full",
-                        index === 0
-                          ? "bg-primary-100 text-primary-600 dark:bg-primary-900/30"
-                          : "bg-slate-100 text-slate-500 dark:bg-slate-700"
+                        commit.is_merge
+                          ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30"
+                          : index === 0
+                            ? "bg-primary-100 text-primary-600 dark:bg-primary-900/30"
+                            : "bg-slate-100 text-slate-500 dark:bg-slate-700"
                       )}
                     >
-                      <GitCommit className="h-3.5 w-3.5" />
+                      {commit.is_merge ? (
+                        <GitMerge className="h-3.5 w-3.5" />
+                      ) : (
+                        <GitCommit className="h-3.5 w-3.5" />
+                      )}
                     </div>
                     {index < commits.length - 1 && (
                       <div className="mt-1 h-full w-px bg-slate-200 dark:bg-slate-600" />
@@ -162,6 +169,14 @@ export function RevisionHistoryPanel({
                     <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                       {commit.message}
                     </p>
+                    {commit.is_merge && commit.merged_branch && (
+                      <div className="mt-1">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                          <GitMerge className="h-3 w-3" />
+                          {commit.merged_branch}
+                        </span>
+                      </div>
+                    )}
                     <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
                       <span
                         className="font-mono"
