@@ -4,7 +4,7 @@ import { Loader2 } from "lucide-react";
 import { WebSocketIcon } from "@/components/ui/icons/WebSocketIcon";
 import { cn } from "@/lib/utils";
 
-export type ConnectionState = "connecting" | "connected" | "disconnected";
+export type ConnectionState = "connecting" | "connected" | "disconnected" | "disabled";
 
 interface ConnectionStatusProps {
   state: ConnectionState;
@@ -36,6 +36,13 @@ const stateConfig = {
     color: "text-red-500",
     bgColor: "bg-red-100 dark:bg-red-900/30",
     label: "Disconnected",
+    animate: false,
+  },
+  disabled: {
+    icon: WebSocketIcon,
+    color: "text-slate-400 dark:text-slate-500",
+    bgColor: "bg-slate-100 dark:bg-slate-800",
+    label: "Not Available",
     animate: false,
   },
 };

@@ -515,12 +515,21 @@ export default function EditorPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* Connection Status */}
-              <ConnectionStatus
-                state={connectionStatus}
-                purpose={wsPurpose}
-                endpoint={wsEndpoint}
-              />
+              {/* WebSocket Connection Status Indicators */}
+              <div className="flex items-center gap-1">
+                {/* Collaboration WebSocket (not yet implemented) */}
+                <ConnectionStatus
+                  state="disabled"
+                  purpose="Real-time collaboration (coming soon)"
+                  endpoint="/api/v1/collab/ws"
+                />
+                {/* Lint WebSocket */}
+                <ConnectionStatus
+                  state={connectionStatus}
+                  purpose={wsPurpose}
+                  endpoint={wsEndpoint}
+                />
+              </div>
 
               {/* Branch Selector */}
               <BranchSelector />
