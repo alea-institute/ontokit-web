@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel } from "@/components/editor/ClassDetailPanel";
 import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
+import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
 import { BranchProvider } from "@/lib/context/BranchContext";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
@@ -20,6 +21,7 @@ import { projectApi, type Project } from "@/lib/api/projects";
 import { pullRequestsApi } from "@/lib/api/pullRequests";
 import { lintApi, type LintSummary } from "@/lib/api/lint";
 import { revisionsApi } from "@/lib/api/revisions";
+import { projectOntologyApi } from "@/lib/api/client";
 
 // Import the ref type and IRI position type
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
@@ -65,6 +67,10 @@ export default function EditorPage() {
   // Background IRI indexing for "View in Source" feature
   const [sourceIriIndex, setSourceIriIndex] = useState<Map<string, IriPosition>>(new Map());
   const [isIndexing, setIsIndexing] = useState(false);
+
+  // Commit dialog state
+  const [commitDialogOpen, setCommitDialogOpen] = useState(false);
+  const [pendingSaveContent, setPendingSaveContent] = useState<string | null>(null);
 
   // Ontology tree state
   const {
@@ -179,6 +185,67 @@ export default function EditorPage() {
       }
     }
   }, [projectId, session?.accessToken, sourceContent]);
+
+  // Refs to handle the save promise
+  const pendingSaveResolveRef = useRef<(() => void) | null>(null);
+  const pendingSaveRejectRef = useRef<((error: Error) => void) | null>(null);
+
+  // Handle saving source content - opens the commit dialog
+  const handleSaveSource = useCallback(async (newContent: string) => {
+    if (!projectId || !session?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    // Store the content and open the dialog
+    setPendingSaveContent(newContent);
+    setCommitDialogOpen(true);
+
+    // Return a promise that will be resolved/rejected when dialog closes
+    // The actual save happens in handleCommitConfirm
+    return new Promise<void>((resolve, reject) => {
+      // Store resolve/reject in refs so the dialog can use them
+      pendingSaveResolveRef.current = resolve;
+      pendingSaveRejectRef.current = reject;
+    });
+  }, [projectId, session?.accessToken]);
+
+  // Handle commit dialog confirmation
+  const handleCommitConfirm = useCallback(async (commitMessage: string) => {
+    if (!projectId || !session?.accessToken || !pendingSaveContent) {
+      throw new Error("Not authenticated or no content to save");
+    }
+
+    await projectOntologyApi.saveSource(
+      projectId,
+      pendingSaveContent,
+      commitMessage,
+      session.accessToken
+    );
+
+    // Update the local source content
+    setSourceContent(pendingSaveContent);
+
+    // Reset the IRI index so it gets rebuilt
+    setSourceIriIndex(new Map());
+
+    // Resolve the pending save promise
+    pendingSaveResolveRef.current?.();
+    pendingSaveResolveRef.current = null;
+    pendingSaveRejectRef.current = null;
+    setPendingSaveContent(null);
+  }, [projectId, session?.accessToken, pendingSaveContent]);
+
+  // Handle commit dialog cancel
+  const handleCommitDialogClose = useCallback((open: boolean) => {
+    setCommitDialogOpen(open);
+    if (!open && pendingSaveContent) {
+      // Dialog was closed without saving - reject the promise
+      pendingSaveRejectRef.current?.(new Error("Save cancelled"));
+      pendingSaveResolveRef.current = null;
+      pendingSaveRejectRef.current = null;
+      setPendingSaveContent(null);
+    }
+  }, [pendingSaveContent]);
 
   // Preload source content when hovering over Source tab
   const handleSourceTabHover = useCallback(() => {
@@ -705,6 +772,7 @@ export default function EditorPage() {
                   initialValue={sourceContent}
                   accessToken={session?.accessToken}
                   readOnly={!canEdit}
+                  onSave={handleSaveSource}
                   onNavigateToClass={async (iri) => {
                     // Switch to tree view and try to navigate to class
                     setViewMode("tree");
@@ -726,6 +794,14 @@ export default function EditorPage() {
           )}
         </div>
       </main>
+
+      {/* Commit Message Dialog */}
+      <CommitMessageDialog
+        open={commitDialogOpen}
+        onOpenChange={handleCommitDialogClose}
+        onConfirm={handleCommitConfirm}
+        defaultMessage="Update ontology"
+      />
     </BranchProvider>
   );
 }

@@ -330,4 +330,29 @@ export const projectOntologyApi = {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       }
     ),
+
+  /**
+   * Save ontology source content
+   */
+  saveSource: (
+    projectId: string,
+    content: string,
+    commitMessage: string,
+    token: string
+  ) =>
+    api.put<SourceContentSaveResponse>(
+      `/api/v1/projects/${projectId}/source`,
+      { content, commit_message: commitMessage },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    ),
 };
+
+// Source content types
+export interface SourceContentSaveResponse {
+  success: boolean;
+  commit_hash: string;
+  commit_message: string;
+  branch: string;
+}
