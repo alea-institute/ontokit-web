@@ -6,6 +6,8 @@ import {
   type Comment,
   type PullRequest,
   type Review,
+  type PRCommit,
+  type PRFileChange,
 } from "@/lib/api/pullRequests";
 import { PRActions } from "./PRActions";
 import { PRCommentThread } from "./PRCommentThread";
@@ -25,6 +27,8 @@ import {
   FileCode,
   GitCommit,
   ExternalLink,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 type TabType = "conversation" | "commits" | "files";
@@ -49,11 +53,17 @@ export function PRDetail({
   const [pr, setPR] = useState<PullRequest | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [comments, setComments] = useState<Comment[]>([]);
+  const [commits, setCommits] = useState<PRCommit[]>([]);
+  const [fileChanges, setFileChanges] = useState<PRFileChange[]>([]);
+  const [diffStats, setDiffStats] = useState<{ additions: number; deletions: number; filesChanged: number } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("conversation");
   const [newComment, setNewComment] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isLoadingCommits, setIsLoadingCommits] = useState(false);
+  const [isLoadingDiff, setIsLoadingDiff] = useState(false);
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
   const loadPR = useCallback(async () => {
     if (!projectId || !prNumber) return;
@@ -84,6 +94,50 @@ export function PRDetail({
   useEffect(() => {
     loadPR();
   }, [loadPR]);
+
+  // Load commits when switching to commits tab
+  const loadCommits = useCallback(async () => {
+    if (!projectId || !prNumber || commits.length > 0) return;
+
+    setIsLoadingCommits(true);
+    try {
+      const commitsData = await pullRequestsApi.getCommits(projectId, prNumber, accessToken);
+      setCommits(commitsData.items);
+    } catch (err) {
+      console.error("Failed to load commits:", err);
+    } finally {
+      setIsLoadingCommits(false);
+    }
+  }, [projectId, prNumber, accessToken, commits.length]);
+
+  // Load diff when switching to files tab
+  const loadDiff = useCallback(async () => {
+    if (!projectId || !prNumber || fileChanges.length > 0) return;
+
+    setIsLoadingDiff(true);
+    try {
+      const diffData = await pullRequestsApi.getDiff(projectId, prNumber, accessToken);
+      setFileChanges(diffData.files);
+      setDiffStats({
+        additions: diffData.total_additions,
+        deletions: diffData.total_deletions,
+        filesChanged: diffData.files_changed,
+      });
+    } catch (err) {
+      console.error("Failed to load diff:", err);
+    } finally {
+      setIsLoadingDiff(false);
+    }
+  }, [projectId, prNumber, accessToken, fileChanges.length]);
+
+  // Load data when tab changes
+  useEffect(() => {
+    if (activeTab === "commits") {
+      loadCommits();
+    } else if (activeTab === "files") {
+      loadDiff();
+    }
+  }, [activeTab, loadCommits, loadDiff]);
 
   const handleAddComment = async () => {
     if (!newComment.trim() || !accessToken) return;
@@ -410,14 +464,189 @@ export function PRDetail({
         )}
 
         {activeTab === "commits" && (
-          <div className="text-center text-sm text-slate-500 py-8">
-            Commits view coming soon
+          <div className="space-y-3">
+            {isLoadingCommits ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+              </div>
+            ) : commits.length === 0 ? (
+              <div className="text-center text-sm text-slate-500 py-8">
+                No commits found
+              </div>
+            ) : (
+              commits.map((commit) => (
+                <div
+                  key={commit.hash}
+                  className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-700">
+                    <GitCommit className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-slate-900 dark:text-slate-100">
+                      {commit.message.split("\n")[0]}
+                    </p>
+                    <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <User className="h-3 w-3" />
+                        {commit.author_name}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {formatDate(commit.timestamp)}
+                      </span>
+                      <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-700">
+                        {commit.short_hash}
+                      </code>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         )}
 
         {activeTab === "files" && (
-          <div className="text-center text-sm text-slate-500 py-8">
-            Files changed view coming soon
+          <div className="space-y-4">
+            {isLoadingDiff ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+              </div>
+            ) : fileChanges.length === 0 ? (
+              <div className="text-center text-sm text-slate-500 py-8">
+                No file changes found
+              </div>
+            ) : (
+              <>
+                {/* Stats summary */}
+                {diffStats && (
+                  <div className="flex items-center gap-4 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-sm dark:border-slate-700 dark:bg-slate-800">
+                    <span className="text-slate-600 dark:text-slate-400">
+                      {diffStats.filesChanged} file{diffStats.filesChanged !== 1 ? "s" : ""} changed
+                    </span>
+                    <span className="text-green-600 dark:text-green-400">
+                      +{diffStats.additions}
+                    </span>
+                    <span className="text-red-600 dark:text-red-400">
+                      -{diffStats.deletions}
+                    </span>
+                  </div>
+                )}
+
+                {/* File list */}
+                <div className="space-y-2">
+                  {fileChanges.map((file) => {
+                    const isExpanded = expandedFiles.has(file.path);
+                    const toggleExpanded = () => {
+                      setExpandedFiles((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(file.path)) {
+                          next.delete(file.path);
+                        } else {
+                          next.add(file.path);
+                        }
+                        return next;
+                      });
+                    };
+
+                    return (
+                      <div
+                        key={file.path}
+                        className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 overflow-hidden"
+                      >
+                        {/* File header */}
+                        <button
+                          onClick={toggleExpanded}
+                          className="flex w-full items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {file.patch ? (
+                              isExpanded ? (
+                                <ChevronDown className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                              )
+                            ) : (
+                              <div className="h-4 w-4 flex-shrink-0" />
+                            )}
+                            <FileCode className={cn(
+                              "h-4 w-4 flex-shrink-0",
+                              file.change_type === "added" && "text-green-600",
+                              file.change_type === "deleted" && "text-red-600",
+                              file.change_type === "modified" && "text-amber-600",
+                              file.change_type === "renamed" && "text-blue-600"
+                            )} />
+                            <div className="min-w-0 text-left">
+                              <span className="font-mono text-sm truncate block">
+                                {file.path}
+                              </span>
+                              {file.change_type === "renamed" && file.old_path && (
+                                <span className="text-xs text-slate-500">
+                                  renamed from {file.old_path}
+                                </span>
+                              )}
+                            </div>
+                            <span className={cn(
+                              "flex-shrink-0 rounded px-1.5 py-0.5 text-xs font-medium",
+                              file.change_type === "added" && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+                              file.change_type === "deleted" && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+                              file.change_type === "modified" && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+                              file.change_type === "renamed" && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                            )}>
+                              {file.change_type}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm">
+                            {file.additions > 0 && (
+                              <span className="text-green-600 dark:text-green-400">
+                                +{file.additions}
+                              </span>
+                            )}
+                            {file.deletions > 0 && (
+                              <span className="text-red-600 dark:text-red-400">
+                                -{file.deletions}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+
+                        {/* Diff content */}
+                        {isExpanded && file.patch && (
+                          <div className="border-t border-slate-200 dark:border-slate-700 overflow-x-auto">
+                            <pre className="text-xs leading-relaxed">
+                              {file.patch.split("\n").map((line, idx) => {
+                                let bgClass = "";
+                                let textClass = "text-slate-700 dark:text-slate-300";
+
+                                if (line.startsWith("+") && !line.startsWith("+++")) {
+                                  bgClass = "bg-green-50 dark:bg-green-900/20";
+                                  textClass = "text-green-800 dark:text-green-300";
+                                } else if (line.startsWith("-") && !line.startsWith("---")) {
+                                  bgClass = "bg-red-50 dark:bg-red-900/20";
+                                  textClass = "text-red-800 dark:text-red-300";
+                                } else if (line.startsWith("@@")) {
+                                  bgClass = "bg-blue-50 dark:bg-blue-900/20";
+                                  textClass = "text-blue-700 dark:text-blue-300";
+                                }
+
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={cn("px-4 py-0.5 font-mono whitespace-pre", bgClass, textClass)}
+                                  >
+                                    {line || " "}
+                                  </div>
+                                );
+                              })}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>

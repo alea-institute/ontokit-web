@@ -139,6 +139,7 @@ export interface PRFileChange {
   old_path?: string;
   additions: number;
   deletions: number;
+  patch?: string;
 }
 
 export interface PRDiffResponse {
