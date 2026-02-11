@@ -14,6 +14,8 @@ import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
 import { BranchProvider } from "@/lib/context/BranchContext";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
+import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
+import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { projectApi, type Project } from "@/lib/api/projects";
 import { pullRequestsApi } from "@/lib/api/pullRequests";
 import { lintApi, type LintSummary } from "@/lib/api/lint";
@@ -78,6 +80,16 @@ export default function EditorPage() {
   } = useOntologyTree({
     projectId,
     accessToken: session?.accessToken,
+  });
+
+  // Track WebSocket connection status (uses lint WebSocket endpoint)
+  const {
+    status: connectionStatus,
+    endpoint: wsEndpoint,
+    purpose: wsPurpose,
+  } = useCollaborationStatus({
+    projectId,
+    enabled: !!projectId && status !== "loading",
   });
 
   useEffect(() => {
@@ -503,6 +515,13 @@ export default function EditorPage() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* Connection Status */}
+              <ConnectionStatus
+                state={connectionStatus}
+                purpose={wsPurpose}
+                endpoint={wsEndpoint}
+              />
+
               {/* Branch Selector */}
               <BranchSelector />
 
