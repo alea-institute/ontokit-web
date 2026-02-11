@@ -102,6 +102,11 @@ export function BranchSelector({
       >
         <GitBranch className="h-4 w-4" />
         <span className="max-w-32 truncate">{currentBranch}</span>
+        {currentBranchInfo?.commit_hash && (
+          <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+            {currentBranchInfo.commit_hash.slice(0, 7)}
+          </code>
+        )}
         {currentBranchInfo && currentBranchInfo.commits_ahead > 0 && (
           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
             +{currentBranchInfo.commits_ahead}
@@ -176,13 +181,22 @@ export function BranchSelector({
             {/* Branch list */}
             <div className="max-h-64 overflow-y-auto py-1">
               {branches.map((branch) => (
-                <button
+                <div
                   key={branch.name}
                   className={cn(
-                    "flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700",
+                    "flex w-full cursor-pointer items-center justify-between px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700",
                     branch.name === currentBranch && "bg-slate-100 dark:bg-slate-700"
                   )}
                   onClick={() => handleSwitchBranch(branch.name)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handleSwitchBranch(branch.name);
+                    }
+                  }}
+                  role="option"
+                  aria-selected={branch.name === currentBranch}
+                  tabIndex={0}
                 >
                   <div className="flex items-center gap-2">
                     {branch.name === currentBranch ? (
@@ -199,6 +213,11 @@ export function BranchSelector({
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {branch.commit_hash && (
+                      <code className="font-mono text-xs text-slate-400 dark:text-slate-500">
+                        {branch.commit_hash.slice(0, 7)}
+                      </code>
+                    )}
                     {branch.commits_ahead > 0 && (
                       <span className="text-xs text-slate-500">
                         +{branch.commits_ahead}
@@ -219,7 +238,7 @@ export function BranchSelector({
                       </button>
                     )}
                   </div>
-                </button>
+                </div>
               ))}
 
               {branches.length === 0 && (
