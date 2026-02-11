@@ -1,0 +1,34 @@
+.scalar-container {
+  height: calc(100vh - 4rem);
+}
+
+/* Override Scalar's CSS variables for sidebar height */
+.scalar-container .scalar-api-reference,
+.scalar-container .references-layout {
+  --refs-sidebar-height: calc(100vh - 4rem) !important;
+  height: 100% !important;
+  max-height: 100% !important;
+}
+
+/* Ensure sidebar respects the height */
+.scalar-container aside.t-doc__sidebar {
+  height: var(--refs-sidebar-height) !important;
+  max-height: var(--refs-sidebar-height) !important;
+}
+
+/* Make the nav list scrollable */
+.scalar-container aside > ul {
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+}
+
+/* Remove the spacer that pushes footer down */
+.scalar-container aside > div.flex-1:not(.darklight-reference) {
+  display: none !important;
+}
+
+/* Ensure footer stays at bottom */
+.scalar-container .darklight-reference {
+  flex-shrink: 0 !important;
+}

@@ -2,6 +2,7 @@
 
 import { ApiReferenceReact } from "@scalar/api-reference-react";
 import "@scalar/api-reference-react/style.css";
+import "./scalar-overrides.css";
 import { Header } from "@/components/layout/header";
 
 const API_BASE_URL =
@@ -11,14 +12,14 @@ export default function ApiDocsPage() {
   return (
     <div className="flex flex-col h-screen">
       <Header />
-      <div className="flex-1 overflow-hidden">
+      <div className="scalar-container">
         <ApiReferenceReact
           configuration={{
             url: `${API_BASE_URL}/openapi.json`,
             theme: "kepler",
             hideModels: false,
             hideDownloadButton: false,
-            darkMode: true,
+            hideDarkModeToggle: false,
             metaData: {
               title: "Axigraph API Documentation",
             },
