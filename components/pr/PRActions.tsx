@@ -17,7 +17,11 @@ import {
   MessageSquare,
   Loader2,
   RotateCcw,
+  Trash2,
+  ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
+import { branchesApi } from "@/lib/api/revisions";
 
 interface PRActionsProps {
   projectId: string;
@@ -43,6 +47,9 @@ export function PRActions({
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
   const [showReopenDialog, setShowReopenDialog] = useState(false);
+  const [deleteSourceBranch, setDeleteSourceBranch] = useState(true);
+  const [showDeleteBranchDialog, setShowDeleteBranchDialog] = useState(false);
+  const [sourceBranchExists, setSourceBranchExists] = useState<boolean | null>(null);
 
   const canMerge = userRole === "owner" || userRole === "admin";
   const canReview = userRole === "owner" || userRole === "admin";
@@ -55,7 +62,7 @@ export function PRActions({
     await pullRequestsApi.merge(
       projectId,
       pr.pr_number,
-      { delete_source_branch: true },
+      { delete_source_branch: deleteSourceBranch },
       accessToken
     );
 
@@ -66,6 +73,18 @@ export function PRActions({
       accessToken
     );
     onUpdate(updatedPR);
+
+    // Track if we didn't delete the branch
+    if (!deleteSourceBranch) {
+      setSourceBranchExists(true);
+    } else {
+      setSourceBranchExists(false);
+    }
+  };
+
+  const handleDeleteSourceBranch = async () => {
+    await branchesApi.delete(projectId, pr.source_branch, accessToken);
+    setSourceBranchExists(false);
   };
 
   const handleClose = async () => {
@@ -120,9 +139,49 @@ export function PRActions({
     }
   };
 
-  // Merged PRs have no actions
+  // Merged PRs - show option to delete source branch and navigate to editor
   if (isMerged) {
-    return null;
+    return (
+      <div className={cn("space-y-4", className)}>
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-900/50 dark:bg-green-900/20">
+          <p className="mb-3 text-sm text-green-800 dark:text-green-200">
+            This pull request was merged into <strong>{pr.target_branch}</strong>.
+          </p>
+
+          <div className="flex flex-wrap gap-2">
+            <Link href={`/projects/${projectId}/editor?branch=${pr.target_branch}`}>
+              <Button size="sm" className="gap-1">
+                <ExternalLink className="h-4 w-4" />
+                Continue to Editor
+              </Button>
+            </Link>
+
+            {sourceBranchExists !== false && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowDeleteBranchDialog(true)}
+                className="gap-1"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete Branch "{pr.source_branch}"
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Delete Branch Confirmation Dialog */}
+        <ConfirmDialog
+          open={showDeleteBranchDialog}
+          onOpenChange={setShowDeleteBranchDialog}
+          onConfirm={handleDeleteSourceBranch}
+          title="Delete Branch"
+          description={`Are you sure you want to delete the branch "${pr.source_branch}"? This action cannot be undone.`}
+          confirmLabel="Delete Branch"
+          variant="danger"
+        />
+      </div>
+    );
   }
 
   // Closed PRs can be reopened
@@ -290,10 +349,22 @@ export function PRActions({
         onOpenChange={setShowMergeDialog}
         onConfirm={handleMerge}
         title="Merge Pull Request"
-        description={`Are you sure you want to merge "${pr.title}"? The source branch will be deleted after merging.`}
+        description={`Are you sure you want to merge "${pr.title}" into ${pr.target_branch}?`}
         confirmLabel="Merge"
         variant="default"
-      />
+      >
+        <label className="flex items-center gap-2 py-2">
+          <input
+            type="checkbox"
+            checked={deleteSourceBranch}
+            onChange={(e) => setDeleteSourceBranch(e.target.checked)}
+            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+          />
+          <span className="text-sm text-slate-700 dark:text-slate-300">
+            Delete source branch "{pr.source_branch}" after merging
+          </span>
+        </label>
+      </ConfirmDialog>
 
       {/* Close Confirmation Dialog */}
       <ConfirmDialog
