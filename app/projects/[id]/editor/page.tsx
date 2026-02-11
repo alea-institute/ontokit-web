@@ -19,6 +19,10 @@ import { pullRequestsApi } from "@/lib/api/pullRequests";
 import { lintApi, type LintSummary } from "@/lib/api/lint";
 import { revisionsApi } from "@/lib/api/revisions";
 
+// Import the ref type and IRI position type
+import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+import type { IriPosition } from "@/lib/editor/indexWorker";
+
 // Dynamically import the source editor to avoid SSR issues with Monaco
 const OntologySourceEditor = dynamic(
   () => import("@/components/editor/OntologySourceEditor").then((mod) => mod.OntologySourceEditor),
@@ -54,6 +58,11 @@ export default function EditorPage() {
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [isPreloading, setIsPreloading] = useState(false);
   const preloadStartedRef = useRef(false);
+  const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
+
+  // Background IRI indexing for "View in Source" feature
+  const [sourceIriIndex, setSourceIriIndex] = useState<Map<string, IriPosition>>(new Map());
+  const [isIndexing, setIsIndexing] = useState(false);
 
   // Ontology tree state
   const {
@@ -187,6 +196,104 @@ export default function EditorPage() {
     }
   }, [viewMode, sourceContent, isLoadingSource, isPreloading, loadSourceContent]);
 
+  // Build IRI index in background when source content is available
+  // This enables instant "View in Source" navigation
+  // Using main thread with chunked processing to avoid blocking UI
+  useEffect(() => {
+    if (!sourceContent || sourceIriIndex.size > 0 || isIndexing) return;
+
+    setIsIndexing(true);
+
+    // Run indexing in chunks to avoid blocking UI
+    const buildIriIndexAsync = async (content: string): Promise<Map<string, IriPosition>> => {
+      const index = new Map<string, IriPosition>();
+      const lines = content.split("\n");
+
+      // Extract prefixes first
+      const prefixes = new Map<string, string>();
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const prefixMatch = line.match(/@?prefix\s+(\w*):\s*<([^>]+)>/i);
+        if (prefixMatch) {
+          prefixes.set(prefixMatch[1], prefixMatch[2]);
+        }
+      }
+
+      // Index IRIs in subject position, processing in chunks
+      // A subject starts a new triple block - it's NOT a continuation of a previous line
+      // Lines ending with , or ; indicate the next line is a continuation (object or predicate-object)
+      const chunkSize = 5000;
+      for (let start = 0; start < lines.length; start += chunkSize) {
+        const end = Math.min(start + chunkSize, lines.length);
+
+        for (let i = start; i < end; i++) {
+          const line = lines[i];
+          const trimmed = line.trim();
+
+          // Skip comments, empty lines, and prefix declarations
+          if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("@") || trimmed.toUpperCase().startsWith("PREFIX")) continue;
+
+          // Check if previous non-empty line ends with , or ; (meaning this is a continuation)
+          let isContinuation = false;
+          for (let j = i - 1; j >= 0; j--) {
+            const prevTrimmed = lines[j].trim();
+            if (!prevTrimmed || prevTrimmed.startsWith("#")) continue; // Skip empty/comment lines
+            // If previous line ends with , or ; this is a continuation
+            if (prevTrimmed.endsWith(",") || prevTrimmed.endsWith(";")) {
+              isContinuation = true;
+            }
+            break; // Only check the immediately preceding non-empty line
+          }
+
+          if (isContinuation) continue; // Skip - this is not a subject
+
+          // Match full IRI at start of line: <...>
+          const fullIriMatch = trimmed.match(/^<([^>\s]+)>/);
+          if (fullIriMatch) {
+            const iri = fullIriMatch[1];
+            if (!index.has(iri)) {
+              const col = line.indexOf('<') + 1;
+              index.set(iri, { line: i + 1, col, len: fullIriMatch[0].length });
+            }
+          }
+
+          // Match prefixed name at start of line: prefix:local or :local
+          const prefixedMatch = trimmed.match(/^(\w*):([A-Za-z_][A-Za-z0-9_\-]*)/);
+          if (prefixedMatch) {
+            const prefix = prefixedMatch[1];
+            const localName = prefixedMatch[2];
+            const namespace = prefixes.get(prefix);
+            if (namespace) {
+              const fullIri = namespace + localName;
+              if (!index.has(fullIri)) {
+                const prefixedName = `${prefix}:${localName}`;
+                const col = line.indexOf(prefixedName) + 1;
+                index.set(fullIri, { line: i + 1, col, len: prefixedName.length });
+              }
+            }
+          }
+        }
+
+        // Yield to UI every chunk
+        if (end < lines.length) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+
+      return index;
+    };
+
+    buildIriIndexAsync(sourceContent)
+      .then((newIndex) => {
+        setSourceIriIndex(newIndex);
+        setIsIndexing(false);
+      })
+      .catch((error) => {
+        console.error("[ViewInSource] Indexing error:", error);
+        setIsIndexing(false);
+      });
+  }, [sourceContent, sourceIriIndex.size, isIndexing]);
+
   // Handle view mode change
   const handleViewModeChange = useCallback((mode: EditorView) => {
     setViewMode(mode);
@@ -196,6 +303,54 @@ export default function EditorPage() {
       setShowHealthCheck(false);
     }
   }, []);
+
+  // Pending scroll IRI - set when navigating to source before editor is ready
+  const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
+
+  // Find IRI position in the pre-built index
+  const findIriInIndex = useCallback((iri: string): IriPosition | null => {
+    // Try exact match
+    let pos = sourceIriIndex.get(iri);
+    if (pos) return pos;
+
+    // Try without trailing slash/hash
+    const normalized = iri.replace(/[/#]$/, '');
+    pos = sourceIriIndex.get(normalized);
+    if (pos) return pos;
+
+    // Try matching by local name
+    const localName = iri.includes('#')
+      ? iri.split('#').pop()
+      : iri.split('/').pop();
+    if (localName) {
+      for (const [indexedIri, indexedPos] of sourceIriIndex) {
+        const indexedLocal = indexedIri.includes('#')
+          ? indexedIri.split('#').pop()
+          : indexedIri.split('/').pop();
+        if (indexedLocal === localName) {
+          return indexedPos;
+        }
+      }
+    }
+
+    return null;
+  }, [sourceIriIndex]);
+
+  // Handle navigation to an IRI in the source view
+  const handleNavigateToSource = useCallback((iri: string) => {
+    // Switch to source view
+    setViewMode("source");
+    setShowHistory(false);
+    setShowHealthCheck(false);
+
+    // Store the IRI to scroll to - the editor will use this when ready
+    setPendingScrollIri(iri);
+
+    // If editor is already mounted and index is ready, scroll immediately
+    if (sourceEditorRef.current && sourceIriIndex.size > 0) {
+      sourceEditorRef.current.scrollToIri(iri);
+    }
+  }, [sourceIriIndex, findIriInIndex]);
 
   if (isLoading || status === "loading") {
     return (
@@ -458,6 +613,7 @@ export default function EditorPage() {
                   classIri={selectedIri}
                   accessToken={session?.accessToken}
                   onNavigateToClass={navigateToNode}
+                  onNavigateToSource={handleNavigateToSource}
                 />
               </div>
 
@@ -516,6 +672,7 @@ export default function EditorPage() {
                 </div>
               ) : (
                 <OntologySourceEditor
+                  ref={sourceEditorRef}
                   projectId={projectId}
                   initialValue={sourceContent}
                   accessToken={session?.accessToken}
@@ -532,6 +689,9 @@ export default function EditorPage() {
                     }
                   }}
                   height="100%"
+                  prebuiltIriIndex={sourceIriIndex}
+                  pendingScrollIri={pendingScrollIri}
+                  onScrollComplete={() => setPendingScrollIri(null)}
                 />
               )}
             </div>

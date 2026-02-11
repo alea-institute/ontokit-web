@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp, FileText, XCircle } from "lucide-react";
+import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp, FileText, XCircle, Code } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
 import { lintApi, type LintIssue } from "@/lib/api/lint";
 import { cn, getLocalName, getPreferredLabel } from "@/lib/utils";
@@ -11,6 +11,8 @@ interface ClassDetailPanelProps {
   classIri: string | null;
   accessToken?: string;
   onNavigateToClass?: (iri: string) => void;
+  /** Callback to navigate to an IRI in the source view */
+  onNavigateToSource?: (iri: string) => void;
 }
 
 export function ClassDetailPanel({
@@ -18,6 +20,7 @@ export function ClassDetailPanel({
   classIri,
   accessToken,
   onNavigateToClass,
+  onNavigateToSource,
 }: ClassDetailPanelProps) {
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
   const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
@@ -123,9 +126,21 @@ export function ClassDetailPanel({
                 </span>
               )}
             </h2>
-            <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400" title={classDetail.iri}>
-              {classDetail.iri}
-            </p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={classDetail.iri}>
+                {classDetail.iri}
+              </p>
+              {onNavigateToSource && (
+                <button
+                  onClick={() => onNavigateToSource(classDetail.iri)}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                  title="View in Source"
+                >
+                  <Code className="h-3 w-3" />
+                  <span>Source</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

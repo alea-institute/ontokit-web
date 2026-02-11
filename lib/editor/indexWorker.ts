@@ -15,7 +15,8 @@ export interface IndexWorkerMessage {
 
 export interface IndexWorkerResult {
   type: 'result';
-  positions: Array<[string, IriPosition]>; // Map entries as array for transfer
+  positions: Array<[string, IriPosition]>; // Issue ID to position (for lint diagnostics)
+  iriIndex: Array<[string, IriPosition]>; // Full IRI to position index (for "View in Source")
   diagnostics: Array<{
     issueId: string;
     startLineNumber: number;
@@ -34,7 +35,8 @@ export interface IndexWorkerResult {
   };
 }
 
-// Build IRI index from content
+// Build IRI index from content - only indexes IRIs in SUBJECT position (definitions)
+// This ensures we find where entities are defined, not where they're referenced
 function buildIriIndex(content: string): Map<string, IriPosition> {
   const index = new Map<string, IriPosition>();
   const lines = content.split("\n");
@@ -51,40 +53,54 @@ function buildIriIndex(content: string): Map<string, IriPosition> {
     }
   }
 
-  // Index all IRIs and prefixed names
+  // Index IRIs that appear in SUBJECT position only
+  // A subject starts a new triple block - it's NOT a continuation of a previous line
+  // Lines ending with , or ; indicate the next line is a continuation (object or predicate-object)
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Skip comments and empty lines
-    if (!trimmed || trimmed.startsWith("#")) continue;
+    // Skip comments, empty lines, and prefix declarations
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("@") || trimmed.toUpperCase().startsWith("PREFIX")) continue;
 
-    // Find full IRIs <...>
-    const fullIriMatches = line.matchAll(/<([^>\s]+)>/g);
-    for (const match of fullIriMatches) {
-      const iri = match[1];
+    // Check if previous non-empty line ends with , or ; (meaning this is a continuation)
+    let isContinuation = false;
+    for (let j = i - 1; j >= 0; j--) {
+      const prevTrimmed = lines[j].trim();
+      if (!prevTrimmed || prevTrimmed.startsWith("#")) continue; // Skip empty/comment lines
+      // If previous line ends with , or ; this is a continuation
+      if (prevTrimmed.endsWith(",") || prevTrimmed.endsWith(";")) {
+        isContinuation = true;
+      }
+      break; // Only check the immediately preceding non-empty line
+    }
+
+    if (isContinuation) continue; // Skip - this is not a subject
+
+    // Match full IRI at start of line: <...>
+    const fullIriMatch = trimmed.match(/^<([^>\s]+)>/);
+    if (fullIriMatch) {
+      const iri = fullIriMatch[1];
       if (!index.has(iri)) {
-        index.set(iri, { line: i + 1, col: match.index! + 1, len: match[0].length });
+        const col = line.indexOf('<') + 1;
+        index.set(iri, { line: i + 1, col, len: fullIriMatch[0].length });
       }
     }
 
-    // Find prefixed names - handle both "prefix:local" and ":local" (empty prefix)
-    // Local names can contain letters, numbers, underscores, and hyphens
-    const prefixedMatches = line.matchAll(/(?:^|[\s;,.\[\(])(\w*):([A-Za-z_][A-Za-z0-9_\-]*)/g);
-    for (const match of prefixedMatches) {
-      const prefix = match[1]; // Can be empty string for default prefix
-      const localName = match[2];
+    // Match prefixed name at start of line: prefix:local or :local
+    const prefixedMatch = trimmed.match(/^(\w*):([A-Za-z_][A-Za-z0-9_\-]*)/);
+    if (prefixedMatch) {
+      const prefix = prefixedMatch[1];
+      const localName = prefixedMatch[2];
       const namespace = prefixes.get(prefix);
       if (namespace) {
         const fullIri = namespace + localName;
         if (!index.has(fullIri)) {
-          // Calculate actual position (account for leading whitespace/delimiter in match)
-          const fullMatch = match[0];
           const prefixedName = `${prefix}:${localName}`;
-          const offset = fullMatch.indexOf(prefixedName);
+          const col = line.indexOf(prefixedName) + 1;
           index.set(fullIri, {
             line: i + 1,
-            col: match.index! + offset + 1,
+            col,
             len: prefixedName.length
           });
         }
@@ -130,7 +146,8 @@ self.onmessage = (event: MessageEvent<IndexWorkerMessage>) => {
   const { content, issues } = event.data;
 
   // Build the index
-  const iriIndex = buildIriIndex(content);
+  try {
+    const iriIndex = buildIriIndex(content);
 
   // Also build a local name index for fallback matching
   const localNameIndex = new Map<string, IriPosition>();
@@ -205,6 +222,7 @@ self.onmessage = (event: MessageEvent<IndexWorkerMessage>) => {
   const result: IndexWorkerResult = {
     type: 'result',
     positions,
+    iriIndex: Array.from(iriIndex.entries()), // Full IRI index for "View in Source"
     diagnostics,
     stats: {
       linesProcessed: content.split("\n").length,
@@ -216,6 +234,23 @@ self.onmessage = (event: MessageEvent<IndexWorkerMessage>) => {
   };
 
   self.postMessage(result);
+  } catch (error) {
+    console.error('[IndexWorker] Error during indexing:', error);
+    // Send empty result on error
+    self.postMessage({
+      type: 'result',
+      positions: [],
+      iriIndex: [],
+      diagnostics: [],
+      stats: {
+        linesProcessed: 0,
+        irisIndexed: 0,
+        localNamesIndexed: 0,
+        issuesMatched: 0,
+        timeMs: 0,
+      },
+    } as IndexWorkerResult);
+  }
 };
 
 export {};

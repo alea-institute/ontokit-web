@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import type { editor } from "monaco-editor";
 import { Save, RotateCcw, AlertCircle, CheckCircle, Loader2, FileText, GitBranch } from "lucide-react";
 import { TurtleEditor, type TurtleDiagnostic } from "./TurtleEditor";
 import { Button } from "@/components/ui/button";
 import { lintApi, type LintIssue } from "@/lib/api/lint";
-import type { IndexWorkerResult } from "@/lib/editor/indexWorker";
+import type { IndexWorkerResult, IriPosition } from "@/lib/editor/indexWorker";
 
 export interface OntologySourceEditorProps {
   /** Project ID for lint integration */
@@ -23,20 +23,39 @@ export interface OntologySourceEditorProps {
   onNavigateToClass?: (iri: string) => void;
   /** Height of the editor */
   height?: string;
+  /** Pre-built IRI index from background indexing */
+  prebuiltIriIndex?: Map<string, IriPosition>;
+  /** Pending IRI to scroll to when editor is ready */
+  pendingScrollIri?: string | null;
+  /** Callback when scroll is complete */
+  onScrollComplete?: () => void;
+}
+
+/** Methods exposed via ref for external control */
+export interface OntologySourceEditorRef {
+  /** Scroll to the line where an IRI is defined in the source */
+  scrollToIri: (iri: string) => boolean;
 }
 
 /**
  * Full-featured ontology source editor with linting integration
  */
-export function OntologySourceEditor({
-  projectId,
-  initialValue,
-  accessToken,
-  readOnly = false,
-  onSave,
-  onNavigateToClass,
-  height = "calc(100vh - 200px)",
-}: OntologySourceEditorProps) {
+export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, OntologySourceEditorProps>(
+  function OntologySourceEditor(
+    {
+      projectId,
+      initialValue,
+      accessToken,
+      readOnly = false,
+      onSave,
+      onNavigateToClass,
+      height = "calc(100vh - 200px)",
+      prebuiltIriIndex,
+      pendingScrollIri,
+      onScrollComplete,
+    },
+    ref
+  ) {
   const [value, setValue] = useState(initialValue);
   const [originalValue, setOriginalValue] = useState(initialValue);
   const [isSaving, setIsSaving] = useState(false);
@@ -50,13 +69,17 @@ export function OntologySourceEditor({
   // Diagnostics state - computed in Web Worker
   const [diagnostics, setDiagnostics] = useState<TurtleDiagnostic[]>([]);
   const [issuePositions, setIssuePositions] = useState<Map<string, { line: number; startCol: number; endCol: number }>>(new Map());
+  const [iriIndex, setIriIndex] = useState<Map<string, IriPosition>>(new Map());
   const [diagnosticsReady, setDiagnosticsReady] = useState(false);
   const [indexStats, setIndexStats] = useState<{ linesProcessed: number; irisIndexed: number; localNamesIndexed: number; issuesMatched: number; timeMs: number } | null>(null);
   const workerRef = useRef<Worker | null>(null);
+  const pendingScrollIriRef = useRef<string | null>(null);
+  const [editorReady, setEditorReady] = useState(false);
 
   // Handle editor ready
   const handleEditorReady = useCallback((editorInstance: editor.IStandaloneCodeEditor) => {
     editorRef.current = editorInstance;
+    setEditorReady(true);
   }, []);
 
   // Scroll to a specific line in the editor
@@ -67,6 +90,90 @@ export function OntologySourceEditor({
       editorRef.current.focus();
     }
   }, []);
+
+  // Find position of an IRI in the index
+  const findIriPosition = useCallback((iri: string, index: Map<string, IriPosition>): IriPosition | null => {
+    // Try exact match first
+    let pos = index.get(iri);
+
+    // Try without trailing slash/hash
+    if (!pos) {
+      const normalized = iri.replace(/[/#]$/, '');
+      pos = index.get(normalized);
+    }
+
+    // Try matching by local name
+    if (!pos) {
+      const localName = iri.includes('#')
+        ? iri.split('#').pop()
+        : iri.split('/').pop();
+      if (localName) {
+        // Search for an IRI ending with this local name
+        for (const [indexedIri, indexedPos] of index) {
+          const indexedLocal = indexedIri.includes('#')
+            ? indexedIri.split('#').pop()
+            : indexedIri.split('/').pop();
+          if (indexedLocal === localName) {
+            pos = indexedPos;
+            break;
+          }
+        }
+      }
+    }
+
+    return pos || null;
+  }, []);
+
+  // Scroll to where an IRI is defined in the source
+  const scrollToIri = useCallback((iri: string): boolean => {
+    // First try the prebuilt index from the editor page (faster)
+    const activeIndex = prebuiltIriIndex && prebuiltIriIndex.size > 0 ? prebuiltIriIndex : iriIndex;
+    const indexReady = activeIndex.size > 0;
+
+    if (indexReady) {
+      const pos = findIriPosition(iri, activeIndex);
+      if (pos) {
+        scrollToLine(pos.line, pos.col);
+        return true;
+      }
+      return false;
+    }
+
+    // Index not ready yet - store the pending IRI and scroll when ready
+    pendingScrollIriRef.current = iri;
+    return true; // Return true to indicate we'll handle it
+  }, [prebuiltIriIndex, iriIndex, findIriPosition, scrollToLine]);
+
+  // Expose methods to parent via ref
+  useImperativeHandle(ref, () => ({
+    scrollToIri,
+  }), [scrollToIri]);
+
+  // Handle pendingScrollIri prop when component mounts with prebuilt index
+  useEffect(() => {
+    if (pendingScrollIri && prebuiltIriIndex && prebuiltIriIndex.size > 0 && editorReady) {
+      const pos = findIriPosition(pendingScrollIri, prebuiltIriIndex);
+      if (pos) {
+        scrollToLine(pos.line, pos.col);
+      }
+      onScrollComplete?.();
+    }
+  }, [pendingScrollIri, prebuiltIriIndex, editorReady, findIriPosition, scrollToLine, onScrollComplete]);
+
+  // Handle pending scroll when local index becomes ready (fallback)
+  useEffect(() => {
+    const activeIndex = prebuiltIriIndex && prebuiltIriIndex.size > 0 ? prebuiltIriIndex : iriIndex;
+
+    if (activeIndex.size > 0 && pendingScrollIriRef.current) {
+      const iri = pendingScrollIriRef.current;
+      pendingScrollIriRef.current = null;
+
+      const pos = findIriPosition(iri, activeIndex);
+      if (pos) {
+        scrollToLine(pos.line, pos.col);
+      }
+    }
+  }, [prebuiltIriIndex, iriIndex, findIriPosition, scrollToLine]);
 
   // Fetch lint issues on mount and when projectId changes
   useEffect(() => {
@@ -90,11 +197,13 @@ export function OntologySourceEditor({
     fetchLintIssues();
   }, [projectId, accessToken]);
 
-  // Compute diagnostics in Web Worker
+  // Build IRI index and compute diagnostics in Web Worker
+  // Always runs when we have content (for "View in Source" feature)
   useEffect(() => {
-    if (!lintIssues.length || !value) {
+    if (!value) {
       setDiagnostics([]);
       setIssuePositions(new Map());
+      setIriIndex(new Map());
       setDiagnosticsReady(true);
       setIndexStats(null);
       return;
@@ -119,6 +228,12 @@ export function OntologySourceEditor({
         positions.set(id, { line: pos.line, startCol: pos.col, endCol: pos.col + pos.len });
       }
 
+      // Convert IRI index array back to Map
+      const newIriIndex = new Map<string, IriPosition>();
+      for (const [iri, pos] of result.iriIndex) {
+        newIriIndex.set(iri, pos);
+      }
+
       // Convert diagnostics
       const diags: TurtleDiagnostic[] = result.diagnostics.map((d) => ({
         startLineNumber: d.startLineNumber,
@@ -131,6 +246,7 @@ export function OntologySourceEditor({
 
       setDiagnostics(diags);
       setIssuePositions(positions);
+      setIriIndex(newIriIndex);
       setIndexStats(result.stats);
       setDiagnosticsReady(true);
 
@@ -464,6 +580,6 @@ export function OntologySourceEditor({
       </div>
     </div>
   );
-}
+});
 
 export default OntologySourceEditor;
