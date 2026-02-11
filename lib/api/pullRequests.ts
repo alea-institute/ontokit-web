@@ -265,6 +265,18 @@ export const pullRequestsApi = {
     ),
 
   /**
+   * Reopen a closed pull request
+   */
+  reopen: (projectId: string, prNumber: number, token: string) =>
+    api.post<PullRequest>(
+      `/api/v1/projects/${projectId}/pull-requests/${prNumber}/reopen`,
+      undefined,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    ),
+
+  /**
    * Merge a pull request
    */
   merge: (

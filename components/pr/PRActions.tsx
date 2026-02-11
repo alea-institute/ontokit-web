@@ -16,6 +16,7 @@ import {
   X,
   MessageSquare,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
 
 interface PRActionsProps {
@@ -41,10 +42,14 @@ export function PRActions({
   const [reviewBody, setReviewBody] = useState("");
   const [showMergeDialog, setShowMergeDialog] = useState(false);
   const [showCloseDialog, setShowCloseDialog] = useState(false);
+  const [showReopenDialog, setShowReopenDialog] = useState(false);
 
   const canMerge = userRole === "owner" || userRole === "admin";
   const canReview = userRole === "owner" || userRole === "admin";
+  const canReopen = userRole === "owner" || userRole === "admin";
   const isOpen = pr.status === "open";
+  const isClosed = pr.status === "closed";
+  const isMerged = pr.status === "merged";
 
   const handleMerge = async () => {
     await pullRequestsApi.merge(
@@ -65,6 +70,15 @@ export function PRActions({
 
   const handleClose = async () => {
     const updatedPR = await pullRequestsApi.close(
+      projectId,
+      pr.pr_number,
+      accessToken
+    );
+    onUpdate(updatedPR);
+  };
+
+  const handleReopen = async () => {
+    const updatedPR = await pullRequestsApi.reopen(
       projectId,
       pr.pr_number,
       accessToken
@@ -106,8 +120,52 @@ export function PRActions({
     }
   };
 
-  if (!isOpen) {
+  // Merged PRs have no actions
+  if (isMerged) {
     return null;
+  }
+
+  // Closed PRs can be reopened
+  if (isClosed) {
+    return (
+      <div className={cn("space-y-4", className)}>
+        {error && (
+          <div className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
+            {error}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          {canReopen && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setShowReopenDialog(true)}
+              disabled={isSubmitting}
+              className="gap-1"
+            >
+              {isSubmitting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RotateCcw className="h-4 w-4" />
+              )}
+              Reopen
+            </Button>
+          )}
+        </div>
+
+        {/* Reopen Confirmation Dialog */}
+        <ConfirmDialog
+          open={showReopenDialog}
+          onOpenChange={setShowReopenDialog}
+          onConfirm={handleReopen}
+          title="Reopen Pull Request"
+          description={`Are you sure you want to reopen "${pr.title}"?`}
+          confirmLabel="Reopen"
+          variant="default"
+        />
+      </div>
+    );
   }
 
   return (
