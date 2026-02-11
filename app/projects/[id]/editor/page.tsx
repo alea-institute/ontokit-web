@@ -712,14 +712,6 @@ export default function EditorPage() {
                 />
               </div>
 
-              {/* Right Panel - Revision History (slide-out) */}
-              <RevisionHistoryPanel
-                projectId={projectId}
-                accessToken={session?.accessToken}
-                isOpen={showHistory}
-                onClose={() => setShowHistory(false)}
-              />
-
               {/* Right Panel - Health Check (slide-out) */}
               {showHealthCheck && (
                 <div className="w-96 flex-shrink-0">
@@ -792,6 +784,14 @@ export default function EditorPage() {
               )}
             </div>
           )}
+
+          {/* Right Panel - Revision History (slide-out, available in both views) */}
+          <RevisionHistoryPanel
+            projectId={projectId}
+            accessToken={session?.accessToken}
+            isOpen={showHistory}
+            onClose={() => setShowHistory(false)}
+          />
         </div>
       </main>
 
