@@ -7,6 +7,7 @@ import {
   type ReviewCreate,
 } from "@/lib/api/pullRequests";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { cn } from "@/lib/utils";
 import {
   GitMerge,
@@ -38,65 +39,37 @@ export function PRActions({
   const [error, setError] = useState<string | null>(null);
   const [showReviewForm, setShowReviewForm] = useState(false);
   const [reviewBody, setReviewBody] = useState("");
+  const [showMergeDialog, setShowMergeDialog] = useState(false);
+  const [showCloseDialog, setShowCloseDialog] = useState(false);
 
   const canMerge = userRole === "owner" || userRole === "admin";
   const canReview = userRole === "owner" || userRole === "admin";
   const isOpen = pr.status === "open";
 
   const handleMerge = async () => {
-    if (!confirm("Are you sure you want to merge this pull request?")) {
-      return;
-    }
+    await pullRequestsApi.merge(
+      projectId,
+      pr.pr_number,
+      { delete_source_branch: true },
+      accessToken
+    );
 
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      await pullRequestsApi.merge(
-        projectId,
-        pr.pr_number,
-        { delete_source_branch: true },
-        accessToken
-      );
-
-      // Refresh PR data
-      const updatedPR = await pullRequestsApi.get(
-        projectId,
-        pr.pr_number,
-        accessToken
-      );
-      onUpdate(updatedPR);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to merge pull request";
-      setError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Refresh PR data
+    const updatedPR = await pullRequestsApi.get(
+      projectId,
+      pr.pr_number,
+      accessToken
+    );
+    onUpdate(updatedPR);
   };
 
   const handleClose = async () => {
-    if (!confirm("Are you sure you want to close this pull request?")) {
-      return;
-    }
-
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const updatedPR = await pullRequestsApi.close(
-        projectId,
-        pr.pr_number,
-        accessToken
-      );
-      onUpdate(updatedPR);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to close pull request";
-      setError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
+    const updatedPR = await pullRequestsApi.close(
+      projectId,
+      pr.pr_number,
+      accessToken
+    );
+    onUpdate(updatedPR);
   };
 
   const handleReview = async (status: ReviewCreate["status"]) => {
@@ -221,7 +194,7 @@ export function PRActions({
           {canMerge && (
             <Button
               size="sm"
-              onClick={handleMerge}
+              onClick={() => setShowMergeDialog(true)}
               disabled={isSubmitting || !pr.can_merge}
               className="gap-1"
               title={
@@ -243,7 +216,7 @@ export function PRActions({
           <Button
             size="sm"
             variant="ghost"
-            onClick={handleClose}
+            onClick={() => setShowCloseDialog(true)}
             disabled={isSubmitting}
             className="gap-1 text-red-600 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
           >
@@ -252,6 +225,28 @@ export function PRActions({
           </Button>
         </div>
       )}
+
+      {/* Merge Confirmation Dialog */}
+      <ConfirmDialog
+        open={showMergeDialog}
+        onOpenChange={setShowMergeDialog}
+        onConfirm={handleMerge}
+        title="Merge Pull Request"
+        description={`Are you sure you want to merge "${pr.title}"? The source branch will be deleted after merging.`}
+        confirmLabel="Merge"
+        variant="default"
+      />
+
+      {/* Close Confirmation Dialog */}
+      <ConfirmDialog
+        open={showCloseDialog}
+        onOpenChange={setShowCloseDialog}
+        onConfirm={handleClose}
+        title="Close Pull Request"
+        description={`Are you sure you want to close "${pr.title}"? This will not delete the branch and can be reopened later.`}
+        confirmLabel="Close PR"
+        variant="danger"
+      />
 
       {/* Merge status */}
       {!pr.can_merge && canMerge && (
