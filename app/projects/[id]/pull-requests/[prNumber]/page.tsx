@@ -95,11 +95,11 @@ export default function PullRequestDetailPage() {
           {/* Breadcrumb */}
           <div className="mb-6 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
             <Link
-              href={`/projects/${projectId}/editor`}
+              href={`/projects/${projectId}/pull-requests`}
               className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-4 w-4" />
-              {project.name}
+              Pull Requests
             </Link>
           </div>
 
