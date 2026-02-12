@@ -15,6 +15,7 @@ export interface RevisionCommit {
   timestamp: string;
   is_merge?: boolean;
   merged_branch?: string;
+  parent_hashes: string[];
 }
 
 export interface RevisionHistoryResponse {

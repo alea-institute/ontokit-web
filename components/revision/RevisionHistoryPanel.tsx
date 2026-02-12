@@ -5,15 +5,14 @@ import { revisionsApi, type RevisionCommit } from "@/lib/api/revisions";
 import { cn } from "@/lib/utils";
 import {
   History,
-  ChevronDown,
-  ChevronRight,
-  GitCommit,
   GitMerge,
   User,
   Calendar,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { GitGraph } from "./GitGraph";
+import { DEFAULT_GRAPH_CONFIG } from "@/lib/git-graph/types";
 
 interface RevisionHistoryPanelProps {
   projectId: string;
@@ -23,6 +22,8 @@ interface RevisionHistoryPanelProps {
   onSelectRevision?: (commit: RevisionCommit) => void;
   className?: string;
 }
+
+const ROW_HEIGHT = DEFAULT_GRAPH_CONFIG.cellHeight;
 
 export function RevisionHistoryPanel({
   projectId,
@@ -66,6 +67,13 @@ export function RevisionHistoryPanel({
     onSelectRevision?.(commit);
   };
 
+  const handleGraphSelect = (hash: string) => {
+    const commit = commits.find((c) => c.hash === hash);
+    if (commit) {
+      handleSelectCommit(commit);
+    }
+  };
+
   const formatDate = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -96,7 +104,7 @@ export function RevisionHistoryPanel({
   return (
     <div
       className={cn(
-        "absolute right-0 top-0 z-30 h-full w-80 border-l border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800",
+        "absolute right-0 top-0 z-30 h-full w-96 border-l border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800",
         className
       )}
     >
@@ -129,74 +137,66 @@ export function RevisionHistoryPanel({
             No revision history yet
           </div>
         ) : (
-          <div className="py-2">
-            {commits.map((commit, index) => (
-              <button
-                key={commit.hash}
-                className={cn(
-                  "w-full px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50",
-                  selectedHash === commit.hash &&
-                    "bg-primary-50 dark:bg-primary-900/20"
-                )}
-                onClick={() => handleSelectCommit(commit)}
-              >
-                <div className="flex items-start gap-3">
-                  {/* Timeline */}
-                  <div className="flex flex-col items-center pt-1">
-                    <div
-                      className={cn(
-                        "flex h-6 w-6 items-center justify-center rounded-full",
-                        commit.is_merge
-                          ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30"
-                          : index === 0
-                            ? "bg-primary-100 text-primary-600 dark:bg-primary-900/30"
-                            : "bg-slate-100 text-slate-500 dark:bg-slate-700"
-                      )}
-                    >
-                      {commit.is_merge ? (
-                        <GitMerge className="h-3.5 w-3.5" />
-                      ) : (
-                        <GitCommit className="h-3.5 w-3.5" />
-                      )}
-                    </div>
-                    {index < commits.length - 1 && (
-                      <div className="mt-1 h-full w-px bg-slate-200 dark:bg-slate-600" />
-                    )}
-                  </div>
+          <div className="flex">
+            {/* Git Graph */}
+            <div className="flex-shrink-0 border-r border-slate-100 dark:border-slate-700/50">
+              <GitGraph
+                commits={commits}
+                selectedHash={selectedHash}
+                onSelectCommit={handleGraphSelect}
+                className="pt-0"
+              />
+            </div>
 
-                  {/* Commit info */}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                      {commit.message}
-                    </p>
-                    {commit.is_merge && commit.merged_branch && (
-                      <div className="mt-1">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                          <GitMerge className="h-3 w-3" />
+            {/* Commit List */}
+            <div className="min-w-0 flex-1">
+              {commits.map((commit, index) => (
+                <button
+                  key={commit.hash}
+                  className={cn(
+                    "w-full text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                    selectedHash === commit.hash &&
+                      "bg-primary-50 dark:bg-primary-900/20"
+                  )}
+                  style={{ height: ROW_HEIGHT }}
+                  onClick={() => handleSelectCommit(commit)}
+                >
+                  <div className="flex h-full items-center px-3">
+                    <div className="min-w-0 flex-1">
+                      {/* Commit message */}
+                      <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                        {commit.message}
+                      </p>
+
+                      {/* Merge badge */}
+                      {commit.is_merge && commit.merged_branch && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                          <GitMerge className="h-2.5 w-2.5" />
                           {commit.merged_branch}
                         </span>
+                      )}
+
+                      {/* Metadata row */}
+                      <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+                        <span className="font-mono" title={commit.hash}>
+                          {commit.short_hash}
+                        </span>
+                        <span className="flex items-center gap-0.5">
+                          <User className="h-3 w-3" />
+                          <span className="max-w-[80px] truncate">
+                            {commit.author_name}
+                          </span>
+                        </span>
+                        <span className="flex items-center gap-0.5 text-slate-400">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(commit.timestamp)}
+                        </span>
                       </div>
-                    )}
-                    <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
-                      <span
-                        className="font-mono"
-                        title={commit.hash}
-                      >
-                        {commit.short_hash}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        {commit.author_name}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex items-center gap-1 text-xs text-slate-400">
-                      <Calendar className="h-3 w-3" />
-                      {formatDate(commit.timestamp)}
                     </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
