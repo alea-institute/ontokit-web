@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, GitPullRequest } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { PRDetail } from "@/components/pr/PRDetail";
@@ -95,23 +95,12 @@ export default function PullRequestDetailPage() {
           {/* Breadcrumb */}
           <div className="mb-6 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
             <Link
-              href={`/projects/${projectId}`}
-              className="hover:text-slate-900 dark:hover:text-slate-200"
-            >
-              {project.name}
-            </Link>
-            <span>/</span>
-            <Link
-              href={`/projects/${projectId}/pull-requests`}
+              href={`/projects/${projectId}/editor`}
               className="flex items-center gap-1 hover:text-slate-900 dark:hover:text-slate-200"
             >
-              <GitPullRequest className="h-4 w-4" />
-              Pull Requests
+              <ArrowLeft className="h-4 w-4" />
+              {project.name}
             </Link>
-            <span>/</span>
-            <span className="text-slate-900 dark:text-slate-100">
-              #{prNumber}
-            </span>
           </div>
 
           {/* PR Detail */}
