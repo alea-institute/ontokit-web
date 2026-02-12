@@ -623,7 +623,7 @@ export default function EditorPage() {
 
               {/* Normalization Status Indicator */}
               {normalizationStatus?.needs_normalization && (
-                <Link href={`/projects/${projectId}/settings`}>
+                <Link href={`/projects/${projectId}/settings#normalization`}>
                   <Button
                     variant="ghost"
                     size="sm"

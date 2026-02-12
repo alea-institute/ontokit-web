@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
@@ -67,6 +67,8 @@ export default function ProjectSettingsPage() {
   const [isCheckingNormalization, setIsCheckingNormalization] = useState(false);
   const [isRunningNormalization, setIsRunningNormalization] = useState(false);
   const [showNormalizationHistory, setShowNormalizationHistory] = useState(false);
+  const [showPreviewHighlight, setShowPreviewHighlight] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // GitHub integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null);
@@ -138,6 +140,19 @@ export default function ProjectSettingsPage() {
       setIsLoading(false);
     }
   }, [projectId, session?.accessToken, status, isAuthenticated]);
+
+  // Scroll to hash on page load (for #normalization link from editor)
+  useEffect(() => {
+    if (!isLoading && typeof window !== "undefined" && window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      const element = document.getElementById(hash);
+      if (element) {
+        setTimeout(() => {
+          element.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
+      }
+    }
+  }, [isLoading]);
 
   const canManage =
     project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
@@ -373,7 +388,13 @@ export default function ProjectSettingsPage() {
           preview_report: result.report,
           error: null,
         });
-        setSuccessMessage("Normalization preview generated");
+        setShowPreviewHighlight(true);
+        // Scroll to preview after state update
+        setTimeout(() => {
+          previewRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 100);
+        // Remove highlight after animation
+        setTimeout(() => setShowPreviewHighlight(false), 2000);
       } else {
         // Refresh the status after running
         const newStatus = await normalizationApi.getStatus(project.id, session.accessToken);
@@ -639,7 +660,10 @@ export default function ProjectSettingsPage() {
 
           {/* On-Demand Normalization Section - only show if project has an ontology */}
           {project.source_file_path && (
-            <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+            <section
+              id="normalization"
+              className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+            >
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <RefreshCw className="h-5 w-5 text-slate-500" />
@@ -725,7 +749,14 @@ export default function ProjectSettingsPage() {
 
               {/* Preview report if available */}
               {normalizationStatus?.preview_report && normalizationStatus.needs_normalization && (
-                <div className="mb-4 space-y-3">
+                <div
+                  ref={previewRef}
+                  className={`mb-4 space-y-3 rounded-lg border-2 p-4 transition-all duration-500 ${
+                    showPreviewHighlight
+                      ? "border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/20"
+                      : "border-transparent"
+                  }`}
+                >
                   <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
                     Preview of Changes
                   </h3>
