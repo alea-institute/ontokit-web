@@ -123,6 +123,8 @@ export function PRDetail({
         deletions: diffData.total_deletions,
         filesChanged: diffData.files_changed,
       });
+      // Expand all files by default
+      setExpandedFiles(new Set(diffData.files.map((f) => f.path)));
     } catch (err) {
       console.error("Failed to load diff:", err);
     } finally {
