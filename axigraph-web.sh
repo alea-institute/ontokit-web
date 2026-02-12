@@ -1,11 +1,21 @@
 #!/bin/bash
 # Axigraph Web UI Management Script
-# Usage: ./axigraph-web.sh {start|stop|restart|status}
+# Usage: ./axigraph-web.sh {start|stop|restart|status} [--force]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$SCRIPT_DIR/.axigraph-web.pid"
 LOG_FILE="$SCRIPT_DIR/.axigraph-web.log"
 PORT="${PORT:-3000}"
+FORCE_MODE=false
+
+# Parse flags
+for arg in "$@"; do
+    case $arg in
+        --force|-f)
+            FORCE_MODE=true
+            ;;
+    esac
+done
 
 # Check if a port is in use
 # Returns 0 if port is in use, 1 if available
@@ -197,8 +207,14 @@ start() {
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
         if kill -0 "$PID" 2>/dev/null; then
-            echo "Axigraph Web is already running (PID: $PID)"
-            exit 1
+            if [ "$FORCE_MODE" = true ]; then
+                echo "Force mode: stopping existing instance (PID: $PID)"
+                stop 2>/dev/null
+                sleep 1
+            else
+                echo "Axigraph Web is already running (PID: $PID)"
+                exit 1
+            fi
         else
             echo "Removing stale PID file"
             rm -f "$PID_FILE"
@@ -207,7 +223,16 @@ start() {
 
     # Check if port is available
     if is_port_in_use "$PORT"; then
-        handle_port_conflict "$PORT"
+        if [ "$FORCE_MODE" = true ]; then
+            echo "Force mode: killing process using port $PORT"
+            if ! kill_port_process "$PORT"; then
+                echo "Failed to free port $PORT"
+                exit 1
+            fi
+            sleep 1
+        else
+            handle_port_conflict "$PORT"
+        fi
     fi
 
     echo "Starting Axigraph Web on port $PORT..."
@@ -268,6 +293,7 @@ stop() {
 }
 
 restart() {
+    # Force mode is already set from command line parsing
     stop 2>/dev/null
     sleep 1
     start
@@ -304,7 +330,7 @@ case "$1" in
         status
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status}"
+        echo "Usage: $0 {start|stop|restart|status} [--force]"
         echo ""
         echo "Commands:"
         echo "  start   - Start the Axigraph Web development server"
@@ -312,8 +338,16 @@ case "$1" in
         echo "  restart - Restart the server"
         echo "  status  - Check if server is running"
         echo ""
+        echo "Options:"
+        echo "  --force, -f  - Force kill any process blocking the port (non-interactive)"
+        echo ""
         echo "Environment variables:"
         echo "  PORT    - Port to run on (default: 3000)"
+        echo ""
+        echo "Examples:"
+        echo "  $0 start              # Start interactively (prompts on port conflict)"
+        echo "  $0 start --force      # Start and auto-kill any blocking process"
+        echo "  $0 restart --force    # Restart with force mode"
         exit 1
         ;;
 esac
