@@ -27,6 +27,10 @@ export interface RevisionHistoryResponse {
 export interface RevisionDiffChange {
   path: string;
   change_type: string;
+  old_path?: string;
+  additions: number;
+  deletions: number;
+  patch?: string;
 }
 
 export interface RevisionDiffResponse {

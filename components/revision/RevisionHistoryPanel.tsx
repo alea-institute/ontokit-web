@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GitGraph } from "./GitGraph";
+import { CommitDetailView } from "./CommitDetailView";
 import { DEFAULT_GRAPH_CONFIG } from "@/lib/git-graph/types";
 
 interface RevisionHistoryPanelProps {
@@ -37,6 +38,7 @@ export function RevisionHistoryPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
+  const [selectedCommit, setSelectedCommit] = useState<RevisionCommit | null>(null);
 
   const loadHistory = useCallback(async () => {
     if (!projectId) return;
@@ -64,7 +66,12 @@ export function RevisionHistoryPanel({
 
   const handleSelectCommit = (commit: RevisionCommit) => {
     setSelectedHash(commit.hash);
+    setSelectedCommit(commit);
     onSelectRevision?.(commit);
+  };
+
+  const handleBackToList = () => {
+    setSelectedCommit(null);
   };
 
   const handleGraphSelect = (hash: string) => {
@@ -123,80 +130,92 @@ export function RevisionHistoryPanel({
       </div>
 
       {/* Content */}
-      <div className="h-[calc(100%-56px)] overflow-y-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
-          </div>
-        ) : error ? (
-          <div className="px-4 py-8 text-center text-sm text-red-500">
-            {error}
-          </div>
-        ) : commits.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-slate-500">
-            No revision history yet
-          </div>
+      <div className="h-[calc(100%-56px)]">
+        {selectedCommit ? (
+          <CommitDetailView
+            commit={selectedCommit}
+            projectId={projectId}
+            accessToken={accessToken}
+            onBack={handleBackToList}
+            commits={commits}
+          />
         ) : (
-          <div className="flex">
-            {/* Git Graph */}
-            <div className="flex-shrink-0 border-r border-slate-100 dark:border-slate-700/50">
-              <GitGraph
-                commits={commits}
-                selectedHash={selectedHash}
-                onSelectCommit={handleGraphSelect}
-                className="pt-0"
-              />
-            </div>
+          <div className="h-full overflow-y-auto">
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-600 border-t-transparent" />
+              </div>
+            ) : error ? (
+              <div className="px-4 py-8 text-center text-sm text-red-500">
+                {error}
+              </div>
+            ) : commits.length === 0 ? (
+              <div className="px-4 py-8 text-center text-sm text-slate-500">
+                No revision history yet
+              </div>
+            ) : (
+              <div className="flex">
+                {/* Git Graph */}
+                <div className="flex-shrink-0 border-r border-slate-100 dark:border-slate-700/50">
+                  <GitGraph
+                    commits={commits}
+                    selectedHash={selectedHash}
+                    onSelectCommit={handleGraphSelect}
+                    className="pt-0"
+                  />
+                </div>
 
-            {/* Commit List */}
-            <div className="min-w-0 flex-1">
-              {commits.map((commit, index) => (
-                <button
-                  key={commit.hash}
-                  className={cn(
-                    "w-full text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50",
-                    selectedHash === commit.hash &&
-                      "bg-primary-50 dark:bg-primary-900/20"
-                  )}
-                  style={{ height: ROW_HEIGHT }}
-                  onClick={() => handleSelectCommit(commit)}
-                >
-                  <div className="flex h-full items-center px-3">
-                    <div className="min-w-0 flex-1">
-                      {/* Commit message */}
-                      <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-                        {commit.message}
-                      </p>
-
-                      {/* Merge badge */}
-                      {commit.is_merge && commit.merged_branch && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
-                          <GitMerge className="h-2.5 w-2.5" />
-                          {commit.merged_branch}
-                        </span>
+                {/* Commit List */}
+                <div className="min-w-0 flex-1">
+                  {commits.map((commit) => (
+                    <button
+                      key={commit.hash}
+                      className={cn(
+                        "w-full text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                        selectedHash === commit.hash &&
+                          "bg-primary-50 dark:bg-primary-900/20"
                       )}
+                      style={{ height: ROW_HEIGHT }}
+                      onClick={() => handleSelectCommit(commit)}
+                    >
+                      <div className="flex h-full items-center px-3">
+                        <div className="min-w-0 flex-1">
+                          {/* Commit message */}
+                          <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                            {commit.message}
+                          </p>
 
-                      {/* Metadata row */}
-                      <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
-                        <span className="font-mono" title={commit.hash}>
-                          {commit.short_hash}
-                        </span>
-                        <span className="flex items-center gap-0.5">
-                          <User className="h-3 w-3" />
-                          <span className="max-w-[80px] truncate">
-                            {commit.author_name}
-                          </span>
-                        </span>
-                        <span className="flex items-center gap-0.5 text-slate-400">
-                          <Calendar className="h-3 w-3" />
-                          {formatDate(commit.timestamp)}
-                        </span>
+                          {/* Merge badge */}
+                          {commit.is_merge && commit.merged_branch && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                              <GitMerge className="h-2.5 w-2.5" />
+                              {commit.merged_branch}
+                            </span>
+                          )}
+
+                          {/* Metadata row */}
+                          <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
+                            <span className="font-mono" title={commit.hash}>
+                              {commit.short_hash}
+                            </span>
+                            <span className="flex items-center gap-0.5">
+                              <User className="h-3 w-3" />
+                              <span className="max-w-[80px] truncate">
+                                {commit.author_name}
+                              </span>
+                            </span>
+                            <span className="flex items-center gap-0.5 text-slate-400">
+                              <Calendar className="h-3 w-3" />
+                              {formatDate(commit.timestamp)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
