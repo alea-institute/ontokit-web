@@ -30,6 +30,22 @@ import {
   type NormalizationRunResponse,
 } from "@/lib/api/normalization";
 import { cn } from "@/lib/utils";
+import dynamic from "next/dynamic";
+
+// Dynamically import the diff viewer to avoid SSR issues with Monaco
+const NormalizationDiffViewer = dynamic(
+  () => import("@/components/editor/NormalizationDiffViewer").then((mod) => mod.NormalizationDiffViewer),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+        <div className="rounded-lg bg-white p-8 dark:bg-slate-800">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+        </div>
+      </div>
+    ),
+  }
+);
 
 export default function ProjectSettingsPage() {
   const { data: session, status } = useSession();
@@ -69,6 +85,11 @@ export default function ProjectSettingsPage() {
   const [showNormalizationHistory, setShowNormalizationHistory] = useState(false);
   const [showPreviewHighlight, setShowPreviewHighlight] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+  const [showDiffViewer, setShowDiffViewer] = useState(false);
+  const [diffContent, setDiffContent] = useState<{
+    original: string;
+    normalized: string;
+  } | null>(null);
 
   // GitHub integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null);
@@ -380,7 +401,7 @@ export default function ProjectSettingsPage() {
       );
 
       if (dryRun) {
-        // Just update the preview
+        // Update the preview status
         setNormalizationStatus({
           needs_normalization: true,
           last_run: normalizationStatus?.last_run || null,
@@ -388,13 +409,22 @@ export default function ProjectSettingsPage() {
           preview_report: result.report,
           error: null,
         });
-        setShowPreviewHighlight(true);
-        // Scroll to preview after state update
-        setTimeout(() => {
-          previewRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 100);
-        // Remove highlight after animation
-        setTimeout(() => setShowPreviewHighlight(false), 2000);
+
+        // Show the diff viewer if we have content
+        if (result.original_content && result.normalized_content) {
+          setDiffContent({
+            original: result.original_content,
+            normalized: result.normalized_content,
+          });
+          setShowDiffViewer(true);
+        } else {
+          // Fallback to highlighting the stats preview
+          setShowPreviewHighlight(true);
+          setTimeout(() => {
+            previewRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }, 100);
+          setTimeout(() => setShowPreviewHighlight(false), 2000);
+        }
       } else {
         // Refresh the status after running
         const newStatus = await normalizationApi.getStatus(project.id, session.accessToken);
@@ -1255,6 +1285,18 @@ export default function ProjectSettingsPage() {
           )}
         </div>
       </main>
+
+      {/* Normalization Diff Viewer Modal */}
+      {showDiffViewer && diffContent && (
+        <NormalizationDiffViewer
+          originalContent={diffContent.original}
+          normalizedContent={diffContent.normalized}
+          onClose={() => {
+            setShowDiffViewer(false);
+            setDiffContent(null);
+          }}
+        />
+      )}
     </>
   );
 }

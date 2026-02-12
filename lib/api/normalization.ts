@@ -23,6 +23,9 @@ export interface NormalizationRunResponse {
   report: NormalizationReport;
   is_dry_run: boolean;
   commit_hash: string | null;
+  // For dry runs, includes content for diff preview
+  original_content: string | null;
+  normalized_content: string | null;
 }
 
 export interface NormalizationHistoryResponse {
