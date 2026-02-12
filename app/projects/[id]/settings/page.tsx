@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/components/projects/project-form";
@@ -24,6 +24,11 @@ import {
   type GitHubIntegration,
   type PRSettings,
 } from "@/lib/api/pullRequests";
+import {
+  normalizationApi,
+  type NormalizationStatusResponse,
+  type NormalizationRunResponse,
+} from "@/lib/api/normalization";
 import { cn } from "@/lib/utils";
 
 export default function ProjectSettingsPage() {
@@ -56,6 +61,13 @@ export default function ProjectSettingsPage() {
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
   const [preferencesSaved, setPreferencesSaved] = useState(false);
 
+  // Normalization state
+  const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
+  const [normalizationHistory, setNormalizationHistory] = useState<NormalizationRunResponse[]>([]);
+  const [isCheckingNormalization, setIsCheckingNormalization] = useState(false);
+  const [isRunningNormalization, setIsRunningNormalization] = useState(false);
+  const [showNormalizationHistory, setShowNormalizationHistory] = useState(false);
+
   // GitHub integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null);
   const [prSettings, setPrSettings] = useState<PRSettings | null>(null);
@@ -84,6 +96,16 @@ export default function ProjectSettingsPage() {
         setProject(projectData);
         setMembers(membersData.items);
         setLabelPreferences(projectData.label_preferences || []);
+
+        // Fetch normalization status if project has an ontology file
+        if (projectData.source_file_path) {
+          try {
+            const normStatus = await normalizationApi.getStatus(projectId, session.accessToken);
+            setNormalizationStatus(normStatus);
+          } catch {
+            // Normalization status may not be available, ignore
+          }
+        }
 
         // Fetch PR settings and GitHub integration for owners/admins/superadmins
         if (projectData.user_role === "owner" || projectData.user_role === "admin" || projectData.is_superadmin) {
@@ -313,6 +335,71 @@ export default function ProjectSettingsPage() {
     }
   };
 
+  const handleCheckNormalization = async () => {
+    if (!session?.accessToken || !project) return;
+
+    setIsCheckingNormalization(true);
+    setError(null);
+
+    try {
+      const status = await normalizationApi.getStatus(project.id, session.accessToken);
+      setNormalizationStatus(status);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to check normalization status");
+    } finally {
+      setIsCheckingNormalization(false);
+    }
+  };
+
+  const handleRunNormalization = async (dryRun: boolean = false) => {
+    if (!session?.accessToken || !project) return;
+
+    setIsRunningNormalization(true);
+    setError(null);
+
+    try {
+      const result = await normalizationApi.runNormalization(
+        project.id,
+        dryRun,
+        session.accessToken
+      );
+
+      if (dryRun) {
+        // Just update the preview
+        setNormalizationStatus({
+          needs_normalization: true,
+          last_run: normalizationStatus?.last_run || null,
+          last_run_id: normalizationStatus?.last_run_id || null,
+          preview_report: result.report,
+          error: null,
+        });
+        setSuccessMessage("Normalization preview generated");
+      } else {
+        // Refresh the status after running
+        const newStatus = await normalizationApi.getStatus(project.id, session.accessToken);
+        setNormalizationStatus(newStatus);
+        setSuccessMessage("Normalization completed successfully");
+      }
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to run normalization");
+    } finally {
+      setIsRunningNormalization(false);
+    }
+  };
+
+  const handleLoadNormalizationHistory = async () => {
+    if (!session?.accessToken || !project) return;
+
+    try {
+      const history = await normalizationApi.getHistory(project.id, 10, true, session.accessToken);
+      setNormalizationHistory(history.items);
+      setShowNormalizationHistory(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load normalization history");
+    }
+  };
+
   if (isLoading || status === "loading") {
     return (
       <>
@@ -460,6 +547,316 @@ export default function ProjectSettingsPage() {
                   {isSavingPreferences ? "Saving..." : "Save Preferences"}
                 </Button>
               </div>
+            </section>
+          )}
+
+          {/* Normalization Report Section - only show if project has an ontology with a report */}
+          {project.normalization_report && (
+            <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+              <div className="mb-4 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-slate-500" />
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  Import Normalization Report
+                </h2>
+              </div>
+              <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                When this ontology was imported, it was normalized to a canonical Turtle format
+                to ensure consistent formatting and minimal diffs in future edits.
+              </p>
+
+              <div className="space-y-4">
+                {/* Summary stats */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/50">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Original Format</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {project.normalization_report.original_format}
+                      {project.normalization_report.format_converted && (
+                        <span className="ml-1 text-xs font-normal text-slate-500">→ Turtle</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/50">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Triple Count</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {project.normalization_report.triple_count.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/50">
+                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Size Change</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {project.normalization_report.original_size_bytes.toLocaleString()} →{" "}
+                      {project.normalization_report.normalized_size_bytes.toLocaleString()} bytes
+                    </p>
+                  </div>
+                </div>
+
+                {/* Prefix changes */}
+                {(project.normalization_report.prefixes_removed.length > 0 ||
+                  project.normalization_report.prefixes_added.length > 0) && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-900/20">
+                    <h3 className="mb-2 text-sm font-medium text-amber-800 dark:text-amber-200">
+                      Prefix Changes
+                    </h3>
+                    {project.normalization_report.prefixes_removed.length > 0 && (
+                      <div className="mb-2">
+                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Removed: </span>
+                        <span className="text-xs text-amber-600 dark:text-amber-400">
+                          {project.normalization_report.prefixes_removed.join(", ")}
+                        </span>
+                      </div>
+                    )}
+                    {project.normalization_report.prefixes_added.length > 0 && (
+                      <div>
+                        <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Added: </span>
+                        <span className="text-xs text-amber-600 dark:text-amber-400">
+                          {project.normalization_report.prefixes_added.join(", ")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Notes */}
+                {project.normalization_report.notes.length > 0 && (
+                  <div>
+                    <h3 className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Changes Made
+                    </h3>
+                    <ul className="space-y-1">
+                      {project.normalization_report.notes.map((note, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
+                          <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-slate-400" />
+                          {note}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* On-Demand Normalization Section - only show if project has an ontology */}
+          {project.source_file_path && (
+            <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <RefreshCw className="h-5 w-5 text-slate-500" />
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Ontology Normalization
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLoadNormalizationHistory}
+                    disabled={isCheckingNormalization}
+                  >
+                    <History className="mr-1 h-4 w-4" />
+                    History
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCheckNormalization}
+                    disabled={isCheckingNormalization}
+                  >
+                    {isCheckingNormalization ? (
+                      <>
+                        <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+                        Checking...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-1 h-4 w-4" />
+                        Check Status
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                Normalization converts the ontology to a canonical Turtle format, ensuring consistent
+                formatting and minimal diffs in future edits. You can run normalization at any time
+                to clean up the source file.
+              </p>
+
+              {/* Status indicator */}
+              {normalizationStatus && (
+                <div className="mb-4">
+                  {normalizationStatus.error ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-900/20">
+                      <p className="text-sm text-red-700 dark:text-red-300">
+                        Error checking status: {normalizationStatus.error}
+                      </p>
+                    </div>
+                  ) : normalizationStatus.needs_normalization ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                          Normalization recommended
+                        </p>
+                      </div>
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        The ontology source file can be optimized for better formatting and smaller diffs.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-900/20">
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                          Ontology is already normalized
+                        </p>
+                      </div>
+                      {normalizationStatus.last_run && (
+                        <p className="mt-1 text-xs text-green-600 dark:text-green-400">
+                          Last normalized: {new Date(normalizationStatus.last_run).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Preview report if available */}
+              {normalizationStatus?.preview_report && normalizationStatus.needs_normalization && (
+                <div className="mb-4 space-y-3">
+                  <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Preview of Changes
+                  </h3>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/50">
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Triple Count</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {normalizationStatus.preview_report.triple_count.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/50">
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Size Change</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {normalizationStatus.preview_report.original_size_bytes.toLocaleString()} →{" "}
+                        {normalizationStatus.preview_report.normalized_size_bytes.toLocaleString()} bytes
+                      </p>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/50">
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Prefixes</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                        {normalizationStatus.preview_report.prefixes_removed.length > 0 && (
+                          <span className="text-red-600">-{normalizationStatus.preview_report.prefixes_removed.length}</span>
+                        )}
+                        {normalizationStatus.preview_report.prefixes_removed.length > 0 &&
+                          normalizationStatus.preview_report.prefixes_added.length > 0 && " / "}
+                        {normalizationStatus.preview_report.prefixes_added.length > 0 && (
+                          <span className="text-green-600">+{normalizationStatus.preview_report.prefixes_added.length}</span>
+                        )}
+                        {normalizationStatus.preview_report.prefixes_removed.length === 0 &&
+                          normalizationStatus.preview_report.prefixes_added.length === 0 &&
+                          "No changes"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {normalizationStatus.preview_report.notes.length > 0 && (
+                    <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/50">
+                      <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">Changes</p>
+                      <ul className="space-y-0.5">
+                        {normalizationStatus.preview_report.notes.slice(0, 5).map((note, idx) => (
+                          <li key={idx} className="text-xs text-slate-600 dark:text-slate-400">
+                            • {note}
+                          </li>
+                        ))}
+                        {normalizationStatus.preview_report.notes.length > 5 && (
+                          <li className="text-xs text-slate-500 dark:text-slate-500">
+                            ... and {normalizationStatus.preview_report.notes.length - 5} more
+                          </li>
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Action buttons */}
+              {canManage && (
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={() => handleRunNormalization(true)}
+                    variant="outline"
+                    disabled={isRunningNormalization}
+                  >
+                    Preview Changes
+                  </Button>
+                  <Button
+                    onClick={() => handleRunNormalization(false)}
+                    disabled={isRunningNormalization || !normalizationStatus?.needs_normalization}
+                  >
+                    {isRunningNormalization ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Running...
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-4 w-4" />
+                        Run Normalization
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {/* History panel */}
+              {showNormalizationHistory && normalizationHistory.length > 0 && (
+                <div className="mt-4 rounded-lg border border-slate-200 dark:border-slate-600">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-4 py-2 dark:border-slate-600">
+                    <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                      Normalization History
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowNormalizationHistory(false)}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {normalizationHistory.map((run) => (
+                      <div
+                        key={run.id}
+                        className="border-b border-slate-100 px-4 py-3 last:border-b-0 dark:border-slate-700"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium text-slate-900 dark:text-white">
+                              {run.trigger_type === "import" ? "Import" : run.trigger_type === "manual" ? "Manual" : "Automatic"}
+                              {run.is_dry_run && (
+                                <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                                  Preview
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              {new Date(run.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="text-right text-xs text-slate-500 dark:text-slate-400">
+                            <p>{run.report.triple_count.toLocaleString()} triples</p>
+                            {run.commit_hash && (
+                              <p className="font-mono">{run.commit_hash.substring(0, 7)}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           )}
 

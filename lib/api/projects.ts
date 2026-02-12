@@ -13,6 +13,20 @@ export interface ProjectOwner {
   email?: string;
 }
 
+export interface NormalizationReport {
+  original_format: string;
+  original_filename: string;
+  original_size_bytes: number;
+  normalized_size_bytes: number;
+  triple_count: number;
+  prefixes_before: string[];
+  prefixes_after: string[];
+  prefixes_removed: string[];
+  prefixes_added: string[];
+  format_converted: boolean;
+  notes: string[];
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -30,6 +44,8 @@ export interface Project {
   ontology_iri?: string;
   // Label preferences for ontology display
   label_preferences?: string[];
+  // Normalization report from initial import
+  normalization_report?: NormalizationReport;
 }
 
 export interface ProjectListResponse {

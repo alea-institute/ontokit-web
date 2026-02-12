@@ -111,7 +111,7 @@ export function RevisionHistoryPanel({
   return (
     <div
       className={cn(
-        "absolute right-0 top-0 z-30 h-full w-96 border-l border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800",
+        "absolute right-0 top-0 z-30 h-full w-[768px] border-l border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800",
         className
       )}
     >

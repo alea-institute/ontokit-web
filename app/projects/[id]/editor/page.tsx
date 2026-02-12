@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Settings, Search, FileCode, GitPullRequest, Activity, TreePine, Code } from "lucide-react";
+import { ArrowLeft, Settings, Search, FileCode, GitPullRequest, Activity, TreePine, Code, RefreshCw } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
@@ -22,6 +22,7 @@ import { pullRequestsApi } from "@/lib/api/pullRequests";
 import { lintApi, type LintSummary } from "@/lib/api/lint";
 import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi } from "@/lib/api/client";
+import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
 
 // Import the ref type and IRI position type
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
@@ -56,6 +57,7 @@ export default function EditorPage() {
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const [openPRCount, setOpenPRCount] = useState(0);
   const [lintSummary, setLintSummary] = useState<LintSummary | null>(null);
+  const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
 
   // View mode state
   const [viewMode, setViewMode] = useState<EditorView>("tree");
@@ -130,6 +132,16 @@ export default function EditorPage() {
           setLintSummary(summary);
         } catch {
           // Ignore lint errors
+        }
+
+        // Fetch normalization status
+        if (data.source_file_path) {
+          try {
+            const normStatus = await normalizationApi.getStatus(projectId, session?.accessToken);
+            setNormalizationStatus(normStatus);
+          } catch {
+            // Ignore normalization status errors
+          }
         }
       } catch (err) {
         if (err instanceof Error && err.message.includes("403")) {
@@ -608,6 +620,21 @@ export default function EditorPage() {
                 onClick={() => setShowHistory(!showHistory)}
                 isOpen={showHistory}
               />
+
+              {/* Normalization Status Indicator */}
+              {normalizationStatus?.needs_normalization && (
+                <Link href={`/projects/${projectId}/settings`}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-2 text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                    title="Ontology normalization recommended"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    <span className="hidden sm:inline">Normalize</span>
+                  </Button>
+                </Link>
+              )}
 
               {/* Health Check Button */}
               <Button

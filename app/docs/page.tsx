@@ -172,6 +172,62 @@ export default function DocsPage() {
               </div>
             </section>
 
+            {/* Import & Normalization */}
+            <section>
+              <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mb-4">
+                Import & Normalization
+              </h2>
+              <div className="space-y-4">
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">
+                    Canonical Turtle Format
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                    When you import an ontology file, Axigraph normalizes it to a canonical Turtle format.
+                    This ensures consistent formatting across all edits and produces minimal, meaningful
+                    diffs in version history. The normalization happens once at import time.
+                  </p>
+                  <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                    <h4 className="font-medium text-amber-800 dark:text-amber-200 mb-2">
+                      What changes during normalization:
+                    </h4>
+                    <ul className="list-disc list-inside text-amber-700 dark:text-amber-300 text-sm space-y-1">
+                      <li>All formats (RDF/XML, OWL/XML, N3, JSON-LD) are converted to Turtle (.ttl)</li>
+                      <li>Triples are reordered into a consistent, deterministic sequence</li>
+                      <li>Unused namespace prefixes may be removed (e.g., <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">rdf:</code>, <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">xml:</code>, <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">xsd:</code> if not explicitly used)</li>
+                      <li>Whitespace and formatting are standardized</li>
+                      <li>The shorthand <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">a</code> is used for <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">rdf:type</code></li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">
+                    Metadata Synchronization
+                  </h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-4">
+                    When you update a project&apos;s name or description in Project Settings, Axigraph
+                    automatically syncs these changes to the ontology&apos;s RDF metadata properties.
+                  </p>
+                  <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
+                    <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-2 text-sm">
+                      How metadata sync works:
+                    </h4>
+                    <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
+                      <li>
+                        <strong>Title:</strong> Updates <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dc:title</code>, <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dcterms:title</code>, or <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">rdfs:label</code> (whichever exists)
+                      </li>
+                      <li>
+                        <strong>Description:</strong> Updates <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dc:description</code>, <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dcterms:description</code>, or <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">rdfs:comment</code>
+                      </li>
+                      <li>If no metadata property exists, <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dc:title</code> / <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dc:description</code> is added</li>
+                      <li>Changes are committed to git with a descriptive message</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             {/* API Reference Link */}
             <section>
               <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mb-4">
