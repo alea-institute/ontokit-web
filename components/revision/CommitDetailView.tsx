@@ -15,9 +15,12 @@ import {
   GitBranch,
   GitMerge,
   ChevronLeft,
+  ChevronDown,
+  ChevronRight,
   Copy,
   Check,
   FileText,
+  FileCode,
   Plus,
   Minus,
 } from "lucide-react";
@@ -44,6 +47,7 @@ export function CommitDetailView({
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
   const [diffError, setDiffError] = useState<string | null>(null);
   const [copiedHash, setCopiedHash] = useState(false);
+  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
 
   const loadDiff = useCallback(async () => {
     if (!commit.parent_hashes.length) {
@@ -64,6 +68,8 @@ export function CommitDetailView({
         accessToken
       );
       setDiff(response);
+      // Expand all files by default
+      setExpandedFiles(new Set(response.changes.map((c) => c.path)));
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to load diff";
@@ -274,60 +280,114 @@ export function CommitDetailView({
                 )}
               </div>
 
-              {/* File list */}
-              <div className="rounded-lg border border-slate-200 dark:border-slate-700">
-                {diff.changes.map((change, index) => {
+              {/* File list with expandable diffs */}
+              <div className="space-y-2">
+                {diff.changes.map((change) => {
                   const typeInfo = getChangeTypeLabel(change.change_type);
+                  const isExpanded = expandedFiles.has(change.path);
+                  const toggleExpanded = () => {
+                    setExpandedFiles((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(change.path)) {
+                        next.delete(change.path);
+                      } else {
+                        next.add(change.path);
+                      }
+                      return next;
+                    });
+                  };
+
                   return (
                     <div
                       key={change.path}
-                      className={cn(
-                        "flex items-center justify-between px-3 py-2",
-                        index > 0 && "border-t border-slate-200 dark:border-slate-700"
-                      )}
+                      className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 overflow-hidden"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span
-                          className={cn(
-                            "rounded px-1.5 py-0.5 text-xs font-medium",
-                            typeInfo.className
+                      {/* File header */}
+                      <button
+                        onClick={toggleExpanded}
+                        className="flex w-full items-center justify-between px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          {change.patch ? (
+                            isExpanded ? (
+                              <ChevronDown className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                            )
+                          ) : (
+                            <div className="h-4 w-4 flex-shrink-0" />
                           )}
-                        >
-                          {typeInfo.label}
-                        </span>
-                        <span className="truncate font-mono text-sm text-slate-700 dark:text-slate-300">
-                          {change.path}
-                        </span>
-                        {change.old_path && change.change_type === "R" && (
-                          <span className="text-xs text-slate-400">
-                            (from {change.old_path})
+                          <FileCode className={cn(
+                            "h-4 w-4 flex-shrink-0",
+                            change.change_type === "A" && "text-green-600",
+                            change.change_type === "D" && "text-red-600",
+                            change.change_type === "M" && "text-amber-600",
+                            change.change_type === "R" && "text-blue-600"
+                          )} />
+                          <div className="min-w-0 text-left">
+                            <span className="font-mono text-sm truncate block text-slate-700 dark:text-slate-300">
+                              {change.path}
+                            </span>
+                            {change.old_path && change.change_type === "R" && (
+                              <span className="text-xs text-slate-500">
+                                renamed from {change.old_path}
+                              </span>
+                            )}
+                          </div>
+                          <span
+                            className={cn(
+                              "flex-shrink-0 rounded px-1.5 py-0.5 text-xs font-medium",
+                              typeInfo.className
+                            )}
+                          >
+                            {typeInfo.label}
                           </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        {change.additions > 0 && (
-                          <span className="text-green-600">+{change.additions}</span>
-                        )}
-                        {change.deletions > 0 && (
-                          <span className="text-red-600">-{change.deletions}</span>
-                        )}
-                      </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          {change.additions > 0 && (
+                            <span className="text-green-600">+{change.additions}</span>
+                          )}
+                          {change.deletions > 0 && (
+                            <span className="text-red-600">-{change.deletions}</span>
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Diff content with syntax highlighting */}
+                      {isExpanded && change.patch && (
+                        <div className="border-t border-slate-200 dark:border-slate-700 overflow-x-auto">
+                          <pre className="text-xs leading-relaxed">
+                            {change.patch.split("\n").map((line, idx) => {
+                              let bgClass = "";
+                              let textClass = "text-slate-700 dark:text-slate-300";
+
+                              if (line.startsWith("+") && !line.startsWith("+++")) {
+                                bgClass = "bg-green-50 dark:bg-green-900/20";
+                                textClass = "text-green-800 dark:text-green-300";
+                              } else if (line.startsWith("-") && !line.startsWith("---")) {
+                                bgClass = "bg-red-50 dark:bg-red-900/20";
+                                textClass = "text-red-800 dark:text-red-300";
+                              } else if (line.startsWith("@@")) {
+                                bgClass = "bg-blue-50 dark:bg-blue-900/20";
+                                textClass = "text-blue-700 dark:text-blue-300";
+                              }
+
+                              return (
+                                <div
+                                  key={idx}
+                                  className={cn("px-4 py-0.5 font-mono whitespace-pre", bgClass, textClass)}
+                                >
+                                  {line || " "}
+                                </div>
+                              );
+                            })}
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
-
-              {/* Patch preview for first file if available */}
-              {diff.changes[0]?.patch && (
-                <details className="mt-4">
-                  <summary className="cursor-pointer text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200">
-                    Show diff patch
-                  </summary>
-                  <pre className="mt-2 max-h-64 overflow-auto rounded-lg bg-slate-900 p-4 text-xs text-slate-100">
-                    {diff.changes[0].patch}
-                  </pre>
-                </details>
-              )}
             </div>
           ) : (
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/50">
