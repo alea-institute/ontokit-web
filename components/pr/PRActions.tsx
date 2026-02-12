@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   pullRequestsApi,
   type PullRequest,
@@ -57,6 +57,22 @@ export function PRActions({
   const isOpen = pr.status === "open";
   const isClosed = pr.status === "closed";
   const isMerged = pr.status === "merged";
+
+  // Check if source branch exists when viewing a merged PR
+  useEffect(() => {
+    if (isMerged && sourceBranchExists === null) {
+      branchesApi
+        .list(projectId, accessToken)
+        .then((response) => {
+          const branchNames = response.items.map((b) => b.name);
+          setSourceBranchExists(branchNames.includes(pr.source_branch));
+        })
+        .catch(() => {
+          // If we can't fetch branches, assume branch might exist to show delete button
+          setSourceBranchExists(true);
+        });
+    }
+  }, [isMerged, sourceBranchExists, projectId, accessToken, pr.source_branch]);
 
   const handleMerge = async () => {
     await pullRequestsApi.merge(
@@ -156,7 +172,19 @@ export function PRActions({
               </Button>
             </Link>
 
-            {sourceBranchExists !== false && (
+            {sourceBranchExists === null && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled
+                className="gap-1"
+              >
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Checking branch...
+              </Button>
+            )}
+
+            {sourceBranchExists === true && (
               <Button
                 size="sm"
                 variant="outline"
@@ -166,6 +194,13 @@ export function PRActions({
                 <Trash2 className="h-4 w-4" />
                 Delete Branch "{pr.source_branch}"
               </Button>
+            )}
+
+            {sourceBranchExists === false && (
+              <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                <Check className="h-4 w-4" />
+                Branch "{pr.source_branch}" deleted
+              </span>
             )}
           </div>
         </div>

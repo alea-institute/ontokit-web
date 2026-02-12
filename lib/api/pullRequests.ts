@@ -31,6 +31,9 @@ export interface PullRequest {
   merged_by?: string;
   merged_by_user?: PRUser;
   merged_at?: string;
+  merge_commit_hash?: string;
+  base_commit_hash?: string;
+  head_commit_hash?: string;
   created_at: string;
   updated_at?: string;
   review_count: number;
