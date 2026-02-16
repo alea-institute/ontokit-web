@@ -2,7 +2,7 @@
  * Projects API client
  */
 
-import { api } from "./client";
+import { api, type UploadProgress } from "./client";
 
 // Types
 export type ProjectRole = "owner" | "admin" | "editor" | "viewer";
@@ -150,8 +150,15 @@ export const projectApi = {
 
   /**
    * Import a project from an ontology file
+   * @param data - Import data including file and metadata
+   * @param token - Access token
+   * @param onProgress - Optional progress callback for upload tracking
    */
-  import: (data: ProjectImportData, token: string) => {
+  import: (
+    data: ProjectImportData,
+    token: string,
+    onProgress?: (progress: UploadProgress) => void
+  ) => {
     const formData = new FormData();
     formData.append("file", data.file);
     formData.append("is_public", String(data.is_public));
@@ -161,6 +168,19 @@ export const projectApi = {
     if (data.description) {
       formData.append("description", data.description);
     }
+
+    // Use progress-enabled upload if callback provided
+    if (onProgress) {
+      return api.uploadWithProgress<ProjectImportResponse>(
+        "/api/v1/projects/import",
+        formData,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          onProgress,
+        }
+      );
+    }
+
     return api.upload<ProjectImportResponse>("/api/v1/projects/import", formData, {
       headers: { Authorization: `Bearer ${token}` },
     });

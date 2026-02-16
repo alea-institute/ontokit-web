@@ -9,7 +9,12 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/file-upload";
 import { ProjectForm } from "@/components/projects/project-form";
-import { projectApi, type ProjectCreate, type ProjectImportData } from "@/lib/api/projects";
+import {
+  projectApi,
+  type ProjectCreate,
+  type ProjectImportData,
+} from "@/lib/api/projects";
+import type { UploadProgress } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 type TabType = "create" | "import";
@@ -21,6 +26,7 @@ export default function NewProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
   const isAuthenticated = status === "authenticated";
   const isLoading = status === "loading";
@@ -58,6 +64,8 @@ export default function NewProjectPage() {
 
     setIsSubmitting(true);
     setImportError(null);
+    setUploadProgress(null);
+
     try {
       const importData: ProjectImportData = {
         file: selectedFile,
@@ -65,7 +73,12 @@ export default function NewProjectPage() {
         name: data.name || undefined,
         description: data.description || undefined,
       };
-      const project = await projectApi.import(importData, session.accessToken);
+
+      const project = await projectApi.import(
+        importData,
+        session.accessToken,
+        (progress) => setUploadProgress(progress)
+      );
       router.push(`/projects/${project.id}`);
     } catch (err) {
       if (err instanceof Error) {
@@ -82,6 +95,7 @@ export default function NewProjectPage() {
       throw err;
     } finally {
       setIsSubmitting(false);
+      setUploadProgress(null);
     }
   };
 
@@ -210,6 +224,39 @@ export default function NewProjectPage() {
                     You can override them below.
                   </p>
                 </div>
+
+                {/* Upload Progress */}
+                {uploadProgress && (
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-700">
+                    <div className="mb-2 flex items-center justify-between text-sm">
+                      <span className="font-medium text-slate-700 dark:text-slate-300">
+                        {uploadProgress.phase === "uploading"
+                          ? "Uploading file..."
+                          : "Processing ontology..."}
+                      </span>
+                      <span className="text-slate-500 dark:text-slate-400">
+                        {uploadProgress.phase === "uploading"
+                          ? `${uploadProgress.percentage}%`
+                          : "Please wait"}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-600">
+                      {uploadProgress.phase === "uploading" ? (
+                        <div
+                          className="h-full rounded-full bg-primary-600 transition-all duration-300"
+                          style={{ width: `${uploadProgress.percentage}%` }}
+                        />
+                      ) : (
+                        <div className="h-full w-full animate-pulse bg-primary-400" />
+                      )}
+                    </div>
+                    {uploadProgress.phase === "processing" && (
+                      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                        Parsing ontology and initializing project...
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 {/* Project Form (for overrides and visibility) */}
                 <ProjectForm

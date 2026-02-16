@@ -104,6 +104,90 @@ async function uploadFile<T>(
   return JSON.parse(text);
 }
 
+export interface UploadProgress {
+  loaded: number;
+  total: number;
+  percentage: number;
+  phase: "uploading" | "processing";
+}
+
+interface UploadWithProgressOptions {
+  headers?: Record<string, string>;
+  onProgress?: (progress: UploadProgress) => void;
+}
+
+/**
+ * Upload a file with progress tracking using XMLHttpRequest
+ */
+function uploadFileWithProgress<T>(
+  endpoint: string,
+  formData: FormData,
+  options: UploadWithProgressOptions = {}
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const url = `${API_BASE}${endpoint}`;
+
+    // Track upload progress
+    xhr.upload.addEventListener("progress", (event) => {
+      if (event.lengthComputable && options.onProgress) {
+        options.onProgress({
+          loaded: event.loaded,
+          total: event.total,
+          percentage: Math.round((event.loaded / event.total) * 100),
+          phase: "uploading",
+        });
+      }
+    });
+
+    // When upload completes, switch to processing phase
+    xhr.upload.addEventListener("load", () => {
+      if (options.onProgress) {
+        options.onProgress({
+          loaded: 100,
+          total: 100,
+          percentage: 100,
+          phase: "processing",
+        });
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = xhr.responseText ? JSON.parse(xhr.responseText) : undefined;
+          resolve(response as T);
+        } catch {
+          resolve(undefined as T);
+        }
+      } else {
+        reject(new ApiError(xhr.status, xhr.statusText, xhr.responseText));
+      }
+    });
+
+    xhr.addEventListener("error", () => {
+      reject(new ApiError(0, "Network Error", "Failed to upload file"));
+    });
+
+    xhr.addEventListener("abort", () => {
+      reject(new ApiError(0, "Aborted", "Upload was cancelled"));
+    });
+
+    xhr.open("POST", url);
+
+    // Set headers (except Content-Type which is auto-set for FormData)
+    if (options.headers) {
+      Object.entries(options.headers).forEach(([key, value]) => {
+        if (key.toLowerCase() !== "content-type") {
+          xhr.setRequestHeader(key, value);
+        }
+      });
+    }
+
+    xhr.send(formData);
+  });
+}
+
 export const api = {
   get: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { ...options, method: "GET" }),
@@ -134,6 +218,12 @@ export const api = {
 
   upload: <T>(endpoint: string, formData: FormData, options?: Omit<RequestOptions, "body">) =>
     uploadFile<T>(endpoint, formData, options),
+
+  uploadWithProgress: <T>(
+    endpoint: string,
+    formData: FormData,
+    options?: UploadWithProgressOptions
+  ) => uploadFileWithProgress<T>(endpoint, formData, options),
 };
 
 // Type-safe API methods for specific endpoints
