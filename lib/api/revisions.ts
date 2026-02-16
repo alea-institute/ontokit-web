@@ -63,6 +63,7 @@ export interface BranchListResponse {
   items: BranchInfo[];
   current_branch: string;
   default_branch: string;
+  preferred_branch: string | null;
 }
 
 export interface BranchCreate {
@@ -192,6 +193,19 @@ export const branchesApi = {
       {
         params: { force },
         headers: { Authorization: `Bearer ${token}` },
+      }
+    ),
+
+  /**
+   * Save user's branch preference (fire-and-forget)
+   */
+  savePreference: (projectId: string, branch: string, token: string) =>
+    api.put<void>(
+      `/api/v1/projects/${projectId}/branch-preference`,
+      undefined,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { branch },
       }
     ),
 };

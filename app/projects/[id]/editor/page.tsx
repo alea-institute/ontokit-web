@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession } from "next-auth/react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, Settings, Search, FileCode, GitPullRequest, Activity, TreePine, Code, RefreshCw } from "lucide-react";
@@ -47,8 +47,12 @@ export default function EditorPage() {
   const { data: session, status } = useSession();
   const params = useParams();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const projectId = params.id as string;
-  const initialBranch = searchParams.get("branch") || undefined;
+  const initialBranch = searchParams.get("branch")
+    || (() => { try { return sessionStorage.getItem(`axigraph:branch:${projectId}`); } catch { return null; } })()
+    || undefined;
 
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -184,7 +188,7 @@ export default function EditorPage() {
     try {
       const response = await revisionsApi.getFileAtVersion(
         projectId,
-        "HEAD",
+        activeBranch || "HEAD",
         session.accessToken
       );
       setSourceContent(response.content);
@@ -202,7 +206,7 @@ export default function EditorPage() {
         setIsLoadingSource(false);
       }
     }
-  }, [projectId, session?.accessToken, sourceContent]);
+  }, [projectId, session?.accessToken, sourceContent, activeBranch]);
 
   // Refs to handle the save promise
   const pendingSaveResolveRef = useRef<(() => void) | null>(null);
@@ -237,7 +241,8 @@ export default function EditorPage() {
       projectId,
       pendingSaveContent,
       commitMessage,
-      session.accessToken
+      session.accessToken,
+      activeBranch
     );
 
     // Update the local source content
@@ -251,7 +256,7 @@ export default function EditorPage() {
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session?.accessToken, pendingSaveContent]);
+  }, [projectId, session?.accessToken, pendingSaveContent, activeBranch]);
 
   // Handle commit dialog cancel
   const handleCommitDialogClose = useCallback((open: boolean) => {
@@ -391,7 +396,7 @@ export default function EditorPage() {
       });
   }, [sourceContent, sourceIriIndex.size, isIndexing]);
 
-  // Handle branch change — reset all branch-dependent state
+  // Handle branch change — reset all branch-dependent state and update URL
   const handleBranchChange = useCallback((branchName: string) => {
     setActiveBranch(branchName);
     // Reset source content so it reloads from the new branch
@@ -399,7 +404,9 @@ export default function EditorPage() {
     setSourceError(null);
     setSourceIriIndex(new Map());
     preloadStartedRef.current = false;
-  }, []);
+    // Update URL to reflect the current branch
+    router.replace(`${pathname}?branch=${encodeURIComponent(branchName)}`);
+  }, [pathname, router]);
 
   // Handle view mode change
   const handleViewModeChange = useCallback((mode: EditorView) => {
@@ -750,6 +757,7 @@ export default function EditorPage() {
                   projectId={projectId}
                   classIri={selectedIri}
                   accessToken={session?.accessToken}
+                  branch={activeBranch}
                   onNavigateToClass={navigateToNode}
                   onNavigateToSource={handleNavigateToSource}
                 />

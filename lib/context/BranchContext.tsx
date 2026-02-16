@@ -11,8 +11,27 @@ import {
 import {
   branchesApi,
   type BranchInfo,
-  type BranchListResponse,
 } from "@/lib/api/revisions";
+
+// --- sessionStorage helpers ---
+
+function getStoredBranch(projectId: string): string | null {
+  try {
+    return sessionStorage.getItem(`axigraph:branch:${projectId}`);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredBranch(projectId: string, branch: string): void {
+  try {
+    sessionStorage.setItem(`axigraph:branch:${projectId}`, branch);
+  } catch {
+    /* ignore */
+  }
+}
+
+// --- Context ---
 
 interface BranchContextValue {
   // State
@@ -48,7 +67,10 @@ export function BranchProvider({
   children,
 }: BranchProviderProps) {
   const [branches, setBranches] = useState<BranchInfo[]>([]);
-  const [currentBranch, setCurrentBranch] = useState<string>("main");
+  // Priority: URL param (initialBranch) > sessionStorage > "main" placeholder
+  const [currentBranch, setCurrentBranch] = useState<string>(
+    () => initialBranch || getStoredBranch(projectId) || "main"
+  );
   const [defaultBranch, setDefaultBranch] = useState<string>("main");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,8 +87,12 @@ export function BranchProvider({
     try {
       const response = await branchesApi.list(projectId, accessToken);
       setBranches(response.items);
-      setCurrentBranch(response.current_branch);
       setDefaultBranch(response.default_branch);
+      // On first load, use DB preference if no URL param or sessionStorage set the branch
+      setCurrentBranch((prev) => {
+        if (prev !== "main") return prev; // already set by URL or sessionStorage
+        return response.preferred_branch || response.current_branch;
+      });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to load branches";
@@ -98,23 +124,27 @@ export function BranchProvider({
 
   const switchBranch = useCallback(
     async (name: string) => {
-      if (!accessToken) {
-        throw new Error("Authentication required");
-      }
-
       if (pendingChanges) {
         throw new Error(
           "You have pending changes. Please commit or discard them before switching branches."
         );
       }
 
-      await branchesApi.switch(projectId, name, accessToken);
-      setCurrentBranch(name);
+      // Validate branch exists locally — no backend call needed
+      const branchExists = branches.some((b) => b.name === name);
+      if (!branchExists) {
+        throw new Error(`Branch not found: ${name}`);
+      }
 
-      // Refresh branches to update ahead/behind counts
-      await loadBranches();
+      setCurrentBranch(name);
+      setStoredBranch(projectId, name);
+
+      // Fire-and-forget: persist to DB for cross-session restore
+      if (accessToken) {
+        branchesApi.savePreference(projectId, name, accessToken).catch(() => {});
+      }
     },
-    [projectId, accessToken, pendingChanges, loadBranches]
+    [branches, pendingChanges, projectId, accessToken]
   );
 
   const deleteBranch = useCallback(
@@ -144,33 +174,22 @@ export function BranchProvider({
     loadBranches();
   }, [loadBranches]);
 
-  // Switch to initial branch if specified and different from current
+  // Set initial branch if specified and different from current (client-side only)
   const [initialBranchHandled, setInitialBranchHandled] = useState(false);
   useEffect(() => {
     if (
       initialBranch &&
       !initialBranchHandled &&
       !isLoading &&
-      branches.length > 0 &&
-      accessToken
+      branches.length > 0
     ) {
-      // Check if the initial branch exists and is different from current
       const branchExists = branches.some((b) => b.name === initialBranch);
       if (branchExists && initialBranch !== currentBranch) {
-        branchesApi.switch(projectId, initialBranch, accessToken)
-          .then(() => {
-            setCurrentBranch(initialBranch);
-            setInitialBranchHandled(true);
-          })
-          .catch((err) => {
-            console.error("Failed to switch to initial branch:", err);
-            setInitialBranchHandled(true);
-          });
-      } else {
-        setInitialBranchHandled(true);
+        setCurrentBranch(initialBranch);
       }
+      setInitialBranchHandled(true);
     }
-  }, [initialBranch, initialBranchHandled, isLoading, branches, currentBranch, projectId, accessToken]);
+  }, [initialBranch, initialBranchHandled, isLoading, branches, currentBranch]);
 
   const value: BranchContextValue = {
     branches,
