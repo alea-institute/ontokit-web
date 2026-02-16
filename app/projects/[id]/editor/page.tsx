@@ -175,7 +175,7 @@ export default function EditorPage() {
 
   // Load source content (can be called for preloading or immediate loading)
   const loadSourceContent = useCallback(async (isPreload = false) => {
-    if (!projectId || !session?.accessToken) return;
+    if (!projectId || !session?.accessToken || !activeBranch) return;
     if (sourceContent) return; // Already loaded
 
     if (isPreload) {
@@ -188,7 +188,7 @@ export default function EditorPage() {
     try {
       const response = await revisionsApi.getFileAtVersion(
         projectId,
-        activeBranch || "HEAD",
+        activeBranch,
         session.accessToken
       );
       setSourceContent(response.content);
