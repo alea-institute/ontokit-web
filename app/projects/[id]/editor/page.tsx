@@ -59,6 +59,9 @@ export default function EditorPage() {
   const [lintSummary, setLintSummary] = useState<LintSummary | null>(null);
   const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
 
+  // Track current branch so editor data reloads on switch
+  const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
+
   // View mode state
   const [viewMode, setViewMode] = useState<EditorView>("tree");
   const [sourceContent, setSourceContent] = useState<string>("");
@@ -90,6 +93,7 @@ export default function EditorPage() {
   } = useOntologyTree({
     projectId,
     accessToken: session?.accessToken,
+    branchKey: activeBranch,
   });
 
   // Track WebSocket connection status (uses lint WebSocket endpoint)
@@ -387,6 +391,16 @@ export default function EditorPage() {
       });
   }, [sourceContent, sourceIriIndex.size, isIndexing]);
 
+  // Handle branch change — reset all branch-dependent state
+  const handleBranchChange = useCallback((branchName: string) => {
+    setActiveBranch(branchName);
+    // Reset source content so it reloads from the new branch
+    setSourceContent("");
+    setSourceError(null);
+    setSourceIriIndex(new Map());
+    preloadStartedRef.current = false;
+  }, []);
+
   // Handle view mode change
   const handleViewModeChange = useCallback((mode: EditorView) => {
     setViewMode(mode);
@@ -613,7 +627,7 @@ export default function EditorPage() {
               </div>
 
               {/* Branch Selector */}
-              <BranchSelector />
+              <BranchSelector onBranchChange={handleBranchChange} />
 
               {/* History Button */}
               <HistoryButton

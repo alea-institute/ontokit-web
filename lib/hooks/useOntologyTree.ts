@@ -7,6 +7,8 @@ import type { ClassTreeNode } from "@/lib/ontology/types";
 interface UseOntologyTreeOptions {
   projectId: string;
   accessToken?: string;
+  /** When this value changes, the tree reloads from scratch */
+  branchKey?: string;
 }
 
 interface UseOntologyTreeReturn {
@@ -64,12 +66,21 @@ function updateNodeInTree(
 export function useOntologyTree({
   projectId,
   accessToken,
+  branchKey,
 }: UseOntologyTreeOptions): UseOntologyTreeReturn {
   const [nodes, setNodes] = useState<ClassTreeNode[]>([]);
   const [totalClasses, setTotalClasses] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIri, setSelectedIri] = useState<string | null>(null);
+
+  // Reset tree state when branch changes
+  useEffect(() => {
+    setNodes([]);
+    setTotalClasses(0);
+    setSelectedIri(null);
+    setError(null);
+  }, [branchKey]);
 
   /**
    * Load root classes
@@ -90,7 +101,8 @@ export function useOntologyTree({
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, accessToken]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, accessToken, branchKey]);
 
   /**
    * Expand a node and load its children
