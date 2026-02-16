@@ -57,6 +57,11 @@ export interface BranchInfo {
   commit_date?: string;
   commits_ahead: number;
   commits_behind: number;
+  created_by_id?: string;
+  created_by_name?: string;
+  can_delete: boolean;
+  has_open_pr: boolean;
+  has_delete_permission: boolean;
 }
 
 export interface BranchListResponse {
@@ -118,9 +123,9 @@ export const revisionsApi = {
       headers.Authorization = `Bearer ${token}`;
     }
     return api.get<RevisionFileResponse>(
-      `/api/v1/projects/${projectId}/revisions/${version}/file`,
+      `/api/v1/projects/${projectId}/revisions/file`,
       {
-        params: { filename },
+        params: { version, filename },
         headers,
       }
     );

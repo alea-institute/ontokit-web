@@ -237,15 +237,31 @@ export function BranchSelector({
                         -{branch.commits_behind}
                       </span>
                     )}
-                    {!branch.is_default && branch.name !== currentBranch && (
-                      <button
-                        className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
-                        onClick={(e) => handleDeleteBranch(branch.name, e)}
-                        title="Delete branch"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    )}
+                    {!branch.is_default &&
+                      branch.name !== currentBranch &&
+                      branch.has_delete_permission && (
+                        <button
+                          className={cn(
+                            "rounded p-1",
+                            branch.can_delete
+                              ? "text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                              : "cursor-not-allowed text-slate-300 dark:text-slate-600"
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (branch.can_delete)
+                              handleDeleteBranch(branch.name, e);
+                          }}
+                          title={
+                            branch.has_open_pr
+                              ? "Cannot delete: branch has an open pull request"
+                              : "Delete branch"
+                          }
+                          disabled={!branch.can_delete}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
                   </div>
                 </div>
               ))}
