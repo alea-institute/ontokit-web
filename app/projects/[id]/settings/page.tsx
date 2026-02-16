@@ -90,6 +90,9 @@ export default function ProjectSettingsPage() {
     original: string;
     normalized: string;
   } | null>(null);
+  // Background job state
+  const [normalizationJobId, setNormalizationJobId] = useState<string | null>(null);
+  const [normalizationJobStatus, setNormalizationJobStatus] = useState<string | null>(null);
 
   // GitHub integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null);
@@ -394,19 +397,22 @@ export default function ProjectSettingsPage() {
     setError(null);
 
     try {
-      const result = await normalizationApi.runNormalization(
-        project.id,
-        dryRun,
-        session.accessToken
-      );
-
       if (dryRun) {
+        // Dry runs can still be synchronous (just generates preview)
+        const result = await normalizationApi.runNormalization(
+          project.id,
+          true,
+          session.accessToken
+        );
+
         // Update the preview status
         setNormalizationStatus({
           needs_normalization: true,
           last_run: normalizationStatus?.last_run || null,
           last_run_id: normalizationStatus?.last_run_id || null,
+          last_check: new Date().toISOString(),
           preview_report: result.report,
+          checking: false,
           error: null,
         });
 
@@ -425,16 +431,59 @@ export default function ProjectSettingsPage() {
           }, 100);
           setTimeout(() => setShowPreviewHighlight(false), 2000);
         }
+        setIsRunningNormalization(false);
       } else {
-        // Refresh the status after running
-        const newStatus = await normalizationApi.getStatus(project.id, session.accessToken);
-        setNormalizationStatus(newStatus);
-        setSuccessMessage("Normalization completed successfully");
+        // Actual normalization runs as a background job
+        const queueResult = await normalizationApi.queueNormalization(
+          project.id,
+          false,
+          session.accessToken
+        );
+
+        setNormalizationJobId(queueResult.job_id);
+        setNormalizationJobStatus("queued");
+        setSuccessMessage("Normalization job queued - processing in background...");
+
+        // Poll for completion
+        const pollInterval = setInterval(async () => {
+          try {
+            const jobStatus = await normalizationApi.getJobStatus(
+              project.id,
+              queueResult.job_id,
+              session.accessToken
+            );
+
+            setNormalizationJobStatus(jobStatus.status);
+
+            if (jobStatus.status === "complete") {
+              clearInterval(pollInterval);
+              setNormalizationJobId(null);
+              setNormalizationJobStatus(null);
+              setIsRunningNormalization(false);
+
+              // Refresh status
+              const newStatus = await normalizationApi.getStatus(project.id, session.accessToken);
+              setNormalizationStatus(newStatus);
+              setSuccessMessage("Normalization completed successfully");
+              setTimeout(() => setSuccessMessage(null), 3000);
+            } else if (jobStatus.status === "failed" || jobStatus.status === "not_found") {
+              clearInterval(pollInterval);
+              setNormalizationJobId(null);
+              setNormalizationJobStatus(null);
+              setIsRunningNormalization(false);
+              setError(jobStatus.error || "Normalization job failed");
+            }
+          } catch (pollErr) {
+            // Continue polling on error
+            console.error("Error polling job status:", pollErr);
+          }
+        }, 2000); // Poll every 2 seconds
+
+        // Cleanup on unmount
+        return () => clearInterval(pollInterval);
       }
-      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to run normalization");
-    } finally {
       setIsRunningNormalization(false);
     }
   };
@@ -777,6 +826,23 @@ export default function ProjectSettingsPage() {
                 </div>
               )}
 
+              {/* Background job status */}
+              {normalizationJobId && (
+                <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-800 dark:bg-blue-900/20">
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                      {normalizationJobStatus === "queued" && "Normalization job queued..."}
+                      {normalizationJobStatus === "pending" && "Normalization job pending..."}
+                      {normalizationJobStatus === "running" && "Normalizing ontology (this may take a while for large files)..."}
+                    </p>
+                  </div>
+                  <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                    Job ID: {normalizationJobId}
+                  </p>
+                </div>
+              )}
+
               {/* Preview report if available */}
               {normalizationStatus?.preview_report && normalizationStatus.needs_normalization && (
                 <div
@@ -844,30 +910,40 @@ export default function ProjectSettingsPage() {
 
               {/* Action buttons */}
               {canManage && (
-                <div className="flex items-center gap-3">
-                  <Button
-                    onClick={() => handleRunNormalization(true)}
-                    variant="outline"
-                    disabled={isRunningNormalization}
-                  >
-                    Preview Changes
-                  </Button>
-                  <Button
-                    onClick={() => handleRunNormalization(false)}
-                    disabled={isRunningNormalization || !normalizationStatus?.needs_normalization}
-                  >
-                    {isRunningNormalization ? (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                        Running...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-4 w-4" />
-                        Run Normalization
-                      </>
-                    )}
-                  </Button>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={() => handleRunNormalization(true)}
+                      variant="outline"
+                      disabled={isRunningNormalization || !!normalizationJobId}
+                    >
+                      Preview Changes
+                    </Button>
+                    <Button
+                      onClick={() => handleRunNormalization(false)}
+                      disabled={isRunningNormalization || !!normalizationJobId}
+                      variant={normalizationStatus?.needs_normalization ? "primary" : "outline"}
+                    >
+                      {isRunningNormalization || normalizationJobId ? (
+                        <>
+                          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                          {normalizationJobStatus === "running" ? "Processing..." : "Queued..."}
+                        </>
+                      ) : (
+                        <>
+                          <Play className="mr-2 h-4 w-4" />
+                          {normalizationStatus?.needs_normalization
+                            ? "Run Normalization"
+                            : "Re-normalize"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  {!normalizationStatus?.needs_normalization && !normalizationJobId && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Re-normalizing will apply canonical blank node identifiers for more stable diffs.
+                    </p>
+                  )}
                 </div>
               )}
 

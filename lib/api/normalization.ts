@@ -7,10 +7,30 @@ import { NormalizationReport } from "./projects";
 
 // Types
 export interface NormalizationStatusResponse {
-  needs_normalization: boolean;
+  needs_normalization: boolean | null; // null means status unknown
   last_run: string | null;
   last_run_id: string | null;
+  last_check: string | null;
   preview_report: NormalizationReport | null;
+  checking: boolean;
+  error: string | null;
+}
+
+export interface RefreshStatusResponse {
+  message: string;
+  job_id: string | null;
+}
+
+export interface QueuedJobResponse {
+  message: string;
+  job_id: string;
+  status: string;
+}
+
+export interface JobStatusResponse {
+  job_id: string;
+  status: "pending" | "running" | "complete" | "failed" | "not_found";
+  result: Record<string, unknown> | null;
   error: string | null;
 }
 
@@ -112,6 +132,53 @@ export const normalizationApi = {
     }
     return api.get<NormalizationRunResponse>(
       `/api/v1/projects/${projectId}/normalization/runs/${runId}`,
+      { headers }
+    );
+  },
+
+  /**
+   * Trigger a background job to refresh normalization status
+   * @param projectId - The project ID
+   * @param token - Access token
+   */
+  refreshStatus: (projectId: string, token?: string) => {
+    const headers: HeadersInit = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return api.post<RefreshStatusResponse>(
+      `/api/v1/projects/${projectId}/normalization/refresh`,
+      {},
+      { headers }
+    );
+  },
+
+  /**
+   * Queue normalization as a background job (for large ontologies)
+   * @param projectId - The project ID
+   * @param dryRun - If true, preview changes without applying
+   * @param token - Access token
+   */
+  queueNormalization: (projectId: string, dryRun: boolean, token: string) =>
+    api.post<QueuedJobResponse>(
+      `/api/v1/projects/${projectId}/normalization/queue`,
+      { dry_run: dryRun },
+      { headers: { Authorization: `Bearer ${token}` } }
+    ),
+
+  /**
+   * Get status of a background job
+   * @param projectId - The project ID
+   * @param jobId - The job ID
+   * @param token - Access token
+   */
+  getJobStatus: (projectId: string, jobId: string, token?: string) => {
+    const headers: HeadersInit = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return api.get<JobStatusResponse>(
+      `/api/v1/projects/${projectId}/normalization/jobs/${jobId}`,
       { headers }
     );
   },
