@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useBranch } from "@/lib/context/BranchContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -38,6 +38,15 @@ export function BranchSelector({
   const [newBranchName, setNewBranchName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // Sync currentBranch to parent on mount and whenever it changes
+  const lastNotified = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentBranch && currentBranch !== lastNotified.current) {
+      lastNotified.current = currentBranch;
+      onBranchChange?.(currentBranch);
+    }
+  }, [currentBranch, onBranchChange]);
+
   const handleSwitchBranch = async (name: string) => {
     if (name === currentBranch) {
       setIsOpen(false);
@@ -60,7 +69,7 @@ export function BranchSelector({
     setError(null);
     try {
       const branch = await createBranch(newBranchName.trim());
-      await switchBranch(branch.name);
+      // createBranch already switches to the new branch
       onBranchChange?.(branch.name);
       setNewBranchName("");
       setIsCreating(false);

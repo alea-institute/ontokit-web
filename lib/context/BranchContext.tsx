@@ -88,10 +88,22 @@ export function BranchProvider({
       const response = await branchesApi.list(projectId, accessToken);
       setBranches(response.items);
       setDefaultBranch(response.default_branch);
-      // On first load, use DB preference if no URL param or sessionStorage set the branch
+      // Validate current branch exists; fall back to DB preference or default
       setCurrentBranch((prev) => {
-        if (prev !== "main") return prev; // already set by URL or sessionStorage
-        return response.preferred_branch || response.current_branch;
+        const prevExists = response.items.some((b) => b.name === prev);
+        if (prevExists) return prev;
+        // Stored/initial branch was deleted — clear stale sessionStorage
+        try {
+          sessionStorage.removeItem(`axigraph:branch:${projectId}`);
+        } catch {
+          /* ignore */
+        }
+        const prefExists =
+          response.preferred_branch &&
+          response.items.some((b) => b.name === response.preferred_branch);
+        return prefExists
+          ? response.preferred_branch!
+          : response.current_branch;
       });
     } catch (err) {
       const message =
@@ -116,6 +128,12 @@ export function BranchProvider({
 
       // Refresh branches list
       await loadBranches();
+
+      // Switch to the new branch directly — avoids stale closure in switchBranch
+      // which would check the pre-update branches array
+      setCurrentBranch(name);
+      setStoredBranch(projectId, name);
+      branchesApi.savePreference(projectId, name, accessToken).catch(() => {});
 
       return newBranch;
     },
