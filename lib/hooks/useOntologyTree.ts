@@ -92,7 +92,7 @@ export function useOntologyTree({
     setError(null);
 
     try {
-      const response = await projectOntologyApi.getRootClasses(projectId, accessToken);
+      const response = await projectOntologyApi.getRootClasses(projectId, accessToken, branchKey);
       setNodes(response.nodes.map(apiNodeToTreeNode));
       setTotalClasses(response.total_classes);
     } catch (err) {
@@ -118,7 +118,7 @@ export function useOntologyTree({
       );
 
       try {
-        const response = await projectOntologyApi.getClassChildren(projectId, iri, accessToken);
+        const response = await projectOntologyApi.getClassChildren(projectId, iri, accessToken, branchKey);
         const children = response.nodes.map(apiNodeToTreeNode);
 
         // Update node with children
@@ -141,7 +141,7 @@ export function useOntologyTree({
         console.error("Failed to expand node:", err);
       }
     },
-    [projectId, accessToken]
+    [projectId, accessToken, branchKey]
   );
 
   /**
@@ -170,7 +170,7 @@ export function useOntologyTree({
     async (iri: string) => {
       try {
         // Fetch the ancestor path
-        const response = await projectOntologyApi.getClassAncestors(projectId, iri, accessToken);
+        const response = await projectOntologyApi.getClassAncestors(projectId, iri, accessToken, branchKey);
         const ancestorNodes = response.nodes;
 
         // Expand each ancestor in sequence
@@ -187,7 +187,7 @@ export function useOntologyTree({
         setSelectedIri(iri);
       }
     },
-    [projectId, accessToken, expandNode]
+    [projectId, accessToken, branchKey, expandNode]
   );
 
   // Load root classes on mount

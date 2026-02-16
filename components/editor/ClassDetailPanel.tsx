@@ -10,6 +10,7 @@ interface ClassDetailPanelProps {
   projectId: string;
   classIri: string | null;
   accessToken?: string;
+  branch?: string;
   onNavigateToClass?: (iri: string) => void;
   /** Callback to navigate to an IRI in the source view */
   onNavigateToSource?: (iri: string) => void;
@@ -19,6 +20,7 @@ export function ClassDetailPanel({
   projectId,
   classIri,
   accessToken,
+  branch,
   onNavigateToClass,
   onNavigateToSource,
 }: ClassDetailPanelProps) {
@@ -41,7 +43,7 @@ export function ClassDetailPanel({
       try {
         // Fetch class details and issues in parallel
         const [detail, issuesResponse] = await Promise.all([
-          projectOntologyApi.getClassDetail(projectId, classIri, accessToken),
+          projectOntologyApi.getClassDetail(projectId, classIri, accessToken, branch),
           lintApi.getIssues(projectId, accessToken, { subject_iri: classIri, limit: 50 }).catch(() => ({ items: [] })),
         ]);
         setClassDetail(detail);
@@ -68,7 +70,7 @@ export function ClassDetailPanel({
     };
 
     fetchClassData();
-  }, [projectId, classIri, accessToken]);
+  }, [projectId, classIri, accessToken, branch]);
 
   if (!classIri) {
     return (

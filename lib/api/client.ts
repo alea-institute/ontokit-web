@@ -293,41 +293,45 @@ export const projectOntologyApi = {
   /**
    * Get the root classes of the ontology tree
    */
-  getRootClasses: (projectId: string, token?: string) =>
+  getRootClasses: (projectId: string, token?: string, branch?: string) =>
     api.get<OWLClassTreeResponse>(`/api/v1/projects/${projectId}/ontology/tree`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      params: { branch },
     }),
 
   /**
    * Get children of a specific class
    */
-  getClassChildren: (projectId: string, classIri: string, token?: string) =>
+  getClassChildren: (projectId: string, classIri: string, token?: string, branch?: string) =>
     api.get<OWLClassTreeResponse>(
       `/api/v1/projects/${projectId}/ontology/tree/${encodeURIComponent(classIri)}/children`,
       {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        params: { branch },
       }
     ),
 
   /**
    * Get ancestor path from root to a specific class
    */
-  getClassAncestors: (projectId: string, classIri: string, token?: string) =>
+  getClassAncestors: (projectId: string, classIri: string, token?: string, branch?: string) =>
     api.get<OWLClassTreeResponse>(
       `/api/v1/projects/${projectId}/ontology/tree/${encodeURIComponent(classIri)}/ancestors`,
       {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        params: { branch },
       }
     ),
 
   /**
    * Get details of a specific class
    */
-  getClassDetail: (projectId: string, classIri: string, token?: string) =>
+  getClassDetail: (projectId: string, classIri: string, token?: string, branch?: string) =>
     api.get<OWLClassDetail>(
       `/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}`,
       {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        params: { branch },
       }
     ),
 
@@ -338,13 +342,15 @@ export const projectOntologyApi = {
     projectId: string,
     content: string,
     commitMessage: string,
-    token: string
+    token: string,
+    branch?: string
   ) =>
     api.put<SourceContentSaveResponse>(
       `/api/v1/projects/${projectId}/source`,
       { content, commit_message: commitMessage },
       {
         headers: { Authorization: `Bearer ${token}` },
+        params: { branch },
       }
     ),
 };
