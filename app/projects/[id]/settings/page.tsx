@@ -25,6 +25,11 @@ import {
   type PRSettings,
 } from "@/lib/api/pullRequests";
 import {
+  userSettingsApi,
+  type GitHubTokenStatus,
+  type GitHubRepoInfo,
+} from "@/lib/api/userSettings";
+import {
   normalizationApi,
   type NormalizationStatusResponse,
   type NormalizationRunResponse,
@@ -98,12 +103,17 @@ export default function ProjectSettingsPage() {
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null);
   const [prSettings, setPrSettings] = useState<PRSettings | null>(null);
   const [showGitHubSetup, setShowGitHubSetup] = useState(false);
-  const [githubRepoOwner, setGithubRepoOwner] = useState("");
-  const [githubRepoName, setGithubRepoName] = useState("");
-  const [githubInstallationId, setGithubInstallationId] = useState("");
   const [isSetupGitHub, setIsSetupGitHub] = useState(false);
   const [prApprovalRequired, setPrApprovalRequired] = useState(0);
   const [isSavingPrSettings, setIsSavingPrSettings] = useState(false);
+
+  // Repo picker state
+  const [hasGithubToken, setHasGithubToken] = useState<boolean | null>(null);
+  const [githubRepos, setGithubRepos] = useState<GitHubRepoInfo[]>([]);
+  const [repoSearchQuery, setRepoSearchQuery] = useState("");
+  const [selectedRepo, setSelectedRepo] = useState<GitHubRepoInfo | null>(null);
+  const [isLoadingRepos, setIsLoadingRepos] = useState(false);
+  const repoSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isAuthenticated = status === "authenticated";
 
@@ -142,6 +152,14 @@ export default function ProjectSettingsPage() {
             setPrApprovalRequired(prSettingsData.pr_approval_required);
           } catch {
             // PR settings may not be available, ignore
+          }
+
+          // Check if user has a GitHub token (for the repo picker)
+          try {
+            const tokenStatus = await userSettingsApi.getGitHubTokenStatus(session.accessToken);
+            setHasGithubToken(tokenStatus.has_token);
+          } catch {
+            setHasGithubToken(false);
           }
         }
       } catch (err) {
@@ -307,9 +325,8 @@ export default function ProjectSettingsPage() {
     }
   };
 
-  const handleSetupGitHub = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!session?.accessToken || !project) return;
+  const handleConnectRepo = async () => {
+    if (!session?.accessToken || !project || !selectedRepo) return;
 
     setIsSetupGitHub(true);
     setError(null);
@@ -318,25 +335,67 @@ export default function ProjectSettingsPage() {
       const integration = await githubIntegrationApi.create(
         project.id,
         {
-          repo_owner: githubRepoOwner,
-          repo_name: githubRepoName,
-          installation_id: parseInt(githubInstallationId, 10),
+          repo_owner: selectedRepo.owner,
+          repo_name: selectedRepo.name,
+          default_branch: selectedRepo.default_branch,
+          webhooks_enabled: false,
         },
         session.accessToken
       );
       setGithubIntegration(integration);
       setShowGitHubSetup(false);
-      setGithubRepoOwner("");
-      setGithubRepoName("");
-      setGithubInstallationId("");
-      setSuccessMessage("GitHub integration configured successfully");
+      setSelectedRepo(null);
+      setGithubRepos([]);
+      setRepoSearchQuery("");
+      setSuccessMessage("GitHub repository connected successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to setup GitHub integration");
+      setError(err instanceof Error ? err.message : "Failed to connect repository");
     } finally {
       setIsSetupGitHub(false);
     }
   };
+
+  const handleSearchRepos = (query: string) => {
+    setRepoSearchQuery(query);
+    setSelectedRepo(null);
+
+    // Debounce search
+    if (repoSearchTimeout.current) {
+      clearTimeout(repoSearchTimeout.current);
+    }
+
+    repoSearchTimeout.current = setTimeout(async () => {
+      if (!session?.accessToken) return;
+
+      setIsLoadingRepos(true);
+      try {
+        const result = await userSettingsApi.listGitHubRepos(
+          session.accessToken,
+          query || undefined,
+          1,
+          20
+        );
+        setGithubRepos(result.items);
+      } catch {
+        setGithubRepos([]);
+      } finally {
+        setIsLoadingRepos(false);
+      }
+    }, 300);
+  };
+
+  // Load initial repos when setup panel opens
+  useEffect(() => {
+    if (showGitHubSetup && hasGithubToken && githubRepos.length === 0 && session?.accessToken) {
+      setIsLoadingRepos(true);
+      userSettingsApi
+        .listGitHubRepos(session.accessToken, undefined, 1, 20)
+        .then((result) => setGithubRepos(result.items))
+        .catch(() => setGithubRepos([]))
+        .finally(() => setIsLoadingRepos(false));
+    }
+  }, [showGitHubSetup, hasGithubToken, session?.accessToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRemoveGitHub = async () => {
     if (!session?.accessToken || !project) return;
@@ -1157,6 +1216,11 @@ export default function ProjectSettingsPage() {
                         </p>
                         <p className="text-sm text-slate-500 dark:text-slate-400">
                           {githubIntegration.sync_enabled ? "Sync enabled" : "Sync disabled"}
+                          {!githubIntegration.connected_by_user_id && (
+                            <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                              Legacy — reconnect to enable sync
+                            </span>
+                          )}
                         </p>
                         {githubIntegration.last_sync_at && (
                           <p className="text-xs text-slate-400">
@@ -1189,93 +1253,113 @@ export default function ProjectSettingsPage() {
                     <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
                     <p className="text-amber-700 dark:text-amber-300">
                       Pull requests created in Axigraph will be synced to GitHub.
-                      Changes merged in GitHub will be reflected here automatically via webhooks.
                     </p>
                   </div>
                 </div>
               ) : showGitHubSetup ? (
-                <form onSubmit={handleSetupGitHub} className="space-y-4">
-                  <p className="text-sm text-slate-600 dark:text-slate-400">
-                    Connect your project to a GitHub repository to sync pull requests.
-                    You&apos;ll need to install the Axigraph GitHub App on your repository first.
-                  </p>
-
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Repository Owner
-                      </label>
-                      <input
-                        type="text"
-                        value={githubRepoOwner}
-                        onChange={(e) => setGithubRepoOwner(e.target.value)}
-                        placeholder="username or organization"
-                        className={cn(
-                          "w-full rounded-md border px-3 py-2 text-sm",
-                          "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                          "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
-                        )}
-                        required
-                      />
+                <div className="space-y-4">
+                  {hasGithubToken === false ? (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-900/20">
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        Connect your GitHub account first.{" "}
+                        <Link href="/settings" className="font-medium underline">
+                          Go to Settings
+                        </Link>
+                      </p>
                     </div>
-                    <div>
-                      <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                        Repository Name
-                      </label>
-                      <input
-                        type="text"
-                        value={githubRepoName}
-                        onChange={(e) => setGithubRepoName(e.target.value)}
-                        placeholder="my-ontology"
-                        className={cn(
-                          "w-full rounded-md border px-3 py-2 text-sm",
-                          "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                          "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                  ) : (
+                    <>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">
+                        Search for a repository to connect to this project.
+                      </p>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Search repositories
+                        </label>
+                        <input
+                          type="text"
+                          value={repoSearchQuery}
+                          onChange={(e) => handleSearchRepos(e.target.value)}
+                          placeholder="Search by name..."
+                          className={cn(
+                            "w-full rounded-md border px-3 py-2 text-sm",
+                            "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
+                            "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                          )}
+                        />
+                      </div>
+
+                      {/* Repo list */}
+                      <div className="max-h-64 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-600">
+                        {isLoadingRepos ? (
+                          <div className="flex items-center justify-center p-4">
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+                          </div>
+                        ) : githubRepos.length === 0 ? (
+                          <p className="p-4 text-center text-sm text-slate-500 dark:text-slate-400">
+                            {repoSearchQuery ? "No repositories found" : "No repositories available"}
+                          </p>
+                        ) : (
+                          githubRepos.map((repo) => (
+                            <button
+                              key={repo.full_name}
+                              type="button"
+                              onClick={() => setSelectedRepo(repo)}
+                              className={cn(
+                                "w-full border-b border-slate-100 px-4 py-3 text-left last:border-b-0 dark:border-slate-700",
+                                "hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                                selectedRepo?.full_name === repo.full_name &&
+                                  "bg-primary-50 border-primary-200 dark:bg-primary-900/20 dark:border-primary-800"
+                              )}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                                    {repo.full_name}
+                                    {repo.private && (
+                                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                                        Private
+                                      </span>
+                                    )}
+                                  </p>
+                                  {repo.description && (
+                                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
+                                      {repo.description}
+                                    </p>
+                                  )}
+                                </div>
+                                {selectedRepo?.full_name === repo.full_name && (
+                                  <Check className="h-4 w-4 text-primary-600 dark:text-primary-400" />
+                                )}
+                              </div>
+                            </button>
+                          ))
                         )}
-                        required
-                      />
-                    </div>
-                  </div>
+                      </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Installation ID
-                    </label>
-                    <input
-                      type="text"
-                      value={githubInstallationId}
-                      onChange={(e) => setGithubInstallationId(e.target.value)}
-                      placeholder="12345678"
-                      className={cn(
-                        "w-full rounded-md border px-3 py-2 text-sm",
-                        "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                        "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
-                      )}
-                      required
-                    />
-                    <p className="mt-1 text-xs text-slate-500">
-                      Find this in your GitHub App installation settings
-                    </p>
-                  </div>
-
-                  <div className="flex gap-3">
-                    <Button type="submit" disabled={isSetupGitHub}>
-                      {isSetupGitHub ? "Connecting..." : "Connect Repository"}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => {
-                        setShowGitHubSetup(false);
-                        setGithubRepoOwner("");
-                        setGithubRepoName("");
-                        setGithubInstallationId("");
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </form>
+                      <div className="flex gap-3">
+                        <Button
+                          onClick={handleConnectRepo}
+                          disabled={!selectedRepo || isSetupGitHub}
+                        >
+                          {isSetupGitHub ? "Connecting..." : "Connect Repository"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowGitHubSetup(false);
+                            setSelectedRepo(null);
+                            setGithubRepos([]);
+                            setRepoSearchQuery("");
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : (
                 <div>
                   <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">

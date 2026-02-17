@@ -158,7 +158,8 @@ export interface GitHubIntegration {
   repo_owner: string;
   repo_name: string;
   repo_url?: string;
-  installation_id: number;
+  connected_by_user_id?: string;
+  webhooks_enabled: boolean;
   default_branch: string;
   sync_enabled: boolean;
   last_sync_at?: string;
@@ -169,12 +170,14 @@ export interface GitHubIntegration {
 export interface GitHubIntegrationCreate {
   repo_owner: string;
   repo_name: string;
-  installation_id: number;
+  default_branch?: string;
+  webhooks_enabled?: boolean;
 }
 
 export interface GitHubIntegrationUpdate {
   default_branch?: string;
   sync_enabled?: boolean;
+  webhooks_enabled?: boolean;
 }
 
 export interface PRSettings {

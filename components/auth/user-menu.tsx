@@ -2,6 +2,7 @@
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
+import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
 
 // Zitadel configuration
@@ -83,6 +84,13 @@ export function UserMenu() {
             </p>
           </div>
           <div className="py-1">
+            <Link
+              href="/settings"
+              onClick={() => setIsOpen(false)}
+              className="block w-full px-4 py-2 text-left text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+            >
+              Settings
+            </Link>
             <button
               onClick={handleSignOut}
               className="w-full text-left px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
