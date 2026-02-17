@@ -17,6 +17,7 @@ export interface IndexWorkerResult {
   type: 'result';
   positions: Array<[string, IriPosition]>; // Issue ID to position (for lint diagnostics)
   iriIndex: Array<[string, IriPosition]>; // Full IRI to position index (for "View in Source")
+  iriLabels: Array<[string, string]>; // Full IRI to rdfs:label (best-guess from source)
   diagnostics: Array<{
     issueId: string;
     startLineNumber: number;
@@ -35,10 +36,12 @@ export interface IndexWorkerResult {
   };
 }
 
-// Build IRI index from content - only indexes IRIs in SUBJECT position (definitions)
+// Build IRI index and label map from content
+// Only indexes IRIs in SUBJECT position (definitions)
 // This ensures we find where entities are defined, not where they're referenced
-function buildIriIndex(content: string): Map<string, IriPosition> {
+function buildIriIndex(content: string): { index: Map<string, IriPosition>; labels: Map<string, string> } {
   const index = new Map<string, IriPosition>();
+  const labels = new Map<string, string>();
   const lines = content.split("\n");
 
   // Extract @base and prefixes first (single pass)
@@ -61,9 +64,11 @@ function buildIriIndex(content: string): Map<string, IriPosition> {
     }
   }
 
-  // Index IRIs that appear in SUBJECT position only
+  // Index IRIs that appear in SUBJECT position and extract rdfs:label values
   // A subject starts a new triple block - it's NOT a continuation of a previous line
   // Lines ending with , or ; indicate the next line is a continuation (object or predicate-object)
+  let currentSubjectIri: string | null = null;
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
@@ -83,44 +88,59 @@ function buildIriIndex(content: string): Map<string, IriPosition> {
       break; // Only check the immediately preceding non-empty line
     }
 
-    if (isContinuation) continue; // Skip - this is not a subject
+    if (!isContinuation) {
+      // This is a subject line — index the IRI
+      currentSubjectIri = null;
 
-    // Match full IRI or relative IRI at start of line: <...>
-    const fullIriMatch = trimmed.match(/^<([^>\s]+)>/);
-    if (fullIriMatch) {
-      let iri = fullIriMatch[1];
-      // Resolve relative IRIs against @base
-      if (baseUri && !iri.match(/^[a-z][a-z0-9+.-]*:/i)) {
-        iri = baseUri + iri;
+      // Match full IRI or relative IRI at start of line: <...>
+      const fullIriMatch = trimmed.match(/^<([^>\s]+)>/);
+      if (fullIriMatch) {
+        let iri = fullIriMatch[1];
+        // Resolve relative IRIs against @base
+        if (baseUri && !iri.match(/^[a-z][a-z0-9+.-]*:/i)) {
+          iri = baseUri + iri;
+        }
+        currentSubjectIri = iri;
+        if (!index.has(iri)) {
+          const col = line.indexOf('<') + 1;
+          index.set(iri, { line: i + 1, col, len: fullIriMatch[0].length });
+        }
       }
-      if (!index.has(iri)) {
-        const col = line.indexOf('<') + 1;
-        index.set(iri, { line: i + 1, col, len: fullIriMatch[0].length });
+
+      // Match prefixed name at start of line: prefix:local or :local
+      const prefixedMatch = trimmed.match(/^(\w*):([A-Za-z_][A-Za-z0-9_\-]*)/);
+      if (prefixedMatch) {
+        const prefix = prefixedMatch[1];
+        const localName = prefixedMatch[2];
+        const namespace = prefixes.get(prefix);
+        if (namespace) {
+          const fullIri = namespace + localName;
+          currentSubjectIri = fullIri;
+          if (!index.has(fullIri)) {
+            const prefixedName = `${prefix}:${localName}`;
+            const col = line.indexOf(prefixedName) + 1;
+            index.set(fullIri, {
+              line: i + 1,
+              col,
+              len: prefixedName.length
+            });
+          }
+        }
       }
     }
 
-    // Match prefixed name at start of line: prefix:local or :local
-    const prefixedMatch = trimmed.match(/^(\w*):([A-Za-z_][A-Za-z0-9_\-]*)/);
-    if (prefixedMatch) {
-      const prefix = prefixedMatch[1];
-      const localName = prefixedMatch[2];
-      const namespace = prefixes.get(prefix);
-      if (namespace) {
-        const fullIri = namespace + localName;
-        if (!index.has(fullIri)) {
-          const prefixedName = `${prefix}:${localName}`;
-          const col = line.indexOf(prefixedName) + 1;
-          index.set(fullIri, {
-            line: i + 1,
-            col,
-            len: prefixedName.length
-          });
-        }
+    // Extract rdfs:label from any line in the current subject block
+    if (currentSubjectIri && !labels.has(currentSubjectIri)) {
+      const labelMatch = trimmed.match(
+        /(?:rdfs:label|<http:\/\/www\.w3\.org\/2000\/01\/rdf-schema#label>)\s+"([^"]*)"(?:@(\w+))?/
+      );
+      if (labelMatch) {
+        labels.set(currentSubjectIri, labelMatch[1]);
       }
     }
   }
 
-  return index;
+  return { index, labels };
 }
 
 // Try to find an IRI in the index with flexible matching
@@ -159,7 +179,7 @@ self.onmessage = (event: MessageEvent<IndexWorkerMessage>) => {
 
   // Build the index
   try {
-    const iriIndex = buildIriIndex(content);
+    const { index: iriIndex, labels: iriLabels } = buildIriIndex(content);
 
   // Also build a local name index for fallback matching
   const localNameIndex = new Map<string, IriPosition>();
@@ -235,6 +255,7 @@ self.onmessage = (event: MessageEvent<IndexWorkerMessage>) => {
     type: 'result',
     positions,
     iriIndex: Array.from(iriIndex.entries()), // Full IRI index for "View in Source"
+    iriLabels: Array.from(iriLabels.entries()), // Full IRI to rdfs:label
     diagnostics,
     stats: {
       linesProcessed: content.split("\n").length,
@@ -253,6 +274,7 @@ self.onmessage = (event: MessageEvent<IndexWorkerMessage>) => {
       type: 'result',
       positions: [],
       iriIndex: [],
+      iriLabels: [],
       diagnostics: [],
       stats: {
         linesProcessed: 0,

@@ -70,6 +70,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
   const [diagnostics, setDiagnostics] = useState<TurtleDiagnostic[]>([]);
   const [issuePositions, setIssuePositions] = useState<Map<string, { line: number; startCol: number; endCol: number }>>(new Map());
   const [iriIndex, setIriIndex] = useState<Map<string, IriPosition>>(new Map());
+  const [iriLabels, setIriLabels] = useState<Map<string, string>>(new Map());
   const [diagnosticsReady, setDiagnosticsReady] = useState(false);
   const [indexStats, setIndexStats] = useState<{ linesProcessed: number; irisIndexed: number; localNamesIndexed: number; issuesMatched: number; timeMs: number } | null>(null);
   const workerRef = useRef<Worker | null>(null);
@@ -234,6 +235,12 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
         newIriIndex.set(iri, pos);
       }
 
+      // Convert IRI labels array back to Map
+      const newIriLabels = new Map<string, string>();
+      for (const [iri, label] of result.iriLabels) {
+        newIriLabels.set(iri, label);
+      }
+
       // Convert diagnostics
       const diags: TurtleDiagnostic[] = result.diagnostics.map((d) => ({
         startLineNumber: d.startLineNumber,
@@ -247,6 +254,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
       setDiagnostics(diags);
       setIssuePositions(positions);
       setIriIndex(newIriIndex);
+      setIriLabels(newIriLabels);
       setIndexStats(result.stats);
       setDiagnosticsReady(true);
 
@@ -452,6 +460,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
           onDiagnosticClick={handleDiagnosticClick}
           onReady={handleEditorReady}
           onInternalLinkClick={onNavigateToClass}
+          iriLabelMap={iriLabels}
           minimap={false}
           lineNumbers={true}
           wordWrap="off"

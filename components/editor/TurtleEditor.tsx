@@ -44,6 +44,8 @@ export interface TurtleEditorProps {
   onReady?: (editor: editor.IStandaloneCodeEditor) => void;
   /** Callback when clicking on an internal IRI link (prefixed name) */
   onInternalLinkClick?: (iri: string) => void;
+  /** Map of full IRI to rdfs:label for hover display */
+  iriLabelMap?: Map<string, string>;
   /** Show minimap */
   minimap?: boolean;
   /** Show line numbers */
@@ -59,6 +61,9 @@ export interface TurtleEditorProps {
 // Track if language is already registered to avoid duplicate registration
 let languageRegistered = false;
 
+// Module-level label cache for the hover provider (updated from iriLabelMap prop)
+let hoverLabelCache = new Map<string, string>();
+
 /**
  * Monaco-based Turtle/RDF editor with syntax highlighting
  */
@@ -71,6 +76,7 @@ export function TurtleEditor({
   onDiagnosticClick,
   onReady,
   onInternalLinkClick,
+  iriLabelMap,
   minimap = false,
   lineNumbers = true,
   wordWrap = "on",
@@ -86,6 +92,11 @@ export function TurtleEditor({
   useEffect(() => {
     onInternalLinkClickRef.current = onInternalLinkClick;
   }, [onInternalLinkClick]);
+
+  // Keep module-level label cache in sync with prop
+  useEffect(() => {
+    hoverLabelCache = iriLabelMap ?? new Map();
+  }, [iriLabelMap]);
 
   // Detect system theme if not overridden
   const [systemTheme, setSystemTheme] = useState<"light" | "dark">("light");
@@ -243,6 +254,7 @@ export function TurtleEditor({
             const isInternal = (docBase && fullIri.startsWith(docBase))
               || [...internalNamespaces].some(ns => fullIri.startsWith(ns));
 
+            const label = hoverLabelCache.get(fullIri);
             return {
               range: {
                 startLineNumber: position.lineNumber,
@@ -252,6 +264,7 @@ export function TurtleEditor({
               },
               contents: [
                 { value: `**<${iriContent}>**` },
+                ...(label ? [{ value: `Label: ${label}` }] : []),
                 ...(isAbsolute ? [] : [{ value: `Full IRI: \`${fullIri}\`` }]),
                 { value: isInternal ? `*Ctrl+Click to navigate to class*` : `*Ctrl+Click to open in browser*` },
               ],
@@ -273,6 +286,7 @@ export function TurtleEditor({
             if (namespace) {
               const fullIri = namespace + localName;
               const isInternal = internalNamespaces.has(namespace);
+              const label = hoverLabelCache.get(fullIri);
 
               return {
                 range: {
@@ -283,6 +297,7 @@ export function TurtleEditor({
                 },
                 contents: [
                   { value: `**${prefix ? prefix + ':' : ':'}${localName}**` },
+                  ...(label ? [{ value: `Label: ${label}` }] : []),
                   { value: `Full IRI: \`${fullIri}\`` },
                   { value: isInternal ? `*Ctrl+Click to navigate to class*` : `*Ctrl+Click to open in browser*` },
                 ],
