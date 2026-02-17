@@ -635,7 +635,7 @@ export default function EditorPage() {
               </div>
 
               {/* Branch Selector */}
-              <BranchSelector onBranchChange={handleBranchChange} />
+              <BranchSelector onBranchChange={handleBranchChange} canCreateBranch={canEdit} />
 
               {/* History Button */}
               <HistoryButton

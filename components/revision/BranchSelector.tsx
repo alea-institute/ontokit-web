@@ -16,11 +16,14 @@ import {
 interface BranchSelectorProps {
   className?: string;
   onBranchChange?: (branchName: string) => void;
+  /** Whether the current user can create new branches (requires editor+ role) */
+  canCreateBranch?: boolean;
 }
 
 export function BranchSelector({
   className,
   onBranchChange,
+  canCreateBranch = false,
 }: BranchSelectorProps) {
   const {
     branches,
@@ -144,7 +147,7 @@ export function BranchSelector({
             )}
 
             {/* Create branch */}
-            {isCreating ? (
+            {canCreateBranch && (isCreating ? (
               <div className="border-b border-slate-200 p-3 dark:border-slate-700">
                 <input
                   type="text"
@@ -185,7 +188,7 @@ export function BranchSelector({
                 <Plus className="h-4 w-4" />
                 Create new branch
               </button>
-            )}
+            ))}
 
             {/* Branch list */}
             <div className="max-h-64 overflow-y-auto py-1">

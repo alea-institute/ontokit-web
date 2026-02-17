@@ -78,6 +78,69 @@ export default function DocsPage() {
               </div>
             </section>
 
+            {/* Team Roles & Permissions */}
+            <section>
+              <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mb-4">
+                Team Roles & Permissions
+              </h2>
+              <div className="space-y-4">
+                <p className="text-slate-600 dark:text-slate-400">
+                  Each project member is assigned a role that determines what they can do.
+                  Roles are project-scoped &mdash; a user can have different roles in different projects.
+                </p>
+                <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 dark:bg-slate-700">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Role</th>
+                        <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Capabilities</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                      <tr>
+                        <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Owner</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                          Full control over the project. Can delete the project, transfer ownership,
+                          manage members and settings, create branches, edit the ontology, and run the health check.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Admin</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                          Manage members and project settings, create branches, edit the ontology,
+                          and run the health check. Cannot delete the project.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Editor</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                          Create branches, edit ontology source, and create pull requests.
+                          Cannot manage members, change settings, or run the health check.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Viewer</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                          Browse the class tree, view the source in read-only mode, and view
+                          health check results. Cannot make any changes.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2">
+                    Good to know
+                  </h4>
+                  <ul className="list-disc list-inside text-blue-700 dark:text-blue-300 text-sm space-y-1">
+                    <li>The person who creates a project automatically becomes its Owner</li>
+                    <li>Public projects can be viewed by anyone, but only members can edit</li>
+                    <li>Private projects are only visible to their members</li>
+                  </ul>
+                </div>
+              </div>
+            </section>
+
             {/* Editor Features */}
             <section>
               <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mb-4">
