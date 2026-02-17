@@ -29,6 +29,8 @@ interface HealthCheckPanelProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigateToClass?: (iri: string) => void;
+  /** Whether the current user can trigger a lint run (requires admin/manager role) */
+  canRunLint?: boolean;
 }
 
 type IssueFilter = "all" | "error" | "warning" | "info";
@@ -48,6 +50,7 @@ const issueColors = {
 export function HealthCheckPanel({
   projectId,
   accessToken,
+  canRunLint = false,
   isOpen,
   onClose,
   onNavigateToClass,
@@ -227,7 +230,7 @@ export function HealthCheckPanel({
             variant="outline"
             size="sm"
             onClick={handleRunLint}
-            disabled={isRunning || !accessToken}
+            disabled={isRunning || !accessToken || !canRunLint}
             className="gap-1"
           >
             <RefreshCw className={cn("h-4 w-4", isRunning && "animate-spin")} />

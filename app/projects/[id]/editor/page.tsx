@@ -773,6 +773,7 @@ export default function EditorPage() {
                     isOpen={showHealthCheck}
                     onClose={() => setShowHealthCheck(false)}
                     onNavigateToClass={navigateToNode}
+                    canRunLint={canManage}
                   />
                 </div>
               )}
