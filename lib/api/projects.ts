@@ -41,6 +41,7 @@ export interface Project {
   is_superadmin?: boolean;  // Whether the current user is a superadmin
   // Import-related fields (optional, only set when project was created via import)
   source_file_path?: string;
+  git_ontology_path?: string;
   ontology_iri?: string;
   // Label preferences for ontology display
   label_preferences?: string[];
@@ -107,6 +108,29 @@ export interface ProjectImportData {
   is_public: boolean;
   name?: string;
   description?: string;
+}
+
+// GitHub clone types
+export interface GitHubRepoFileInfo {
+  path: string;
+  name: string;
+  size: number;
+}
+
+export interface GitHubRepoFilesResponse {
+  items: GitHubRepoFileInfo[];
+  total: number;
+}
+
+export interface ProjectCreateFromGitHub {
+  repo_owner: string;
+  repo_name: string;
+  ontology_file_path: string;
+  turtle_file_path?: string;
+  is_public: boolean;
+  name?: string;
+  description?: string;
+  default_branch?: string;
 }
 
 // API functions
@@ -199,6 +223,28 @@ export const projectApi = {
    */
   delete: (id: string, token: string) =>
     api.delete(`/api/v1/projects/${id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  /**
+   * Scan a GitHub repo for ontology files
+   */
+  scanGitHubRepoFiles: (
+    owner: string,
+    repo: string,
+    token: string,
+    ref?: string
+  ) =>
+    api.get<GitHubRepoFilesResponse>("/api/v1/projects/github/scan-files", {
+      params: { owner, repo, ref },
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  /**
+   * Create a project from a GitHub repository
+   */
+  createFromGitHub: (data: ProjectCreateFromGitHub, token: string) =>
+    api.post<ProjectImportResponse>("/api/v1/projects/from-github", data, {
       headers: { Authorization: `Bearer ${token}` },
     }),
 

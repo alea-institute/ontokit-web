@@ -4,20 +4,25 @@ import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Upload } from "lucide-react";
+import { ArrowLeft, Plus, Upload, Github } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/file-upload";
 import { ProjectForm } from "@/components/projects/project-form";
+import { GitHubRepoPicker } from "@/components/projects/github-repo-picker";
+import { OntologyFilePicker } from "@/components/projects/ontology-file-picker";
 import {
   projectApi,
   type ProjectCreate,
   type ProjectImportData,
+  type GitHubRepoFileInfo,
+  type ProjectCreateFromGitHub,
 } from "@/lib/api/projects";
+import type { GitHubRepoInfo } from "@/lib/api/userSettings";
 import type { UploadProgress } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
-type TabType = "create" | "import";
+type TabType = "create" | "import" | "github";
 
 export default function NewProjectPage() {
   const { data: session, status } = useSession();
@@ -27,6 +32,12 @@ export default function NewProjectPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+
+  // GitHub clone state
+  const [githubRepo, setGithubRepo] = useState<GitHubRepoInfo | null>(null);
+  const [githubFile, setGithubFile] = useState<GitHubRepoFileInfo | null>(null);
+  const [githubTurtlePath, setGithubTurtlePath] = useState<string | null>(null);
+  const [githubError, setGithubError] = useState<string | null>(null);
 
   const isAuthenticated = status === "authenticated";
   const isLoading = status === "loading";
@@ -82,7 +93,6 @@ export default function NewProjectPage() {
       router.push(`/projects/${project.id}`);
     } catch (err) {
       if (err instanceof Error) {
-        // Try to parse the error message as JSON (API error format)
         try {
           const errorData = JSON.parse(err.message);
           setImportError(errorData.detail || err.message);
@@ -96,6 +106,53 @@ export default function NewProjectPage() {
     } finally {
       setIsSubmitting(false);
       setUploadProgress(null);
+    }
+  };
+
+  const handleGitHubSubmit = async (data: {
+    name: string;
+    description?: string;
+    is_public: boolean;
+  }) => {
+    if (!session?.accessToken) {
+      throw new Error("You must be signed in to create a project");
+    }
+
+    if (!githubRepo || !githubFile) {
+      throw new Error("Please select a repository and ontology file");
+    }
+
+    setIsSubmitting(true);
+    setGithubError(null);
+
+    try {
+      const createData: ProjectCreateFromGitHub = {
+        repo_owner: githubRepo.owner,
+        repo_name: githubRepo.name,
+        ontology_file_path: githubFile.path,
+        turtle_file_path: githubTurtlePath || undefined,
+        is_public: data.is_public,
+        name: data.name || undefined,
+        description: data.description || undefined,
+        default_branch: githubRepo.default_branch,
+      };
+
+      const project = await projectApi.createFromGitHub(createData, session.accessToken);
+      router.push(`/projects/${project.id}`);
+    } catch (err) {
+      if (err instanceof Error) {
+        try {
+          const errorData = JSON.parse(err.message);
+          setGithubError(errorData.detail || err.message);
+        } catch {
+          setGithubError(err.message);
+        }
+      } else {
+        setGithubError("An error occurred while cloning the repository");
+      }
+      throw err;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -195,18 +252,33 @@ export default function NewProjectPage() {
               <Upload className="h-4 w-4" />
               Import from File
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("github")}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
+                activeTab === "github"
+                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                  : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
+              )}
+            >
+              <Github className="h-4 w-4" />
+              Clone from GitHub
+            </button>
           </div>
 
           {/* Tab Content */}
           <div className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
-            {activeTab === "create" ? (
+            {activeTab === "create" && (
               <ProjectForm
                 onSubmit={handleCreateSubmit}
                 onCancel={handleCancel}
                 submitLabel="Create Project"
                 isLoading={isSubmitting}
               />
-            ) : (
+            )}
+
+            {activeTab === "import" && (
               <div className="space-y-6">
                 {/* File Upload */}
                 <div>
@@ -268,6 +340,85 @@ export default function NewProjectPage() {
                   namePlaceholder="Leave empty to use name from ontology"
                   descriptionPlaceholder="Leave empty to use description from ontology"
                 />
+              </div>
+            )}
+
+            {activeTab === "github" && (
+              <div className="space-y-6">
+                {/* Step 1: Select Repository */}
+                <div>
+                  <h3 className="mb-3 text-sm font-medium text-slate-900 dark:text-white">
+                    Step 1: Select a repository
+                  </h3>
+                  <GitHubRepoPicker
+                    onSelect={(repo) => {
+                      setGithubRepo(repo);
+                      setGithubFile(null);
+                      setGithubTurtlePath(null);
+                      setGithubError(null);
+                    }}
+                  />
+                </div>
+
+                {/* Step 2: Select Ontology File */}
+                {githubRepo && session?.accessToken && (
+                  <div>
+                    <h3 className="mb-3 text-sm font-medium text-slate-900 dark:text-white">
+                      Step 2: Select an ontology file
+                    </h3>
+                    <OntologyFilePicker
+                      owner={githubRepo.owner}
+                      repo={githubRepo.name}
+                      token={session.accessToken}
+                      onSelect={(file, turtlePath) => {
+                        setGithubFile(file);
+                        setGithubTurtlePath(turtlePath);
+                        setGithubError(null);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Step 3: Project Form */}
+                {githubRepo && githubFile && githubTurtlePath && (
+                  <div>
+                    <h3 className="mb-3 text-sm font-medium text-slate-900 dark:text-white">
+                      Step 3: Configure project
+                    </h3>
+
+                    {/* Selected summary */}
+                    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-700/50">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Repository: <span className="font-medium text-slate-700 dark:text-slate-300">{githubRepo.full_name}</span>
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Source file: <span className="font-medium text-slate-700 dark:text-slate-300">{githubFile.path}</span>
+                      </p>
+                      {githubTurtlePath && githubTurtlePath !== githubFile.path && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          Turtle output: <span className="font-medium text-slate-700 dark:text-slate-300">{githubTurtlePath}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Error */}
+                    {githubError && (
+                      <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                        {githubError}
+                      </div>
+                    )}
+
+                    <ProjectForm
+                      onSubmit={handleGitHubSubmit}
+                      onCancel={handleCancel}
+                      submitLabel={isSubmitting ? "Cloning repository..." : "Clone & Create Project"}
+                      isLoading={isSubmitting}
+                      nameRequired={false}
+                      namePlaceholder="Leave empty to use name from ontology"
+                      descriptionPlaceholder="Leave empty to use description from ontology"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -1222,6 +1222,17 @@ export default function ProjectSettingsPage() {
                             </span>
                           )}
                         </p>
+                        {githubIntegration.ontology_file_path && (
+                          <p className="text-xs text-slate-400">
+                            Source file: {githubIntegration.ontology_file_path}
+                          </p>
+                        )}
+                        {githubIntegration.turtle_file_path &&
+                          githubIntegration.turtle_file_path !== githubIntegration.ontology_file_path && (
+                          <p className="text-xs text-slate-400">
+                            Turtle output: {githubIntegration.turtle_file_path}
+                          </p>
+                        )}
                         {githubIntegration.last_sync_at && (
                           <p className="text-xs text-slate-400">
                             Last synced: {new Date(githubIntegration.last_sync_at).toLocaleString()}
@@ -1248,6 +1259,53 @@ export default function ProjectSettingsPage() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Sync status indicator */}
+                  {githubIntegration.sync_status === "idle" && (
+                    <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900/50 dark:bg-green-900/20">
+                      <div className="h-2 w-2 rounded-full bg-green-500" />
+                      <p className="text-sm text-green-700 dark:text-green-300">In sync</p>
+                    </div>
+                  )}
+                  {githubIntegration.sync_status === "syncing" && (
+                    <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/50 dark:bg-blue-900/20">
+                      <RefreshCw className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+                      <p className="text-sm text-blue-700 dark:text-blue-300">Syncing...</p>
+                    </div>
+                  )}
+                  {githubIntegration.sync_status === "conflict" && (
+                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-900/20">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                          Merge conflict detected
+                        </p>
+                      </div>
+                      {githubIntegration.sync_error && (
+                        <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                          {githubIntegration.sync_error}
+                        </p>
+                      )}
+                      <p className="mt-2 text-xs text-red-500 dark:text-red-400">
+                        Sync is paused. Resolve the conflict by force-pushing from Axigraph or resetting to the remote version.
+                      </p>
+                    </div>
+                  )}
+                  {githubIntegration.sync_status === "error" && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/20">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                          Sync error
+                        </p>
+                      </div>
+                      {githubIntegration.sync_error && (
+                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                          {githubIntegration.sync_error}
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-900/20">
                     <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />

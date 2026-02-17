@@ -189,7 +189,8 @@ export default function EditorPage() {
       const response = await revisionsApi.getFileAtVersion(
         projectId,
         activeBranch,
-        session.accessToken
+        session.accessToken,
+        project?.git_ontology_path
       );
       setSourceContent(response.content);
     } catch (err) {
@@ -206,7 +207,7 @@ export default function EditorPage() {
         setIsLoadingSource(false);
       }
     }
-  }, [projectId, session?.accessToken, sourceContent, activeBranch]);
+  }, [projectId, session?.accessToken, sourceContent, activeBranch, project?.git_ontology_path]);
 
   // Refs to handle the save promise
   const pendingSaveResolveRef = useRef<(() => void) | null>(null);

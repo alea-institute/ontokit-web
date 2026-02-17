@@ -161,7 +161,11 @@ export interface GitHubIntegration {
   connected_by_user_id?: string;
   webhooks_enabled: boolean;
   default_branch: string;
+  ontology_file_path?: string;
+  turtle_file_path?: string;
   sync_enabled: boolean;
+  sync_status: string; // "idle" | "syncing" | "conflict" | "error"
+  sync_error?: string;
   last_sync_at?: string;
   created_at: string;
   updated_at?: string;
@@ -178,6 +182,8 @@ export interface GitHubIntegrationUpdate {
   default_branch?: string;
   sync_enabled?: boolean;
   webhooks_enabled?: boolean;
+  ontology_file_path?: string;
+  turtle_file_path?: string;
 }
 
 export interface PRSettings {
