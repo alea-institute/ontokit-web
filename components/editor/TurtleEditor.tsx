@@ -194,10 +194,15 @@ export function TurtleEditor({
         const lineContent = model.getLineContent(position.lineNumber);
         const column = position.column;
 
-        // Get all prefixes defined in the document and track internal namespaces
+        // Get all prefixes and @base defined in the document
         const content = model.getValue();
         const docPrefixes = new Map<string, string>();
         const internalNamespaces = new Set<string>();
+        let docBase: string | null = null;
+        const baseMatch = content.match(/@?base\s+<([^>]+)>/i);
+        if (baseMatch) {
+          docBase = baseMatch[1];
+        }
         const prefixMatches = content.matchAll(/@?prefix\s+(\w*):\s*<([^>]+)>/gi);
         for (const match of prefixMatches) {
           const prefix = match[1];
@@ -213,6 +218,44 @@ export function TurtleEditor({
         for (const p of commonPrefixes) {
           if (!docPrefixes.has(p.prefix)) {
             docPrefixes.set(p.prefix, p.namespace);
+          }
+        }
+
+        // Find IRIs in angle brackets at cursor position: <...>
+        const angleBracketMatches = lineContent.matchAll(/<([^>\s]+)>/g);
+        for (const match of angleBracketMatches) {
+          const iriContent = match[1];
+          const matchStart = match.index! + 1;
+          const matchEnd = matchStart + match[0].length;
+
+          if (column >= matchStart && column <= matchEnd) {
+            const isAbsolute = !!iriContent.match(/^[a-z][a-z0-9+.-]*:/i);
+            let fullIri: string;
+            if (isAbsolute) {
+              fullIri = iriContent;
+            } else if (docBase) {
+              fullIri = docBase + iriContent;
+            } else {
+              continue; // Relative IRI with no @base — can't resolve
+            }
+
+            // Check if this IRI belongs to an internal namespace or matches @base
+            const isInternal = (docBase && fullIri.startsWith(docBase))
+              || [...internalNamespaces].some(ns => fullIri.startsWith(ns));
+
+            return {
+              range: {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: matchStart,
+                endColumn: matchEnd,
+              },
+              contents: [
+                { value: `**<${iriContent}>**` },
+                ...(isAbsolute ? [] : [{ value: `Full IRI: \`${fullIri}\`` }]),
+                { value: isInternal ? `*Ctrl+Click to navigate to class*` : `*Ctrl+Click to open in browser*` },
+              ],
+            };
           }
         }
 
@@ -253,19 +296,39 @@ export function TurtleEditor({
     });
 
     // Register link provider for external URLs only
-    // Internal links (prefixed names) are handled via Ctrl+Click in handleMount
+    // Internal links are handled via Ctrl+Click in handleMount
     monaco.languages.registerLinkProvider(TURTLE_LANGUAGE_ID, {
       provideLinks: (model: editor.ITextModel) => {
         const links: languages.ILink[] = [];
         const lineCount = model.getLineCount();
 
+        // Determine internal namespaces to exclude from browser links
+        const content = model.getValue();
+        const internalNs = new Set<string>();
+        const baseMatch = content.match(/@?base\s+<([^>]+)>/i);
+        if (baseMatch) {
+          internalNs.add(baseMatch[1]);
+        }
+        const prefixMatches = content.matchAll(/@?prefix\s+(\w*):\s*<([^>]+)>/gi);
+        for (const match of prefixMatches) {
+          const namespace = match[2];
+          const isKnownExternal = commonPrefixes.some(p => p.namespace === namespace);
+          if (!isKnownExternal) {
+            internalNs.add(namespace);
+          }
+        }
+
         for (let lineNum = 1; lineNum <= lineCount; lineNum++) {
           const lineContent = model.getLineContent(lineNum);
 
-          // Find full IRIs <http://...> or <https://...> - external links only
+          // Find full IRIs <http://...> or <https://...>
           const iriMatches = lineContent.matchAll(/<(https?:\/\/[^>\s]+)>/g);
           for (const match of iriMatches) {
             const url = match[1];
+            // Skip internal IRIs — these are handled by Ctrl+Click → tree navigation
+            const isInternal = [...internalNs].some(ns => url.startsWith(ns));
+            if (isInternal) continue;
+
             const startCol = match.index! + 2; // After '<'
             const endCol = startCol + url.length;
             links.push({
@@ -298,11 +361,11 @@ export function TurtleEditor({
 
       const model = editor.getModel();
 
-      // Get prefixes from the document + common prefixes for resolving links
-      // Returns { prefixes, internalNamespaces } where internalNamespaces are from the document
-      const getPrefixInfo = (): { prefixes: Map<string, string>; internalNamespaces: Set<string> } => {
+      // Get prefixes and @base from the document + common prefixes for resolving links
+      const getPrefixInfo = (): { prefixes: Map<string, string>; internalNamespaces: Set<string>; baseUri: string | null } => {
         const prefixes = new Map<string, string>();
         const internalNamespaces = new Set<string>();
+        let baseUri: string | null = null;
 
         // Add common prefixes first (these are external vocabularies)
         for (const p of commonPrefixes) {
@@ -313,6 +376,11 @@ export function TurtleEditor({
         // Document-defined prefixes (especially empty prefix) are considered internal
         if (model) {
           const content = model.getValue();
+          // Extract @base
+          const baseMatch = content.match(/@?base\s+<([^>]+)>/i);
+          if (baseMatch) {
+            baseUri = baseMatch[1];
+          }
           const prefixMatches = content.matchAll(/@?prefix\s+(\w*):\s*<([^>]+)>/gi);
           for (const match of prefixMatches) {
             const prefix = match[1];
@@ -327,10 +395,10 @@ export function TurtleEditor({
           }
         }
 
-        return { prefixes, internalNamespaces };
+        return { prefixes, internalNamespaces, baseUri };
       };
 
-      // Handle Ctrl+Click for links (prefixed names)
+      // Handle Ctrl+Click for links (relative IRIs and prefixed names)
       editor.onMouseDown((e) => {
         // Check for Ctrl+Click (or Cmd+Click on Mac)
         if ((e.event.ctrlKey || e.event.metaKey) && model) {
@@ -338,6 +406,41 @@ export function TurtleEditor({
           if (position) {
             const lineContent = model.getLineContent(position.lineNumber);
             const column = position.column;
+            const { prefixes, internalNamespaces, baseUri } = getPrefixInfo();
+
+            // Check for IRIs in angle brackets: <...>
+            const angleBracketMatches = lineContent.matchAll(/<([^>\s]+)>/g);
+            for (const match of angleBracketMatches) {
+              const iriContent = match[1];
+              const matchStart = match.index! + 1;
+              const matchEnd = matchStart + match[0].length;
+
+              if (column >= matchStart && column <= matchEnd) {
+                const isAbsolute = !!iriContent.match(/^[a-z][a-z0-9+.-]*:/i);
+                let fullIri: string;
+                if (isAbsolute) {
+                  fullIri = iriContent;
+                } else if (baseUri) {
+                  fullIri = baseUri + iriContent;
+                } else {
+                  continue; // Can't resolve relative IRI
+                }
+
+                // Check if internal (matches @base or internal namespace)
+                const isInternal = (baseUri && fullIri.startsWith(baseUri))
+                  || [...internalNamespaces].some(ns => fullIri.startsWith(ns));
+
+                e.event.preventDefault();
+                e.event.stopPropagation();
+
+                if (isInternal && onInternalLinkClickRef.current) {
+                  onInternalLinkClickRef.current(fullIri);
+                } else if (fullIri.startsWith('http://') || fullIri.startsWith('https://')) {
+                  window.open(fullIri, '_blank', 'noopener,noreferrer');
+                }
+                return;
+              }
+            }
 
             // Find if we're clicking on a prefixed name pattern
             // Look for prefix:localName where cursor is within the match
@@ -349,7 +452,6 @@ export function TurtleEditor({
               if (column >= matchStart && column <= matchEnd) {
                 const prefix = match[1];
                 const localName = match[2];
-                const { prefixes, internalNamespaces } = getPrefixInfo();
                 const namespace = prefixes.get(prefix);
 
                 if (namespace) {

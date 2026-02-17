@@ -41,11 +41,19 @@ function buildIriIndex(content: string): Map<string, IriPosition> {
   const index = new Map<string, IriPosition>();
   const lines = content.split("\n");
 
-  // Extract prefixes first (single pass)
-  // Support both @prefix and PREFIX, with optional empty prefix
+  // Extract @base and prefixes first (single pass)
+  // Support both @base and BASE, @prefix and PREFIX
+  let baseUri: string | null = null;
   const prefixes = new Map<string, string>();
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    // Match @base or BASE declaration
+    if (!baseUri) {
+      const baseMatch = line.match(/@?base\s+<([^>]+)>/i);
+      if (baseMatch) {
+        baseUri = baseMatch[1];
+      }
+    }
     // Match @prefix or PREFIX declarations - prefix name can be empty
     const prefixMatch = line.match(/@?prefix\s+(\w*):\s*<([^>]+)>/i);
     if (prefixMatch) {
@@ -77,10 +85,14 @@ function buildIriIndex(content: string): Map<string, IriPosition> {
 
     if (isContinuation) continue; // Skip - this is not a subject
 
-    // Match full IRI at start of line: <...>
+    // Match full IRI or relative IRI at start of line: <...>
     const fullIriMatch = trimmed.match(/^<([^>\s]+)>/);
     if (fullIriMatch) {
-      const iri = fullIriMatch[1];
+      let iri = fullIriMatch[1];
+      // Resolve relative IRIs against @base
+      if (baseUri && !iri.match(/^[a-z][a-z0-9+.-]*:/i)) {
+        iri = baseUri + iri;
+      }
       if (!index.has(iri)) {
         const col = line.indexOf('<') + 1;
         index.set(iri, { line: i + 1, col, len: fullIriMatch[0].length });
