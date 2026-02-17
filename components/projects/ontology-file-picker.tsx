@@ -88,14 +88,21 @@ export function OntologyFilePicker({
     setSelectedFile(file);
     // Reset turtle path state
     setSelectedTurtleFile(null);
-    setTurtlePathMode("new");
 
     if (isTtlFile(file.path)) {
       // .ttl files proceed immediately
+      setTurtlePathMode("new");
       onSelect(file, file.path);
     } else {
       // Non-.ttl: suggest a default turtle path
       setCustomTurtlePath(toTtlPath(file.path));
+      // Default to "existing" mode if .ttl files are available in the repo
+      if (ttlFiles.length > 0) {
+        setTurtlePathMode("existing");
+        setSelectedTurtleFile(ttlFiles[0]);
+      } else {
+        setTurtlePathMode("new");
+      }
     }
   };
 
@@ -234,42 +241,49 @@ export function OntologyFilePicker({
               </div>
             </label>
 
-            {/* Option: Use existing .ttl file (only if there are .ttl files in the repo) */}
-            {ttlFiles.length > 0 && (
-              <label className="flex items-start gap-2">
-                <input
-                  type="radio"
-                  name="turtlePathMode"
-                  checked={turtlePathMode === "existing"}
-                  onChange={() => setTurtlePathMode("existing")}
-                  className="mt-1"
-                />
-                <div className="flex-1">
-                  <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    Use existing .ttl file
-                  </span>
-                  {turtlePathMode === "existing" && (
-                    <div className="mt-1 max-h-32 overflow-y-auto rounded-md border border-slate-300 dark:border-slate-600">
-                      {ttlFiles.map((f) => (
-                        <button
-                          key={f.path}
-                          type="button"
-                          onClick={() => setSelectedTurtleFile(f)}
-                          className={cn(
-                            "w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 dark:border-slate-700",
-                            "hover:bg-slate-50 dark:hover:bg-slate-700/50",
-                            selectedTurtleFile?.path === f.path &&
-                              "bg-primary-50 font-medium dark:bg-primary-900/20"
-                          )}
-                        >
-                          {f.path}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </label>
-            )}
+            {/* Option: Use existing .ttl file */}
+            <label className={cn(
+              "flex items-start gap-2",
+              ttlFiles.length === 0 && "cursor-not-allowed opacity-50"
+            )}>
+              <input
+                type="radio"
+                name="turtlePathMode"
+                checked={turtlePathMode === "existing"}
+                onChange={() => setTurtlePathMode("existing")}
+                disabled={ttlFiles.length === 0}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Use existing .ttl file
+                </span>
+                {ttlFiles.length === 0 && (
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    No .ttl files found in the repository
+                  </p>
+                )}
+                {turtlePathMode === "existing" && ttlFiles.length > 0 && (
+                  <div className="mt-1 max-h-32 overflow-y-auto rounded-md border border-slate-300 dark:border-slate-600">
+                    {ttlFiles.map((f) => (
+                      <button
+                        key={f.path}
+                        type="button"
+                        onClick={() => setSelectedTurtleFile(f)}
+                        className={cn(
+                          "w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 dark:border-slate-700",
+                          "hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                          selectedTurtleFile?.path === f.path &&
+                            "bg-primary-50 font-medium dark:bg-primary-900/20"
+                        )}
+                      >
+                        {f.path}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </label>
 
             {/* Confirm button */}
             <button
