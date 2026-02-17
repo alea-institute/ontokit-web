@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -24,6 +24,15 @@ import { cn } from "@/lib/utils";
 
 type TabType = "create" | "import" | "github";
 
+const GITHUB_CLONE_STEPS = [
+  { label: "Parsing ontology file...", progress: 15 },
+  { label: "Normalizing to Turtle format...", progress: 30 },
+  { label: "Creating project...", progress: 45 },
+  { label: "Cloning repository...", progress: 70 },
+  { label: "Normalizing repository content...", progress: 85 },
+  { label: "Finalizing...", progress: 95 },
+];
+
 export default function NewProjectPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -38,6 +47,22 @@ export default function NewProjectPage() {
   const [githubFile, setGithubFile] = useState<GitHubRepoFileInfo | null>(null);
   const [githubTurtlePath, setGithubTurtlePath] = useState<string | null>(null);
   const [githubError, setGithubError] = useState<string | null>(null);
+  const [githubCloneStep, setGithubCloneStep] = useState(0);
+
+  // Advance GitHub clone progress steps on a timer
+  useEffect(() => {
+    if (!(isSubmitting && activeTab === "github")) {
+      setGithubCloneStep(0);
+      return;
+    }
+
+    const delays = [0, 1500, 3500, 5500, 20500, 25500];
+    const timers = delays.map((delay, i) =>
+      setTimeout(() => setGithubCloneStep(i), delay)
+    );
+
+    return () => timers.forEach(clearTimeout);
+  }, [isSubmitting, activeTab]);
 
   const isAuthenticated = status === "authenticated";
   const isLoading = status === "loading";
@@ -405,6 +430,29 @@ export default function NewProjectPage() {
                     {githubError && (
                       <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
                         {githubError}
+                      </div>
+                    )}
+
+                    {/* Clone Progress */}
+                    {isSubmitting && (
+                      <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-700">
+                        <div className="mb-2 flex items-center justify-between text-sm">
+                          <span className="font-medium text-slate-700 dark:text-slate-300">
+                            {GITHUB_CLONE_STEPS[githubCloneStep].label}
+                          </span>
+                          <span className="text-slate-500 dark:text-slate-400">
+                            {GITHUB_CLONE_STEPS[githubCloneStep].progress}%
+                          </span>
+                        </div>
+                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-600">
+                          <div
+                            className="h-full rounded-full bg-primary-600 transition-all duration-1000 ease-out"
+                            style={{ width: `${GITHUB_CLONE_STEPS[githubCloneStep].progress}%` }}
+                          />
+                        </div>
+                        <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                          This may take a moment for large repositories
+                        </p>
                       </div>
                     )}
 
