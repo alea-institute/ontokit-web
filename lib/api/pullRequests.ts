@@ -195,8 +195,31 @@ export interface PRSettingsUpdate {
   pr_approval_required: number;
 }
 
+// Open PR summary types (for notification bell)
+export interface ProjectOpenPRCount {
+  project_id: string;
+  project_name: string;
+  open_count: number;
+}
+
+export interface OpenPRsSummary {
+  total_open: number;
+  by_project: ProjectOpenPRCount[];
+}
+
 // API functions
 export const pullRequestsApi = {
+  /**
+   * Get summary of open PRs across projects the user manages
+   */
+  getOpenSummary: (token: string) =>
+    api.get<OpenPRsSummary>(
+      `/api/v1/projects/pull-requests/open-summary`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    ),
+
   /**
    * List pull requests for a project
    */

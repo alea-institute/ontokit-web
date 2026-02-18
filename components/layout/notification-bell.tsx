@@ -8,12 +8,16 @@ import {
   joinRequestApi,
   type PendingJoinRequestsSummary,
 } from "@/lib/api/joinRequests";
+import {
+  pullRequestsApi,
+  type OpenPRsSummary,
+} from "@/lib/api/pullRequests";
 
 export function NotificationBell() {
   const { data: session, status } = useSession();
-  const [summary, setSummary] = useState<PendingJoinRequestsSummary | null>(
-    null
-  );
+  const [joinSummary, setJoinSummary] =
+    useState<PendingJoinRequestsSummary | null>(null);
+  const [prSummary, setPrSummary] = useState<OpenPRsSummary | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -22,7 +26,14 @@ export function NotificationBell() {
 
     joinRequestApi
       .getPendingSummary(session.accessToken)
-      .then(setSummary)
+      .then(setJoinSummary)
+      .catch(() => {
+        // Ignore errors — user may not manage any projects
+      });
+
+    pullRequestsApi
+      .getOpenSummary(session.accessToken)
+      .then(setPrSummary)
       .catch(() => {
         // Ignore errors — user may not manage any projects
       });
@@ -41,7 +52,9 @@ export function NotificationBell() {
 
   if (status !== "authenticated") return null;
 
-  const totalPending = summary?.total_pending ?? 0;
+  const totalPending = joinSummary?.total_pending ?? 0;
+  const totalOpenPRs = prSummary?.total_open ?? 0;
+  const totalCount = totalPending + totalOpenPRs;
 
   return (
     <div className="relative" ref={menuRef}>
@@ -51,9 +64,9 @@ export function NotificationBell() {
         aria-label="Notifications"
       >
         <Bell className="h-5 w-5" />
-        {totalPending > 0 && (
+        {totalCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
-            {totalPending > 99 ? "99+" : totalPending}
+            {totalCount > 99 ? "99+" : totalCount}
           </span>
         )}
       </button>
@@ -66,32 +79,72 @@ export function NotificationBell() {
             </p>
           </div>
           <div className="max-h-64 overflow-y-auto py-1">
-            {totalPending === 0 ? (
+            {totalCount === 0 ? (
               <p className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
                 No notifications
               </p>
             ) : (
-              summary?.by_project.map((project) => (
-                <Link
-                  key={project.project_id}
-                  href={`/projects/${project.project_id}/settings#join-requests`}
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                      {project.project_name}
+              <>
+                {totalPending > 0 && (
+                  <div>
+                    <p className="px-4 pt-2 pb-1 text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      Join Requests
                     </p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      {project.pending_count} pending join{" "}
-                      {project.pending_count === 1 ? "request" : "requests"}
-                    </p>
+                    {joinSummary?.by_project.map((project) => (
+                      <Link
+                        key={`join-${project.project_id}`}
+                        href={`/projects/${project.project_id}/settings#join-requests`}
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                            {project.project_name}
+                          </p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {project.pending_count} pending join{" "}
+                            {project.pending_count === 1
+                              ? "request"
+                              : "requests"}
+                          </p>
+                        </div>
+                        <span className="ml-2 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          {project.pending_count}
+                        </span>
+                      </Link>
+                    ))}
                   </div>
-                  <span className="ml-2 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                    {project.pending_count}
-                  </span>
-                </Link>
-              ))
+                )}
+
+                {totalOpenPRs > 0 && (
+                  <div>
+                    <p className="px-4 pt-2 pb-1 text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                      Open Pull Requests
+                    </p>
+                    {prSummary?.by_project.map((project) => (
+                      <Link
+                        key={`pr-${project.project_id}`}
+                        href={`/projects/${project.project_id}/pull-requests`}
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                            {project.project_name}
+                          </p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {project.open_count} open{" "}
+                            {project.open_count === 1 ? "PR" : "PRs"}
+                          </p>
+                        </div>
+                        <span className="ml-2 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-indigo-100 px-1.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                          {project.open_count}
+                        </span>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
