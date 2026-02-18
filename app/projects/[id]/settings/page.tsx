@@ -21,6 +21,7 @@ import {
   type MemberUpdate,
   type TransferOwnership,
 } from "@/lib/api/projects";
+import { TurtleOutputPicker } from "@/components/projects/turtle-output-picker";
 import {
   githubIntegrationApi,
   prSettingsApi,
@@ -127,6 +128,7 @@ export default function ProjectSettingsPage() {
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepoInfo | null>(null);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const repoSearchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [githubOutputPath, setGithubOutputPath] = useState<string | null>(null);
 
   const isAuthenticated = status === "authenticated";
 
@@ -424,6 +426,7 @@ export default function ProjectSettingsPage() {
           repo_name: selectedRepo.name,
           default_branch: selectedRepo.default_branch,
           webhooks_enabled: false,
+          ontology_file_path: githubOutputPath || undefined,
         },
         session.accessToken
       );
@@ -432,6 +435,7 @@ export default function ProjectSettingsPage() {
       setSelectedRepo(null);
       setGithubRepos([]);
       setRepoSearchQuery("");
+      setGithubOutputPath(null);
       setSuccessMessage("GitHub repository connected successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -444,6 +448,7 @@ export default function ProjectSettingsPage() {
   const handleSearchRepos = (query: string) => {
     setRepoSearchQuery(query);
     setSelectedRepo(null);
+    setGithubOutputPath(null);
 
     // Debounce search
     if (repoSearchTimeout.current) {
@@ -1471,7 +1476,14 @@ export default function ProjectSettingsPage() {
                   {githubIntegration.sync_status === "idle" && (
                     <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900/50 dark:bg-green-900/20">
                       <div className="h-2 w-2 rounded-full bg-green-500" />
-                      <p className="text-sm text-green-700 dark:text-green-300">In sync</p>
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        In sync
+                        {githubIntegration.ontology_file_path && (
+                          <span className="ml-1 text-green-600 dark:text-green-400">
+                            &mdash; {githubIntegration.ontology_file_path}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   )}
                   {githubIntegration.sync_status === "syncing" && (
@@ -1570,7 +1582,10 @@ export default function ProjectSettingsPage() {
                             <button
                               key={repo.full_name}
                               type="button"
-                              onClick={() => setSelectedRepo(repo)}
+                              onClick={() => {
+                                setSelectedRepo(repo);
+                                setGithubOutputPath(null);
+                              }}
                               className={cn(
                                 "w-full border-b border-slate-100 px-4 py-3 text-left last:border-b-0 dark:border-slate-700",
                                 "hover:bg-slate-50 dark:hover:bg-slate-700/50",
@@ -1603,10 +1618,20 @@ export default function ProjectSettingsPage() {
                         )}
                       </div>
 
+                      {/* Turtle output path picker - shown after repo selection */}
+                      {selectedRepo && session?.accessToken && (
+                        <TurtleOutputPicker
+                          owner={selectedRepo.owner}
+                          repo={selectedRepo.name}
+                          token={session.accessToken}
+                          onSelect={(path) => setGithubOutputPath(path)}
+                        />
+                      )}
+
                       <div className="flex gap-3">
                         <Button
                           onClick={handleConnectRepo}
-                          disabled={!selectedRepo || isSetupGitHub}
+                          disabled={!selectedRepo || !githubOutputPath || isSetupGitHub}
                         >
                           {isSetupGitHub ? "Connecting..." : "Connect Repository"}
                         </Button>
@@ -1617,6 +1642,7 @@ export default function ProjectSettingsPage() {
                             setSelectedRepo(null);
                             setGithubRepos([]);
                             setRepoSearchQuery("");
+                            setGithubOutputPath(null);
                           }}
                         >
                           Cancel

@@ -176,6 +176,8 @@ export interface GitHubIntegrationCreate {
   repo_name: string;
   default_branch?: string;
   webhooks_enabled?: boolean;
+  ontology_file_path?: string;
+  turtle_file_path?: string;
 }
 
 export interface GitHubIntegrationUpdate {
