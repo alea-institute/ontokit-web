@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MoreVertical, Shield, Pencil, Eye, UserMinus, Crown } from "lucide-react";
+import { MoreVertical, Shield, Pencil, Eye, UserMinus, Crown, ArrowRightLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ProjectMember, ProjectRole, MemberUpdate } from "@/lib/api/projects";
@@ -13,6 +13,7 @@ interface MemberListProps {
   isPublic?: boolean;
   onUpdateRole: (userId: string, data: MemberUpdate) => Promise<void>;
   onRemove: (userId: string) => Promise<void>;
+  onTransferOwnership?: (userId: string) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -44,6 +45,7 @@ export function MemberList({
   isPublic = false,
   onUpdateRole,
   onRemove,
+  onTransferOwnership,
   isLoading = false,
 }: MemberListProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -82,6 +84,25 @@ export function MemberList({
     } finally {
       setProcessingId(null);
     }
+  };
+
+  const handleTransferOwnership = async (userId: string) => {
+    if (!onTransferOwnership) return;
+    setProcessingId(userId);
+    setOpenMenuId(null);
+    try {
+      await onTransferOwnership(userId);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const canTransferTo = (member: ProjectMember): boolean => {
+    return (
+      currentUserRole === "owner" &&
+      member.role === "admin" &&
+      !!onTransferOwnership
+    );
   };
 
   return (
@@ -131,7 +152,7 @@ export function MemberList({
                 <span className="text-sm font-medium">{roleLabels[member.role]}</span>
               </div>
 
-              {(canEditMember(member) || canRemoveMember(member)) && (
+              {(canEditMember(member) || canRemoveMember(member) || canTransferTo(member)) && (
                 <div className="relative">
                   <Button
                     variant="ghost"
@@ -176,6 +197,18 @@ export function MemberList({
                                 );
                               })}
                             <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
+                          </>
+                        )}
+                        {canTransferTo(member) && (
+                          <>
+                            <div className="my-1 border-t border-slate-200 dark:border-slate-700" />
+                            <button
+                              onClick={() => handleTransferOwnership(member.user_id)}
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-900/20"
+                            >
+                              <ArrowRightLeft className="h-4 w-4" />
+                              Transfer Ownership
+                            </button>
                           </>
                         )}
                         {canRemoveMember(member) && (

@@ -18,6 +18,7 @@ import {
   type ProjectUpdate,
   type MemberCreate,
   type MemberUpdate,
+  type TransferOwnership,
 } from "@/lib/api/projects";
 import {
   githubIntegrationApi,
@@ -304,6 +305,38 @@ export default function ProjectSettingsPage() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove member");
+    }
+  };
+
+  const handleTransferOwnership = async (userId: string) => {
+    if (!session?.accessToken || !project) return;
+
+    const targetMember = members.find((m) => m.user_id === userId);
+    const targetName = targetMember?.user?.name || userId;
+
+    if (
+      !confirm(
+        `Are you sure you want to transfer ownership of "${project.name}" to ${targetName}? You will be demoted to admin.`
+      )
+    )
+      return;
+
+    try {
+      const result = await projectApi.transferOwnership(
+        project.id,
+        { new_owner_id: userId } as TransferOwnership,
+        session.accessToken
+      );
+      setMembers(result.items);
+      // Refresh the project to get updated owner_id and user_role
+      const updatedProject = await projectApi.get(project.id, session.accessToken);
+      setProject(updatedProject);
+      setSuccessMessage("Ownership transferred successfully");
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to transfer ownership"
+      );
     }
   };
 
@@ -1285,6 +1318,7 @@ export default function ProjectSettingsPage() {
               isPublic={project.is_public}
               onUpdateRole={handleUpdateMemberRole}
               onRemove={handleRemoveMember}
+              onTransferOwnership={isOwner ? handleTransferOwnership : undefined}
             />
           </section>
 

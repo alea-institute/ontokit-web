@@ -98,6 +98,10 @@ export interface MemberUpdate {
   role: ProjectRole;
 }
 
+export interface TransferOwnership {
+  new_owner_id: string;
+}
+
 export interface ProjectImportResponse extends Project {
   ontology_iri?: string;
   file_path: string;
@@ -290,4 +294,20 @@ export const projectApi = {
     api.delete(`/api/v1/projects/${projectId}/members/${userId}`, {
       headers: { Authorization: `Bearer ${token}` },
     }),
+
+  /**
+   * Transfer project ownership to an admin member
+   */
+  transferOwnership: (
+    projectId: string,
+    data: TransferOwnership,
+    token: string
+  ) =>
+    api.post<MemberListResponse>(
+      `/api/v1/projects/${projectId}/transfer-ownership`,
+      data,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    ),
 };
