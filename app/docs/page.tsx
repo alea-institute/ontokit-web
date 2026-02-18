@@ -1,14 +1,8 @@
-"use client";
-
-import { Header } from "@/components/layout/header";
 import Link from "next/link";
 
 export default function DocsPage() {
   return (
-    <>
-      <Header />
-      <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
-        <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
             Documentation
           </h1>
@@ -314,7 +308,5 @@ export default function DocsPage() {
             </section>
           </div>
         </div>
-      </main>
-    </>
   );
 }
