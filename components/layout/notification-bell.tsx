@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Bell } from "lucide-react";
@@ -13,6 +13,9 @@ import {
   type OpenPRsSummary,
 } from "@/lib/api/pullRequests";
 
+/** Dispatch this event to trigger a notification refetch. */
+export const NOTIFICATIONS_CHANGED_EVENT = "notifications:changed";
+
 export function NotificationBell() {
   const { data: session, status } = useSession();
   const [joinSummary, setJoinSummary] =
@@ -21,7 +24,7 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const fetchNotifications = useCallback(() => {
     if (status !== "authenticated" || !session?.accessToken) return;
 
     joinRequestApi
@@ -38,6 +41,18 @@ export function NotificationBell() {
         // Ignore errors — user may not manage any projects
       });
   }, [session?.accessToken, status]);
+
+  // Fetch on mount / session change
+  useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
+
+  // Refetch when other components signal a change
+  useEffect(() => {
+    const handler = () => fetchNotifications();
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
+    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
+  }, [fetchNotifications]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

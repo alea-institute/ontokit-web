@@ -39,6 +39,7 @@ import {
   joinRequestApi,
   type JoinRequest as JoinRequestType,
 } from "@/lib/api/joinRequests";
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/components/layout/notification-bell";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
 
@@ -466,6 +467,7 @@ export default function ProjectSettingsPage() {
       setProject({ ...project, member_count: membersData.total });
       setSuccessMessage("Join request approved — user added as editor");
       setTimeout(() => setSuccessMessage(null), 3000);
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve request");
     } finally {
@@ -483,6 +485,7 @@ export default function ProjectSettingsPage() {
       setJoinRequestCount(Math.max(0, joinRequestCount - 1));
       setSuccessMessage("Join request declined");
       setTimeout(() => setSuccessMessage(null), 3000);
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to decline request");
     } finally {
