@@ -11,6 +11,7 @@ import { ProjectForm } from "@/components/projects/project-form";
 import { MemberList } from "@/components/projects/member-list";
 import { UserSearchInput } from "@/components/projects/user-search-input";
 import { LabelPreferences } from "@/components/projects/label-preferences";
+import { ApiError } from "@/lib/api/client";
 import {
   projectApi,
   type Project,
@@ -334,6 +335,37 @@ export default function ProjectSettingsPage() {
       setSuccessMessage("Ownership transferred successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
+      // Handle 409: GitHub integration will be disconnected
+      if (err instanceof ApiError && err.status === 409) {
+        const confirmed = confirm(
+          `${err.message}\n\nDo you want to proceed and disconnect the GitHub integration?`
+        );
+        if (!confirmed) return;
+
+        // Retry with force=true
+        try {
+          const result = await projectApi.transferOwnership(
+            project.id,
+            { new_owner_id: userId } as TransferOwnership,
+            session.accessToken,
+            true
+          );
+          setMembers(result.items);
+          const updatedProject = await projectApi.get(project.id, session.accessToken);
+          setProject(updatedProject);
+          setGithubIntegration(null);
+          setSuccessMessage(
+            "Ownership transferred. GitHub integration was disconnected because the new owner has no GitHub token."
+          );
+          setTimeout(() => setSuccessMessage(null), 5000);
+        } catch (retryErr) {
+          setError(
+            retryErr instanceof Error ? retryErr.message : "Failed to transfer ownership"
+          );
+        }
+        return;
+      }
+
       setError(
         err instanceof Error ? err.message : "Failed to transfer ownership"
       );

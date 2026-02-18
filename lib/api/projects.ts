@@ -297,16 +297,19 @@ export const projectApi = {
 
   /**
    * Transfer project ownership to an admin member
+   * @param force - If true, proceed even if GitHub integration will be disconnected
    */
   transferOwnership: (
     projectId: string,
     data: TransferOwnership,
-    token: string
+    token: string,
+    force?: boolean
   ) =>
     api.post<MemberListResponse>(
       `/api/v1/projects/${projectId}/transfer-ownership`,
       data,
       {
+        params: { force },
         headers: { Authorization: `Bearer ${token}` },
       }
     ),
