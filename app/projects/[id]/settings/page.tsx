@@ -74,7 +74,7 @@ export default function ProjectSettingsPage() {
   // Add member form state
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberUserId, setNewMemberUserId] = useState("");
-  const [newMemberRole, setNewMemberRole] = useState<"admin" | "editor" | "viewer">("viewer");
+  const [newMemberRole, setNewMemberRole] = useState<"admin" | "editor" | "viewer">("editor");
   const [addMemberError, setAddMemberError] = useState<string | null>(null);
   const [isAddingMember, setIsAddingMember] = useState(false);
 
@@ -261,7 +261,7 @@ export default function ProjectSettingsPage() {
       setProject({ ...project, member_count: project.member_count + 1 });
       setShowAddMember(false);
       setNewMemberUserId("");
-      setNewMemberRole("viewer");
+      setNewMemberRole("editor");
       setSuccessMessage("Member added successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -1252,7 +1252,7 @@ export default function ProjectSettingsPage() {
                     >
                       {isOwner && <option value="admin">Admin</option>}
                       <option value="editor">Editor</option>
-                      <option value="viewer">Viewer</option>
+                      {!project.is_public && <option value="viewer">Viewer</option>}
                     </select>
                     <Button type="submit" size="sm" disabled={isAddingMember || !newMemberUserId}>
                       {isAddingMember ? "Adding..." : "Add"}
