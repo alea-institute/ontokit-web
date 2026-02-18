@@ -6,14 +6,41 @@
  * via HTTP POST when public projects change.
  */
 
+import { readdirSync } from "fs";
 import { readFile, writeFile } from "fs/promises";
+import { join } from "path";
 
 const SITE_URL = process.env.SITE_URL || "http://localhost:3000";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const SITEMAP_PATH =
   process.env.SITEMAP_OUTPUT_PATH || `${process.cwd()}/public/sitemap.xml`;
 
-const STATIC_PAGES = ["/", "/docs", "/api-docs", "/projects"];
+/** Route prefixes excluded from the sitemap (auth-required or disallowed by robots.txt). */
+const DISALLOWED_PREFIXES = ["/api", "/auth", "/settings", "/projects/new"];
+
+/**
+ * Scan the app/ directory for all page.tsx files and return the public static routes.
+ * Excludes dynamic routes (containing `[`) and routes matching DISALLOWED_PREFIXES.
+ */
+function discoverStaticPages(): string[] {
+  const appDir = join(process.cwd(), "app");
+  const entries = readdirSync(appDir, { recursive: true }) as string[];
+
+  return entries
+    .filter((entry) => entry.endsWith("page.tsx"))
+    .map((entry) => {
+      // app/docs/changelog/page.tsx → /docs/changelog
+      const route = "/" + entry.replace(/\/page\.tsx$/, "").replace(/^page\.tsx$/, "");
+      return route === "/" ? "/" : route.replace(/\/$/, "");
+    })
+    .filter((route) => !route.includes("["))
+    .filter((route) =>
+      !DISALLOWED_PREFIXES.some(
+        (prefix) => route === prefix || route.startsWith(prefix + "/"),
+      ),
+    )
+    .sort();
+}
 
 interface ProjectListItem {
   id: string;
@@ -50,8 +77,8 @@ function buildSitemapXml(entries: string[]): string {
 export async function generateSitemap(): Promise<void> {
   const entries: string[] = [];
 
-  // Static pages
-  for (const page of STATIC_PAGES) {
+  // Static pages (auto-discovered from app/ directory)
+  for (const page of discoverStaticPages()) {
     entries.push(buildUrlEntry(page));
   }
 
