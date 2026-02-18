@@ -5,7 +5,8 @@ import { useSession } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Settings, Search, FileCode, GitPullRequest, Activity, TreePine, Code, RefreshCw } from "lucide-react";
+import { ArrowLeft, Settings, Search, X, FileCode, GitPullRequest, Activity, TreePine, Code, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
@@ -21,7 +22,7 @@ import { projectApi, type Project } from "@/lib/api/projects";
 import { pullRequestsApi } from "@/lib/api/pullRequests";
 import { lintApi, type LintSummary } from "@/lib/api/lint";
 import { revisionsApi } from "@/lib/api/revisions";
-import { projectOntologyApi } from "@/lib/api/client";
+import { projectOntologyApi, type EntitySearchResult } from "@/lib/api/client";
 import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
 
 // Import the ref type and IRI position type
@@ -82,6 +83,13 @@ export default function EditorPage() {
   // Commit dialog state
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
   const [pendingSaveContent, setPendingSaveContent] = useState<string | null>(null);
+
+  // Search state
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<EntitySearchResult[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Ontology tree state
   const {
@@ -419,6 +427,66 @@ export default function EditorPage() {
     }
   }, []);
 
+  // Toggle search mode
+  const handleToggleSearch = useCallback(() => {
+    setShowSearch((prev) => {
+      if (!prev) {
+        // Opening search — focus input after render
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+      } else {
+        // Closing search — clear state
+        setSearchQuery("");
+        setSearchResults(null);
+      }
+      return !prev;
+    });
+  }, []);
+
+  // Close search
+  const closeSearch = useCallback(() => {
+    setShowSearch(false);
+    setSearchQuery("");
+    setSearchResults(null);
+  }, []);
+
+  // Handle search result selection
+  const handleSearchSelect = useCallback((iri: string) => {
+    navigateToNode(iri);
+    closeSearch();
+  }, [navigateToNode, closeSearch]);
+
+  // Debounced search effect
+  useEffect(() => {
+    if (!showSearch) return;
+
+    if (!searchQuery.trim()) {
+      setSearchResults(null);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const response = await projectOntologyApi.searchEntities(
+          projectId,
+          searchQuery.trim(),
+          session?.accessToken,
+          activeBranch,
+        );
+        setSearchResults(response.results);
+      } catch (err) {
+        console.error("Search failed:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, showSearch, projectId, session?.accessToken, activeBranch]);
+
   // Pending scroll IRI - set when navigating to source before editor is ready
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
 
@@ -714,12 +782,37 @@ export default function EditorPage() {
                 <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
                   <div className="flex items-center justify-between">
                     <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Class Hierarchy
+                      {showSearch ? "Search" : "Class Hierarchy"}
                     </h2>
-                    <button className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700">
-                      <Search className="h-4 w-4 text-slate-500" />
+                    <button
+                      onClick={handleToggleSearch}
+                      className={cn(
+                        "rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
+                        showSearch && "bg-slate-100 dark:bg-slate-700"
+                      )}
+                    >
+                      {showSearch ? (
+                        <X className="h-4 w-4 text-slate-500" />
+                      ) : (
+                        <Search className="h-4 w-4 text-slate-500" />
+                      )}
                     </button>
                   </div>
+                  {showSearch && (
+                    <div className="mt-2">
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Escape") closeSearch();
+                        }}
+                        placeholder="Search classes, properties, individuals..."
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Tree Content */}
@@ -747,6 +840,9 @@ export default function EditorPage() {
                       onSelect={selectNode}
                       onExpand={expandNode}
                       onCollapse={collapseNode}
+                      searchResults={showSearch ? searchResults : undefined}
+                      isSearching={isSearching}
+                      onSearchSelect={handleSearchSelect}
                     />
                   )}
                 </div>

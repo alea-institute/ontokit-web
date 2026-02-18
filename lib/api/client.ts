@@ -426,6 +426,24 @@ export const projectOntologyApi = {
     ),
 
   /**
+   * Search for entities in the ontology
+   */
+  searchEntities: (
+    projectId: string,
+    query: string,
+    token?: string,
+    branch?: string,
+    entityTypes?: string,
+  ) =>
+    api.get<EntitySearchResponse>(
+      `/api/v1/projects/${projectId}/ontology/search`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        params: { q: query, branch, entity_types: entityTypes },
+      }
+    ),
+
+  /**
    * Save ontology source content
    */
   saveSource: (
@@ -444,6 +462,19 @@ export const projectOntologyApi = {
       }
     ),
 };
+
+// Entity search types
+export interface EntitySearchResult {
+  iri: string;
+  label: string;
+  entity_type: "class" | "property" | "individual";
+  deprecated: boolean;
+}
+
+export interface EntitySearchResponse {
+  results: EntitySearchResult[];
+  total: number;
+}
 
 // Source content types
 export interface SourceContentSaveResponse {
