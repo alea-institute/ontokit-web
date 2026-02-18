@@ -57,6 +57,8 @@ export interface BranchInfo {
   commit_date?: string;
   commits_ahead: number;
   commits_behind: number;
+  remote_commits_ahead: number | null;
+  remote_commits_behind: number | null;
   created_by_id?: string;
   created_by_name?: string;
   can_delete: boolean;
@@ -69,6 +71,9 @@ export interface BranchListResponse {
   current_branch: string;
   default_branch: string;
   preferred_branch: string | null;
+  has_github_remote: boolean;
+  last_sync_at: string | null;
+  sync_status: string | null;
 }
 
 export interface BranchCreate {

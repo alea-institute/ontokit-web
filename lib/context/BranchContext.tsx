@@ -42,6 +42,9 @@ interface BranchContextValue {
   error: string | null;
   isFeatureBranch: boolean;
   pendingChanges: boolean;
+  hasGitHubRemote: boolean;
+  lastSyncAt: string | null;
+  syncStatus: string | null;
 
   // Actions
   loadBranches: () => Promise<void>;
@@ -75,6 +78,9 @@ export function BranchProvider({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingChanges, setPendingChanges] = useState(false);
+  const [hasGitHubRemote, setHasGitHubRemote] = useState(false);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   const isFeatureBranch = currentBranch !== defaultBranch;
 
@@ -88,6 +94,9 @@ export function BranchProvider({
       const response = await branchesApi.list(projectId, accessToken);
       setBranches(response.items);
       setDefaultBranch(response.default_branch);
+      setHasGitHubRemote(response.has_github_remote);
+      setLastSyncAt(response.last_sync_at);
+      setSyncStatus(response.sync_status);
       // Validate current branch exists; fall back to DB preference or default
       setCurrentBranch((prev) => {
         const prevExists = response.items.some((b) => b.name === prev);
@@ -217,6 +226,9 @@ export function BranchProvider({
     error,
     isFeatureBranch,
     pendingChanges,
+    hasGitHubRemote,
+    lastSyncAt,
+    syncStatus,
     loadBranches,
     createBranch,
     switchBranch,

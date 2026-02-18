@@ -13,6 +13,17 @@ import {
   Trash2,
 } from "lucide-react";
 
+function formatSyncTime(isoDate: string): string {
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 interface BranchSelectorProps {
   className?: string;
   onBranchChange?: (branchName: string) => void;
@@ -34,6 +45,9 @@ export function BranchSelector({
     switchBranch,
     createBranch,
     deleteBranch,
+    hasGitHubRemote,
+    lastSyncAt,
+    syncStatus,
   } = useBranch();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -122,6 +136,19 @@ export function BranchSelector({
         {currentBranchInfo && currentBranchInfo.commits_ahead > 0 && (
           <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
             +{currentBranchInfo.commits_ahead}
+          </span>
+        )}
+        {hasGitHubRemote && currentBranchInfo && (
+          currentBranchInfo.remote_commits_ahead !== null ||
+          currentBranchInfo.remote_commits_behind !== null
+        ) && (currentBranchInfo.remote_commits_ahead! > 0 || currentBranchInfo.remote_commits_behind! > 0) && (
+          <span
+            className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+            title="Ahead/behind remote"
+          >
+            {currentBranchInfo.remote_commits_ahead! > 0 && `\u2191${currentBranchInfo.remote_commits_ahead}`}
+            {currentBranchInfo.remote_commits_ahead! > 0 && currentBranchInfo.remote_commits_behind! > 0 && " "}
+            {currentBranchInfo.remote_commits_behind! > 0 && `\u2193${currentBranchInfo.remote_commits_behind}`}
           </span>
         )}
         <ChevronDown className="h-4 w-4" />
@@ -240,6 +267,19 @@ export function BranchSelector({
                         -{branch.commits_behind}
                       </span>
                     )}
+                    {hasGitHubRemote && (
+                      branch.remote_commits_ahead !== null ||
+                      branch.remote_commits_behind !== null
+                    ) && (branch.remote_commits_ahead! > 0 || branch.remote_commits_behind! > 0) && (
+                      <span
+                        className="rounded bg-blue-100 px-1 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        title="Ahead/behind remote"
+                      >
+                        {branch.remote_commits_ahead! > 0 && `\u2191${branch.remote_commits_ahead}`}
+                        {branch.remote_commits_ahead! > 0 && branch.remote_commits_behind! > 0 && " "}
+                        {branch.remote_commits_behind! > 0 && `\u2193${branch.remote_commits_behind}`}
+                      </span>
+                    )}
                     {!branch.is_default &&
                       branch.name !== currentBranch &&
                       branch.has_delete_permission && (
@@ -275,6 +315,32 @@ export function BranchSelector({
                 </div>
               )}
             </div>
+
+            {/* Sync status footer */}
+            {hasGitHubRemote && (
+              <div className="border-t border-slate-200 px-3 py-2 dark:border-slate-700">
+                <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  {syncStatus === "error" ? (
+                    <AlertCircle className="h-3 w-3 text-red-500" />
+                  ) : syncStatus === "conflict" ? (
+                    <AlertCircle className="h-3 w-3 text-amber-500" />
+                  ) : (
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-blue-500" />
+                  )}
+                  <span>
+                    {syncStatus === "error"
+                      ? "Sync error"
+                      : syncStatus === "conflict"
+                        ? "Sync conflict"
+                        : syncStatus === "syncing"
+                          ? "Syncing..."
+                          : lastSyncAt
+                            ? `Last synced ${formatSyncTime(lastSyncAt)}`
+                            : "GitHub connected"}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
