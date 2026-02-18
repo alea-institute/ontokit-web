@@ -1282,6 +1282,7 @@ export default function ProjectSettingsPage() {
               members={members}
               currentUserId={session?.user?.id || ""}
               currentUserRole={project.user_role!}
+              isPublic={project.is_public}
               onUpdateRole={handleUpdateMemberRole}
               onRemove={handleRemoveMember}
             />

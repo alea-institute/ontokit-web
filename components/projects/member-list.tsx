@@ -10,6 +10,7 @@ interface MemberListProps {
   members: ProjectMember[];
   currentUserId: string;
   currentUserRole: ProjectRole;
+  isPublic?: boolean;
   onUpdateRole: (userId: string, data: MemberUpdate) => Promise<void>;
   onRemove: (userId: string) => Promise<void>;
   isLoading?: boolean;
@@ -40,6 +41,7 @@ export function MemberList({
   members,
   currentUserId,
   currentUserRole,
+  isPublic = false,
   onUpdateRole,
   onRemove,
   isLoading = false,
@@ -157,7 +159,8 @@ export function MemberList({
                               .filter(
                                 (role) =>
                                   role !== member.role &&
-                                  (currentUserRole === "owner" || role !== "admin")
+                                  (currentUserRole === "owner" || role !== "admin") &&
+                                  (!isPublic || role !== "viewer")
                               )
                               .map((role) => {
                                 const Icon = roleIcons[role];
