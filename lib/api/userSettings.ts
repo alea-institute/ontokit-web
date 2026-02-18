@@ -34,6 +34,18 @@ export interface GitHubRepoListResponse {
   total: number;
 }
 
+export interface UserSearchResult {
+  id: string;
+  username: string;
+  display_name?: string;
+  email?: string;
+}
+
+export interface UserSearchResponse {
+  items: UserSearchResult[];
+  total: number;
+}
+
 // API functions
 
 export const userSettingsApi = {
@@ -55,6 +67,13 @@ export const userSettingsApi = {
   deleteGitHubToken: (token: string) =>
     api.delete("/api/v1/users/me/github-token", {
       headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  /** Search Zitadel users by username, email, or display name. */
+  searchUsers: (token: string, query: string, limit = 10) =>
+    api.get<UserSearchResponse>("/api/v1/users/search", {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { q: query, limit },
     }),
 
   /** List GitHub repos accessible via the stored PAT. */

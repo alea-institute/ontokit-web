@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/components/projects/project-form";
 import { MemberList } from "@/components/projects/member-list";
+import { UserSearchInput } from "@/components/projects/user-search-input";
 import { LabelPreferences } from "@/components/projects/label-preferences";
 import {
   projectApi,
@@ -72,7 +73,7 @@ export default function ProjectSettingsPage() {
 
   // Add member form state
   const [showAddMember, setShowAddMember] = useState(false);
-  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [newMemberUserId, setNewMemberUserId] = useState("");
   const [newMemberRole, setNewMemberRole] = useState<"admin" | "editor" | "viewer">("viewer");
   const [addMemberError, setAddMemberError] = useState<string | null>(null);
   const [isAddingMember, setIsAddingMember] = useState(false);
@@ -241,16 +242,14 @@ export default function ProjectSettingsPage() {
 
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session?.accessToken || !project || !newMemberEmail.trim()) return;
+    if (!session?.accessToken || !project || !newMemberUserId) return;
 
     setIsAddingMember(true);
     setAddMemberError(null);
 
     try {
-      // Note: In a real app, you'd need to look up the user by email to get their ID
-      // For now, we'll use the email as a placeholder for the user_id
       const memberData: MemberCreate = {
-        user_id: newMemberEmail.trim(), // This should be resolved to actual user ID
+        user_id: newMemberUserId,
         role: newMemberRole,
       };
       const newMember = await projectApi.addMember(
@@ -261,7 +260,7 @@ export default function ProjectSettingsPage() {
       setMembers([...members, newMember]);
       setProject({ ...project, member_count: project.member_count + 1 });
       setShowAddMember(false);
-      setNewMemberEmail("");
+      setNewMemberUserId("");
       setNewMemberRole("viewer");
       setSuccessMessage("Member added successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
@@ -1230,51 +1229,48 @@ export default function ProjectSettingsPage() {
                     {addMemberError}
                   </div>
                 )}
-                <div className="flex gap-3">
-                  <input
-                    type="text"
-                    placeholder="User ID or email"
-                    value={newMemberEmail}
-                    onChange={(e) => setNewMemberEmail(e.target.value)}
-                    className={cn(
-                      "flex-1 rounded-md border px-3 py-2 text-sm",
-                      "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                      "dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                    )}
+                <div className="space-y-3">
+                  <UserSearchInput
+                    value={newMemberUserId}
+                    onSelect={(userId) => setNewMemberUserId(userId)}
+                    onClear={() => setNewMemberUserId("")}
+                    token={session?.accessToken || ""}
                     disabled={isAddingMember}
                   />
-                  <select
-                    value={newMemberRole}
-                    onChange={(e) =>
-                      setNewMemberRole(e.target.value as "admin" | "editor" | "viewer")
-                    }
-                    className={cn(
-                      "rounded-md border px-3 py-2 text-sm",
-                      "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                      "dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                    )}
-                    disabled={isAddingMember}
-                  >
-                    {isOwner && <option value="admin">Admin</option>}
-                    <option value="editor">Editor</option>
-                    <option value="viewer">Viewer</option>
-                  </select>
-                  <Button type="submit" size="sm" disabled={isAddingMember || !newMemberEmail.trim()}>
-                    {isAddingMember ? "Adding..." : "Add"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setShowAddMember(false);
-                      setNewMemberEmail("");
-                      setAddMemberError(null);
-                    }}
-                    disabled={isAddingMember}
-                  >
-                    Cancel
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={newMemberRole}
+                      onChange={(e) =>
+                        setNewMemberRole(e.target.value as "admin" | "editor" | "viewer")
+                      }
+                      className={cn(
+                        "rounded-md border px-3 py-2 text-sm",
+                        "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
+                        "dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                      )}
+                      disabled={isAddingMember}
+                    >
+                      {isOwner && <option value="admin">Admin</option>}
+                      <option value="editor">Editor</option>
+                      <option value="viewer">Viewer</option>
+                    </select>
+                    <Button type="submit" size="sm" disabled={isAddingMember || !newMemberUserId}>
+                      {isAddingMember ? "Adding..." : "Add"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setShowAddMember(false);
+                        setNewMemberUserId("");
+                        setAddMemberError(null);
+                      }}
+                      disabled={isAddingMember}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
               </form>
             )}
