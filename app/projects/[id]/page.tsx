@@ -12,10 +12,20 @@ import {
   Lock,
   ExternalLink,
   Pencil,
+  UserPlus,
+  Clock,
+  XCircle,
+  X,
+  Inbox,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { projectApi, type Project } from "@/lib/api/projects";
+import {
+  joinRequestApi,
+  type MyJoinRequestResponse,
+  type JoinRequestListResponse,
+} from "@/lib/api/joinRequests";
 import { cn, formatDate } from "@/lib/utils";
 
 export default function ProjectPage() {
@@ -28,6 +38,15 @@ export default function ProjectPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Join request state
+  const [joinRequestStatus, setJoinRequestStatus] =
+    useState<MyJoinRequestResponse | null>(null);
+  const [showJoinForm, setShowJoinForm] = useState(false);
+  const [joinMessage, setJoinMessage] = useState("");
+  const [isSubmittingJoin, setIsSubmittingJoin] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [pendingJoinCount, setPendingJoinCount] = useState(0);
+
   const isAuthenticated = status === "authenticated";
 
   useEffect(() => {
@@ -38,6 +57,41 @@ export default function ProjectPage() {
       try {
         const data = await projectApi.get(projectId, session?.accessToken);
         setProject(data);
+
+        // Fetch pending join request count for admins/owners of public projects
+        const userCanManage =
+          data.user_role === "owner" ||
+          data.user_role === "admin" ||
+          data.is_superadmin;
+        if (session?.accessToken && data.is_public && userCanManage) {
+          try {
+            const jrList: JoinRequestListResponse = await joinRequestApi.list(
+              projectId,
+              session.accessToken
+            );
+            setPendingJoinCount(jrList.total);
+          } catch {
+            // Ignore — join request listing may fail
+          }
+        }
+
+        // Fetch join request status for authenticated users on public projects
+        // who don't have a role
+        if (
+          session?.accessToken &&
+          data.is_public &&
+          !data.user_role
+        ) {
+          try {
+            const jrStatus = await joinRequestApi.getMine(
+              projectId,
+              session.accessToken
+            );
+            setJoinRequestStatus(jrStatus);
+          } catch {
+            // Ignore — user may not have a join request
+          }
+        }
       } catch (err) {
         if (err instanceof Error && err.message.includes("403")) {
           setError("You don't have access to this project");
@@ -62,6 +116,65 @@ export default function ProjectPage() {
     project?.user_role === "editor";
 
   const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
+
+  const showJoinRequestSection =
+    isAuthenticated &&
+    project?.is_public &&
+    !project?.user_role &&
+    !project?.is_superadmin;
+
+  const handleSubmitJoinRequest = async () => {
+    if (!session?.accessToken || !project) return;
+
+    setIsSubmittingJoin(true);
+    setJoinError(null);
+
+    try {
+      await joinRequestApi.create(
+        project.id,
+        { message: joinMessage },
+        session.accessToken
+      );
+      const jrStatus = await joinRequestApi.getMine(
+        project.id,
+        session.accessToken
+      );
+      setJoinRequestStatus(jrStatus);
+      setShowJoinForm(false);
+      setJoinMessage("");
+    } catch (err) {
+      setJoinError(
+        err instanceof Error ? err.message : "Failed to submit join request"
+      );
+    } finally {
+      setIsSubmittingJoin(false);
+    }
+  };
+
+  const handleWithdrawJoinRequest = async () => {
+    if (
+      !session?.accessToken ||
+      !project ||
+      !joinRequestStatus?.request
+    )
+      return;
+
+    try {
+      await joinRequestApi.withdraw(
+        project.id,
+        joinRequestStatus.request.id,
+        session.accessToken
+      );
+      setJoinRequestStatus({
+        has_pending_request: false,
+        request: undefined,
+      });
+    } catch (err) {
+      setJoinError(
+        err instanceof Error ? err.message : "Failed to withdraw request"
+      );
+    }
+  };
 
   if (isLoading || status === "loading") {
     return (
@@ -211,7 +324,7 @@ export default function ProjectPage() {
                     </Button>
                   </Link>
                 )}
-                {!canEdit && (
+                {!canEdit && !showJoinRequestSection && (
                   <Link href={`/projects/${project.id}/editor`}>
                     <Button variant="outline" size="sm">
                       <ExternalLink className="mr-2 h-4 w-4" />
@@ -219,9 +332,127 @@ export default function ProjectPage() {
                     </Button>
                   </Link>
                 )}
+                {showJoinRequestSection && (
+                  <>
+                    {joinRequestStatus?.has_pending_request ? (
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-sm font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                          <Clock className="h-3.5 w-3.5" />
+                          Request Pending
+                        </span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleWithdrawJoinRequest}
+                        >
+                          <X className="mr-1 h-3.5 w-3.5" />
+                          Withdraw
+                        </Button>
+                      </div>
+                    ) : joinRequestStatus?.request?.status === "declined" ? (
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-red-100 px-3 py-1 text-sm font-medium text-red-700 dark:bg-red-900/30 dark:text-red-400">
+                          <XCircle className="h-3.5 w-3.5" />
+                          Request Declined
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => setShowJoinForm(true)}
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          Request Again
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        onClick={() => setShowJoinForm(true)}
+                      >
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Request to Join
+                      </Button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Pending Join Requests Banner (admin/owner only) */}
+          {canManage && project.is_public && pendingJoinCount > 0 && (
+            <Link
+              href={`/projects/${project.id}/settings#join-requests`}
+              className="mt-4 flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 transition-colors hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-900/20 dark:hover:bg-amber-900/30"
+            >
+              <Inbox className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              <div className="flex-1">
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  {pendingJoinCount} pending join{" "}
+                  {pendingJoinCount === 1 ? "request" : "requests"}
+                </p>
+              </div>
+              <span className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                Review in Settings
+              </span>
+            </Link>
+          )}
+
+          {/* Join Request Form */}
+          {showJoinForm && (
+            <div className="mt-4 rounded-lg border border-primary-200 bg-primary-50 p-5 dark:border-primary-800 dark:bg-primary-900/20">
+              <h3 className="mb-2 font-semibold text-slate-900 dark:text-white">
+                Request to Join
+              </h3>
+              <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
+                Tell the project owners why you&apos;d like to join this project.
+              </p>
+              {joinError && (
+                <div className="mb-3 rounded bg-red-50 p-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                  {joinError}
+                </div>
+              )}
+              <textarea
+                value={joinMessage}
+                onChange={(e) => setJoinMessage(e.target.value)}
+                placeholder="I'd like to contribute to this project because..."
+                rows={3}
+                minLength={10}
+                maxLength={1000}
+                className={cn(
+                  "w-full rounded-md border px-3 py-2 text-sm",
+                  "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
+                  "dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                )}
+                disabled={isSubmittingJoin}
+              />
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {joinMessage.length}/1000 characters (minimum 10)
+                </span>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setShowJoinForm(false);
+                      setJoinMessage("");
+                      setJoinError(null);
+                    }}
+                    disabled={isSubmittingJoin}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSubmitJoinRequest}
+                    disabled={isSubmittingJoin || joinMessage.length < 10}
+                  >
+                    {isSubmittingJoin ? "Submitting..." : "Submit Request"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Quick Actions */}
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

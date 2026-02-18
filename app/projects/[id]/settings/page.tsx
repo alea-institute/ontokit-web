@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/components/projects/project-form";
@@ -34,6 +34,10 @@ import {
   type NormalizationStatusResponse,
   type NormalizationRunResponse,
 } from "@/lib/api/normalization";
+import {
+  joinRequestApi,
+  type JoinRequest as JoinRequestType,
+} from "@/lib/api/joinRequests";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
 
@@ -99,6 +103,11 @@ export default function ProjectSettingsPage() {
   const [normalizationJobId, setNormalizationJobId] = useState<string | null>(null);
   const [normalizationJobStatus, setNormalizationJobStatus] = useState<string | null>(null);
 
+  // Join requests state
+  const [joinRequests, setJoinRequests] = useState<JoinRequestType[]>([]);
+  const [joinRequestCount, setJoinRequestCount] = useState(0);
+  const [processingJoinRequest, setProcessingJoinRequest] = useState<string | null>(null);
+
   // GitHub integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null);
   const [prSettings, setPrSettings] = useState<PRSettings | null>(null);
@@ -152,6 +161,17 @@ export default function ProjectSettingsPage() {
             setPrApprovalRequired(prSettingsData.pr_approval_required);
           } catch {
             // PR settings may not be available, ignore
+          }
+
+          // Fetch join requests for public projects
+          if (projectData.is_public) {
+            try {
+              const jrData = await joinRequestApi.list(projectId, session.accessToken);
+              setJoinRequests(jrData.items);
+              setJoinRequestCount(jrData.total);
+            } catch {
+              // Join requests may not be available, ignore
+            }
           }
 
           // Check if user has a GitHub token (for the repo picker)
@@ -430,6 +450,44 @@ export default function ProjectSettingsPage() {
       setError(err instanceof Error ? err.message : "Failed to save PR settings");
     } finally {
       setIsSavingPrSettings(false);
+    }
+  };
+
+  const handleApproveJoinRequest = async (requestId: string) => {
+    if (!session?.accessToken || !project) return;
+
+    setProcessingJoinRequest(requestId);
+    try {
+      await joinRequestApi.approve(project.id, requestId, session.accessToken);
+      setJoinRequests(joinRequests.filter((jr) => jr.id !== requestId));
+      setJoinRequestCount(Math.max(0, joinRequestCount - 1));
+      // Refresh member list
+      const membersData = await projectApi.listMembers(project.id, session.accessToken);
+      setMembers(membersData.items);
+      setProject({ ...project, member_count: membersData.total });
+      setSuccessMessage("Join request approved — user added as editor");
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve request");
+    } finally {
+      setProcessingJoinRequest(null);
+    }
+  };
+
+  const handleDeclineJoinRequest = async (requestId: string) => {
+    if (!session?.accessToken || !project) return;
+
+    setProcessingJoinRequest(requestId);
+    try {
+      await joinRequestApi.decline(project.id, requestId, session.accessToken);
+      setJoinRequests(joinRequests.filter((jr) => jr.id !== requestId));
+      setJoinRequestCount(Math.max(0, joinRequestCount - 1));
+      setSuccessMessage("Join request declined");
+      setTimeout(() => setSuccessMessage(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to decline request");
+    } finally {
+      setProcessingJoinRequest(null);
     }
   };
 
@@ -1057,6 +1115,83 @@ export default function ProjectSettingsPage() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Join Requests Section - only for public projects */}
+          {canManage && project.is_public && (
+            <section
+              id="join-requests"
+              className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Inbox className="h-5 w-5 text-slate-500" />
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Join Requests
+                  </h2>
+                  {joinRequestCount > 0 && (
+                    <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      {joinRequestCount}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {joinRequests.length === 0 ? (
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  No pending join requests.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {joinRequests.map((jr) => (
+                    <div
+                      key={jr.id}
+                      className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-600 dark:bg-slate-700/50"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-900 dark:text-white">
+                              {jr.user?.name || jr.user?.email || jr.user_id}
+                            </span>
+                            {jr.user?.email && jr.user?.name && (
+                              <span className="text-sm text-slate-500 dark:text-slate-400">
+                                ({jr.user.email})
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm italic text-slate-600 dark:text-slate-400">
+                            &ldquo;{jr.message}&rdquo;
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            Requested {new Date(jr.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleApproveJoinRequest(jr.id)}
+                            disabled={processingJoinRequest === jr.id}
+                          >
+                            <CheckCircle className="mr-1 h-3.5 w-3.5" />
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeclineJoinRequest(jr.id)}
+                            disabled={processingJoinRequest === jr.id}
+                          >
+                            <XCircle className="mr-1 h-3.5 w-3.5" />
+                            Decline
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </section>
