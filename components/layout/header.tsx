@@ -21,7 +21,7 @@ export function Header() {
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-xl font-bold text-slate-900 dark:text-white">
-              Axigraph
+              OntoKit
             </span>
           </Link>
           <nav className="hidden md:flex items-center gap-6">

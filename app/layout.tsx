@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Axigraph - Collaborative Ontology Editor",
+  title: "OntoKit - Collaborative Ontology Editor",
   description:
     "A modern platform for collaborative OWL ontology curation with real-time editing and GitHub integration.",
   keywords: ["ontology", "OWL", "RDF", "semantic web", "knowledge graph", "collaboration"],

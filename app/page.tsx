@@ -8,7 +8,7 @@ export default function HomePage() {
       <main className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center p-24">
         <div className="text-center">
         <h1 className="text-5xl font-bold tracking-tight text-slate-900 dark:text-white">
-          Axigraph
+          OntoKit
         </h1>
         <p className="mt-4 text-xl text-slate-600 dark:text-slate-300">
           Collaborative OWL Ontology Curation Platform
@@ -25,7 +25,7 @@ export default function HomePage() {
             Get Started
           </Link>
           <Link
-            href="https://github.com/axigraph"
+            href="https://github.com/ontokit"
             className="rounded-lg border border-slate-300 dark:border-slate-600 px-6 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             target="_blank"
             rel="noopener noreferrer"

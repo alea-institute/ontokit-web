@@ -7,7 +7,7 @@ export default function DocsPage() {
             Documentation
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mb-8">
-            Learn how to use Axigraph to create, edit, and collaborate on OWL ontologies.
+            Learn how to use OntoKit to create, edit, and collaborate on OWL ontologies.
           </p>
 
           <div className="space-y-10">
@@ -18,7 +18,7 @@ export default function DocsPage() {
               </h2>
               <div className="prose prose-slate dark:prose-invert max-w-none">
                 <p className="text-slate-600 dark:text-slate-400 mb-4">
-                  Axigraph is a modern, collaborative OWL ontology curation platform designed as a
+                  OntoKit is a modern, collaborative OWL ontology curation platform designed as a
                   replacement for Stanford WebProtege. It provides a streamlined workflow for creating,
                   editing, and managing semantic web ontologies.
                 </p>
@@ -240,7 +240,7 @@ export default function DocsPage() {
                     Canonical Turtle Format
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-4">
-                    When you import an ontology file, Axigraph normalizes it to a canonical Turtle format.
+                    When you import an ontology file, OntoKit normalizes it to a canonical Turtle format.
                     This ensures consistent formatting across all edits and produces minimal, meaningful
                     diffs in version history. The normalization happens once at import time.
                   </p>
@@ -263,7 +263,7 @@ export default function DocsPage() {
                     Metadata Synchronization
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-4">
-                    When you update a project&apos;s name or description in Project Settings, Axigraph
+                    When you update a project&apos;s name or description in Project Settings, OntoKit
                     automatically syncs these changes to the ontology&apos;s RDF metadata properties.
                   </p>
                   <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
@@ -292,8 +292,8 @@ export default function DocsPage() {
               </h2>
               <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
                 <p className="text-slate-600 dark:text-slate-400 mb-4">
-                  Axigraph provides a comprehensive REST API for programmatic access to all platform features.
-                  Use the API to integrate Axigraph with your existing tools and workflows.
+                  OntoKit provides a comprehensive REST API for programmatic access to all platform features.
+                  Use the API to integrate OntoKit with your existing tools and workflows.
                 </p>
                 <Link
                   href="/api-docs"

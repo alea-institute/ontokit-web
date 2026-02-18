@@ -17,7 +17,7 @@ import {
 
 function getStoredBranch(projectId: string): string | null {
   try {
-    return sessionStorage.getItem(`axigraph:branch:${projectId}`);
+    return sessionStorage.getItem(`ontokit:branch:${projectId}`);
   } catch {
     return null;
   }
@@ -25,7 +25,7 @@ function getStoredBranch(projectId: string): string | null {
 
 function setStoredBranch(projectId: string, branch: string): void {
   try {
-    sessionStorage.setItem(`axigraph:branch:${projectId}`, branch);
+    sessionStorage.setItem(`ontokit:branch:${projectId}`, branch);
   } catch {
     /* ignore */
   }
@@ -103,7 +103,7 @@ export function BranchProvider({
         if (prevExists) return prev;
         // Stored/initial branch was deleted — clear stale sessionStorage
         try {
-          sessionStorage.removeItem(`axigraph:branch:${projectId}`);
+          sessionStorage.removeItem(`ontokit:branch:${projectId}`);
         } catch {
           /* ignore */
         }

@@ -21,7 +21,7 @@ export default function ApiDocsPage() {
             hideDownloadButton: false,
             hideDarkModeToggle: false,
             metaData: {
-              title: "Axigraph API Documentation",
+              title: "OntoKit API Documentation",
             },
           }}
         />

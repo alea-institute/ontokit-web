@@ -52,7 +52,7 @@ export default function EditorPage() {
   const pathname = usePathname();
   const projectId = params.id as string;
   const initialBranch = searchParams.get("branch")
-    || (() => { try { return sessionStorage.getItem(`axigraph:branch:${projectId}`); } catch { return null; } })()
+    || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
 
   const [project, setProject] = useState<Project | null>(null);

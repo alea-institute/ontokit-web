@@ -1,4 +1,4 @@
-# Axigraph Web Dockerfile
+# OntoKit Web Dockerfile
 FROM node:22-alpine AS base
 
 # Install dependencies only when needed

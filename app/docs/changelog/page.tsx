@@ -17,10 +17,10 @@ const changelog: ChangelogEntry[] = [
       {
         title: "New features",
         items: [
-          "Initial release of Axigraph as a standalone package.",
-          "Renamed package from 'app' to 'axigraph' with consistent module imports.",
-          "Added CLI entry point ('axigraph' command) installed via pyproject.toml scripts.",
-          "Weblate-style version management in axigraph/version.py with dynamic version in pyproject.toml via hatch.",
+          "Initial release of OntoKit as a standalone package.",
+          "Renamed package from 'app' to 'ontokit' with consistent module imports.",
+          "Added CLI entry point ('ontokit' command) installed via pyproject.toml scripts.",
+          "Weblate-style version management in ontokit/version.py with dynamic version in pyproject.toml via hatch.",
           "CI/CD pipeline with GitHub Actions: lint, test, build, and publish to PyPI on tagged releases.",
           "Docker image publishing as part of the release workflow.",
           "Bare git repository service using pygit2 for concurrent access to ontology projects.",

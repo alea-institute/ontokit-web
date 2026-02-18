@@ -1,5 +1,5 @@
 /**
- * Sitemap generation utilities for Axigraph.
+ * Sitemap generation utilities for OntoKit.
  *
  * Generates a static sitemap.xml file that can be served directly by Nginx
  * or the Next.js static file server. The backend triggers regeneration

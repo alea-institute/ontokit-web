@@ -1,6 +1,6 @@
-# Axigraph Web
+# OntoKit Web
 
-The web frontend for Axigraph - a collaborative OWL ontology curation platform.
+The web frontend for OntoKit - a collaborative OWL ontology curation platform.
 
 ## Features
 
@@ -31,8 +31,8 @@ The web frontend for Axigraph - a collaborative OWL ontology curation platform.
 
 ```bash
 # Clone the repository
-git clone https://github.com/axigraph/axigraph-web.git
-cd axigraph-web
+git clone https://github.com/ontokit/ontokit-web.git
+cd ontokit-web
 
 # Install dependencies
 npm install
@@ -54,16 +54,16 @@ The app will be available at http://localhost:3000
 docker build \
   --build-arg NEXT_PUBLIC_API_URL=http://api:8000 \
   --build-arg NEXT_PUBLIC_WS_URL=ws://api:8000 \
-  -t axigraph-web .
+  -t ontokit-web .
 
 # Run the container
-docker run -p 3000:3000 axigraph-web
+docker run -p 3000:3000 ontokit-web
 ```
 
 ## Project Structure
 
 ```
-axigraph-web/
+ontokit-web/
 ├── app/                    # Next.js app router pages
 │   ├── [locale]/          # Internationalized routes
 │   ├── api/               # API routes (BFF)

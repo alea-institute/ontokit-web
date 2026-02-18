@@ -49,5 +49,5 @@ public/workbox-*.js
 # Generated sitemap
 public/sitemap.xml
 
-.axigraph-web.log
-.axigraph-web.pid
+.ontokit-web.log
+.ontokit-web.pid

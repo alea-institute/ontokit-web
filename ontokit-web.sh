@@ -1,10 +1,10 @@
 #!/bin/bash
-# Axigraph Web UI Management Script
-# Usage: ./axigraph-web.sh {start|stop|restart|status} [--force]
+# OntoKit Web UI Management Script
+# Usage: ./ontokit-web.sh {start|stop|restart|status} [--force]
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PID_FILE="$SCRIPT_DIR/.axigraph-web.pid"
-LOG_FILE="$SCRIPT_DIR/.axigraph-web.log"
+PID_FILE="$SCRIPT_DIR/.ontokit-web.pid"
+LOG_FILE="$SCRIPT_DIR/.ontokit-web.log"
 PORT="${PORT:-3000}"
 FORCE_MODE=false
 
@@ -212,7 +212,7 @@ start() {
                 stop 2>/dev/null
                 sleep 1
             else
-                echo "Axigraph Web is already running (PID: $PID)"
+                echo "OntoKit Web is already running (PID: $PID)"
                 exit 1
             fi
         else
@@ -235,7 +235,7 @@ start() {
         fi
     fi
 
-    echo "Starting Axigraph Web on port $PORT..."
+    echo "Starting OntoKit Web on port $PORT..."
     cd "$SCRIPT_DIR"
 
     # Start Next.js dev server in background with specified port
@@ -246,24 +246,24 @@ start() {
     sleep 2
     if kill -0 "$PID" 2>/dev/null; then
         echo "$PID" > "$PID_FILE"
-        echo "Axigraph Web started (PID: $PID)"
+        echo "OntoKit Web started (PID: $PID)"
         echo "Log file: $LOG_FILE"
         echo "Access at: http://localhost:$PORT"
     else
-        echo "Failed to start Axigraph Web. Check $LOG_FILE for errors."
+        echo "Failed to start OntoKit Web. Check $LOG_FILE for errors."
         exit 1
     fi
 }
 
 stop() {
     if [ ! -f "$PID_FILE" ]; then
-        echo "Axigraph Web is not running (no PID file found)"
+        echo "OntoKit Web is not running (no PID file found)"
         exit 1
     fi
 
     PID=$(cat "$PID_FILE")
     if kill -0 "$PID" 2>/dev/null; then
-        echo "Stopping Axigraph Web (PID: $PID)..."
+        echo "Stopping OntoKit Web (PID: $PID)..."
 
         # Kill the main process and its children (npm spawns node)
         pkill -P "$PID" 2>/dev/null
@@ -285,7 +285,7 @@ stop() {
         fi
 
         rm -f "$PID_FILE"
-        echo "Axigraph Web stopped"
+        echo "OntoKit Web stopped"
     else
         echo "Process $PID not running, cleaning up PID file"
         rm -f "$PID_FILE"
@@ -303,15 +303,15 @@ status() {
     if [ -f "$PID_FILE" ]; then
         PID=$(cat "$PID_FILE")
         if kill -0 "$PID" 2>/dev/null; then
-            echo "Axigraph Web is running (PID: $PID)"
+            echo "OntoKit Web is running (PID: $PID)"
             echo "Port: $PORT"
             exit 0
         else
-            echo "Axigraph Web is not running (stale PID file)"
+            echo "OntoKit Web is not running (stale PID file)"
             exit 1
         fi
     else
-        echo "Axigraph Web is not running"
+        echo "OntoKit Web is not running"
         exit 1
     fi
 }
@@ -333,7 +333,7 @@ case "$1" in
         echo "Usage: $0 {start|stop|restart|status} [--force]"
         echo ""
         echo "Commands:"
-        echo "  start   - Start the Axigraph Web development server"
+        echo "  start   - Start the OntoKit Web development server"
         echo "  stop    - Stop the running server"
         echo "  restart - Restart the server"
         echo "  status  - Check if server is running"

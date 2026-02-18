@@ -14,7 +14,7 @@ function SignInContent() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h1 className="text-center text-4xl font-bold text-gray-900 dark:text-white">
-            Axigraph
+            OntoKit
           </h1>
           <h2 className="mt-6 text-center text-2xl font-semibold text-gray-900 dark:text-white">
             Sign in to your account

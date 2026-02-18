@@ -16,13 +16,13 @@ npm run test:coverage # Run tests with coverage
 
 ## Development Server Management Script
 
-Use the `axigraph-web.sh` script to manage the development server:
+Use the `ontokit-web.sh` script to manage the development server:
 
 ```bash
-./axigraph-web.sh start    # Start the dev server (runs in background)
-./axigraph-web.sh stop     # Stop the running server
-./axigraph-web.sh restart  # Restart the server
-./axigraph-web.sh status   # Check if server is running
+./ontokit-web.sh start    # Start the dev server (runs in background)
+./ontokit-web.sh stop     # Stop the running server
+./ontokit-web.sh restart  # Restart the server
+./ontokit-web.sh status   # Check if server is running
 ```
 
 **Important usage notes:**
@@ -30,16 +30,16 @@ Use the `axigraph-web.sh` script to manage the development server:
 - The script handles port conflicts interactively (kill blocking process, use random port, or quit)
 - When running non-interactively, first kill any process on port 3000, then run `start`:
   ```bash
-  lsof -ti:3000 | xargs -r kill -9; sleep 2; ./axigraph-web.sh start
+  lsof -ti:3000 | xargs -r kill -9; sleep 2; ./ontokit-web.sh start
   ```
-- To clear Next.js cache before starting: `rm -rf .next && ./axigraph-web.sh start`
-- Log file: `.axigraph-web.log`
-- PID file: `.axigraph-web.pid`
+- To clear Next.js cache before starting: `rm -rf .next && ./ontokit-web.sh start`
+- Log file: `.ontokit-web.log`
+- PID file: `.ontokit-web.pid`
 - Environment variable `PORT` can override default port 3000
 
 ## Architecture Overview
 
-Axigraph Web is a Next.js 15 frontend for collaborative OWL ontology editing. It connects to a FastAPI backend (axigraph-api) for ontology operations.
+OntoKit Web is a Next.js 15 frontend for collaborative OWL ontology editing. It connects to a FastAPI backend (ontokit-api) for ontology operations.
 
 ### Key Architectural Patterns
 

@@ -1506,7 +1506,7 @@ export default function ProjectSettingsPage() {
                         </p>
                       )}
                       <p className="mt-2 text-xs text-red-500 dark:text-red-400">
-                        Sync is paused. Resolve the conflict by force-pushing from Axigraph or resetting to the remote version.
+                        Sync is paused. Resolve the conflict by force-pushing from OntoKit or resetting to the remote version.
                       </p>
                     </div>
                   )}
@@ -1529,7 +1529,7 @@ export default function ProjectSettingsPage() {
                   <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-900/20">
                     <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
                     <p className="text-amber-700 dark:text-amber-300">
-                      Pull requests created in Axigraph will be synced to GitHub.
+                      Pull requests created in OntoKit will be synced to GitHub.
                     </p>
                   </div>
                 </div>

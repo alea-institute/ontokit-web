@@ -1,5 +1,5 @@
 /**
- * API client for Axigraph backend
+ * API client for OntoKit backend
  */
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
