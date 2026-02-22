@@ -90,8 +90,7 @@ export const authConfig: NextAuthConfig = {
       session.accessToken = token.accessToken as string;
       session.error = token.error as string | undefined;
       if (token.user) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        session.user = token.user as any;
+        session.user = token.user as User;
       }
       return session;
     },
