@@ -22,6 +22,8 @@ interface UseOntologyTreeReturn {
   collapseNode: (iri: string) => void;
   selectNode: (iri: string) => void;
   navigateToNode: (iri: string) => Promise<void>;
+  /** Optimistically insert a new node into the tree (before the save round-trips to the API) */
+  addOptimisticNode: (iri: string, label: string, parentIri?: string) => void;
 }
 
 /**
@@ -190,6 +192,43 @@ export function useOntologyTree({
     [projectId, accessToken, branchKey, expandNode]
   );
 
+  /**
+   * Optimistically add a new node to the tree.
+   * If parentIri is given, the node is inserted as a child (parent is expanded).
+   * Otherwise it is appended to the root list.
+   */
+  const addOptimisticNode = useCallback(
+    (iri: string, label: string, parentIri?: string) => {
+      const newNode: ClassTreeNode = {
+        iri,
+        label,
+        children: [],
+        isExpanded: false,
+        isLoading: false,
+        hasChildren: false,
+      };
+
+      if (parentIri) {
+        // Insert as a child of the parent and expand the parent
+        setNodes((prev) =>
+          updateNodeInTree(prev, parentIri, (parent) => ({
+            ...parent,
+            children: [...parent.children, newNode],
+            hasChildren: true,
+            isExpanded: true,
+          }))
+        );
+      } else {
+        // Append to root list
+        setNodes((prev) => [...prev, newNode]);
+      }
+
+      setTotalClasses((prev) => prev + 1);
+      setSelectedIri(iri);
+    },
+    []
+  );
+
   // Load root classes on mount
   useEffect(() => {
     loadRootClasses();
@@ -206,5 +245,6 @@ export function useOntologyTree({
     collapseNode,
     selectNode,
     navigateToNode,
+    addOptimisticNode,
   };
 }

@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { ArrowLeft, Settings, Search, X, FileCode, GitPullRequest, Activity, TreePine, Code, RefreshCw } from "lucide-react";
+import { ArrowLeft, Settings, Search, X, FileCode, GitPullRequest, Activity, TreePine, Code, RefreshCw, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
-import { ClassDetailPanel } from "@/components/editor/ClassDetailPanel";
+import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
+import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
 import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
 import { BranchProvider } from "@/lib/context/BranchContext";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
@@ -24,6 +25,9 @@ import { lintApi, type LintSummary } from "@/lib/api/lint";
 import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type EntitySearchResult } from "@/lib/api/client";
 import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
+import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
+import { detectPatternFromIriIndex, type IriSuffixPattern } from "@/lib/ontology/iriGeneration";
+import { commonPrefixes } from "@/lib/editor/languages/turtle";
 
 // Import the ref type and IRI position type
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
@@ -91,6 +95,19 @@ export default function EditorPage() {
   const [isSearching, setIsSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Add entity dialog state
+  const [addEntityDialogOpen, setAddEntityDialogOpen] = useState(false);
+  const [addEntityParentIri, setAddEntityParentIri] = useState<string | undefined>(undefined);
+  const [addEntityParentLabel, setAddEntityParentLabel] = useState<string | undefined>(undefined);
+
+
+  // IRI pattern detection state
+  const [iriPattern, setIriPattern] = useState<IriSuffixPattern>("uuid");
+  const [nextNumeric, setNextNumeric] = useState<number | undefined>(undefined);
+  const [ontologyNamespace, setOntologyNamespace] = useState("http://example.org/ont#");
+  const [ontologyPrefix, setOntologyPrefix] = useState<string | undefined>(undefined);
+  const iriPatternDetectedRef = useRef(false);
+
   // Ontology tree state
   const {
     nodes,
@@ -98,15 +115,37 @@ export default function EditorPage() {
     isLoading: isTreeLoading,
     error: treeError,
     selectedIri,
+    loadRootClasses,
     expandNode,
     collapseNode,
     selectNode,
     navigateToNode,
+    addOptimisticNode,
   } = useOntologyTree({
     projectId,
     accessToken: session?.accessToken,
     branchKey: activeBranch,
   });
+
+  // Derive fallback data for the selected node from the tree (used for unsaved entities)
+  const selectedNodeFallback = useMemo((): TreeNodeFallback | null => {
+    if (!selectedIri) return null;
+    const findInTree = (
+      items: typeof nodes,
+      parentIri?: string,
+      parentLabel?: string,
+    ): TreeNodeFallback | null => {
+      for (const node of items) {
+        if (node.iri === selectedIri) {
+          return { iri: node.iri, label: node.label, parentIri, parentLabel };
+        }
+        const found = findInTree(node.children, node.iri, node.label);
+        if (found) return found;
+      }
+      return null;
+    };
+    return findInTree(nodes);
+  }, [selectedIri, nodes]);
 
   // Track WebSocket connection status (uses lint WebSocket endpoint)
   const {
@@ -260,12 +299,18 @@ export default function EditorPage() {
     // Reset the IRI index so it gets rebuilt
     setSourceIriIndex(new Map());
 
+    // Refresh the tree to show newly created entities
+    loadRootClasses();
+
+    // Reset pattern detection so next entity creation re-detects with updated source
+    iriPatternDetectedRef.current = false;
+
     // Resolve the pending save promise
     pendingSaveResolveRef.current?.();
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session?.accessToken, pendingSaveContent, activeBranch]);
+  }, [projectId, session?.accessToken, pendingSaveContent, activeBranch, loadRootClasses]);
 
   // Handle commit dialog cancel
   const handleCommitDialogClose = useCallback((open: boolean) => {
@@ -405,6 +450,101 @@ export default function EditorPage() {
       });
   }, [sourceContent, sourceIriIndex.size, isIndexing]);
 
+  // Detect IRI pattern once when the IRI index is first populated
+  useEffect(() => {
+    if (iriPatternDetectedRef.current || sourceIriIndex.size === 0 || !sourceContent) return;
+    iriPatternDetectedRef.current = true;
+
+    // Parse @base and @prefix declarations to identify internal namespaces
+    const internalNamespaces = new Set<string>();
+    const prefixMap = new Map<string, string>();
+    const externalNamespaces = new Set(commonPrefixes.map((p) => p.namespace));
+
+    for (const line of sourceContent.split("\n")) {
+      const baseMatch = line.match(/@base\s+<([^>]+)>/i);
+      if (baseMatch) {
+        internalNamespaces.add(baseMatch[1]);
+      }
+      const prefixMatch = line.match(/@?prefix\s+(\w*):\s*<([^>]+)>/i);
+      if (prefixMatch) {
+        const [, pfx, ns] = prefixMatch;
+        prefixMap.set(pfx, ns);
+        if (!externalNamespaces.has(ns)) {
+          internalNamespaces.add(ns);
+        }
+      }
+    }
+
+    // Use the default (empty) prefix namespace, or the first internal one
+    const defaultNs = prefixMap.get("") ?? [...internalNamespaces][0];
+    if (defaultNs) {
+      setOntologyNamespace(defaultNs);
+    }
+
+    // Find the prefix alias for the ontology namespace
+    for (const [pfx, ns] of prefixMap) {
+      if (ns === defaultNs && pfx !== "") {
+        setOntologyPrefix(pfx);
+        break;
+      }
+    }
+
+    const result = detectPatternFromIriIndex(sourceIriIndex, internalNamespaces);
+    setIriPattern(result.pattern);
+    if (result.nextNumeric !== undefined) {
+      setNextNumeric(result.nextNumeric);
+    }
+  }, [sourceIriIndex, sourceContent]);
+
+  // Handle "Add Entity" — opens the dialog with optional parent
+  const handleAddEntity = useCallback((parentIri?: string) => {
+    setAddEntityParentIri(parentIri);
+    // Look up the parent's label from the tree nodes
+    if (parentIri) {
+      const findLabel = (items: typeof nodes): string | undefined => {
+        for (const node of items) {
+          if (node.iri === parentIri) return node.label;
+          const found = findLabel(node.children);
+          if (found) return found;
+        }
+        return undefined;
+      };
+      setAddEntityParentLabel(findLabel(nodes));
+    } else {
+      setAddEntityParentLabel(undefined);
+    }
+    setAddEntityDialogOpen(true);
+  }, [nodes]);
+
+  // Handle entity creation confirmed from dialog
+  const handleEntityConfirm = useCallback(
+    (entity: NewEntityInfo) => {
+      const snippet = generateTurtleSnippet({
+        iri: entity.iri,
+        label: entity.label,
+        entityType: entity.entityType,
+        parentIri: entity.parentIri,
+        ontologyPrefix,
+        ontologyNamespace,
+      });
+
+      // Inject Turtle snippet into source
+      if (viewMode === "source" && sourceEditorRef.current) {
+        sourceEditorRef.current.insertAtEnd(snippet);
+        // Sync page-level sourceContent so it stays in sync with the editor
+        setSourceContent(sourceEditorRef.current.getValue());
+      } else {
+        setSourceContent((prev) => prev + snippet);
+      }
+
+      // Optimistically show the new entity in the tree (WebProtege-style)
+      if (entity.entityType === "class") {
+        addOptimisticNode(entity.iri, entity.label, entity.parentIri);
+      }
+    },
+    [ontologyPrefix, ontologyNamespace, viewMode, addOptimisticNode],
+  );
+
   // Handle branch change — reset all branch-dependent state and update URL
   const handleBranchChange = useCallback((branchName: string) => {
     setActiveBranch(branchName);
@@ -419,13 +559,17 @@ export default function EditorPage() {
 
   // Handle view mode change
   const handleViewModeChange = useCallback((mode: EditorView) => {
+    // Sync source content from editor before leaving source view
+    if (viewMode === "source" && mode !== "source" && sourceEditorRef.current) {
+      setSourceContent(sourceEditorRef.current.getValue());
+    }
     setViewMode(mode);
     // Close side panels when switching to source view
     if (mode === "source") {
       setShowHistory(false);
       setShowHealthCheck(false);
     }
-  }, []);
+  }, [viewMode]);
 
   // Toggle search mode
   const handleToggleSearch = useCallback(() => {
@@ -784,19 +928,30 @@ export default function EditorPage() {
                     <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">
                       {showSearch ? "Search" : "Class Hierarchy"}
                     </h2>
-                    <button
-                      onClick={handleToggleSearch}
-                      className={cn(
-                        "rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
-                        showSearch && "bg-slate-100 dark:bg-slate-700"
+                    <div className="flex items-center gap-1">
+                      {canEdit && (
+                        <button
+                          onClick={() => handleAddEntity()}
+                          className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
+                          title="Add entity"
+                        >
+                          <Plus className="h-4 w-4 text-slate-500" />
+                        </button>
                       )}
-                    >
-                      {showSearch ? (
-                        <X className="h-4 w-4 text-slate-500" />
-                      ) : (
-                        <Search className="h-4 w-4 text-slate-500" />
-                      )}
-                    </button>
+                      <button
+                        onClick={handleToggleSearch}
+                        className={cn(
+                          "rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
+                          showSearch && "bg-slate-100 dark:bg-slate-700"
+                        )}
+                      >
+                        {showSearch ? (
+                          <X className="h-4 w-4 text-slate-500" />
+                        ) : (
+                          <Search className="h-4 w-4 text-slate-500" />
+                        )}
+                      </button>
+                    </div>
                   </div>
                   {showSearch && (
                     <div className="mt-2">
@@ -840,6 +995,7 @@ export default function EditorPage() {
                       onSelect={selectNode}
                       onExpand={expandNode}
                       onCollapse={collapseNode}
+                      onAddChild={canEdit ? (parentIri: string) => handleAddEntity(parentIri) : undefined}
                       searchResults={showSearch ? searchResults : undefined}
                       isSearching={isSearching}
                       onSearchSelect={handleSearchSelect}
@@ -857,6 +1013,7 @@ export default function EditorPage() {
                   branch={activeBranch}
                   onNavigateToClass={navigateToNode}
                   onNavigateToSource={handleNavigateToSource}
+                  selectedNodeFallback={selectedNodeFallback}
                 />
               </div>
 
@@ -950,6 +1107,19 @@ export default function EditorPage() {
         onOpenChange={handleCommitDialogClose}
         onConfirm={handleCommitConfirm}
         defaultMessage="Update ontology"
+      />
+
+      {/* Add Entity Dialog */}
+      <AddEntityDialog
+        open={addEntityDialogOpen}
+        onOpenChange={setAddEntityDialogOpen}
+        onConfirm={handleEntityConfirm}
+        iriPattern={iriPattern}
+        nextNumeric={nextNumeric}
+        ontologyNamespace={ontologyNamespace}
+        ontologyPrefix={ontologyPrefix}
+        parentIri={addEntityParentIri}
+        parentLabel={addEntityParentLabel}
       />
     </BranchProvider>
   );

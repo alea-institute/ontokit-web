@@ -1,10 +1,18 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp, FileText, XCircle, Code } from "lucide-react";
+import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp, FileText, XCircle, Code, Clock } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
 import { lintApi, type LintIssue } from "@/lib/api/lint";
 import { cn, getLocalName, getPreferredLabel } from "@/lib/utils";
+
+/** Minimal data from the tree node, used as fallback when the API has no data yet */
+export interface TreeNodeFallback {
+  label: string;
+  iri: string;
+  parentIri?: string;
+  parentLabel?: string;
+}
 
 interface ClassDetailPanelProps {
   projectId: string;
@@ -14,6 +22,8 @@ interface ClassDetailPanelProps {
   onNavigateToClass?: (iri: string) => void;
   /** Callback to navigate to an IRI in the source view */
   onNavigateToSource?: (iri: string) => void;
+  /** Fallback data from the tree node — used when the API returns 404 (unsaved entity) */
+  selectedNodeFallback?: TreeNodeFallback | null;
 }
 
 export function ClassDetailPanel({
@@ -23,6 +33,7 @@ export function ClassDetailPanel({
   branch,
   onNavigateToClass,
   onNavigateToSource,
+  selectedNodeFallback,
 }: ClassDetailPanelProps) {
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
   const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
@@ -49,19 +60,21 @@ export function ClassDetailPanel({
         setClassDetail(detail);
         setClassIssues(issuesResponse.items);
       } catch (err) {
-        let message = "Failed to load class details";
-        if (err instanceof Error) {
-          // Check for "Class not found" error and provide friendlier message
-          if (err.message.includes("Class not found") || err.message.includes("404")) {
-            const localName = classIri.includes('#')
-              ? classIri.split('#').pop()
-              : classIri.split('/').pop();
-            message = `"${localName}" is not an OWL Class. It may be an individual, property, or other entity type.`;
-          } else {
-            message = err.message;
-          }
+        const is404 = err instanceof Error &&
+          (err.message.includes("Class not found") || err.message.includes("404"));
+
+        if (is404 && selectedNodeFallback?.iri === classIri) {
+          // Entity exists in the tree (optimistic) but not yet in the API —
+          // clear the error so the fallback preview renders instead
+          setError(null);
+        } else if (is404) {
+          const localName = classIri.includes('#')
+            ? classIri.split('#').pop()
+            : classIri.split('/').pop();
+          setError(`"${localName}" is not an OWL Class. It may be an individual, property, or other entity type.`);
+        } else {
+          setError(err instanceof Error ? err.message : "Failed to load class details");
         }
-        setError(message);
         setClassDetail(null);
         setClassIssues([]);
       } finally {
@@ -70,7 +83,7 @@ export function ClassDetailPanel({
     };
 
     fetchClassData();
-  }, [projectId, classIri, accessToken, branch]);
+  }, [projectId, classIri, accessToken, branch, selectedNodeFallback]);
 
   if (!classIri) {
     return (
@@ -99,6 +112,57 @@ export function ClassDetailPanel({
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-center dark:border-red-900/50 dark:bg-red-900/20">
           <AlertTriangle className="mx-auto h-8 w-8 text-red-500" />
           <p className="mt-2 text-sm text-red-700 dark:text-red-400">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // No API data — show tree-node fallback if available (unsaved entity)
+  if (!classDetail && selectedNodeFallback?.iri === classIri) {
+    return (
+      <div className="h-full overflow-y-auto">
+        <div className="border-b border-slate-200 p-4 dark:border-slate-700">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-owl-class/20 border border-owl-class">
+              <span className="text-sm font-bold text-owl-class">C</span>
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                {selectedNodeFallback.label}
+                <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                  <Clock className="mr-1 h-3 w-3" />
+                  Unsaved
+                </span>
+              </h2>
+              <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400" title={classIri}>
+                {classIri}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="p-4 space-y-6">
+          <Section title="Labels" icon={<Tag className="h-4 w-4" />}>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-slate-700 dark:text-slate-300">{selectedNodeFallback.label}</span>
+              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                en
+              </span>
+            </div>
+          </Section>
+          {selectedNodeFallback.parentIri && (
+            <Section title="Superclasses" icon={<ArrowUp className="h-4 w-4" />}>
+              <IriLink
+                iri={selectedNodeFallback.parentIri}
+                label={selectedNodeFallback.parentLabel}
+                onClick={onNavigateToClass}
+              />
+            </Section>
+          )}
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/10">
+            <p className="text-sm text-amber-800 dark:text-amber-300">
+              This entity has not been saved yet. Save your changes to persist it.
+            </p>
+          </div>
         </div>
       </div>
     );

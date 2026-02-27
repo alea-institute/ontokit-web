@@ -35,6 +35,10 @@ export interface OntologySourceEditorProps {
 export interface OntologySourceEditorRef {
   /** Scroll to the line where an IRI is defined in the source */
   scrollToIri: (iri: string) => boolean;
+  /** Append text at the end of the document (integrates with undo stack) */
+  insertAtEnd: (text: string) => void;
+  /** Get the current editor content (for syncing back to parent state) */
+  getValue: () => string;
 }
 
 /**
@@ -145,10 +149,51 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
     return true; // Return true to indicate we'll handle it
   }, [prebuiltIriIndex, iriIndex, findIriPosition, scrollToLine]);
 
+  // Insert text at the end of the document using executeEdits (supports undo)
+  const insertAtEnd = useCallback((text: string) => {
+    const ed = editorRef.current;
+    if (!ed) return;
+
+    const model = ed.getModel();
+    if (!model) return;
+
+    const lastLine = model.getLineCount();
+    const lastCol = model.getLineMaxColumn(lastLine);
+
+    // Use executeEdits so the insertion integrates with the undo stack
+    ed.executeEdits("add-entity", [
+      {
+        range: {
+          startLineNumber: lastLine,
+          startColumn: lastCol,
+          endLineNumber: lastLine,
+          endColumn: lastCol,
+        },
+        text,
+        forceMoveMarkers: true,
+      },
+    ]);
+
+    // Sync internal state so hasChanges detection works
+    const newValue = model.getValue();
+    setValue(newValue);
+
+    // Scroll to the new content
+    const newLastLine = model.getLineCount();
+    ed.revealLineInCenter(newLastLine);
+    ed.setPosition({ lineNumber: newLastLine, column: 1 });
+    ed.focus();
+  }, []);
+
+  // Get current editor content
+  const getValue = useCallback(() => value, [value]);
+
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     scrollToIri,
-  }), [scrollToIri]);
+    insertAtEnd,
+    getValue,
+  }), [scrollToIri, insertAtEnd, getValue]);
 
   // Handle pendingScrollIri prop when component mounts with prebuilt index
   useEffect(() => {
