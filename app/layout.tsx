@@ -28,6 +28,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var s=JSON.parse(localStorage.getItem("ontokit-editor-preferences")||"{}");var t=(s.state&&s.state.theme)||"system";if(t==="dark")document.documentElement.classList.add("dark");else if(t==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark")}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         <Providers>{children}</Providers>
       </body>

@@ -8,12 +8,10 @@
   --background-end-rgb: 255, 255, 255;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 15, 23, 42;
-    --background-end-rgb: 30, 41, 59;
-  }
+.dark {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 15, 23, 42;
+  --background-end-rgb: 30, 41, 59;
 }
 
 body {
@@ -46,14 +44,12 @@ body {
   background: rgb(148 163 184);
 }
 
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb {
-    background: rgb(71 85 105);
-  }
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(71 85 105);
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgb(100 116 139);
-  }
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(100 116 139);
 }
 
 /* Class tree item styling */

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, Github, Trash2, Check, AlertCircle } from "lucide-react";
+import { ArrowLeft, Github, Trash2, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +12,11 @@ import {
   type GitHubTokenResponse,
 } from "@/lib/api/userSettings";
 import { cn } from "@/lib/utils";
+import {
+  useEditorModeStore,
+  type EditorMode,
+  type ThemePreference,
+} from "@/lib/stores/editorModeStore";
 
 export default function UserSettingsPage() {
   const { data: session, status } = useSession();
@@ -173,8 +178,11 @@ export default function UserSettingsPage() {
             </div>
           )}
 
+          {/* Editor Preferences */}
+          <EditorPreferencesSection />
+
           {/* Connected Accounts */}
-          <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+          <section className="mt-6 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
             <div className="mb-4 flex items-center gap-2">
               <Github className="h-5 w-5 text-slate-500" />
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
@@ -286,5 +294,103 @@ export default function UserSettingsPage() {
         </div>
       </main>
     </>
+  );
+}
+
+// --- Editor Preferences Section ---
+
+const modeOptions: { value: EditorMode; label: string; description: string; icon: typeof Code }[] = [
+  { value: "standard", label: "Standard", description: "Form-based editing with visual controls", icon: LayoutGrid },
+  { value: "developer", label: "Developer", description: "Source-code editor with Turtle syntax", icon: Code },
+];
+
+const themeOptions: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
+
+function EditorPreferencesSection() {
+  const editorMode = useEditorModeStore((s) => s.editorMode);
+  const setEditorMode = useEditorModeStore((s) => s.setEditorMode);
+  const theme = useEditorModeStore((s) => s.theme);
+  const setTheme = useEditorModeStore((s) => s.setTheme);
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          Editor Preferences
+        </h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Choose your preferred editing mode and theme.
+        </p>
+      </div>
+
+      {/* Editor Mode */}
+      <div className="mb-6">
+        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Editor Mode
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          {modeOptions.map(({ value, label, description, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setEditorMode(value)}
+              className={cn(
+                "flex items-start gap-3 rounded-lg border p-4 text-left transition-colors",
+                editorMode === value
+                  ? "border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/20"
+                  : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
+              )}
+            >
+              <Icon className={cn(
+                "mt-0.5 h-5 w-5 flex-shrink-0",
+                editorMode === value
+                  ? "text-primary-600 dark:text-primary-400"
+                  : "text-slate-400",
+              )} />
+              <div>
+                <p className={cn(
+                  "font-medium",
+                  editorMode === value
+                    ? "text-primary-700 dark:text-primary-300"
+                    : "text-slate-900 dark:text-white",
+                )}>
+                  {label}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {description}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Theme */}
+      <div>
+        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Theme
+        </label>
+        <div className="flex gap-2">
+          {themeOptions.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setTheme(value)}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+                theme === value
+                  ? "border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/20 dark:text-primary-300"
+                  : "border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:text-slate-400 dark:hover:border-slate-500",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }

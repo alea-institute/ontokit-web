@@ -4,6 +4,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
 import { useState, type ReactNode } from "react";
 
+// Import the store module to ensure module-level theme sync runs
+import "@/lib/stores/editorModeStore";
+
 interface ProvidersProps {
   children: ReactNode;
 }
