@@ -7,8 +7,10 @@ import Link from "next/link";
 import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
+import { useToast } from "@/lib/context/ToastContext";
 import type { TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
@@ -86,6 +88,14 @@ export default function EditorPage() {
   const [ontologyPrefix, setOntologyPrefix] = useState<string | undefined>(undefined);
   const iriPatternDetectedRef = useRef(false);
 
+  // Delete class state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteTargetIri, setDeleteTargetIri] = useState<string | null>(null);
+  const [deleteTargetLabel, setDeleteTargetLabel] = useState<string>("");
+
+  // Toast
+  const toast = useToast();
+
   // Pending scroll IRI for source navigation
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
 
@@ -102,6 +112,7 @@ export default function EditorPage() {
     selectNode,
     navigateToNode,
     addOptimisticNode,
+    removeOptimisticNode,
   } = useOntologyTree({
     projectId,
     accessToken: session?.accessToken,
@@ -183,7 +194,9 @@ export default function EditorPage() {
   }, [projectId, session?.accessToken, status]);
 
   const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
-  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor";
+  // If user_role is null but user has access to the project, default to edit (backend enforces actual perms)
+  const hasExplicitRole = !!project?.user_role;
+  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin || (!hasExplicitRole && !!session?.accessToken);
   const hasOntology = project?.source_file_path;
 
   // Load source content
@@ -455,6 +468,50 @@ export default function EditorPage() {
     [ontologyPrefix, ontologyNamespace, addOptimisticNode],
   );
 
+  // Handle copy IRI
+  const handleCopyIri = useCallback(async (iri: string) => {
+    try {
+      await navigator.clipboard.writeText(iri);
+      toast.success("IRI copied to clipboard");
+    } catch {
+      toast.error("Failed to copy IRI");
+    }
+  }, [toast]);
+
+  // Handle delete class
+  const handleDeleteClass = useCallback((iri: string, label: string) => {
+    setDeleteTargetIri(iri);
+    setDeleteTargetLabel(label);
+    setDeleteDialogOpen(true);
+  }, []);
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTargetIri || !session?.accessToken) return;
+
+    // Optimistic removal
+    removeOptimisticNode(deleteTargetIri);
+
+    try {
+      await projectOntologyApi.deleteClass(
+        projectId,
+        deleteTargetIri,
+        `Delete class ${deleteTargetLabel}`,
+        session.accessToken,
+        activeBranch
+      );
+      toast.success(`Deleted "${deleteTargetLabel}"`);
+      // Reload tree to ensure consistency
+      loadRootClasses();
+    } catch (err) {
+      toast.error(
+        "Failed to delete class",
+        err instanceof Error ? err.message : "Unknown error"
+      );
+      // Reload tree to restore state
+      loadRootClasses();
+    }
+  }, [deleteTargetIri, deleteTargetLabel, session?.accessToken, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses]);
+
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
     setActiveBranch(branchName);
@@ -690,6 +747,8 @@ export default function EditorPage() {
                   sourceEditorRef={sourceEditorRef}
                   onSaveSource={handleSaveSource}
                   onAddEntity={handleAddEntity}
+                  onDeleteClass={handleDeleteClass}
+                  onCopyIri={handleCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
                   showHealthCheck={showHealthCheck}
                   onCloseHealthCheck={() => setShowHealthCheck(false)}
@@ -710,6 +769,8 @@ export default function EditorPage() {
                 collapseNode={collapseNode}
                 navigateToNode={navigateToNode}
                 onAddEntity={handleAddEntity}
+                onDeleteClass={handleDeleteClass}
+                onCopyIri={handleCopyIri}
                 selectedNodeFallback={selectedNodeFallback}
               />
             )}
@@ -744,6 +805,17 @@ export default function EditorPage() {
         ontologyPrefix={ontologyPrefix}
         parentIri={addEntityParentIri}
         parentLabel={addEntityParentLabel}
+      />
+
+      {/* Delete Class Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Class"
+        description={`Are you sure you want to delete "${deleteTargetLabel}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        variant="danger"
       />
     </BranchProvider>
   );

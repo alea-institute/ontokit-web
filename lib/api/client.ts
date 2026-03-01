@@ -465,6 +465,21 @@ export const projectOntologyApi = {
     ),
 
   /**
+   * Delete a class from the ontology
+   */
+  deleteClass: (
+    projectId: string,
+    classIri: string,
+    commitMessage: string,
+    token: string,
+    branch?: string
+  ) =>
+    api.delete(`/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { commit_message: commitMessage, branch },
+    }),
+
+  /**
    * Save ontology source content
    */
   saveSource: (

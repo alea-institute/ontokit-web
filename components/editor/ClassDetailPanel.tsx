@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp, FileText, XCircle, Code, Clock } from "lucide-react";
+import { ExternalLink, AlertTriangle, Info, Tag, MessageSquare, ArrowUp, FileText, XCircle, Code, Clock, Copy } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
 import { lintApi, type LintIssue } from "@/lib/api/lint";
 import { cn, getLocalName, getPreferredLabel } from "@/lib/utils";
@@ -22,6 +22,8 @@ interface ClassDetailPanelProps {
   onNavigateToClass?: (iri: string) => void;
   /** Callback to navigate to an IRI in the source view */
   onNavigateToSource?: (iri: string) => void;
+  /** Callback to copy an IRI to clipboard */
+  onCopyIri?: (iri: string) => void;
   /** Fallback data from the tree node — used when the API returns 404 (unsaved entity) */
   selectedNodeFallback?: TreeNodeFallback | null;
 }
@@ -33,6 +35,7 @@ export function ClassDetailPanel({
   branch,
   onNavigateToClass,
   onNavigateToSource,
+  onCopyIri,
   selectedNodeFallback,
 }: ClassDetailPanelProps) {
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
@@ -196,6 +199,15 @@ export function ClassDetailPanel({
               <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={classDetail.iri}>
                 {classDetail.iri}
               </p>
+              {onCopyIri && (
+                <button
+                  onClick={() => onCopyIri(classDetail.iri)}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                  title="Copy IRI"
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+              )}
               {onNavigateToSource && (
                 <button
                   onClick={() => onNavigateToSource(classDetail.iri)}

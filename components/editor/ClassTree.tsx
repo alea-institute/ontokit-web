@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { ChevronRight, ChevronDown, Circle, Plus } from "lucide-react";
 import { cn, getLocalName } from "@/lib/utils";
+import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { TreeNodeContextMenu } from "@/components/editor/TreeNodeContextMenu";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import type { EntitySearchResult } from "@/lib/api/client";
 
@@ -13,6 +15,9 @@ interface ClassTreeProps {
   onExpand: (iri: string) => void;
   onCollapse: (iri: string) => void;
   onAddChild?: (parentIri: string) => void;
+  onCopyIri?: (iri: string) => void;
+  onDelete?: (iri: string, label: string) => void;
+  onViewInSource?: (iri: string) => void;
   searchResults?: EntitySearchResult[] | null;
   isSearching?: boolean;
   onSearchSelect?: (iri: string) => void;
@@ -25,6 +30,9 @@ export function ClassTree({
   onExpand,
   onCollapse,
   onAddChild,
+  onCopyIri,
+  onDelete,
+  onViewInSource,
   searchResults,
   isSearching,
   onSearchSelect,
@@ -68,6 +76,9 @@ export function ClassTree({
           onExpand={onExpand}
           onCollapse={onCollapse}
           onAddChild={onAddChild}
+          onCopyIri={onCopyIri}
+          onDelete={onDelete}
+          onViewInSource={onViewInSource}
         />
       ))}
     </div>
@@ -128,6 +139,9 @@ interface ClassTreeItemProps {
   onExpand: (iri: string) => void;
   onCollapse: (iri: string) => void;
   onAddChild?: (parentIri: string) => void;
+  onCopyIri?: (iri: string) => void;
+  onDelete?: (iri: string, label: string) => void;
+  onViewInSource?: (iri: string) => void;
 }
 
 function ClassTreeItem({
@@ -138,6 +152,9 @@ function ClassTreeItem({
   onExpand,
   onCollapse,
   onAddChild,
+  onCopyIri,
+  onDelete,
+  onViewInSource,
 }: ClassTreeItemProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isSelected = selectedIri === node.iri;
@@ -157,56 +174,77 @@ function ClassTreeItem({
     onAddChild?.(node.iri);
   };
 
+  const hasContextMenu = onCopyIri || onDelete || onViewInSource || onAddChild;
+
+  const rowContent = (
+    <div
+      className={cn(
+        "tree-item group",
+        isSelected && "selected"
+      )}
+      style={{ paddingLeft: `${depth * 16 + 8}px` }}
+      onClick={() => onSelect(node.iri)}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      {/* Expand/collapse button */}
+      <button
+        onClick={handleToggle}
+        className={cn(
+          "w-4 h-4 flex items-center justify-center",
+          !hasChildren && "invisible"
+        )}
+      >
+        {node.isLoading ? (
+          <Circle className="w-3 h-3 animate-pulse" />
+        ) : node.isExpanded ? (
+          <ChevronDown className="w-4 h-4" />
+        ) : (
+          <ChevronRight className="w-4 h-4" />
+        )}
+      </button>
+
+      {/* Class icon */}
+      <div className="w-4 h-4 rounded-full bg-owl-class/20 border border-owl-class flex items-center justify-center">
+        <span className="text-[10px] font-bold text-owl-class">C</span>
+      </div>
+
+      {/* Label */}
+      <span className="flex-1 truncate text-sm">
+        {node.label || getLocalName(node.iri)}
+      </span>
+
+      {/* Add child button */}
+      {onAddChild && isHovered && (
+        <button
+          onClick={handleAddChild}
+          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+          title="Add subclass"
+        >
+          <Plus className="w-3 h-3" />
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div>
-      <div
-        className={cn(
-          "tree-item group",
-          isSelected && "selected"
-        )}
-        style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        onClick={() => onSelect(node.iri)}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-      >
-        {/* Expand/collapse button */}
-        <button
-          onClick={handleToggle}
-          className={cn(
-            "w-4 h-4 flex items-center justify-center",
-            !hasChildren && "invisible"
-          )}
-        >
-          {node.isLoading ? (
-            <Circle className="w-3 h-3 animate-pulse" />
-          ) : node.isExpanded ? (
-            <ChevronDown className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
-        </button>
-
-        {/* Class icon */}
-        <div className="w-4 h-4 rounded-full bg-owl-class/20 border border-owl-class flex items-center justify-center">
-          <span className="text-[10px] font-bold text-owl-class">C</span>
-        </div>
-
-        {/* Label */}
-        <span className="flex-1 truncate text-sm">
-          {node.label || getLocalName(node.iri)}
-        </span>
-
-        {/* Add child button */}
-        {onAddChild && isHovered && (
-          <button
-            onClick={handleAddChild}
-            className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-            title="Add subclass"
-          >
-            <Plus className="w-3 h-3" />
-          </button>
-        )}
-      </div>
+      {hasContextMenu ? (
+        <ContextMenu>
+          <ContextMenuTrigger asChild>
+            {rowContent}
+          </ContextMenuTrigger>
+          <TreeNodeContextMenu
+            node={node}
+            onAddChild={onAddChild}
+            onCopyIri={onCopyIri}
+            onDelete={onDelete}
+            onViewInSource={onViewInSource}
+          />
+        </ContextMenu>
+      ) : (
+        rowContent
+      )}
 
       {/* Children */}
       {node.isExpanded && node.children.length > 0 && (
@@ -221,6 +259,9 @@ function ClassTreeItem({
               onExpand={onExpand}
               onCollapse={onCollapse}
               onAddChild={onAddChild}
+              onCopyIri={onCopyIri}
+              onDelete={onDelete}
+              onViewInSource={onViewInSource}
             />
           ))}
         </div>

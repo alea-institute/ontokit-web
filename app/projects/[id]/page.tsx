@@ -110,10 +110,13 @@ export default function ProjectPage() {
     }
   }, [projectId, session?.accessToken, status]);
 
+  const hasExplicitRole = !!project?.user_role;
   const canEdit =
     project?.user_role === "owner" ||
     project?.user_role === "admin" ||
-    project?.user_role === "editor";
+    project?.user_role === "editor" ||
+    project?.is_superadmin ||
+    (!hasExplicitRole && !!session?.accessToken);
 
   const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
 

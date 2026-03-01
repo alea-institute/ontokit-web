@@ -59,6 +59,8 @@ export interface DeveloperEditorLayoutProps {
   // Actions
   onSaveSource: (content: string) => Promise<void>;
   onAddEntity: (parentIri?: string) => void;
+  onDeleteClass?: (iri: string, label: string) => void;
+  onCopyIri?: (iri: string) => void;
 
   // Detail panel
   selectedNodeFallback: TreeNodeFallback | null;
@@ -95,6 +97,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     sourceEditorRef,
     onSaveSource,
     onAddEntity,
+    onDeleteClass,
+    onCopyIri,
     selectedNodeFallback,
     showHealthCheck,
     onCloseHealthCheck,
@@ -304,6 +308,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                     onExpand={expandNode}
                     onCollapse={collapseNode}
                     onAddChild={canEdit ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+                    onCopyIri={onCopyIri}
+                    onDelete={canEdit ? onDeleteClass : undefined}
+                    onViewInSource={handleNavigateToSource}
                     searchResults={showSearch ? searchResults : undefined}
                     isSearching={isSearching}
                     onSearchSelect={handleSearchSelect}
@@ -321,6 +328,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 branch={activeBranch}
                 onNavigateToClass={(iri) => navigateToNode(iri)}
                 onNavigateToSource={handleNavigateToSource}
+                onCopyIri={onCopyIri}
                 selectedNodeFallback={selectedNodeFallback}
               />
             </div>

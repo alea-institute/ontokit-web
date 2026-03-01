@@ -3,6 +3,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SessionProvider } from "next-auth/react";
 import { useState, type ReactNode } from "react";
+import { ToastProvider } from "@/lib/context/ToastContext";
+import { ToastContainer } from "@/components/ui/toast-container";
 
 // Import the store module to ensure module-level theme sync runs
 import "@/lib/stores/editorModeStore";
@@ -26,7 +28,12 @@ export function Providers({ children }: ProvidersProps) {
 
   return (
     <SessionProvider>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          {children}
+          <ToastContainer />
+        </ToastProvider>
+      </QueryClientProvider>
     </SessionProvider>
   );
 }

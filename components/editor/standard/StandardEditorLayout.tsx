@@ -26,6 +26,8 @@ export interface StandardEditorLayoutProps {
 
   // Actions
   onAddEntity: (parentIri?: string) => void;
+  onDeleteClass?: (iri: string, label: string) => void;
+  onCopyIri?: (iri: string) => void;
 
   // Detail panel
   selectedNodeFallback: TreeNodeFallback | null;
@@ -46,6 +48,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     collapseNode,
     navigateToNode,
     onAddEntity,
+    onDeleteClass,
+    onCopyIri,
     selectedNodeFallback,
   } = props;
 
@@ -182,6 +186,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
               onExpand={expandNode}
               onCollapse={collapseNode}
               onAddChild={canEdit ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+              onCopyIri={onCopyIri}
+              onDelete={canEdit ? onDeleteClass : undefined}
               searchResults={showSearch ? searchResults : undefined}
               isSearching={isSearching}
               onSearchSelect={handleSearchSelect}
@@ -198,6 +204,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           accessToken={accessToken}
           branch={activeBranch}
           onNavigateToClass={(iri) => navigateToNode(iri)}
+          onCopyIri={onCopyIri}
           selectedNodeFallback={selectedNodeFallback}
         />
       </div>

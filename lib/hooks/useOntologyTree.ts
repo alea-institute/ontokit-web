@@ -24,6 +24,8 @@ interface UseOntologyTreeReturn {
   navigateToNode: (iri: string) => Promise<void>;
   /** Optimistically insert a new node into the tree (before the save round-trips to the API) */
   addOptimisticNode: (iri: string, label: string, parentIri?: string) => void;
+  /** Optimistically remove a node from the tree by IRI */
+  removeOptimisticNode: (iri: string) => void;
 }
 
 /**
@@ -103,7 +105,6 @@ export function useOntologyTree({
     } finally {
       setIsLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, accessToken, branchKey]);
 
   /**
@@ -229,6 +230,28 @@ export function useOntologyTree({
     []
   );
 
+  /**
+   * Optimistically remove a node from the tree by IRI.
+   * Clears selection if the removed node was selected.
+   */
+  const removeOptimisticNode = useCallback(
+    (iri: string) => {
+      const filterNodes = (items: ClassTreeNode[]): ClassTreeNode[] =>
+        items
+          .filter((node) => node.iri !== iri)
+          .map((node) =>
+            node.children.length > 0
+              ? { ...node, children: filterNodes(node.children) }
+              : node
+          );
+
+      setNodes((prev) => filterNodes(prev));
+      setTotalClasses((prev) => Math.max(0, prev - 1));
+      setSelectedIri((prev) => (prev === iri ? null : prev));
+    },
+    []
+  );
+
   // Load root classes on mount
   useEffect(() => {
     loadRootClasses();
@@ -246,5 +269,6 @@ export function useOntologyTree({
     selectNode,
     navigateToNode,
     addOptimisticNode,
+    removeOptimisticNode,
   };
 }
