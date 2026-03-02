@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import type { LocalizedString, AnnotationUpdate } from "@/lib/api/client";
 import { cn, getLocalName } from "@/lib/utils";
+import { LanguageFlag } from "@/components/editor/LanguageFlag";
 import { AnnotationRow } from "@/components/editor/standard/AnnotationRow";
 import { InlineAnnotationAdder } from "@/components/editor/standard/InlineAnnotationAdder";
 import { RelationshipSection, type RelationshipGroup, type RelationshipTarget } from "@/components/editor/standard/RelationshipSection";
@@ -437,6 +438,7 @@ export function IndividualDetailPanel({
                 {editLabels.map((label, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <input type="text" value={label.value} onChange={(e) => updateLabel(index, "value", e.target.value)} onBlur={() => triggerSave()} placeholder="Label text" className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                    <LanguageFlag lang={label.lang} />
                     <input type="text" value={label.lang} onChange={(e) => updateLabel(index, "lang", e.target.value)} onBlur={() => triggerSave()} className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" title="Language tag" />
                     {editLabels.length > 1 ? (
                       <button onClick={() => removeLabel(index)} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></button>
@@ -451,7 +453,6 @@ export function IndividualDetailPanel({
                 {detail.labels.map((l, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <span className="text-sm text-slate-700 dark:text-slate-300">{l.value}</span>
-                    <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{l.lang}</span>
                   </div>
                 ))}
               </div>
@@ -474,8 +475,8 @@ export function IndividualDetailPanel({
             <Section title="Definition" icon={<Lightbulb className="h-4 w-4" />}>
               <div className="space-y-1">{detail.definitions.map((d, i) => (
                 <div key={i} className="flex items-center gap-2">
+                  {d.lang && <LanguageFlag lang={d.lang} />}
                   <span className="text-sm text-slate-700 dark:text-slate-300">{d.value}</span>
-                  {d.lang && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{d.lang}</span>}
                 </div>
               ))}</div>
             </Section>
@@ -497,8 +498,8 @@ export function IndividualDetailPanel({
             <Section title="Comment(s)" icon={<MessageSquare className="h-4 w-4" />}>
               <div className="space-y-1">{detail.comments.map((c, i) => (
                 <div key={i} className="flex items-center gap-2">
+                  {c.lang && <LanguageFlag lang={c.lang} />}
                   <span className="text-sm text-slate-700 dark:text-slate-300">{c.value}</span>
-                  {c.lang && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{c.lang}</span>}
                 </div>
               ))}</div>
             </Section>
@@ -640,10 +641,8 @@ export function IndividualDetailPanel({
                     </span>
                   </div>
                   <div className="min-w-0 flex-1 flex items-center gap-2">
+                    {a.lang && <LanguageFlag lang={a.lang} />}
                     <span className="text-sm text-slate-700 dark:text-slate-300">{a.value}</span>
-                    {a.lang && (
-                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{a.lang}</span>
-                    )}
                     {a.datatype && (
                       <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>{getLocalName(a.datatype)}</span>
                     )}
@@ -703,8 +702,8 @@ export function IndividualDetailPanel({
                         <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={curie}>{effectiveLabel}</span>
                       </div>
                       <div className="min-w-0 flex-1 flex items-center gap-2">
+                        {v.lang && <LanguageFlag lang={v.lang} />}
                         <span className="text-sm text-slate-700 dark:text-slate-300">{v.value}</span>
-                        {v.lang && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{v.lang}</span>}
                       </div>
                     </div>
                   );

@@ -33,6 +33,7 @@ import { projectOntologyApi, type OWLClassDetail, type ClassUpdatePayload, type 
 import type { LocalizedString } from "@/lib/api/client";
 import { lintApi, type LintIssue } from "@/lib/api/lint";
 import { cn, getLocalName, getPreferredLabel } from "@/lib/utils";
+import { LanguageFlag } from "@/components/editor/LanguageFlag";
 import { ParentClassPicker } from "@/components/editor/ParentClassPicker";
 import { AnnotationRow } from "@/components/editor/standard/AnnotationRow";
 import { InlineAnnotationAdder } from "@/components/editor/standard/InlineAnnotationAdder";
@@ -522,9 +523,6 @@ export function ClassDetailPanel({
           <Section title="Primary Label" tooltip="rdfs:label" icon={<Tag className="h-4 w-4" />}>
             <div className="flex items-center gap-2">
               <span className="text-sm text-slate-700 dark:text-slate-300">{selectedNodeFallback.label}</span>
-              <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                en
-              </span>
             </div>
           </Section>
           {selectedNodeFallback.parentIri && (
@@ -656,6 +654,7 @@ export function ClassDetailPanel({
                       placeholder="Label text"
                       className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                     />
+                    <LanguageFlag lang={label.lang} />
                     <input
                       type="text"
                       value={label.lang}
@@ -687,9 +686,6 @@ export function ClassDetailPanel({
                 {classDetail.labels.map((label, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <span className="text-sm text-slate-700 dark:text-slate-300">{label.value}</span>
-                    <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                      {label.lang}
-                    </span>
                   </div>
                 ))}
               </div>
@@ -735,10 +731,8 @@ export function ClassDetailPanel({
                   <div className="space-y-1">
                     {defAnnotation.values.map((val, vIndex) => (
                       <div key={vIndex} className="flex items-start gap-2">
+                        {val.lang && <LanguageFlag lang={val.lang} />}
                         <span className="text-sm text-slate-700 dark:text-slate-300">{val.value}</span>
-                        {val.lang && (
-                          <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{val.lang}</span>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -765,6 +759,9 @@ export function ClassDetailPanel({
                         rows={isGhost ? 1 : 2}
                         className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                       />
+                      <div className="mt-1 shrink-0">
+                        <LanguageFlag lang={comment.lang} />
+                      </div>
                       <input
                         type="text"
                         value={comment.lang}
@@ -796,8 +793,8 @@ export function ClassDetailPanel({
               <div className="space-y-1">
                 {classDetail.comments.map((comment, index) => (
                   <div key={index} className="flex items-start gap-2">
+                    {comment.lang && <LanguageFlag lang={comment.lang} />}
                     <span className="text-sm text-slate-700 dark:text-slate-300">{comment.value}</span>
-                    <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">{comment.lang}</span>
                   </div>
                 ))}
               </div>
@@ -846,12 +843,8 @@ export function ClassDetailPanel({
                       <div className="space-y-1">
                         {annotation.values.map((val, vIdx) => (
                           <div key={vIdx} className="flex items-center gap-2">
+                            {val.lang && <LanguageFlag lang={val.lang} />}
                             <span className="text-sm text-slate-700 dark:text-slate-300">{val.value}</span>
-                            {val.lang && (
-                              <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                                {val.lang}
-                              </span>
-                            )}
                           </div>
                         ))}
                       </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { LanguageFlag } from "@/components/editor/LanguageFlag";
 import {
   ANNOTATION_PROPERTIES,
   getAnnotationPropertiesByVocabulary,
@@ -194,6 +195,9 @@ export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: Inli
                 : "border-dashed border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500"
             )}
           />
+          <div className="mt-1 shrink-0">
+            <LanguageFlag lang={lang} />
+          </div>
           <input
             type="text"
             value={lang}

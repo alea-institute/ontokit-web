@@ -102,3 +102,74 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
     timeoutId = setTimeout(() => fn(...args), delay);
   };
 }
+
+/** Map bare language codes to their default country code for flag rendering */
+const LANG_TO_COUNTRY: Record<string, string> = {
+  en: "US",
+  ja: "JP",
+  ko: "KR",
+  zh: "CN",
+  hi: "IN",
+  ur: "PK",
+  bn: "BD",
+  ta: "IN",
+  te: "IN",
+  mr: "IN",
+  gu: "IN",
+  kn: "IN",
+  ml: "IN",
+  pa: "IN",
+  vi: "VN",
+  uk: "UA",
+  el: "GR",
+  he: "IL",
+  ar: "SA",
+  fa: "IR",
+  cs: "CZ",
+  da: "DK",
+  sv: "SE",
+  nb: "NO",
+  nn: "NO",
+  et: "EE",
+  sl: "SI",
+  sq: "AL",
+  ms: "MY",
+  ga: "IE",
+  cy: "GB",
+  eu: "ES",
+  ca: "ES",
+  gl: "ES",
+  sw: "KE",
+  af: "ZA",
+  zu: "ZA",
+};
+
+/**
+ * Convert an ISO language tag to a flag emoji.
+ * - `xx-YY` → uses YY country code
+ * - `xx` bare code → lookup table or self-mapping heuristic (e.g. `de`→`DE`)
+ * Returns null if the code can't be mapped.
+ */
+export function langToFlag(lang: string): string | null {
+  if (!lang) return null;
+  const normalized = lang.trim().toLowerCase();
+  if (!normalized) return null;
+
+  let countryCode: string | undefined;
+
+  if (normalized.includes("-")) {
+    const parts = normalized.split("-");
+    countryCode = parts[parts.length - 1].toUpperCase();
+  } else {
+    countryCode = LANG_TO_COUNTRY[normalized] ?? normalized.toUpperCase();
+  }
+
+  if (!countryCode || countryCode.length !== 2 || !/^[A-Z]{2}$/.test(countryCode)) {
+    return null;
+  }
+
+  const flag = String.fromCodePoint(
+    ...countryCode.split("").map((c) => 0x1f1e6 + c.charCodeAt(0) - 65)
+  );
+  return flag;
+}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Trash2 } from "lucide-react";
 import { getLocalName } from "@/lib/utils";
+import { LanguageFlag } from "@/components/editor/LanguageFlag";
 import { projectOntologyApi } from "@/lib/api/client";
 import type { PropertyAssertion } from "@/lib/ontology/entityDetailExtractors";
 
@@ -58,12 +59,8 @@ export function PropertyAssertionSection({
                 </button>
               ) : (
                 <>
+                  {a.lang && <LanguageFlag lang={a.lang} />}
                   <span className="text-sm text-slate-700 dark:text-slate-300">{a.value}</span>
-                  {a.lang && (
-                    <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                      {a.lang}
-                    </span>
-                  )}
                   {a.datatype && (
                     <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>
                       {getLocalName(a.datatype)}
@@ -281,6 +278,9 @@ function AssertionAdder({ assertionType, projectId, accessToken, branch, onAdd }
               disabled={!selectedPropIri}
               className="flex-1 rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500 dark:disabled:bg-slate-800"
             />
+            <div className="mt-1 shrink-0">
+              <LanguageFlag lang={dataLang} />
+            </div>
             <input
               type="text"
               value={dataLang}
