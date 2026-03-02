@@ -6,10 +6,8 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
-import type { ClassTreeNode } from "@/lib/ontology/types";
-
 interface TreeNodeContextMenuProps {
-  node: ClassTreeNode;
+  node: { iri: string; label: string };
   onAddChild?: (parentIri: string) => void;
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;

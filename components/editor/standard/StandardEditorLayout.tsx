@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { Search, X, Plus } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState, useMemo } from "react";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
@@ -10,7 +8,10 @@ import { PropertyTree } from "@/components/editor/standard/PropertyTree";
 import { IndividualList } from "@/components/editor/standard/IndividualList";
 import { EntityPlaceholderDetail } from "@/components/editor/EntityPlaceholderDetail";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
-import { projectOntologyApi, type EntitySearchResult, type ClassUpdatePayload } from "@/lib/api/client";
+import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
+import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
+import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
+import type { ClassUpdatePayload } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import { useDraftStore } from "@/lib/stores/draftStore";
 
@@ -28,6 +29,8 @@ export interface StandardEditorLayoutProps {
   selectNode: (iri: string) => void;
   expandNode: (iri: string) => void;
   collapseNode: (iri: string) => void;
+  expandAll: () => Promise<void>;
+  collapseAll: () => void;
   navigateToNode: (iri: string) => Promise<void>;
 
   // Actions
@@ -57,6 +60,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     selectNode,
     expandNode,
     collapseNode,
+    expandAll,
+    collapseAll,
     navigateToNode,
     onAddEntity,
     onDeleteClass,
@@ -85,62 +90,36 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   const [selectedPropertyIri, setSelectedPropertyIri] = useState<string | null>(null);
   const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
 
-  // Search state
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<EntitySearchResult[] | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  // Shared search state
+  const {
+    showSearch,
+    searchQuery,
+    searchResults,
+    isSearching,
+    searchInputRef,
+    toggleSearch,
+    closeSearch,
+    setSearchQuery,
+    handleSearchSelect: baseSearchSelect,
+  } = useTreeSearch({
+    projectId,
+    accessToken,
+    branch: activeBranch,
+    onSearchSelect: navigateToNode,
+  });
 
-  const handleToggleSearch = useCallback(() => {
-    setShowSearch((prev) => {
-      if (!prev) {
-        setTimeout(() => searchInputRef.current?.focus(), 0);
-      } else {
-        setSearchQuery("");
-        setSearchResults(null);
-      }
-      return !prev;
-    });
-  }, []);
+  // Filtered tree search for classes
+  const { filteredNodes, isBuilding: isFilteredTreeBuilding, truncated: filteredTreeTruncated } = useFilteredTree({
+    searchResults: showSearch ? searchResults : null,
+    projectId,
+    accessToken,
+    branch: activeBranch,
+  });
 
-  const closeSearch = useCallback(() => {
-    setShowSearch(false);
-    setSearchQuery("");
-    setSearchResults(null);
-  }, []);
-
-  const handleSearchSelect = useCallback((iri: string) => {
-    navigateToNode(iri);
+  const handleSearchSelect = (iri: string) => {
+    baseSearchSelect(iri);
     closeSearch();
-  }, [navigateToNode, closeSearch]);
-
-  // Debounced search
-  useEffect(() => {
-    if (!showSearch) return;
-    if (!searchQuery.trim()) {
-      setSearchResults(null);
-      setIsSearching(false);
-      return;
-    }
-    setIsSearching(true);
-    const timer = setTimeout(async () => {
-      try {
-        const response = await projectOntologyApi.searchEntities(
-          projectId,
-          searchQuery.trim(),
-          accessToken,
-          activeBranch,
-        );
-        setSearchResults(response.results);
-      } catch {
-        setSearchResults([]);
-      } finally {
-        setIsSearching(false);
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchQuery, showSearch, projectId, accessToken, activeBranch]);
+  };
 
   // Determine the effective selected IRI for the detail panel
   const effectiveSelectedIri =
@@ -155,48 +134,19 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         {/* Entity Type Tabs */}
         <EntityTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Toolbar: add + search */}
-        <div className="border-b border-slate-200 px-4 py-1.5 dark:border-slate-700">
-          <div className="flex items-center justify-end gap-1">
-            {canEdit && activeTab === "classes" && (
-              <button
-                onClick={() => onAddEntity()}
-                className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
-                title="Add entity"
-              >
-                <Plus className="h-4 w-4 text-slate-500" />
-              </button>
-            )}
-            <button
-              onClick={handleToggleSearch}
-              className={cn(
-                "rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
-                showSearch && "bg-slate-100 dark:bg-slate-700",
-              )}
-            >
-              {showSearch ? (
-                <X className="h-4 w-4 text-slate-500" />
-              ) : (
-                <Search className="h-4 w-4 text-slate-500" />
-              )}
-            </button>
-          </div>
-          {showSearch && (
-            <div className="mt-1.5 pb-0.5">
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") closeSearch();
-                }}
-                placeholder="Search classes, properties, individuals..."
-                className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500"
-              />
-            </div>
-          )}
-        </div>
+        {/* Toolbar: add + expand/collapse + search */}
+        <EntityTreeToolbar
+          canAdd={canEdit && activeTab === "classes"}
+          onAdd={() => onAddEntity()}
+          showSearch={showSearch}
+          searchQuery={searchQuery}
+          onToggleSearch={toggleSearch}
+          onSearchChange={setSearchQuery}
+          onCloseSearch={closeSearch}
+          searchInputRef={searchInputRef}
+          onExpandAll={activeTab === "classes" ? expandAll : undefined}
+          onCollapseAll={activeTab === "classes" ? collapseAll : undefined}
+        />
 
         {/* Tab Content */}
         <div className="h-[calc(100%-5.5rem)] overflow-y-auto">
@@ -231,7 +181,11 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                   searchResults={showSearch ? searchResults : undefined}
                   isSearching={isSearching}
                   onSearchSelect={handleSearchSelect}
+                  searchQuery={searchQuery}
                   draftIris={draftIris}
+                  filteredTree={filteredNodes}
+                  isFilteredTreeBuilding={isFilteredTreeBuilding}
+                  filteredTreeTruncated={filteredTreeTruncated}
                 />
               )}
             </>

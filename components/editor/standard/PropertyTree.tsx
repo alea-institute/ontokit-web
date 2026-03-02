@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ChevronRight, ChevronDown } from "lucide-react";
-import { cn, getLocalName } from "@/lib/utils";
+import { useState, useEffect, useMemo } from "react";
+import { getLocalName } from "@/lib/utils";
 import { projectOntologyApi, type EntitySearchResult } from "@/lib/api/client";
+import { EntityTree } from "@/components/editor/shared/EntityTree";
+import type { EntityTreeNode } from "@/lib/ontology/types";
 
 interface PropertyTreeProps {
   projectId: string;
@@ -114,9 +115,41 @@ export function PropertyTree({
     return () => { cancelled = true; };
   }, [projectId, accessToken, branch]);
 
-  const toggleGroup = (index: number) => {
+  // Convert PropertyGroup[] to EntityTreeNode[]
+  const entityNodes = useMemo((): EntityTreeNode[] => {
+    return groups.map((group) => ({
+      iri: `__group__${group.type}`,
+      label: group.label,
+      children: group.items.map((prop) => ({
+        iri: prop.iri,
+        label: prop.label || getLocalName(prop.iri),
+        children: [],
+        isExpanded: false,
+        isLoading: false,
+        hasChildren: false,
+        entityType: "property" as const,
+        deprecated: prop.deprecated,
+      })),
+      isExpanded: group.isExpanded,
+      isLoading: false,
+      hasChildren: group.items.length > 0,
+      isGroupHeader: true,
+    }));
+  }, [groups]);
+
+  const handleExpand = (iri: string) => {
     setGroups((prev) =>
-      prev.map((g, i) => (i === index ? { ...g, isExpanded: !g.isExpanded } : g))
+      prev.map((g) =>
+        `__group__${g.type}` === iri ? { ...g, isExpanded: true } : g,
+      ),
+    );
+  };
+
+  const handleCollapse = (iri: string) => {
+    setGroups((prev) =>
+      prev.map((g) =>
+        `__group__${g.type}` === iri ? { ...g, isExpanded: false } : g,
+      ),
     );
   };
 
@@ -149,46 +182,12 @@ export function PropertyTree({
   }
 
   return (
-    <div className="py-1">
-      {groups.map((group, gi) => (
-        <div key={group.type}>
-          <button
-            onClick={() => toggleGroup(gi)}
-            className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50"
-          >
-            {group.isExpanded ? (
-              <ChevronDown className="h-3 w-3" />
-            ) : (
-              <ChevronRight className="h-3 w-3" />
-            )}
-            {group.label}
-            <span className="ml-auto font-normal text-slate-400">{group.items.length}</span>
-          </button>
-          {group.isExpanded && (
-            <div>
-              {group.items.map((prop) => (
-                <button
-                  key={prop.iri}
-                  onClick={() => onSelect(prop.iri)}
-                  className={cn(
-                    "flex w-full items-center gap-2 px-4 py-1.5 text-left text-sm",
-                    selectedIri === prop.iri
-                      ? "bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400"
-                      : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"
-                  )}
-                >
-                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-emerald-100 border-emerald-300 text-emerald-700 dark:bg-emerald-900/30 dark:border-emerald-700 dark:text-emerald-400">
-                    <span className="text-[9px] font-bold">P</span>
-                  </span>
-                  <span className="truncate">
-                    {prop.label || getLocalName(prop.iri)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
+    <EntityTree
+      nodes={entityNodes}
+      selectedIri={selectedIri}
+      onSelect={onSelect}
+      onExpand={handleExpand}
+      onCollapse={handleCollapse}
+    />
   );
 }

@@ -120,6 +120,8 @@ export default function EditorPage() {
     addOptimisticNode,
     removeOptimisticNode,
     updateNodeLabel,
+    collapseAll,
+    expandAll,
   } = useOntologyTree({
     projectId,
     accessToken: session?.accessToken,
@@ -789,6 +791,8 @@ export default function EditorPage() {
                   selectNode={selectNode}
                   expandNode={expandNode}
                   collapseNode={collapseNode}
+                  expandAll={expandAll}
+                  collapseAll={collapseAll}
                   navigateToNode={navigateToNode}
                   sourceContent={sourceContent}
                   setSourceContent={setSourceContent as (content: string | ((prev: string) => string)) => void}
@@ -824,6 +828,8 @@ export default function EditorPage() {
                 selectNode={selectNode}
                 expandNode={expandNode}
                 collapseNode={collapseNode}
+                expandAll={expandAll}
+                collapseAll={collapseAll}
                 navigateToNode={navigateToNode}
                 onAddEntity={handleAddEntity}
                 onDeleteClass={handleDeleteClass}

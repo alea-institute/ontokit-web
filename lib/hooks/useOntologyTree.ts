@@ -28,6 +28,10 @@ interface UseOntologyTreeReturn {
   removeOptimisticNode: (iri: string) => void;
   /** Update a node's label in-place without affecting tree expansion state */
   updateNodeLabel: (iri: string, newLabel: string) => void;
+  /** Collapse all expanded nodes */
+  collapseAll: () => void;
+  /** Expand all visible nodes with children (one level deeper) */
+  expandAll: () => Promise<void>;
 }
 
 /**
@@ -269,6 +273,42 @@ export function useOntologyTree({
     []
   );
 
+  /**
+   * Collapse all expanded nodes in the tree.
+   */
+  const collapseAll = useCallback(() => {
+    const collapseTree = (items: ClassTreeNode[]): ClassTreeNode[] =>
+      items.map((node) => ({
+        ...node,
+        isExpanded: false,
+        children: node.children.length > 0 ? collapseTree(node.children) : node.children,
+      }));
+    setNodes((prev) => collapseTree(prev));
+  }, []);
+
+  /**
+   * Expand all visible nodes that have children but are not yet expanded.
+   * Expands one additional level (visible nodes + their direct children).
+   */
+  const expandAll = useCallback(async () => {
+    const collectUnexpanded = (items: ClassTreeNode[]): string[] => {
+      const result: string[] = [];
+      for (const node of items) {
+        if ((node.hasChildren || node.children.length > 0) && !node.isExpanded) {
+          result.push(node.iri);
+        }
+        if (node.isExpanded && node.children.length > 0) {
+          result.push(...collectUnexpanded(node.children));
+        }
+      }
+      return result;
+    };
+
+    const irisToExpand = collectUnexpanded(nodes);
+    // Expand in parallel (all at once)
+    await Promise.all(irisToExpand.map((iri) => expandNode(iri)));
+  }, [nodes, expandNode]);
+
   // Load root classes on mount
   useEffect(() => {
     loadRootClasses();
@@ -288,5 +328,7 @@ export function useOntologyTree({
     addOptimisticNode,
     removeOptimisticNode,
     updateNodeLabel,
+    collapseAll,
+    expandAll,
   };
 }

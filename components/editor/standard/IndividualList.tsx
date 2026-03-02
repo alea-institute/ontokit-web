@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { cn, getLocalName } from "@/lib/utils";
+import { useState, useEffect, useMemo } from "react";
+import { getLocalName } from "@/lib/utils";
 import { projectOntologyApi, type EntitySearchResult } from "@/lib/api/client";
+import { EntityTree } from "@/components/editor/shared/EntityTree";
+import type { EntityTreeNode } from "@/lib/ontology/types";
 
 interface IndividualListProps {
   projectId: string;
@@ -56,6 +58,20 @@ export function IndividualList({
     return () => { cancelled = true; };
   }, [projectId, accessToken, branch]);
 
+  // Convert individuals to EntityTreeNode[] (flat list)
+  const entityNodes = useMemo((): EntityTreeNode[] => {
+    return individuals.map((ind) => ({
+      iri: ind.iri,
+      label: ind.label || getLocalName(ind.iri),
+      children: [],
+      isExpanded: false,
+      isLoading: false,
+      hasChildren: false,
+      entityType: "individual" as const,
+      deprecated: ind.deprecated,
+    }));
+  }, [individuals]);
+
   if (isLoading) {
     return (
       <div className="flex h-32 items-center justify-center">
@@ -85,31 +101,12 @@ export function IndividualList({
   }
 
   return (
-    <div className="py-1">
-      {individuals.map((ind) => (
-        <button
-          key={ind.iri}
-          onClick={() => onSelect(ind.iri)}
-          className={cn(
-            "flex w-full items-center gap-2 px-4 py-1.5 text-left text-sm",
-            selectedIri === ind.iri
-              ? "bg-primary-50 text-primary-700 dark:bg-primary-900/20 dark:text-primary-400"
-              : "text-slate-700 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"
-          )}
-        >
-          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-400">
-            <span className="text-[9px] font-bold">I</span>
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-medium">
-              {ind.label || getLocalName(ind.iri)}
-            </p>
-            <p className="truncate text-xs text-slate-500 dark:text-slate-400">
-              {ind.iri}
-            </p>
-          </div>
-        </button>
-      ))}
-    </div>
+    <EntityTree
+      nodes={entityNodes}
+      selectedIri={selectedIri}
+      onSelect={onSelect}
+      onExpand={() => {}}
+      onCollapse={() => {}}
+    />
   );
 }

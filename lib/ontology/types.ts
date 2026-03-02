@@ -84,6 +84,37 @@ export interface ClassTreeNode {
   hasChildren: boolean;
 }
 
+// Shared tree node type used by all entity tabs (Classes, Properties, Individuals)
+export interface EntityTreeNode {
+  iri: string;
+  label: string;
+  children: EntityTreeNode[];
+  isExpanded: boolean;
+  isLoading: boolean;
+  hasChildren: boolean;
+  entityType?: "class" | "property" | "individual";
+  isGroupHeader?: boolean;
+  deprecated?: boolean;
+  isSearchMatch?: boolean;
+}
+
+/**
+ * Convert ClassTreeNode[] to EntityTreeNode[] for the shared tree renderer.
+ */
+export function classTreeNodesToEntityNodes(
+  nodes: ClassTreeNode[],
+): EntityTreeNode[] {
+  return nodes.map((node) => ({
+    iri: node.iri,
+    label: node.label,
+    children: classTreeNodesToEntityNodes(node.children),
+    isExpanded: node.isExpanded,
+    isLoading: node.isLoading,
+    hasChildren: node.hasChildren,
+    entityType: "class" as const,
+  }));
+}
+
 // For Manchester syntax support
 export interface ClassExpression {
   type:

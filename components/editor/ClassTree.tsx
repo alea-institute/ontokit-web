@@ -1,10 +1,10 @@
 "use client";
 
-import { ChevronRight, ChevronDown, Circle, Plus } from "lucide-react";
+import { useMemo } from "react";
 import { cn, getLocalName } from "@/lib/utils";
-import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { TreeNodeContextMenu } from "@/components/editor/TreeNodeContextMenu";
-import type { ClassTreeNode } from "@/lib/ontology/types";
+import { EntityTree } from "@/components/editor/shared/EntityTree";
+import { classTreeNodesToEntityNodes } from "@/lib/ontology/types";
+import type { ClassTreeNode, EntityTreeNode } from "@/lib/ontology/types";
 import type { EntitySearchResult } from "@/lib/api/client";
 
 interface ClassTreeProps {
@@ -20,8 +20,15 @@ interface ClassTreeProps {
   searchResults?: EntitySearchResult[] | null;
   isSearching?: boolean;
   onSearchSelect?: (iri: string) => void;
+  searchQuery?: string;
   /** IRIs that have uncommitted drafts — shown with amber dot indicator */
   draftIris?: Set<string>;
+  /** Pre-built filtered tree from useFilteredTree (ancestor-path search results) */
+  filteredTree?: EntityTreeNode[] | null;
+  /** Whether the filtered tree is still being built */
+  isFilteredTreeBuilding?: boolean;
+  /** Whether search results were truncated */
+  filteredTreeTruncated?: boolean;
 }
 
 export function ClassTree({
@@ -37,13 +44,26 @@ export function ClassTree({
   searchResults,
   isSearching,
   onSearchSelect,
+  searchQuery,
   draftIris,
+  filteredTree,
+  isFilteredTreeBuilding,
+  filteredTreeTruncated,
 }: ClassTreeProps) {
+  // Convert ClassTreeNode[] to EntityTreeNode[]
+  const entityNodes = useMemo(
+    () => classTreeNodesToEntityNodes(nodes),
+    [nodes],
+  );
+
   // Show search results when available
   if (searchResults !== null && searchResults !== undefined) {
+    const classResults = searchResults.filter((r) => r.entity_type === "class");
+    const nonClassResults = searchResults.filter((r) => r.entity_type !== "class");
+
     return (
       <div className="py-2">
-        {isSearching ? (
+        {isSearching || isFilteredTreeBuilding ? (
           <div className="flex h-20 items-center justify-center">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
           </div>
@@ -54,37 +74,74 @@ export function ClassTree({
             </p>
           </div>
         ) : (
-          searchResults.map((result) => (
-            <SearchResultItem
-              key={result.iri}
-              result={result}
-              onSelect={onSearchSelect || onSelect}
-            />
-          ))
+          <>
+            {/* Filtered tree view for class results */}
+            {filteredTree && filteredTree.length > 0 && (
+              <>
+                <EntityTree
+                  nodes={filteredTree}
+                  selectedIri={selectedIri}
+                  onSelect={onSearchSelect || onSelect}
+                  onExpand={onExpand}
+                  onCollapse={onCollapse}
+                  searchQuery={searchQuery}
+                  enableKeyboardNav
+                />
+                {filteredTreeTruncated && (
+                  <p className="px-4 py-1 text-xs text-slate-400 dark:text-slate-500">
+                    Showing top {classResults.length > 20 ? 20 : classResults.length} matches in tree context
+                  </p>
+                )}
+              </>
+            )}
+
+            {/* Flat list fallback for class results when no filtered tree */}
+            {!filteredTree && classResults.length > 0 && (
+              classResults.map((result) => (
+                <SearchResultItem
+                  key={result.iri}
+                  result={result}
+                  onSelect={onSearchSelect || onSelect}
+                />
+              ))
+            )}
+
+            {/* Non-class results always shown as flat list */}
+            {nonClassResults.length > 0 && (
+              <>
+                {(filteredTree || classResults.length > 0) && nonClassResults.length > 0 && (
+                  <div className="mx-4 my-2 border-t border-slate-200 dark:border-slate-700" />
+                )}
+                {nonClassResults.map((result) => (
+                  <SearchResultItem
+                    key={result.iri}
+                    result={result}
+                    onSelect={onSearchSelect || onSelect}
+                  />
+                ))}
+              </>
+            )}
+          </>
         )}
       </div>
     );
   }
 
+  // Normal tree view
   return (
-    <div className="py-2">
-      {nodes.map((node) => (
-        <ClassTreeItem
-          key={node.iri}
-          node={node}
-          depth={0}
-          selectedIri={selectedIri}
-          onSelect={onSelect}
-          onExpand={onExpand}
-          onCollapse={onCollapse}
-          onAddChild={onAddChild}
-          onCopyIri={onCopyIri}
-          onDelete={onDelete}
-          onViewInSource={onViewInSource}
-          draftIris={draftIris}
-        />
-      ))}
-    </div>
+    <EntityTree
+      nodes={entityNodes}
+      selectedIri={selectedIri}
+      onSelect={onSelect}
+      onExpand={onExpand}
+      onCollapse={onCollapse}
+      onAddChild={onAddChild}
+      onCopyIri={onCopyIri}
+      onDelete={onDelete}
+      onViewInSource={onViewInSource}
+      draftIris={draftIris}
+      enableKeyboardNav
+    />
   );
 }
 
@@ -131,149 +188,5 @@ function SearchResultItem({ result, onSelect }: SearchResultItemProps) {
         {result.entity_type}
       </span>
     </button>
-  );
-}
-
-interface ClassTreeItemProps {
-  node: ClassTreeNode;
-  depth: number;
-  selectedIri?: string | null;
-  onSelect: (iri: string) => void;
-  onExpand: (iri: string) => void;
-  onCollapse: (iri: string) => void;
-  onAddChild?: (parentIri: string) => void;
-  onCopyIri?: (iri: string) => void;
-  onDelete?: (iri: string, label: string) => void;
-  onViewInSource?: (iri: string) => void;
-  draftIris?: Set<string>;
-}
-
-function ClassTreeItem({
-  node,
-  depth,
-  selectedIri,
-  onSelect,
-  onExpand,
-  onCollapse,
-  onAddChild,
-  onCopyIri,
-  onDelete,
-  onViewInSource,
-  draftIris,
-}: ClassTreeItemProps) {
-  const isSelected = selectedIri === node.iri;
-  const hasChildren = node.hasChildren || node.children.length > 0;
-
-  const handleToggle = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (node.isExpanded) {
-      onCollapse(node.iri);
-    } else {
-      onExpand(node.iri);
-    }
-  };
-
-  const handleAddChild = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onAddChild?.(node.iri);
-  };
-
-  const hasContextMenu = onCopyIri || onDelete || onViewInSource || onAddChild;
-
-  const rowContent = (
-    <div
-      className={cn(
-        "tree-item group",
-        isSelected && "selected"
-      )}
-      style={{ paddingLeft: `${depth * 16 + 8}px` }}
-      onClick={() => onSelect(node.iri)}
-    >
-      {/* Expand/collapse button */}
-      <button
-        onClick={handleToggle}
-        className={cn(
-          "w-4 h-4 flex items-center justify-center",
-          !hasChildren && "invisible"
-        )}
-      >
-        {node.isLoading ? (
-          <Circle className="w-3 h-3 animate-pulse" />
-        ) : node.isExpanded ? (
-          <ChevronDown className="w-4 h-4" />
-        ) : (
-          <ChevronRight className="w-4 h-4" />
-        )}
-      </button>
-
-      {/* Class icon */}
-      <div className="w-4 h-4 rounded-full bg-owl-class/20 border border-owl-class flex items-center justify-center">
-        <span className="text-[10px] font-bold text-owl-class">C</span>
-      </div>
-
-      {/* Label */}
-      <span className="flex-1 truncate text-sm">
-        {node.label || getLocalName(node.iri)}
-      </span>
-
-      {/* Draft indicator */}
-      {draftIris?.has(node.iri) && (
-        <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" title="Unsaved draft" />
-      )}
-
-      {/* Add child button — always rendered to reserve space, visible on hover */}
-      {onAddChild && (
-        <button
-          onClick={handleAddChild}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-          title="Add subclass"
-        >
-          <Plus className="w-3 h-3" />
-        </button>
-      )}
-    </div>
-  );
-
-  return (
-    <div>
-      {hasContextMenu ? (
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
-            {rowContent}
-          </ContextMenuTrigger>
-          <TreeNodeContextMenu
-            node={node}
-            onAddChild={onAddChild}
-            onCopyIri={onCopyIri}
-            onDelete={onDelete}
-            onViewInSource={onViewInSource}
-          />
-        </ContextMenu>
-      ) : (
-        rowContent
-      )}
-
-      {/* Children */}
-      {node.isExpanded && node.children.length > 0 && (
-        <div>
-          {node.children.map((child) => (
-            <ClassTreeItem
-              key={child.iri}
-              node={child}
-              depth={depth + 1}
-              selectedIri={selectedIri}
-              onSelect={onSelect}
-              onExpand={onExpand}
-              onCollapse={onCollapse}
-              onAddChild={onAddChild}
-              onCopyIri={onCopyIri}
-              onDelete={onDelete}
-              onViewInSource={onViewInSource}
-              draftIris={draftIris}
-            />
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
