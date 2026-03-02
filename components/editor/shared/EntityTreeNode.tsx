@@ -154,28 +154,26 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
       aria-expanded={hasChildren ? node.isExpanded : undefined}
       data-iri={node.iri}
     >
-      {/* Expand/collapse chevron */}
-      <button
-        onClick={handleToggle}
-        className={cn(
-          "w-4 h-4 flex items-center justify-center flex-shrink-0",
-          !hasChildren && "invisible",
-        )}
-        tabIndex={-1}
-        aria-hidden="true"
-      >
-        {node.isLoading ? (
-          <Circle className="w-3 h-3 animate-pulse" />
-        ) : node.isExpanded ? (
-          <ChevronDown className="w-4 h-4" />
-        ) : (
-          <ChevronRight className="w-4 h-4" />
-        )}
-      </button>
-
-      {/* Leaf dot (for nodes without children) */}
-      {!hasChildren && (
-        <span className="tree-leaf-dot" />
+      {/* Expand/collapse chevron or leaf dot — same 16px box for alignment */}
+      {hasChildren ? (
+        <button
+          onClick={handleToggle}
+          className="w-4 h-4 flex items-center justify-center flex-shrink-0"
+          tabIndex={-1}
+          aria-hidden="true"
+        >
+          {node.isLoading ? (
+            <Circle className="w-3 h-3 animate-pulse" />
+          ) : node.isExpanded ? (
+            <ChevronDown className="w-4 h-4" />
+          ) : (
+            <ChevronRight className="w-4 h-4" />
+          )}
+        </button>
+      ) : (
+        <span className="w-4 h-4 flex items-center justify-center flex-shrink-0">
+          <span className="tree-leaf-dot" />
+        </span>
       )}
 
       {/* Label */}

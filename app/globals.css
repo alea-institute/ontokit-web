@@ -67,7 +67,7 @@ body {
 
 /* Root-level tree item emphasis */
 .tree-item-root {
-  @apply font-semibold;
+  @apply font-semibold border-l-2 border-transparent;
   background: rgb(248 250 252 / 0.5);
 }
 
@@ -76,7 +76,7 @@ body {
 }
 
 .tree-item-root.selected {
-  @apply border-l-2 border-primary-500;
+  @apply border-primary-500;
 }
 
 /* Leaf dot for nodes without children */
