@@ -9,6 +9,10 @@ import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
+import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
+import { PropertyTree } from "@/components/editor/standard/PropertyTree";
+import { IndividualList } from "@/components/editor/standard/IndividualList";
+import { EntityPlaceholderDetail } from "@/components/editor/EntityPlaceholderDetail";
 import { projectOntologyApi, type EntitySearchResult, type ClassUpdatePayload } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
@@ -126,6 +130,13 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
   // Panel width state (default 320px = w-80)
   const [treePanelWidth, setTreePanelWidth] = useState(320);
+
+  // Entity tab state
+  const [activeTab, setActiveTab] = useState<EntityTab>("classes");
+
+  // Track selected entity per tab (properties/individuals have their own selection)
+  const [selectedPropertyIri, setSelectedPropertyIri] = useState<string | null>(null);
+  const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
 
   // Search state
   const [showSearch, setShowSearch] = useState(false);
@@ -254,40 +265,39 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
       <div className="relative flex flex-1 overflow-hidden">
         {viewMode === "tree" ? (
           <>
-            {/* Left Panel - Class Tree */}
+            {/* Left Panel - Entity Tree/List with tabs */}
             <div className="flex-shrink-0 bg-white dark:bg-slate-800" style={{ width: treePanelWidth }}>
-              <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {showSearch ? "Search" : "Class Hierarchy"}
-                  </h2>
-                  <div className="flex items-center gap-1">
-                    {canEdit && (
-                      <button
-                        onClick={() => onAddEntity()}
-                        className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
-                        title="Add entity"
-                      >
-                        <Plus className="h-4 w-4 text-slate-500" />
-                      </button>
-                    )}
+              {/* Entity Type Tabs */}
+              <EntityTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+
+              {/* Toolbar: add + search */}
+              <div className="border-b border-slate-200 px-4 py-1.5 dark:border-slate-700">
+                <div className="flex items-center justify-end gap-1">
+                  {canEdit && activeTab === "classes" && (
                     <button
-                      onClick={handleToggleSearch}
-                      className={cn(
-                        "rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
-                        showSearch && "bg-slate-100 dark:bg-slate-700",
-                      )}
+                      onClick={() => onAddEntity()}
+                      className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
+                      title="Add entity"
                     >
-                      {showSearch ? (
-                        <X className="h-4 w-4 text-slate-500" />
-                      ) : (
-                        <Search className="h-4 w-4 text-slate-500" />
-                      )}
+                      <Plus className="h-4 w-4 text-slate-500" />
                     </button>
-                  </div>
+                  )}
+                  <button
+                    onClick={handleToggleSearch}
+                    className={cn(
+                      "rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
+                      showSearch && "bg-slate-100 dark:bg-slate-700",
+                    )}
+                  >
+                    {showSearch ? (
+                      <X className="h-4 w-4 text-slate-500" />
+                    ) : (
+                      <Search className="h-4 w-4 text-slate-500" />
+                    )}
+                  </button>
                 </div>
                 {showSearch && (
-                  <div className="mt-2">
+                  <div className="mt-1.5 pb-0.5">
                     <input
                       ref={searchInputRef}
                       type="text"
@@ -303,38 +313,63 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 )}
               </div>
 
-              <div className="h-[calc(100%-3.5rem)] overflow-y-auto">
-                {isTreeLoading && nodes.length === 0 ? (
-                  <div className="flex h-32 items-center justify-center">
-                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
-                  </div>
-                ) : treeError ? (
-                  <div className="p-4">
-                    <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center dark:border-red-900/50 dark:bg-red-900/20">
-                      <p className="text-sm text-red-700 dark:text-red-400">{treeError}</p>
-                    </div>
-                  </div>
-                ) : nodes.length === 0 ? (
-                  <div className="p-4 text-center">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      No classes found in this ontology
-                    </p>
-                  </div>
-                ) : (
-                  <ClassTree
-                    nodes={nodes}
-                    selectedIri={selectedIri}
-                    onSelect={selectNode}
-                    onExpand={expandNode}
-                    onCollapse={collapseNode}
-                    onAddChild={canEdit ? (parentIri: string) => onAddEntity(parentIri) : undefined}
-                    onCopyIri={onCopyIri}
-                    onDelete={canEdit ? onDeleteClass : undefined}
-                    onViewInSource={handleNavigateToSource}
-                    searchResults={showSearch ? searchResults : undefined}
-                    isSearching={isSearching}
-                    onSearchSelect={handleSearchSelect}
-                    draftIris={draftIris}
+              {/* Tab Content */}
+              <div className="h-[calc(100%-5.5rem)] overflow-y-auto">
+                {activeTab === "classes" && (
+                  <>
+                    {isTreeLoading && nodes.length === 0 ? (
+                      <div className="flex h-32 items-center justify-center">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+                      </div>
+                    ) : treeError ? (
+                      <div className="p-4">
+                        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center dark:border-red-900/50 dark:bg-red-900/20">
+                          <p className="text-sm text-red-700 dark:text-red-400">{treeError}</p>
+                        </div>
+                      </div>
+                    ) : nodes.length === 0 ? (
+                      <div className="p-4 text-center">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          No classes found in this ontology
+                        </p>
+                      </div>
+                    ) : (
+                      <ClassTree
+                        nodes={nodes}
+                        selectedIri={selectedIri}
+                        onSelect={selectNode}
+                        onExpand={expandNode}
+                        onCollapse={collapseNode}
+                        onAddChild={canEdit ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+                        onCopyIri={onCopyIri}
+                        onDelete={canEdit ? onDeleteClass : undefined}
+                        onViewInSource={handleNavigateToSource}
+                        searchResults={showSearch ? searchResults : undefined}
+                        isSearching={isSearching}
+                        onSearchSelect={handleSearchSelect}
+                        draftIris={draftIris}
+                      />
+                    )}
+                  </>
+                )}
+
+                {activeTab === "properties" && (
+                  <PropertyTree
+                    projectId={projectId}
+                    accessToken={accessToken}
+                    branch={activeBranch}
+                    selectedIri={selectedPropertyIri}
+                    onSelect={setSelectedPropertyIri}
+                  />
+                )}
+
+                {activeTab === "individuals" && (
+                  <IndividualList
+                    projectId={projectId}
+                    accessToken={accessToken}
+                    branch={activeBranch}
+                    selectedIri={selectedIndividualIri}
+                    onSelect={setSelectedIndividualIri}
                   />
                 )}
               </div>
@@ -348,21 +383,28 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               maxWidth={600}
             />
 
-            {/* Center Panel - Class Details */}
+            {/* Center Panel - Entity Details */}
             <div className="min-w-0 flex-1 bg-white dark:bg-slate-800">
-              <ClassDetailPanel
-                projectId={projectId}
-                classIri={selectedIri}
-                accessToken={accessToken}
-                branch={activeBranch}
-                onNavigateToClass={(iri) => navigateToNode(iri)}
-                onNavigateToSource={handleNavigateToSource}
-                onCopyIri={onCopyIri}
-                selectedNodeFallback={selectedNodeFallback}
-                canEdit={canEdit}
-                onUpdateClass={onUpdateClass}
-                refreshKey={detailRefreshKey}
-              />
+              {activeTab === "classes" ? (
+                <ClassDetailPanel
+                  projectId={projectId}
+                  classIri={selectedIri}
+                  accessToken={accessToken}
+                  branch={activeBranch}
+                  onNavigateToClass={(iri) => navigateToNode(iri)}
+                  onNavigateToSource={handleNavigateToSource}
+                  onCopyIri={onCopyIri}
+                  selectedNodeFallback={selectedNodeFallback}
+                  canEdit={canEdit}
+                  onUpdateClass={onUpdateClass}
+                  refreshKey={detailRefreshKey}
+                />
+              ) : (
+                <EntityPlaceholderDetail
+                  selectedIri={activeTab === "properties" ? selectedPropertyIri : selectedIndividualIri}
+                  entityType={activeTab === "properties" ? "Property" : "Individual"}
+                />
+              )}
             </div>
 
             {/* Right Panel - Health Check */}

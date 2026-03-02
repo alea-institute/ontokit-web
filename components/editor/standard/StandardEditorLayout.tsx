@@ -8,6 +8,7 @@ import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/Cla
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
 import { PropertyTree } from "@/components/editor/standard/PropertyTree";
 import { IndividualList } from "@/components/editor/standard/IndividualList";
+import { EntityPlaceholderDetail } from "@/components/editor/EntityPlaceholderDetail";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
 import { projectOntologyApi, type EntitySearchResult, type ClassUpdatePayload } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
@@ -147,12 +148,6 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     activeTab === "properties" ? selectedPropertyIri :
     selectedIndividualIri;
 
-  // Tab header label
-  const tabHeaderLabel =
-    activeTab === "classes" ? "Classes" :
-    activeTab === "properties" ? "Properties" :
-    "Individuals";
-
   return (
     <div className="flex h-full min-w-0 flex-1">
       {/* Left Panel - Entity Tree/List with tabs */}
@@ -160,39 +155,34 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         {/* Entity Type Tabs */}
         <EntityTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Header with search and add */}
-        <div className="border-b border-slate-200 px-4 py-2.5 dark:border-slate-700">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              {showSearch ? "Search" : tabHeaderLabel}
-            </h2>
-            <div className="flex items-center gap-1">
-              {canEdit && activeTab === "classes" && (
-                <button
-                  onClick={() => onAddEntity()}
-                  className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
-                  title="Add entity"
-                >
-                  <Plus className="h-4 w-4 text-slate-500" />
-                </button>
-              )}
+        {/* Toolbar: add + search */}
+        <div className="border-b border-slate-200 px-4 py-1.5 dark:border-slate-700">
+          <div className="flex items-center justify-end gap-1">
+            {canEdit && activeTab === "classes" && (
               <button
-                onClick={handleToggleSearch}
-                className={cn(
-                  "rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
-                  showSearch && "bg-slate-100 dark:bg-slate-700",
-                )}
+                onClick={() => onAddEntity()}
+                className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
+                title="Add entity"
               >
-                {showSearch ? (
-                  <X className="h-4 w-4 text-slate-500" />
-                ) : (
-                  <Search className="h-4 w-4 text-slate-500" />
-                )}
+                <Plus className="h-4 w-4 text-slate-500" />
               </button>
-            </div>
+            )}
+            <button
+              onClick={handleToggleSearch}
+              className={cn(
+                "rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
+                showSearch && "bg-slate-100 dark:bg-slate-700",
+              )}
+            >
+              {showSearch ? (
+                <X className="h-4 w-4 text-slate-500" />
+              ) : (
+                <Search className="h-4 w-4 text-slate-500" />
+              )}
+            </button>
           </div>
           {showSearch && (
-            <div className="mt-2">
+            <div className="mt-1.5 pb-0.5">
               <input
                 ref={searchInputRef}
                 type="text"
@@ -209,7 +199,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         </div>
 
         {/* Tab Content */}
-        <div className="h-[calc(100%-6.25rem)] overflow-y-auto">
+        <div className="h-[calc(100%-5.5rem)] overflow-y-auto">
           {activeTab === "classes" && (
             <>
               {isTreeLoading && nodes.length === 0 ? (
@@ -299,60 +289,6 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             entityType={activeTab === "properties" ? "Property" : "Individual"}
           />
         )}
-      </div>
-    </div>
-  );
-}
-
-/** Simple placeholder for property/individual detail (no structured editor yet) */
-function EntityPlaceholderDetail({
-  selectedIri,
-  entityType,
-}: {
-  selectedIri: string | null;
-  entityType: string;
-}) {
-  if (!selectedIri) {
-    return (
-      <div className="flex h-full items-center justify-center p-8 text-center">
-        <div>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Select a {entityType.toLowerCase()} to view its details
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6">
-      <div className="flex items-center gap-3 border-b border-slate-200 pb-4 dark:border-slate-700">
-        <div className={cn(
-          "flex h-8 w-8 items-center justify-center rounded-full border",
-          entityType === "Property"
-            ? "bg-emerald-100 border-emerald-300 dark:bg-emerald-900/30 dark:border-emerald-700"
-            : "bg-purple-100 border-purple-300 dark:bg-purple-900/30 dark:border-purple-700"
-        )}>
-          <span className={cn(
-            "text-sm font-bold",
-            entityType === "Property" ? "text-emerald-700 dark:text-emerald-400" : "text-purple-700 dark:text-purple-400"
-          )}>
-            {entityType[0]}
-          </span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-            {selectedIri.includes("#") ? selectedIri.split("#").pop() : selectedIri.split("/").pop()}
-          </h2>
-          <p className="mt-1 truncate text-xs text-slate-500 dark:text-slate-400" title={selectedIri}>
-            {selectedIri}
-          </p>
-        </div>
-      </div>
-      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
-        <p className="text-sm text-slate-500 dark:text-slate-400">
-          {entityType} detail editing will be available in a future update.
-        </p>
       </div>
     </div>
   );
