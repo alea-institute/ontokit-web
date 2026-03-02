@@ -26,6 +26,8 @@ import {
   StickyNote,
   Hash,
   Link2,
+  Pencil,
+  X,
 } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail, type ClassUpdatePayload, type AnnotationUpdate } from "@/lib/api/client";
 import type { LocalizedString } from "@/lib/api/client";
@@ -38,6 +40,8 @@ import { RelationshipSection, type RelationshipGroup, type RelationshipTarget } 
 import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, RELATIONSHIP_PROPERTY_IRIS, SEE_ALSO_IRI, getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
 import { AutoSaveStatusBar } from "@/components/editor/AutoSaveStatusBar";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { useToast } from "@/lib/context/ToastContext";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
 function ensureTrailingEmpty(arr: LocalizedString[]): LocalizedString[] {
@@ -88,7 +92,10 @@ export function ClassDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [resolvedTargetLabels, setResolvedTargetLabels] = useState<Record<string, string>>({});
 
-  // Edit state (always active when canEdit)
+  // Edit mode: explicit state (default read-only)
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Edit state
   const [editLabels, setEditLabels] = useState<LocalizedString[]>([]);
   const [editComments, setEditComments] = useState<LocalizedString[]>([]);
   const [editParentIris, setEditParentIris] = useState<string[]>([]);
@@ -100,6 +107,14 @@ export function ClassDetailPanel({
   // Track the previous classIri so we can flush on navigate
   const prevClassIriRef = useRef<string | null>(null);
   const editInitializedRef = useRef(false);
+  // Track if user explicitly cancelled for this classIri (prevents continuous-editing auto-re-entry)
+  const cancelledIriRef = useRef<string | null>(null);
+
+  // Continuous editing from store
+  const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
+
+  // Toast for error feedback
+  const toast = useToast();
 
   // Auto-save hook
   const {
@@ -108,6 +123,7 @@ export function ClassDetailPanel({
     validationError,
     triggerSave,
     flushToGit,
+    discardDraft,
     editStateRef,
     restoredDraft,
     clearRestoredDraft,
@@ -118,11 +134,12 @@ export function ClassDetailPanel({
     classDetail,
     canEdit: !!canEdit,
     onUpdateClass,
+    onError: (msg) => toast.error(msg),
   });
 
-  // Keep editStateRef in sync with current edit state
+  // Keep editStateRef in sync with current edit state (only when editing)
   useEffect(() => {
-    if (!canEdit) return;
+    if (!isEditing) return;
     editStateRef.current = {
       labels: editLabels,
       comments: editComments,
@@ -131,9 +148,16 @@ export function ClassDetailPanel({
       annotations: editAnnotations,
       relationships: editRelationships,
     };
-  }, [canEdit, editLabels, editComments, editParentIris, editParentLabels, editAnnotations, editRelationships, editStateRef]);
+  }, [isEditing, editLabels, editComments, editParentIris, editParentLabels, editAnnotations, editRelationships, editStateRef]);
 
-  // Flush to git when class selection changes
+  // Clear editStateRef when not editing
+  useEffect(() => {
+    if (!isEditing) {
+      editStateRef.current = null;
+    }
+  }, [isEditing, editStateRef]);
+
+  // Flush to git when class selection changes, then reset to read-only
   useEffect(() => {
     if (prevClassIriRef.current && prevClassIriRef.current !== classIri) {
       flushToGit();
@@ -141,14 +165,34 @@ export function ClassDetailPanel({
     prevClassIriRef.current = classIri;
     setResolvedTargetLabels({});
     editInitializedRef.current = false;
+    setIsEditing(false);
+    cancelledIriRef.current = null;
   }, [classIri]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Initialize edit state from classDetail or restored draft
-  useEffect(() => {
-    if (editInitializedRef.current) return;
-    if (!canEdit) return;
+  // Enter edit mode: initialize edit state from classDetail
+  const enterEditMode = useCallback(() => {
+    if (!classDetail) return;
+    initEditState(classDetail);
+    editInitializedRef.current = true;
+    setIsEditing(true);
+  }, [classDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // Restore from draft if available
+  // Cancel edit mode: discard draft, revert to server state
+  const cancelEditMode = useCallback(() => {
+    discardDraft();
+    if (classDetail) {
+      initEditState(classDetail);
+    }
+    setIsEditing(false);
+    cancelledIriRef.current = classIri;
+  }, [classIri, classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-enter edit mode based on continuous editing or restored draft
+  useEffect(() => {
+    if (isEditing || editInitializedRef.current) return;
+    if (!canEdit || !classDetail) return;
+
+    // Restored draft → always auto-enter
     if (restoredDraft && classIri) {
       setEditLabels(restoredDraft.labels);
       setEditComments(ensureTrailingEmpty(restoredDraft.comments));
@@ -157,15 +201,17 @@ export function ClassDetailPanel({
       setEditAnnotations(restoredDraft.annotations);
       setEditRelationships(restoredDraft.relationships);
       editInitializedRef.current = true;
+      setIsEditing(true);
       clearRestoredDraft();
       return;
     }
 
-    if (!classDetail) return;
-
-    initEditState(classDetail);
-    editInitializedRef.current = true;
-  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+    // Continuous editing → auto-enter (unless user explicitly cancelled for this class)
+    if (continuousEditing && cancelledIriRef.current !== classIri) {
+      enterEditMode();
+      return;
+    }
+  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, continuousEditing, isEditing, enterEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialize edit state from OWLClassDetail
   const initEditState = useCallback((detail: OWLClassDetail) => {
@@ -273,12 +319,22 @@ export function ClassDetailPanel({
       const newLabels: Record<string, string> = {};
       await Promise.all(
         targetIris.map(async (iri) => {
+          // Try class endpoint first (most common case)
           try {
             const detail = await projectOntologyApi.getClassDetail(projectId, iri, accessToken, branch);
             const label = getPreferredLabel(detail.labels);
-            if (label) newLabels[iri] = label;
+            if (label) { newLabels[iri] = label; return; }
           } catch {
-            // Not a class or not found
+            // Not a class — fall through to entity search
+          }
+          // Fallback: search by local name to resolve individuals/properties
+          try {
+            const localName = getLocalName(iri);
+            const searchResult = await projectOntologyApi.searchEntities(projectId, localName, accessToken, branch);
+            const match = searchResult.results.find((r) => r.iri === iri);
+            if (match?.label) newLabels[iri] = match.label;
+          } catch {
+            // Search failed — leave as IRI suffix
           }
         }),
       );
@@ -290,6 +346,20 @@ export function ClassDetailPanel({
     resolveLabels();
     return () => { cancelled = true; };
   }, [classDetail, projectId, accessToken, branch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Patch relationship target labels when async resolution finishes
+  useEffect(() => {
+    if (!isEditing || Object.keys(resolvedTargetLabels).length === 0) return;
+    setEditRelationships((prev) =>
+      prev.map((g) => ({
+        ...g,
+        targets: g.targets.map((t) => {
+          const resolved = resolvedTargetLabels[t.iri];
+          return resolved && resolved !== t.label ? { ...t, label: resolved } : t;
+        }),
+      })),
+    );
+  }, [resolvedTargetLabels, isEditing]);
 
   // -- Label editing helpers --
   const updateLabel = useCallback((index: number, field: "value" | "lang", newVal: string) => {
@@ -481,7 +551,7 @@ export function ClassDetailPanel({
   }
 
   const displayLabel = getPreferredLabel(classDetail.labels) || getLocalName(classDetail.iri);
-  const isEditing = !!canEdit && !!onUpdateClass;
+  const canEnterEdit = !!canEdit && !!onUpdateClass;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -493,15 +563,40 @@ export function ClassDetailPanel({
               <span className="text-sm font-bold text-owl-class">C</span>
             </div>
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                {displayLabel}
-                {classDetail.deprecated && (
-                  <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                    <AlertTriangle className="mr-1 h-3 w-3" />
-                    Deprecated
-                  </span>
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
+                  {displayLabel}
+                  {classDetail.deprecated && (
+                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                      <AlertTriangle className="mr-1 h-3 w-3" />
+                      Deprecated
+                    </span>
+                  )}
+                </h2>
+                {canEnterEdit && (
+                  <div className="shrink-0">
+                    {isEditing ? (
+                      <button
+                        onClick={cancelEditMode}
+                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                        title="Discard changes and return to read-only"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                        Cancel
+                      </button>
+                    ) : (
+                      <button
+                        onClick={enterEditMode}
+                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                        title="Enter edit mode"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit Item
+                      </button>
+                    )}
+                  </div>
                 )}
-              </h2>
+              </div>
               <div className="mt-1 flex items-center gap-2">
                 <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={classDetail.iri}>
                   {classDetail.iri}
@@ -925,7 +1020,7 @@ export function ClassDetailPanel({
       </div>
 
       {/* ═══ AUTO-SAVE STATUS BAR ═══ */}
-      {canEdit && (
+      {isEditing && (
         <AutoSaveStatusBar
           status={saveStatus}
           error={saveError}

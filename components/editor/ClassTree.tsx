@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { ChevronRight, ChevronDown, Circle, Plus } from "lucide-react";
 import { cn, getLocalName } from "@/lib/utils";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
@@ -162,7 +161,6 @@ function ClassTreeItem({
   onViewInSource,
   draftIris,
 }: ClassTreeItemProps) {
-  const [isHovered, setIsHovered] = useState(false);
   const isSelected = selectedIri === node.iri;
   const hasChildren = node.hasChildren || node.children.length > 0;
 
@@ -190,8 +188,6 @@ function ClassTreeItem({
       )}
       style={{ paddingLeft: `${depth * 16 + 8}px` }}
       onClick={() => onSelect(node.iri)}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
     >
       {/* Expand/collapse button */}
       <button
@@ -225,8 +221,8 @@ function ClassTreeItem({
         <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" title="Unsaved draft" />
       )}
 
-      {/* Add child button */}
-      {onAddChild && isHovered && (
+      {/* Add child button — always rendered to reserve space, visible on hover */}
+      {onAddChild && (
         <button
           onClick={handleAddChild}
           className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"

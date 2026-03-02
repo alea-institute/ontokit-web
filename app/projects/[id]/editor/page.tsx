@@ -13,6 +13,7 @@ import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEnti
 import { useToast } from "@/lib/context/ToastContext";
 import type { TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
+import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingToggle";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
@@ -118,6 +119,7 @@ export default function EditorPage() {
     navigateToNode,
     addOptimisticNode,
     removeOptimisticNode,
+    updateNodeLabel,
   } = useOntologyTree({
     projectId,
     accessToken: session?.accessToken,
@@ -555,14 +557,14 @@ export default function EditorPage() {
     setSourceContent(modifiedSource);
     toast.success(`Updated "${label}"`);
 
-    // Refresh tree (labels may have changed) and detail panel
-    loadRootClasses();
+    // Update the tree node label in-place (preserves expansion state)
+    updateNodeLabel(classIri, label);
     setDetailRefreshKey((k) => k + 1);
 
     // Re-index source IRIs
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, loadRootClasses]);
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel]);
 
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
@@ -685,6 +687,7 @@ export default function EditorPage() {
 
               {/* Mode Switcher */}
               <ModeSwitcher />
+              {canEdit && <ContinuousEditingToggle />}
             </div>
             <div className="flex items-center gap-2">
               {/* WebSocket Connection Status */}

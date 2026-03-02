@@ -13,6 +13,7 @@ interface UseAutoSaveOptions {
   classDetail: OWLClassDetail | null;
   canEdit: boolean;
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
+  onError?: (msg: string) => void;
 }
 
 interface EditState {
@@ -30,6 +31,7 @@ export interface UseAutoSaveReturn {
   validationError: string | null;
   triggerSave: () => void;
   flushToGit: () => Promise<void>;
+  discardDraft: () => void;
   editStateRef: React.MutableRefObject<EditState | null>;
   classDetailRef: React.MutableRefObject<OWLClassDetail | null>;
   restoredDraft: DraftEntry | null;
@@ -43,8 +45,11 @@ export function useAutoSave({
   classDetail,
   canEdit,
   onUpdateClass,
+  onError,
 }: UseAutoSaveOptions): UseAutoSaveReturn {
   const { setDraft, clearDraft, getDraft } = useDraftStore();
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -80,6 +85,18 @@ export function useAutoSave({
   const clearRestoredDraft = useCallback(() => {
     setRestoredDraft(null);
   }, []);
+
+  // Discard draft for current classIri (used by Cancel)
+  const discardDraft = useCallback(() => {
+    if (!classIri || !branch) return;
+    const key = draftKey(projectId, branch, classIri);
+    clearDraft(key);
+    setSaveStatus("idle");
+    setSaveError(null);
+    setValidationError(null);
+    setRestoredDraft(null);
+    editStateRef.current = null;
+  }, [classIri, branch, projectId, clearDraft, editStateRef]);
 
   // Save edit state to draft store (Tier 1: instant, local)
   const triggerSave = useCallback(() => {
@@ -164,8 +181,10 @@ export function useAutoSave({
       // Fade "saved" indicator after 2s
       savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to save";
       setSaveStatus("error");
-      setSaveError(err instanceof Error ? err.message : "Failed to save");
+      setSaveError(msg);
+      onErrorRef.current?.(msg);
     } finally {
       flushingRef.current = false;
     }
@@ -184,6 +203,7 @@ export function useAutoSave({
     validationError,
     triggerSave,
     flushToGit,
+    discardDraft,
     editStateRef,
     classDetailRef,
     restoredDraft,

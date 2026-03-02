@@ -26,6 +26,8 @@ interface UseOntologyTreeReturn {
   addOptimisticNode: (iri: string, label: string, parentIri?: string) => void;
   /** Optimistically remove a node from the tree by IRI */
   removeOptimisticNode: (iri: string) => void;
+  /** Update a node's label in-place without affecting tree expansion state */
+  updateNodeLabel: (iri: string, newLabel: string) => void;
 }
 
 /**
@@ -252,6 +254,21 @@ export function useOntologyTree({
     []
   );
 
+  /**
+   * Update a node's label in-place without affecting tree expansion state.
+   */
+  const updateNodeLabel = useCallback(
+    (iri: string, newLabel: string) => {
+      setNodes((prev) =>
+        updateNodeInTree(prev, iri, (node) => ({
+          ...node,
+          label: newLabel,
+        }))
+      );
+    },
+    []
+  );
+
   // Load root classes on mount
   useEffect(() => {
     loadRootClasses();
@@ -270,5 +287,6 @@ export function useOntologyTree({
     navigateToNode,
     addOptimisticNode,
     removeOptimisticNode,
+    updateNodeLabel,
   };
 }

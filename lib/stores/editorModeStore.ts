@@ -7,8 +7,10 @@ export type ThemePreference = "light" | "dark" | "system";
 interface EditorModeState {
   editorMode: EditorMode;
   theme: ThemePreference;
+  continuousEditing: boolean;
   setEditorMode: (mode: EditorMode) => void;
   setTheme: (theme: ThemePreference) => void;
+  setContinuousEditing: (on: boolean) => void;
 }
 
 /**
@@ -35,6 +37,7 @@ export const useEditorModeStore = create<EditorModeState>()(
     (set) => ({
       editorMode: "standard",
       theme: "system",
+      continuousEditing: false,
 
       setEditorMode: (mode) => set({ editorMode: mode }),
 
@@ -42,6 +45,8 @@ export const useEditorModeStore = create<EditorModeState>()(
         applyThemeToDOM(theme);
         set({ theme });
       },
+
+      setContinuousEditing: (on) => set({ continuousEditing: on }),
     }),
     {
       name: "ontokit-editor-preferences",
