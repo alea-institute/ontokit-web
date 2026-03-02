@@ -6,12 +6,15 @@ import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/Cla
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
 import { PropertyTree } from "@/components/editor/standard/PropertyTree";
 import { IndividualList } from "@/components/editor/standard/IndividualList";
-import { EntityPlaceholderDetail } from "@/components/editor/EntityPlaceholderDetail";
+import { PropertyDetailPanel } from "@/components/editor/PropertyDetailPanel";
+import { IndividualDetailPanel } from "@/components/editor/IndividualDetailPanel";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
 import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
 import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
 import type { ClassUpdatePayload } from "@/lib/api/client";
+import type { TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
+import type { TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import { useDraftStore } from "@/lib/stores/draftStore";
 
@@ -45,6 +48,11 @@ export interface StandardEditorLayoutProps {
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   /** Bumped to trigger detail panel re-fetch after an update */
   detailRefreshKey?: number;
+
+  // Property & Individual editing
+  sourceContent?: string;
+  onUpdateProperty?: (propertyIri: string, data: TurtlePropertyUpdateData) => Promise<void>;
+  onUpdateIndividual?: (individualIri: string, data: TurtleIndividualUpdateData) => Promise<void>;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -69,6 +77,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     selectedNodeFallback,
     onUpdateClass,
     detailRefreshKey,
+    sourceContent,
+    onUpdateProperty,
+    onUpdateIndividual,
   } = props;
 
   // Draft badges
@@ -120,12 +131,6 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     baseSearchSelect(iri);
     closeSearch();
   };
-
-  // Determine the effective selected IRI for the detail panel
-  const effectiveSelectedIri =
-    activeTab === "classes" ? selectedIri :
-    activeTab === "properties" ? selectedPropertyIri :
-    selectedIndividualIri;
 
   return (
     <div className="flex h-full min-w-0 flex-1">
@@ -236,11 +241,31 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onUpdateClass={onUpdateClass}
             refreshKey={detailRefreshKey}
           />
+        ) : activeTab === "properties" ? (
+          <PropertyDetailPanel
+            projectId={projectId}
+            propertyIri={selectedPropertyIri}
+            sourceContent={sourceContent || ""}
+            canEdit={canEdit}
+            onUpdateProperty={onUpdateProperty}
+            branch={activeBranch}
+            refreshKey={detailRefreshKey}
+            onNavigateToEntity={(iri) => navigateToNode(iri)}
+            onCopyIri={onCopyIri}
+            accessToken={accessToken}
+          />
         ) : (
-          /* Placeholder detail panel for properties/individuals */
-          <EntityPlaceholderDetail
-            selectedIri={effectiveSelectedIri}
-            entityType={activeTab === "properties" ? "Property" : "Individual"}
+          <IndividualDetailPanel
+            projectId={projectId}
+            individualIri={selectedIndividualIri}
+            sourceContent={sourceContent || ""}
+            canEdit={canEdit}
+            onUpdateIndividual={onUpdateIndividual}
+            branch={activeBranch}
+            refreshKey={detailRefreshKey}
+            onNavigateToEntity={(iri) => navigateToNode(iri)}
+            onCopyIri={onCopyIri}
+            accessToken={accessToken}
           />
         )}
       </div>

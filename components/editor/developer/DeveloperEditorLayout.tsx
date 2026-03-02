@@ -12,11 +12,14 @@ import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
 import { PropertyTree } from "@/components/editor/standard/PropertyTree";
 import { IndividualList } from "@/components/editor/standard/IndividualList";
-import { EntityPlaceholderDetail } from "@/components/editor/EntityPlaceholderDetail";
+import { PropertyDetailPanel } from "@/components/editor/PropertyDetailPanel";
+import { IndividualDetailPanel } from "@/components/editor/IndividualDetailPanel";
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
 import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
 import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
 import type { ClassUpdatePayload } from "@/lib/api/client";
+import type { TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
+import type { TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 import type { IriPosition } from "@/lib/editor/indexWorker";
@@ -83,6 +86,10 @@ export interface DeveloperEditorLayoutProps {
   // Side panels
   showHealthCheck: boolean;
   onCloseHealthCheck: () => void;
+
+  // Property & Individual editing
+  onUpdateProperty?: (propertyIri: string, data: TurtlePropertyUpdateData) => Promise<void>;
+  onUpdateIndividual?: (individualIri: string, data: TurtleIndividualUpdateData) => Promise<void>;
 }
 
 export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
@@ -121,6 +128,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     detailRefreshKey,
     showHealthCheck,
     onCloseHealthCheck,
+    onUpdateProperty,
+    onUpdateIndividual,
   } = props;
 
   // Draft badges
@@ -355,10 +364,31 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   onUpdateClass={onUpdateClass}
                   refreshKey={detailRefreshKey}
                 />
+              ) : activeTab === "properties" ? (
+                <PropertyDetailPanel
+                  projectId={projectId}
+                  propertyIri={selectedPropertyIri}
+                  sourceContent={sourceContent || ""}
+                  canEdit={canEdit}
+                  onUpdateProperty={onUpdateProperty}
+                  branch={activeBranch}
+                  refreshKey={detailRefreshKey}
+                  onNavigateToEntity={(iri) => navigateToNode(iri)}
+                  onCopyIri={onCopyIri}
+                  accessToken={accessToken}
+                />
               ) : (
-                <EntityPlaceholderDetail
-                  selectedIri={activeTab === "properties" ? selectedPropertyIri : selectedIndividualIri}
-                  entityType={activeTab === "properties" ? "Property" : "Individual"}
+                <IndividualDetailPanel
+                  projectId={projectId}
+                  individualIri={selectedIndividualIri}
+                  sourceContent={sourceContent || ""}
+                  canEdit={canEdit}
+                  onUpdateIndividual={onUpdateIndividual}
+                  branch={activeBranch}
+                  refreshKey={detailRefreshKey}
+                  onNavigateToEntity={(iri) => navigateToNode(iri)}
+                  onCopyIri={onCopyIri}
+                  accessToken={accessToken}
                 />
               )}
             </div>

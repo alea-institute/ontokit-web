@@ -72,8 +72,9 @@ export function useAutoSave({
     if (!classIri || !branch) return;
     const key = draftKey(projectId, branch, classIri);
     const draft = getDraft(key);
-    if (draft) {
-      setRestoredDraft(draft);
+    // Only restore class drafts (no entityType or entityType === "class")
+    if (draft && (!draft.entityType || draft.entityType === "class")) {
+      setRestoredDraft(draft as DraftEntry);
     } else {
       setRestoredDraft(null);
     }
@@ -136,8 +137,11 @@ export function useAutoSave({
     if (!classIri || !branch || !canEdit || !onUpdateClass) return;
 
     const key = draftKey(projectId, branch, classIri);
-    const draft = getDraft(key);
-    if (!draft) return;
+    const rawDraft = getDraft(key);
+    if (!rawDraft) return;
+    // Only flush class drafts
+    if (rawDraft.entityType && rawDraft.entityType !== "class") return;
+    const draft = rawDraft as DraftEntry;
 
     const detail = classDetailRef.current;
 

@@ -31,6 +31,8 @@ import { getLocalName } from "@/lib/utils";
 import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
 import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
+import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
+import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import { detectPatternFromIriIndex, type IriSuffixPattern } from "@/lib/ontology/iriGeneration";
 import { commonPrefixes } from "@/lib/editor/languages/turtle";
 
@@ -568,6 +570,78 @@ export default function EditorPage() {
     iriPatternDetectedRef.current = false;
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel]);
 
+  // Handle update property (form-based editing)
+  const handleUpdateProperty = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
+    if (!session?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    let source = sourceContent;
+    if (!source) {
+      const response = await revisionsApi.getFileAtVersion(
+        projectId,
+        activeBranch!,
+        session.accessToken,
+        project?.git_ontology_path,
+      );
+      source = response.content;
+    }
+
+    const modifiedSource = updatePropertyInTurtle(source, propertyIri, data);
+    const label = data.labels[0]?.value || getLocalName(propertyIri);
+    const commitMessage = `Update property ${label}`;
+
+    await projectOntologyApi.saveSource(
+      projectId,
+      modifiedSource,
+      commitMessage,
+      session.accessToken,
+      activeBranch,
+    );
+
+    setSourceContent(modifiedSource);
+    toast.success(`Updated "${label}"`);
+    setDetailRefreshKey((k) => k + 1);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast]);
+
+  // Handle update individual (form-based editing)
+  const handleUpdateIndividual = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
+    if (!session?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    let source = sourceContent;
+    if (!source) {
+      const response = await revisionsApi.getFileAtVersion(
+        projectId,
+        activeBranch!,
+        session.accessToken,
+        project?.git_ontology_path,
+      );
+      source = response.content;
+    }
+
+    const modifiedSource = updateIndividualInTurtle(source, individualIri, data);
+    const label = data.labels[0]?.value || getLocalName(individualIri);
+    const commitMessage = `Update individual ${label}`;
+
+    await projectOntologyApi.saveSource(
+      projectId,
+      modifiedSource,
+      commitMessage,
+      session.accessToken,
+      activeBranch,
+    );
+
+    setSourceContent(modifiedSource);
+    toast.success(`Updated "${label}"`);
+    setDetailRefreshKey((k) => k + 1);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast]);
+
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
     setActiveBranch(branchName);
@@ -813,6 +887,8 @@ export default function EditorPage() {
                   detailRefreshKey={detailRefreshKey}
                   showHealthCheck={showHealthCheck}
                   onCloseHealthCheck={() => setShowHealthCheck(false)}
+                  onUpdateProperty={handleUpdateProperty}
+                  onUpdateIndividual={handleUpdateIndividual}
                 />
               </div>
             ) : (
@@ -837,6 +913,9 @@ export default function EditorPage() {
                 selectedNodeFallback={selectedNodeFallback}
                 onUpdateClass={handleUpdateClass}
                 detailRefreshKey={detailRefreshKey}
+                sourceContent={sourceContent}
+                onUpdateProperty={handleUpdateProperty}
+                onUpdateIndividual={handleUpdateIndividual}
               />
             )}
           </div>
