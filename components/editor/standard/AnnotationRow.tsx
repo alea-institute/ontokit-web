@@ -10,6 +10,8 @@ interface AnnotationRowProps {
   onValueChange: (value: string) => void;
   onLangChange: (lang: string) => void;
   onRemove?: () => void;
+  /** Called when an input loses focus — used for auto-save */
+  onBlur?: () => void;
   /** Show property label chip (false when used in a section that already has a heading) */
   showPropertyLabel?: boolean;
   /** Custom placeholder for the value input (defaults to "Value") */
@@ -23,6 +25,7 @@ export function AnnotationRow({
   onValueChange,
   onLangChange,
   onRemove,
+  onBlur,
   showPropertyLabel = true,
   placeholder = "Value",
 }: AnnotationRowProps) {
@@ -43,6 +46,7 @@ export function AnnotationRow({
         <textarea
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
+          onBlur={onBlur}
           placeholder={placeholder}
           rows={2}
           className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
@@ -52,6 +56,7 @@ export function AnnotationRow({
           type="text"
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
+          onBlur={onBlur}
           placeholder={placeholder}
           className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
         />
@@ -60,6 +65,7 @@ export function AnnotationRow({
         type="text"
         value={lang}
         onChange={(e) => onLangChange(e.target.value)}
+        onBlur={onBlur}
         className="w-14 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
         title="Language tag (e.g. en, de, fr)"
         placeholder="lang"

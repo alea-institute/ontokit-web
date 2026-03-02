@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { Search, X, FileCode, TreePine, Code, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { projectOntologyApi, type EntitySearchResult, type ClassUpdatePayload } 
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 import type { IriPosition } from "@/lib/editor/indexWorker";
+import { useDraftStore } from "@/lib/stores/draftStore";
 
 const OntologySourceEditor = dynamic(
   () => import("@/components/editor/OntologySourceEditor").then((mod) => mod.OntologySourceEditor),
@@ -110,6 +111,15 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     showHealthCheck,
     onCloseHealthCheck,
   } = props;
+
+  // Draft badges
+  const getDraftIris = useDraftStore((s) => s.getDraftIris);
+  const drafts = useDraftStore((s) => s.drafts);
+  const draftIris = useMemo(
+    () => new Set(getDraftIris(projectId, activeBranch || "main")),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getDraftIris, projectId, activeBranch, drafts],
+  );
 
   const [viewMode, setViewMode] = useState<DeveloperView>("tree");
   const preloadStartedRef = useRef(false);
@@ -324,6 +334,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                     searchResults={showSearch ? searchResults : undefined}
                     isSearching={isSearching}
                     onSearchSelect={handleSearchSelect}
+                    draftIris={draftIris}
                   />
                 )}
               </div>

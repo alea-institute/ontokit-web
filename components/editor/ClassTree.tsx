@@ -21,6 +21,8 @@ interface ClassTreeProps {
   searchResults?: EntitySearchResult[] | null;
   isSearching?: boolean;
   onSearchSelect?: (iri: string) => void;
+  /** IRIs that have uncommitted drafts — shown with amber dot indicator */
+  draftIris?: Set<string>;
 }
 
 export function ClassTree({
@@ -36,6 +38,7 @@ export function ClassTree({
   searchResults,
   isSearching,
   onSearchSelect,
+  draftIris,
 }: ClassTreeProps) {
   // Show search results when available
   if (searchResults !== null && searchResults !== undefined) {
@@ -79,6 +82,7 @@ export function ClassTree({
           onCopyIri={onCopyIri}
           onDelete={onDelete}
           onViewInSource={onViewInSource}
+          draftIris={draftIris}
         />
       ))}
     </div>
@@ -142,6 +146,7 @@ interface ClassTreeItemProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  draftIris?: Set<string>;
 }
 
 function ClassTreeItem({
@@ -155,6 +160,7 @@ function ClassTreeItem({
   onCopyIri,
   onDelete,
   onViewInSource,
+  draftIris,
 }: ClassTreeItemProps) {
   const [isHovered, setIsHovered] = useState(false);
   const isSelected = selectedIri === node.iri;
@@ -214,6 +220,11 @@ function ClassTreeItem({
         {node.label || getLocalName(node.iri)}
       </span>
 
+      {/* Draft indicator */}
+      {draftIris?.has(node.iri) && (
+        <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" title="Unsaved draft" />
+      )}
+
       {/* Add child button */}
       {onAddChild && isHovered && (
         <button
@@ -262,6 +273,7 @@ function ClassTreeItem({
               onCopyIri={onCopyIri}
               onDelete={onDelete}
               onViewInSource={onViewInSource}
+              draftIris={draftIris}
             />
           ))}
         </div>

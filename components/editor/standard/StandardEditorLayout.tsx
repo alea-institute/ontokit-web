@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Search, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ClassTree } from "@/components/editor/ClassTree";
@@ -11,6 +11,7 @@ import { IndividualList } from "@/components/editor/standard/IndividualList";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
 import { projectOntologyApi, type EntitySearchResult, type ClassUpdatePayload } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
+import { useDraftStore } from "@/lib/stores/draftStore";
 
 export interface StandardEditorLayoutProps {
   projectId: string;
@@ -63,6 +64,15 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     onUpdateClass,
     detailRefreshKey,
   } = props;
+
+  // Draft badges
+  const getDraftIris = useDraftStore((s) => s.getDraftIris);
+  const drafts = useDraftStore((s) => s.drafts);
+  const draftIris = useMemo(
+    () => new Set(getDraftIris(projectId, activeBranch || "main")),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [getDraftIris, projectId, activeBranch, drafts],
+  );
 
   // Panel width state (default 320px = w-80)
   const [treePanelWidth, setTreePanelWidth] = useState(320);
@@ -231,6 +241,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                   searchResults={showSearch ? searchResults : undefined}
                   isSearching={isSearching}
                   onSearchSelect={handleSearchSelect}
+                  draftIris={draftIris}
                 />
               )}
             </>

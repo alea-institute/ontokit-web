@@ -50,6 +50,8 @@ interface RelationshipSectionProps {
   onChangeProperty?: (groupIdx: number, newIri: string, newLabel: string) => void;
   onAddGroup?: () => void;
   onNavigateToClass?: (iri: string) => void;
+  /** Called after add/remove actions — used for auto-save */
+  onSaveNeeded?: () => void;
 }
 
 export function RelationshipSection({
@@ -63,6 +65,7 @@ export function RelationshipSection({
   onChangeProperty,
   onAddGroup,
   onNavigateToClass,
+  onSaveNeeded,
 }: RelationshipSectionProps) {
   // In read mode, only show groups that have actual targets
   const visibleGroups = isEditing ? groups : groups.filter((g) => g.targets.length > 0);
@@ -133,7 +136,7 @@ export function RelationshipSection({
                   <span className="truncate">{target.label || getLocalName(target.iri)}</span>
                 </button>
                 <button
-                  onClick={() => onRemoveTarget?.(gIdx, tIdx)}
+                  onClick={() => { onRemoveTarget?.(gIdx, tIdx); onSaveNeeded?.(); }}
                   className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                   title="Remove"
                 >
@@ -148,12 +151,13 @@ export function RelationshipSection({
               accessToken={accessToken}
               branch={branch}
               excludeIris={group.targets.map((t) => t.iri)}
-              onSelect={(result) =>
+              onSelect={(result) => {
                 onAddTarget?.(gIdx, {
                   iri: result.iri,
                   label: result.label || getLocalName(result.iri),
-                })
-              }
+                });
+                onSaveNeeded?.();
+              }}
             />
           </div>
         </div>

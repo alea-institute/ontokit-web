@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   ExternalLink,
   AlertTriangle,
@@ -14,12 +14,8 @@ import {
   Code,
   Clock,
   Copy,
-  Pencil,
   Plus,
   Trash2,
-  Save,
-  X,
-  Loader2,
   Equal,
   Ban,
   BarChart3,
@@ -40,7 +36,8 @@ import { AnnotationRow } from "@/components/editor/standard/AnnotationRow";
 import { InlineAnnotationAdder } from "@/components/editor/standard/InlineAnnotationAdder";
 import { RelationshipSection, type RelationshipGroup, type RelationshipTarget } from "@/components/editor/standard/RelationshipSection";
 import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, RELATIONSHIP_PROPERTY_IRIS, SEE_ALSO_IRI, getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
-import { Button } from "@/components/ui/button";
+import { AutoSaveStatusBar } from "@/components/editor/AutoSaveStatusBar";
+import { useAutoSave } from "@/lib/hooks/useAutoSave";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
 function ensureTrailingEmpty(arr: LocalizedString[]): LocalizedString[] {
@@ -64,17 +61,11 @@ interface ClassDetailPanelProps {
   accessToken?: string;
   branch?: string;
   onNavigateToClass?: (iri: string) => void;
-  /** Callback to navigate to an IRI in the source view */
   onNavigateToSource?: (iri: string) => void;
-  /** Callback to copy an IRI to clipboard */
   onCopyIri?: (iri: string) => void;
-  /** Fallback data from the tree node — used when the API returns 404 (unsaved entity) */
   selectedNodeFallback?: TreeNodeFallback | null;
-  /** Whether the user can edit this class */
   canEdit?: boolean;
-  /** Callback to update a class — returns a promise that resolves on success */
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
-  /** Bumped to trigger a data re-fetch (e.g. after an update) */
   refreshKey?: number;
 }
 
@@ -97,25 +88,127 @@ export function ClassDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [resolvedTargetLabels, setResolvedTargetLabels] = useState<Record<string, string>>({});
 
-  // Edit mode state
-  const [isEditing, setIsEditing] = useState(false);
+  // Edit state (always active when canEdit)
   const [editLabels, setEditLabels] = useState<LocalizedString[]>([]);
   const [editComments, setEditComments] = useState<LocalizedString[]>([]);
   const [editParentIris, setEditParentIris] = useState<string[]>([]);
   const [editParentLabels, setEditParentLabels] = useState<Record<string, string>>({});
   const [editAnnotations, setEditAnnotations] = useState<AnnotationUpdate[]>([]);
   const [editRelationships, setEditRelationships] = useState<RelationshipGroup[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
   const [showParentPicker, setShowParentPicker] = useState(false);
 
-  // Exit edit mode when selection changes
-  useEffect(() => {
-    setIsEditing(false);
-    setSaveError(null);
-    setResolvedTargetLabels({});
-  }, [classIri]);
+  // Track the previous classIri so we can flush on navigate
+  const prevClassIriRef = useRef<string | null>(null);
+  const editInitializedRef = useRef(false);
 
+  // Auto-save hook
+  const {
+    saveStatus,
+    saveError,
+    validationError,
+    triggerSave,
+    flushToGit,
+    editStateRef,
+    restoredDraft,
+    clearRestoredDraft,
+  } = useAutoSave({
+    projectId,
+    branch: branch || "main",
+    classIri,
+    classDetail,
+    canEdit: !!canEdit,
+    onUpdateClass,
+  });
+
+  // Keep editStateRef in sync with current edit state
+  useEffect(() => {
+    if (!canEdit) return;
+    editStateRef.current = {
+      labels: editLabels,
+      comments: editComments,
+      parentIris: editParentIris,
+      parentLabels: editParentLabels,
+      annotations: editAnnotations,
+      relationships: editRelationships,
+    };
+  }, [canEdit, editLabels, editComments, editParentIris, editParentLabels, editAnnotations, editRelationships, editStateRef]);
+
+  // Flush to git when class selection changes
+  useEffect(() => {
+    if (prevClassIriRef.current && prevClassIriRef.current !== classIri) {
+      flushToGit();
+    }
+    prevClassIriRef.current = classIri;
+    setResolvedTargetLabels({});
+    editInitializedRef.current = false;
+  }, [classIri]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initialize edit state from classDetail or restored draft
+  useEffect(() => {
+    if (editInitializedRef.current) return;
+    if (!canEdit) return;
+
+    // Restore from draft if available
+    if (restoredDraft && classIri) {
+      setEditLabels(restoredDraft.labels);
+      setEditComments(ensureTrailingEmpty(restoredDraft.comments));
+      setEditParentIris(restoredDraft.parentIris);
+      setEditParentLabels(restoredDraft.parentLabels);
+      setEditAnnotations(restoredDraft.annotations);
+      setEditRelationships(restoredDraft.relationships);
+      editInitializedRef.current = true;
+      clearRestoredDraft();
+      return;
+    }
+
+    if (!classDetail) return;
+
+    initEditState(classDetail);
+    editInitializedRef.current = true;
+  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Initialize edit state from OWLClassDetail
+  const initEditState = useCallback((detail: OWLClassDetail) => {
+    setEditLabels(detail.labels.map((l) => ({ ...l })));
+    setEditComments(ensureTrailingEmpty(detail.comments.map((c) => ({ ...c }))));
+    setEditParentIris([...detail.parent_iris]);
+    setEditParentLabels({ ...detail.parent_labels });
+
+    const allAnnotations = detail.annotations || [];
+    const regularAnnotations: AnnotationUpdate[] = [];
+    const relationships: RelationshipGroup[] = [];
+
+    for (const a of allAnnotations) {
+      if (RELATIONSHIP_PROPERTY_IRIS.has(a.property_iri)) {
+        const propInfo = getAnnotationPropertyInfo(a.property_iri);
+        relationships.push({
+          property_iri: a.property_iri,
+          property_label: propInfo.displayLabel,
+          targets: a.values
+            .filter((v) => v.value.trim())
+            .map((v) => ({ iri: v.value, label: resolvedTargetLabels[v.value] || getLocalName(v.value) })),
+        });
+      } else {
+        regularAnnotations.push({
+          property_iri: a.property_iri,
+          values: ensureTrailingEmpty(a.values.map((v) => ({ ...v }))),
+        });
+      }
+    }
+
+    if (!regularAnnotations.find((a) => a.property_iri === DEFINITION_IRI)) {
+      regularAnnotations.unshift({ property_iri: DEFINITION_IRI, values: [{ value: "", lang: "en" }] });
+    }
+
+    if (relationships.length === 0) {
+      relationships.push({ property_iri: SEE_ALSO_IRI, property_label: "See Also", targets: [] });
+    }
+
+    setEditAnnotations(regularAnnotations);
+    setEditRelationships(relationships);
+  }, [resolvedTargetLabels]);
+
+  // Fetch class data
   useEffect(() => {
     if (!classIri) {
       setClassDetail(null);
@@ -128,7 +221,6 @@ export function ClassDetailPanel({
       setError(null);
 
       try {
-        // Fetch class details and issues in parallel
         const [detail, issuesResponse] = await Promise.all([
           projectOntologyApi.getClassDetail(projectId, classIri, accessToken, branch),
           lintApi.getIssues(projectId, accessToken, { subject_iri: classIri, limit: 50 }).catch(() => ({ items: [] })),
@@ -186,7 +278,7 @@ export function ClassDetailPanel({
             const label = getPreferredLabel(detail.labels);
             if (label) newLabels[iri] = label;
           } catch {
-            // Not a class or not found — leave unresolved
+            // Not a class or not found
           }
         }),
       );
@@ -199,110 +291,6 @@ export function ClassDetailPanel({
     return () => { cancelled = true; };
   }, [classDetail, projectId, accessToken, branch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Enter edit mode
-  const startEditing = useCallback(() => {
-    if (!classDetail) return;
-    setEditLabels(classDetail.labels.map((l) => ({ ...l })));
-    setEditComments(ensureTrailingEmpty(classDetail.comments.map((c) => ({ ...c }))));
-    setEditParentIris([...classDetail.parent_iris]);
-    setEditParentLabels({ ...classDetail.parent_labels });
-
-    // Separate relationship annotations from regular annotations
-    const allAnnotations = classDetail.annotations || [];
-    const regularAnnotations: AnnotationUpdate[] = [];
-    const relationships: RelationshipGroup[] = [];
-
-    for (const a of allAnnotations) {
-      if (RELATIONSHIP_PROPERTY_IRIS.has(a.property_iri)) {
-        const propInfo = getAnnotationPropertyInfo(a.property_iri);
-        relationships.push({
-          property_iri: a.property_iri,
-          property_label: propInfo.displayLabel,
-          targets: a.values
-            .filter((v) => v.value.trim())
-            .map((v) => ({ iri: v.value, label: resolvedTargetLabels[v.value] || getLocalName(v.value) })),
-        });
-      } else {
-        regularAnnotations.push({
-          property_iri: a.property_iri,
-          values: ensureTrailingEmpty(a.values.map((v) => ({ ...v }))),
-        });
-      }
-    }
-
-    // Ensure definition annotation exists (always show in edit mode)
-    if (!regularAnnotations.find((a) => a.property_iri === DEFINITION_IRI)) {
-      regularAnnotations.unshift({ property_iri: DEFINITION_IRI, values: [{ value: "", lang: "en" }] });
-    }
-
-    // Ensure at least one empty relationship group
-    if (relationships.length === 0) {
-      relationships.push({
-        property_iri: SEE_ALSO_IRI,
-        property_label: "See Also",
-        targets: [],
-      });
-    }
-
-    setEditAnnotations(regularAnnotations);
-    setEditRelationships(relationships);
-    setSaveError(null);
-    setIsEditing(true);
-  }, [classDetail, resolvedTargetLabels]);
-
-  const cancelEditing = useCallback(() => {
-    setIsEditing(false);
-    setSaveError(null);
-  }, []);
-
-  const handleSave = useCallback(async () => {
-    if (!classIri || !onUpdateClass) return;
-
-    // Validate: at least one non-empty label
-    const validLabels = editLabels.filter((l) => l.value.trim());
-    if (validLabels.length === 0) {
-      setSaveError("At least one label is required");
-      return;
-    }
-
-    setIsSaving(true);
-    setSaveError(null);
-
-    try {
-      // Filter out annotation values with empty strings
-      const cleanAnnotations = editAnnotations
-        .map((a) => ({
-          ...a,
-          values: a.values.filter((v) => v.value.trim()),
-        }))
-        .filter((a) => a.values.length > 0);
-
-      // Convert relationships back to annotation format
-      const relationshipAnnotations: AnnotationUpdate[] = editRelationships
-        .filter((g) => g.targets.length > 0)
-        .map((g) => ({
-          property_iri: g.property_iri,
-          values: g.targets.map((t) => ({ value: t.iri, lang: "" })),
-        }));
-
-      await onUpdateClass(classIri, {
-        labels: validLabels,
-        comments: editComments.filter((c) => c.value.trim()),
-        parent_iris: editParentIris,
-        annotations: [...cleanAnnotations, ...relationshipAnnotations],
-        // Preserve fields not edited by the form
-        deprecated: classDetail?.deprecated,
-        equivalent_iris: classDetail?.equivalent_iris,
-        disjoint_iris: classDetail?.disjoint_iris,
-      });
-      setIsEditing(false);
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : "Failed to save changes");
-    } finally {
-      setIsSaving(false);
-    }
-  }, [classIri, onUpdateClass, editLabels, editComments, editParentIris, editAnnotations, editRelationships]);
-
   // -- Label editing helpers --
   const updateLabel = useCallback((index: number, field: "value" | "lang", newVal: string) => {
     setEditLabels((prev) => prev.map((l, i) => (i === index ? { ...l, [field]: newVal } : l)));
@@ -310,7 +298,8 @@ export function ClassDetailPanel({
 
   const removeLabel = useCallback((index: number) => {
     setEditLabels((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+    requestAnimationFrame(() => triggerSave());
+  }, [triggerSave]);
 
   // -- Comment editing helpers --
   const updateComment = useCallback((index: number, field: "value" | "lang", newVal: string) => {
@@ -325,17 +314,20 @@ export function ClassDetailPanel({
       const updated = prev.filter((_, i) => i !== index);
       return ensureTrailingEmpty(updated);
     });
-  }, []);
+    requestAnimationFrame(() => triggerSave());
+  }, [triggerSave]);
 
   // -- Parent editing helpers --
   const addParent = useCallback((iri: string, label: string) => {
     setEditParentIris((prev) => [...prev, iri]);
     setEditParentLabels((prev) => ({ ...prev, [iri]: label }));
-  }, []);
+    requestAnimationFrame(() => triggerSave());
+  }, [triggerSave]);
 
   const removeParent = useCallback((iri: string) => {
     setEditParentIris((prev) => prev.filter((p) => p !== iri));
-  }, []);
+    requestAnimationFrame(() => triggerSave());
+  }, [triggerSave]);
 
   // -- Annotation editing helpers --
   const updateAnnotationValue = useCallback(
@@ -360,23 +352,10 @@ export function ClassDetailPanel({
           return { ...a, values: ensureTrailingEmpty(filtered) };
         })
       );
+      requestAnimationFrame(() => triggerSave());
     },
-    []
+    [triggerSave]
   );
-
-  const addAnnotationValue = useCallback((propertyIri: string) => {
-    setEditAnnotations((prev) => {
-      const existing = prev.find((a) => a.property_iri === propertyIri);
-      if (existing) {
-        return prev.map((a) =>
-          a.property_iri === propertyIri
-            ? { ...a, values: [...a.values, { value: "", lang: "en" }] }
-            : a
-        );
-      }
-      return [...prev, { property_iri: propertyIri, values: [{ value: "", lang: "en" }] }];
-    });
-  }, []);
 
   // -- Relationship editing helpers --
   const addRelationshipTarget = useCallback((groupIdx: number, target: RelationshipTarget) => {
@@ -385,7 +364,8 @@ export function ClassDetailPanel({
         i === groupIdx ? { ...g, targets: [...g.targets, target] } : g
       )
     );
-  }, []);
+    requestAnimationFrame(() => triggerSave());
+  }, [triggerSave]);
 
   const removeRelationshipTarget = useCallback((groupIdx: number, targetIdx: number) => {
     setEditRelationships((prev) =>
@@ -393,7 +373,8 @@ export function ClassDetailPanel({
         i === groupIdx ? { ...g, targets: g.targets.filter((_, ti) => ti !== targetIdx) } : g
       )
     );
-  }, []);
+    requestAnimationFrame(() => triggerSave());
+  }, [triggerSave]);
 
   const changeRelationshipProperty = useCallback((groupIdx: number, newIri: string, newLabel: string) => {
     setEditRelationships((prev) =>
@@ -401,7 +382,8 @@ export function ClassDetailPanel({
         i === groupIdx ? { ...g, property_iri: newIri, property_label: newLabel } : g
       )
     );
-  }, []);
+    requestAnimationFrame(() => triggerSave());
+  }, [triggerSave]);
 
   const addRelationshipGroup = useCallback(() => {
     setEditRelationships((prev) => [
@@ -409,36 +391,6 @@ export function ClassDetailPanel({
       { property_iri: SEE_ALSO_IRI, property_label: "See Also", targets: [] },
     ]);
   }, []);
-
-  // Check if there are unsaved changes
-  const hasChanges = useCallback(() => {
-    if (!classDetail) return false;
-    const labelsChanged = JSON.stringify(editLabels) !== JSON.stringify(classDetail.labels);
-    const commentsChanged = JSON.stringify(editComments) !== JSON.stringify(classDetail.comments);
-    const parentsChanged = JSON.stringify(editParentIris) !== JSON.stringify(classDetail.parent_iris);
-
-    // Build original annotations and relationships from classDetail
-    const originalAllAnnotations = classDetail.annotations || [];
-    const originalRegular = originalAllAnnotations
-      .filter((a) => !RELATIONSHIP_PROPERTY_IRIS.has(a.property_iri))
-      .map((a) => ({ property_iri: a.property_iri, values: a.values.map((v) => ({ value: v.value, lang: v.lang })) }));
-    const originalRelationships = originalAllAnnotations
-      .filter((a) => RELATIONSHIP_PROPERTY_IRIS.has(a.property_iri))
-      .map((a) => ({
-        property_iri: a.property_iri,
-        targets: a.values.filter((v) => v.value.trim()).map((v) => ({ iri: v.value, label: getLocalName(v.value) })),
-      }));
-
-    const annotationsChanged = JSON.stringify(editAnnotations) !== JSON.stringify(originalRegular);
-
-    // Compare relationships (ignore empty groups)
-    const currentRels = editRelationships
-      .filter((g) => g.targets.length > 0)
-      .map((g) => ({ property_iri: g.property_iri, targets: g.targets }));
-    const relationshipsChanged = JSON.stringify(currentRels) !== JSON.stringify(originalRelationships);
-
-    return labelsChanged || commentsChanged || parentsChanged || annotationsChanged || relationshipsChanged;
-  }, [classDetail, editLabels, editComments, editParentIris, editAnnotations, editRelationships]);
 
   // ── Render: empty state ──
   if (!classIri) {
@@ -529,7 +481,7 @@ export function ClassDetailPanel({
   }
 
   const displayLabel = getPreferredLabel(classDetail.labels) || getLocalName(classDetail.iri);
-  const showEditButton = canEdit && onUpdateClass && !isEditing;
+  const isEditing = !!canEdit && !!onUpdateClass;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -541,26 +493,15 @@ export function ClassDetailPanel({
               <span className="text-sm font-bold text-owl-class">C</span>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  {displayLabel}
-                  {classDetail.deprecated && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                      <AlertTriangle className="mr-1 h-3 w-3" />
-                      Deprecated
-                    </span>
-                  )}
-                </h2>
-                {showEditButton && (
-                  <Button
-                    size="sm"
-                    onClick={startEditing}
-                  >
-                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                    Edit
-                  </Button>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                {displayLabel}
+                {classDetail.deprecated && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                    <AlertTriangle className="mr-1 h-3 w-3" />
+                    Deprecated
+                  </span>
                 )}
-              </div>
+              </h2>
               <div className="mt-1 flex items-center gap-2">
                 <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={classDetail.iri}>
                   {classDetail.iri}
@@ -616,6 +557,7 @@ export function ClassDetailPanel({
                       type="text"
                       value={label.value}
                       onChange={(e) => updateLabel(index, "value", e.target.value)}
+                      onBlur={() => triggerSave()}
                       placeholder="Label text"
                       className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                     />
@@ -623,6 +565,7 @@ export function ClassDetailPanel({
                       type="text"
                       value={label.lang}
                       onChange={(e) => updateLabel(index, "lang", e.target.value)}
+                      onBlur={() => triggerSave()}
                       className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                       title="Language tag (e.g. en, de, fr)"
                     />
@@ -680,6 +623,7 @@ export function ClassDetailPanel({
                           onValueChange={(v) => updateAnnotationValue(DEFINITION_IRI, vIdx, "value", v)}
                           onLangChange={(l) => updateAnnotationValue(DEFINITION_IRI, vIdx, "lang", l)}
                           onRemove={isGhost ? undefined : () => removeAnnotationValue(DEFINITION_IRI, vIdx)}
+                          onBlur={() => triggerSave()}
                           showPropertyLabel={false}
                           placeholder={isGhost ? "Add another Definition \u2014 or translation." : undefined}
                         />
@@ -721,6 +665,7 @@ export function ClassDetailPanel({
                       <textarea
                         value={comment.value}
                         onChange={(e) => updateComment(index, "value", e.target.value)}
+                        onBlur={() => triggerSave()}
                         placeholder={isGhost ? "Add another Comment \u2014 or translation." : ""}
                         rows={isGhost ? 1 : 2}
                         className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
@@ -729,6 +674,7 @@ export function ClassDetailPanel({
                         type="text"
                         value={comment.lang}
                         onChange={(e) => updateComment(index, "lang", e.target.value)}
+                        onBlur={() => triggerSave()}
                         className="w-14 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                         title="Language tag"
                       />
@@ -789,6 +735,7 @@ export function ClassDetailPanel({
                                 onValueChange={(v) => updateAnnotationValue(annotation.property_iri, vIdx, "value", v)}
                                 onLangChange={(l) => updateAnnotationValue(annotation.property_iri, vIdx, "lang", l)}
                                 onRemove={isGhost ? undefined : () => removeAnnotationValue(annotation.property_iri, vIdx)}
+                                onBlur={() => triggerSave()}
                                 showPropertyLabel={false}
                                 placeholder={isGhost ? `Add another ${propInfo.displayLabel} \u2014 or translation.` : undefined}
                               />
@@ -839,6 +786,7 @@ export function ClassDetailPanel({
                           { property_iri: propertyIri, values: ensureTrailingEmpty([{ value, lang }]) },
                         ];
                       });
+                      requestAnimationFrame(() => triggerSave());
                     }}
                   />
                 )}
@@ -906,7 +854,6 @@ export function ClassDetailPanel({
 
           {/* ═══ RELATIONSHIP(S) ═══ */}
           {(() => {
-            // In read mode, extract relationships from classDetail.annotations
             const readRelationships: RelationshipGroup[] = isEditing
               ? editRelationships
               : (classDetail.annotations || [])
@@ -938,6 +885,7 @@ export function ClassDetailPanel({
                   onChangeProperty={changeRelationshipProperty}
                   onAddGroup={addRelationshipGroup}
                   onNavigateToClass={onNavigateToClass}
+                  onSaveNeeded={() => triggerSave()}
                 />
               </Section>
             );
@@ -976,41 +924,14 @@ export function ClassDetailPanel({
         </div>
       </div>
 
-      {/* ═══ EDIT MODE FOOTER ═══ */}
-      {isEditing && (
-        <div className="border-t border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
-          {saveError && (
-            <p className="mb-2 text-xs text-red-600 dark:text-red-400">{saveError}</p>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-500 dark:text-slate-400">
-              {hasChanges() ? "Unsaved changes" : "No changes"}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={cancelEditing}
-                disabled={isSaving}
-              >
-                <X className="mr-1 h-3.5 w-3.5" />
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={isSaving || !hasChanges()}
-              >
-                {isSaving ? (
-                  <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Save className="mr-1 h-3.5 w-3.5" />
-                )}
-                Save
-              </Button>
-            </div>
-          </div>
-        </div>
+      {/* ═══ AUTO-SAVE STATUS BAR ═══ */}
+      {canEdit && (
+        <AutoSaveStatusBar
+          status={saveStatus}
+          error={saveError}
+          validationError={validationError}
+          onRetry={() => flushToGit()}
+        />
       )}
     </div>
   );
@@ -1019,18 +940,15 @@ export function ClassDetailPanel({
 // ── Helpers ──────────────────────────────────────────────────────────
 
 const ANNOTATION_ICON_MAP: Record<string, React.ReactNode> = {
-  // SKOS labels
   "http://www.w3.org/2004/02/skos/core#prefLabel": <Star className="h-4 w-4" />,
   "http://www.w3.org/2004/02/skos/core#altLabel": <Tags className="h-4 w-4" />,
   "http://www.w3.org/2004/02/skos/core#hiddenLabel": <EyeOff className="h-4 w-4" />,
-  // SKOS documentation
   "http://www.w3.org/2004/02/skos/core#example": <Lightbulb className="h-4 w-4" />,
   "http://www.w3.org/2004/02/skos/core#scopeNote": <StickyNote className="h-4 w-4" />,
   "http://www.w3.org/2004/02/skos/core#editorialNote": <StickyNote className="h-4 w-4" />,
   "http://www.w3.org/2004/02/skos/core#historyNote": <StickyNote className="h-4 w-4" />,
   "http://www.w3.org/2004/02/skos/core#changeNote": <StickyNote className="h-4 w-4" />,
   "http://www.w3.org/2004/02/skos/core#notation": <Hash className="h-4 w-4" />,
-  // RDFS
   "http://www.w3.org/2000/01/rdf-schema#seeAlso": <ExternalLink className="h-4 w-4" />,
   "http://www.w3.org/2000/01/rdf-schema#isDefinedBy": <Link2 className="h-4 w-4" />,
 };
@@ -1043,7 +961,6 @@ function getAnnotationIcon(propertyIri: string): React.ReactNode {
 
 interface SectionProps {
   title: string;
-  /** Ontological IRI or curie shown as tooltip on the heading */
   tooltip?: string;
   icon?: React.ReactNode;
   children: React.ReactNode;

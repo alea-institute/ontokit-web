@@ -12,9 +12,11 @@ import {
 interface InlineAnnotationAdderProps {
   excludeIris: string[];
   onAdd: (propertyIri: string, value: string, lang: string) => void;
+  /** Called after a new annotation is committed — used for auto-save */
+  onSaveNeeded?: () => void;
 }
 
-export function InlineAnnotationAdder({ excludeIris, onAdd }: InlineAnnotationAdderProps) {
+export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: InlineAnnotationAdderProps) {
   const [selectedProperty, setSelectedProperty] = useState<KnownAnnotationProperty | null>(null);
   const [propertyQuery, setPropertyQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -72,6 +74,7 @@ export function InlineAnnotationAdder({ excludeIris, onAdd }: InlineAnnotationAd
     setPropertyQuery("");
     setValue("");
     setLang("en");
+    onSaveNeeded?.();
   };
 
   const handleValueKeyDown = (e: React.KeyboardEvent) => {

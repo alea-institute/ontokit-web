@@ -1,0 +1,192 @@
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useDraftStore, draftKey, type DraftEntry } from "@/lib/stores/draftStore";
+import type { LocalizedString, AnnotationUpdate, ClassUpdatePayload } from "@/lib/api/client";
+import type { RelationshipGroup } from "@/components/editor/standard/RelationshipSection";
+import type { OWLClassDetail } from "@/lib/api/client";
+
+export type SaveStatus = "idle" | "draft" | "saving" | "saved" | "error";
+
+interface UseAutoSaveOptions {
+  projectId: string;
+  branch: string;
+  classIri: string | null;
+  classDetail: OWLClassDetail | null;
+  canEdit: boolean;
+  onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
+}
+
+interface EditState {
+  labels: LocalizedString[];
+  comments: LocalizedString[];
+  parentIris: string[];
+  parentLabels: Record<string, string>;
+  annotations: AnnotationUpdate[];
+  relationships: RelationshipGroup[];
+}
+
+export interface UseAutoSaveReturn {
+  saveStatus: SaveStatus;
+  saveError: string | null;
+  validationError: string | null;
+  triggerSave: () => void;
+  flushToGit: () => Promise<void>;
+  editStateRef: React.MutableRefObject<EditState | null>;
+  classDetailRef: React.MutableRefObject<OWLClassDetail | null>;
+  restoredDraft: DraftEntry | null;
+  clearRestoredDraft: () => void;
+}
+
+export function useAutoSave({
+  projectId,
+  branch,
+  classIri,
+  classDetail,
+  canEdit,
+  onUpdateClass,
+}: UseAutoSaveOptions): UseAutoSaveReturn {
+  const { setDraft, clearDraft, getDraft } = useDraftStore();
+
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const [restoredDraft, setRestoredDraft] = useState<DraftEntry | null>(null);
+
+  // Refs to hold current edit state so flush closure reads latest values
+  const editStateRef = useRef<EditState | null>(null);
+  const classDetailRef = useRef<OWLClassDetail | null>(null);
+  const flushingRef = useRef(false);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep classDetail ref up to date
+  useEffect(() => {
+    classDetailRef.current = classDetail;
+  }, [classDetail]);
+
+  // Check for restored draft on class change
+  useEffect(() => {
+    if (!classIri || !branch) return;
+    const key = draftKey(projectId, branch, classIri);
+    const draft = getDraft(key);
+    if (draft) {
+      setRestoredDraft(draft);
+    } else {
+      setRestoredDraft(null);
+    }
+    setSaveStatus("idle");
+    setSaveError(null);
+    setValidationError(null);
+  }, [classIri, branch, projectId, getDraft]);
+
+  const clearRestoredDraft = useCallback(() => {
+    setRestoredDraft(null);
+  }, []);
+
+  // Save edit state to draft store (Tier 1: instant, local)
+  const triggerSave = useCallback(() => {
+    if (!classIri || !branch || !canEdit) return;
+    const state = editStateRef.current;
+    if (!state) return;
+
+    // Validate: at least one non-empty label
+    const validLabels = state.labels.filter((l) => l.value.trim());
+    if (validLabels.length === 0) {
+      setValidationError("At least one label is required");
+      return;
+    }
+    setValidationError(null);
+
+    const key = draftKey(projectId, branch, classIri);
+    const entry: DraftEntry = {
+      labels: state.labels,
+      comments: state.comments,
+      parentIris: state.parentIris,
+      parentLabels: state.parentLabels,
+      annotations: state.annotations,
+      relationships: state.relationships,
+      updatedAt: Date.now(),
+    };
+    setDraft(key, entry);
+    setSaveStatus("draft");
+    setSaveError(null);
+
+    // Clear any "saved" fade timer
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+  }, [classIri, branch, projectId, canEdit, setDraft]);
+
+  // Flush draft to git (Tier 2: commit on navigate away)
+  const flushToGit = useCallback(async () => {
+    if (flushingRef.current) return;
+    if (!classIri || !branch || !canEdit || !onUpdateClass) return;
+
+    const key = draftKey(projectId, branch, classIri);
+    const draft = getDraft(key);
+    if (!draft) return;
+
+    const detail = classDetailRef.current;
+
+    flushingRef.current = true;
+    setSaveStatus("saving");
+    setSaveError(null);
+
+    try {
+      // Filter out empty annotation values
+      const cleanAnnotations = draft.annotations
+        .map((a) => ({
+          ...a,
+          values: a.values.filter((v) => v.value.trim()),
+        }))
+        .filter((a) => a.values.length > 0);
+
+      // Convert relationships back to annotation format
+      const relationshipAnnotations: AnnotationUpdate[] = draft.relationships
+        .filter((g) => g.targets.length > 0)
+        .map((g) => ({
+          property_iri: g.property_iri,
+          values: g.targets.map((t) => ({ value: t.iri, lang: "" })),
+        }));
+
+      const validLabels = draft.labels.filter((l) => l.value.trim());
+
+      const payload: ClassUpdatePayload = {
+        labels: validLabels,
+        comments: draft.comments.filter((c) => c.value.trim()),
+        parent_iris: draft.parentIris,
+        annotations: [...cleanAnnotations, ...relationshipAnnotations],
+        deprecated: detail?.deprecated,
+        equivalent_iris: detail?.equivalent_iris,
+        disjoint_iris: detail?.disjoint_iris,
+      };
+
+      await onUpdateClass(classIri, payload);
+      clearDraft(key);
+      setSaveStatus("saved");
+
+      // Fade "saved" indicator after 2s
+      savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+    } catch (err) {
+      setSaveStatus("error");
+      setSaveError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      flushingRef.current = false;
+    }
+  }, [classIri, branch, projectId, canEdit, onUpdateClass, getDraft, clearDraft]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
+
+  return {
+    saveStatus,
+    saveError,
+    validationError,
+    triggerSave,
+    flushToGit,
+    editStateRef,
+    classDetailRef,
+    restoredDraft,
+    clearRestoredDraft,
+  };
+}
