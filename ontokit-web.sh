@@ -5,7 +5,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PID_FILE="$SCRIPT_DIR/.ontokit-web.pid"
 LOG_FILE="$SCRIPT_DIR/.ontokit-web.log"
-PORT="${PORT:-3000}"
+PORT="${PORT:-53000}"
 FORCE_MODE=false
 
 # Parse flags

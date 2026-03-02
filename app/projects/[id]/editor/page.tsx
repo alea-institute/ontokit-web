@@ -25,9 +25,11 @@ import { projectApi, type Project } from "@/lib/api/projects";
 import { pullRequestsApi } from "@/lib/api/pullRequests";
 import { lintApi, type LintSummary } from "@/lib/api/lint";
 import { revisionsApi } from "@/lib/api/revisions";
-import { projectOntologyApi } from "@/lib/api/client";
+import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
+import { getLocalName } from "@/lib/utils";
 import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
 import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
+import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
 import { detectPatternFromIriIndex, type IriSuffixPattern } from "@/lib/ontology/iriGeneration";
 import { commonPrefixes } from "@/lib/editor/languages/turtle";
 
@@ -87,6 +89,9 @@ export default function EditorPage() {
   const [ontologyNamespace, setOntologyNamespace] = useState("http://example.org/ont#");
   const [ontologyPrefix, setOntologyPrefix] = useState<string | undefined>(undefined);
   const iriPatternDetectedRef = useRef(false);
+
+  // Detail panel refresh key (bumped after class update)
+  const [detailRefreshKey, setDetailRefreshKey] = useState(0);
 
   // Delete class state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -512,6 +517,53 @@ export default function EditorPage() {
     }
   }, [deleteTargetIri, deleteTargetLabel, session?.accessToken, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses]);
 
+  // Handle update class (form-based editing)
+  // Routes through source save: modifies the Turtle text and commits via PUT /source
+  const handleUpdateClass = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
+    if (!session?.accessToken) {
+      throw new Error("Not authenticated");
+    }
+
+    // Ensure source content is loaded
+    let source = sourceContent;
+    if (!source) {
+      const response = await revisionsApi.getFileAtVersion(
+        projectId,
+        activeBranch!,
+        session.accessToken,
+        project?.git_ontology_path,
+      );
+      source = response.content;
+    }
+
+    // Apply the update to the Turtle source text
+    const modifiedSource = updateClassInTurtle(source, classIri, data);
+
+    // Save via the source endpoint (the only project-level write path)
+    const label = data.labels[0]?.value || getLocalName(classIri);
+    const commitMessage = `Update class ${label}`;
+
+    await projectOntologyApi.saveSource(
+      projectId,
+      modifiedSource,
+      commitMessage,
+      session.accessToken,
+      activeBranch,
+    );
+
+    // Update local source content to match what was saved
+    setSourceContent(modifiedSource);
+    toast.success(`Updated "${label}"`);
+
+    // Refresh tree (labels may have changed) and detail panel
+    loadRootClasses();
+    setDetailRefreshKey((k) => k + 1);
+
+    // Re-index source IRIs
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, loadRootClasses]);
+
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
     setActiveBranch(branchName);
@@ -750,6 +802,8 @@ export default function EditorPage() {
                   onDeleteClass={handleDeleteClass}
                   onCopyIri={handleCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
+                  onUpdateClass={handleUpdateClass}
+                  detailRefreshKey={detailRefreshKey}
                   showHealthCheck={showHealthCheck}
                   onCloseHealthCheck={() => setShowHealthCheck(false)}
                 />
@@ -772,6 +826,8 @@ export default function EditorPage() {
                 onDeleteClass={handleDeleteClass}
                 onCopyIri={handleCopyIri}
                 selectedNodeFallback={selectedNodeFallback}
+                onUpdateClass={handleUpdateClass}
+                detailRefreshKey={detailRefreshKey}
               />
             )}
           </div>

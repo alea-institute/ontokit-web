@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
-import { projectOntologyApi, type EntitySearchResult } from "@/lib/api/client";
+import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
+import { projectOntologyApi, type EntitySearchResult, type ClassUpdatePayload } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 import type { IriPosition } from "@/lib/editor/indexWorker";
@@ -65,6 +66,10 @@ export interface DeveloperEditorLayoutProps {
   // Detail panel
   selectedNodeFallback: TreeNodeFallback | null;
 
+  // Class editing
+  onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
+  detailRefreshKey?: number;
+
   // Side panels
   showHealthCheck: boolean;
   onCloseHealthCheck: () => void;
@@ -100,12 +105,17 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     onDeleteClass,
     onCopyIri,
     selectedNodeFallback,
+    onUpdateClass,
+    detailRefreshKey,
     showHealthCheck,
     onCloseHealthCheck,
   } = props;
 
   const [viewMode, setViewMode] = useState<DeveloperView>("tree");
   const preloadStartedRef = useRef(false);
+
+  // Panel width state (default 320px = w-80)
+  const [treePanelWidth, setTreePanelWidth] = useState(320);
 
   // Search state
   const [showSearch, setShowSearch] = useState(false);
@@ -235,7 +245,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
         {viewMode === "tree" ? (
           <>
             {/* Left Panel - Class Tree */}
-            <div className="w-80 flex-shrink-0 border-r border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+            <div className="flex-shrink-0 bg-white dark:bg-slate-800" style={{ width: treePanelWidth }}>
               <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -319,8 +329,16 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               </div>
             </div>
 
+            {/* Draggable Divider */}
+            <ResizablePanelDivider
+              width={treePanelWidth}
+              onWidthChange={setTreePanelWidth}
+              minWidth={200}
+              maxWidth={600}
+            />
+
             {/* Center Panel - Class Details */}
-            <div className="flex-1 bg-white dark:bg-slate-800">
+            <div className="min-w-0 flex-1 bg-white dark:bg-slate-800">
               <ClassDetailPanel
                 projectId={projectId}
                 classIri={selectedIri}
@@ -330,6 +348,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 onNavigateToSource={handleNavigateToSource}
                 onCopyIri={onCopyIri}
                 selectedNodeFallback={selectedNodeFallback}
+                canEdit={canEdit}
+                onUpdateClass={onUpdateClass}
+                refreshKey={detailRefreshKey}
               />
             </div>
 

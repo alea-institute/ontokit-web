@@ -465,6 +465,26 @@ export const projectOntologyApi = {
     ),
 
   /**
+   * Update a class in the ontology (labels, comments, parent classes)
+   */
+  updateClass: (
+    projectId: string,
+    classIri: string,
+    data: ClassUpdatePayload,
+    commitMessage: string,
+    token: string,
+    branch?: string
+  ) =>
+    api.patch<OWLClassDetail>(
+      `/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}`,
+      { ...data, commit_message: commitMessage },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { branch },
+      }
+    ),
+
+  /**
    * Delete a class from the ontology
    */
   deleteClass: (
@@ -498,6 +518,24 @@ export const projectOntologyApi = {
       }
     ),
 };
+
+// Annotation update — a single annotation property with its values
+export interface AnnotationUpdate {
+  property_iri: string;
+  values: LocalizedString[];
+}
+
+// Class update payload for structured editing
+export interface ClassUpdatePayload {
+  labels: LocalizedString[];
+  comments: LocalizedString[];
+  parent_iris: string[];
+  annotations?: AnnotationUpdate[];
+  // Preserved fields (not edited by form, but needed for Turtle source generation)
+  deprecated?: boolean;
+  equivalent_iris?: string[];
+  disjoint_iris?: string[];
+}
 
 // Entity search types
 export interface EntitySearchResult {
