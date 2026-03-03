@@ -25,6 +25,24 @@ const IS_DEFINED_BY_IRI = "http://www.w3.org/2000/01/rdf-schema#isDefinedBy";
 const MAX_CHILDREN_PER_NODE = 20;
 
 /**
+ * Extract IRI-valued seeAlso/isDefinedBy targets from a class detail's annotations.
+ */
+export function getSeeAlsoIris(detail: OWLClassDetail): string[] {
+  const iris: string[] = [];
+  for (const annot of detail.annotations) {
+    if (annot.property_iri === SEEALSO_IRI || annot.property_iri === IS_DEFINED_BY_IRI) {
+      for (const val of annot.values) {
+        const v = typeof val === "string" ? val : val.value;
+        if (v.startsWith("http://") || v.startsWith("https://")) {
+          iris.push(v);
+        }
+      }
+    }
+  }
+  return iris;
+}
+
+/**
  * Build graph data from a set of resolved class details centered on a focus IRI.
  */
 export function buildGraphFromClassDetail(

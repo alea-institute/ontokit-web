@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
-import { buildGraphFromClassDetail } from "@/lib/graph/buildGraphData";
+import { buildGraphFromClassDetail, getSeeAlsoIris } from "@/lib/graph/buildGraphData";
 import type { GraphData } from "@/lib/graph/types";
 
 const MAX_RESOLVED_NODES = 100;
@@ -89,6 +89,11 @@ export function useGraphData({
               newNeighborIris.push(djIri);
             }
           }
+          for (const seeAlsoIri of getSeeAlsoIris(detail)) {
+            if (!resolvedNodesRef.current.has(seeAlsoIri)) {
+              newNeighborIris.push(seeAlsoIri);
+            }
+          }
         }
       }
       return [...new Set(newNeighborIris)];
@@ -129,11 +134,12 @@ export function useGraphData({
           return;
         }
 
-        // Depth 1: immediate neighbors
+        // Depth 1: immediate neighbors (including seeAlso/isDefinedBy targets)
         const depth1Iris = [
           ...focusDetail.parent_iris,
           ...focusDetail.equivalent_iris,
           ...focusDetail.disjoint_iris,
+          ...getSeeAlsoIris(focusDetail),
         ];
         const depth2Candidates = await fetchNeighbors(depth1Iris);
         if (cancelled) return;
@@ -168,6 +174,7 @@ export function useGraphData({
             ...detail.parent_iris,
             ...detail.equivalent_iris,
             ...detail.disjoint_iris,
+            ...getSeeAlsoIris(detail),
           ];
           await fetchNeighbors(neighborIris);
         }

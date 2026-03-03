@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import { ToastProvider } from "@/lib/context/ToastContext";
 import { ToastContainer } from "@/components/ui/toast-container";
 import { ScreenReaderAnnouncerProvider } from "@/components/ui/ScreenReaderAnnouncer";
+import { SessionGuard } from "@/components/auth/SessionGuard";
 
 // Import the store module to ensure module-level theme sync runs
 import "@/lib/stores/editorModeStore";
@@ -29,6 +30,7 @@ export function Providers({ children }: ProvidersProps) {
 
   return (
     <SessionProvider>
+      <SessionGuard />
       <QueryClientProvider client={queryClient}>
         <ScreenReaderAnnouncerProvider>
           <ToastProvider>
