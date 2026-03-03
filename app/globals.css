@@ -98,6 +98,24 @@ body {
   @apply ring-2 ring-primary-500/50 ring-inset;
 }
 
+/* Drag-and-drop tree reparenting */
+.tree-item-dragging {
+  @apply opacity-30;
+}
+
+.tree-item-drop-valid {
+  @apply ring-2 ring-primary-500 ring-inset bg-primary-50 dark:bg-primary-900/20;
+}
+
+.tree-item-drop-invalid {
+  @apply ring-2 ring-red-400 ring-inset bg-red-50 dark:bg-red-900/20 cursor-not-allowed;
+}
+
+.tree-drag-overlay {
+  @apply flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg dark:border-slate-600 dark:bg-slate-800;
+  max-width: 260px;
+}
+
 /* Collaboration cursor colors */
 .collab-cursor {
   @apply absolute pointer-events-none z-50;

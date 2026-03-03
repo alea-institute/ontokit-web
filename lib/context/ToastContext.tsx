@@ -10,12 +10,18 @@ import {
 
 export type ToastType = "success" | "error" | "warning" | "info";
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface Toast {
   id: string;
   type: ToastType;
   title: string;
   description?: string;
   duration?: number;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {

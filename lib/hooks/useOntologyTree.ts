@@ -11,6 +11,10 @@ interface UseOntologyTreeOptions {
   branchKey?: string;
 }
 
+interface ReparentSnapshot {
+  previousNodes: ClassTreeNode[];
+}
+
 interface UseOntologyTreeReturn {
   nodes: ClassTreeNode[];
   totalClasses: number;
@@ -32,6 +36,10 @@ interface UseOntologyTreeReturn {
   collapseAll: () => void;
   /** Expand all visible nodes with children (one level deeper) */
   expandAll: () => Promise<void>;
+  /** Optimistically move a node from one parent to another. Returns snapshot for rollback. */
+  reparentOptimistic: (iri: string, oldParentIri: string | null, newParentIri: string | null) => ReparentSnapshot;
+  /** Rollback a reparent using the snapshot */
+  rollbackReparent: (snapshot: ReparentSnapshot) => void;
 }
 
 /**
@@ -309,6 +317,79 @@ export function useOntologyTree({
     await Promise.all(irisToExpand.map((iri) => expandNode(iri)));
   }, [nodes, expandNode]);
 
+  /**
+   * Optimistically reparent a node: remove from old parent, add under new parent.
+   * Returns a snapshot that can be used to rollback.
+   */
+  const reparentOptimistic = useCallback(
+    (iri: string, oldParentIri: string | null, newParentIri: string | null): ReparentSnapshot => {
+      let snapshot: ReparentSnapshot = { previousNodes: [] };
+
+      setNodes((prev) => {
+        snapshot = { previousNodes: prev };
+
+        // Find the node to move (deep clone its subtree)
+        const findAndClone = (items: ClassTreeNode[]): ClassTreeNode | null => {
+          for (const node of items) {
+            if (node.iri === iri) return { ...node };
+            if (node.children.length > 0) {
+              const found = findAndClone(node.children);
+              if (found) return found;
+            }
+          }
+          return null;
+        };
+
+        const movingNode = findAndClone(prev);
+        if (!movingNode) return prev;
+
+        // Step 1: Remove from old location
+        const removeFromTree = (items: ClassTreeNode[]): ClassTreeNode[] => {
+          const filtered = items.filter((n) => n.iri !== iri);
+          return filtered.map((n) => {
+            if (n.children.length > 0) {
+              const newChildren = removeFromTree(n.children);
+              const lostChild = n.children.length !== newChildren.length;
+              return {
+                ...n,
+                children: newChildren,
+                hasChildren: newChildren.length > 0 || (n.hasChildren && !lostChild),
+              };
+            }
+            return n;
+          });
+        };
+
+        let result = removeFromTree(prev);
+
+        // Step 2: Insert under new parent (or root)
+        if (newParentIri) {
+          result = updateNodeInTree(result, newParentIri, (parent) => ({
+            ...parent,
+            children: [...parent.children, movingNode],
+            hasChildren: true,
+            isExpanded: true,
+          }));
+        } else {
+          // Add to root
+          result = [...result, movingNode];
+        }
+
+        return result;
+      });
+
+      return snapshot;
+    },
+    [],
+  );
+
+  /**
+   * Rollback a reparent using the snapshot.
+   */
+  const rollbackReparent = useCallback((snapshot: ReparentSnapshot) => {
+    setNodes(snapshot.previousNodes);
+  }, []);
+
   // Load root classes on mount
   useEffect(() => {
     loadRootClasses();
@@ -330,5 +411,7 @@ export function useOntologyTree({
     updateNodeLabel,
     collapseAll,
     expandAll,
+    reparentOptimistic,
+    rollbackReparent,
   };
 }

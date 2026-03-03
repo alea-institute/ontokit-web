@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
@@ -12,11 +12,15 @@ import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
 import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
 import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
+import { DraggableTreeWrapper } from "@/components/editor/shared/DraggableTreeWrapper";
+import { useTreeDragDrop, type DragMode } from "@/lib/hooks/useTreeDragDrop";
+import { useToast } from "@/lib/context/ToastContext";
 import type { ClassUpdatePayload } from "@/lib/api/client";
 import type { TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import type { TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import { useDraftStore } from "@/lib/stores/draftStore";
+import { getLocalName } from "@/lib/utils";
 
 export interface StandardEditorLayoutProps {
   projectId: string;
@@ -55,6 +59,11 @@ export interface StandardEditorLayoutProps {
   sourceContent?: string;
   onUpdateProperty?: (propertyIri: string, data: TurtlePropertyUpdateData) => Promise<void>;
   onUpdateIndividual?: (individualIri: string, data: TurtleIndividualUpdateData) => Promise<void>;
+
+  // Drag-and-drop reparenting
+  onReparentClass?: (classIri: string, oldParentIris: string[], newParentIris: string[], mode: DragMode) => Promise<void>;
+  reparentOptimistic?: (iri: string, oldParentIri: string | null, newParentIri: string | null) => { previousNodes: ClassTreeNode[] };
+  rollbackReparent?: (snapshot: { previousNodes: ClassTreeNode[] }) => void;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -85,7 +94,12 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     sourceContent,
     onUpdateProperty,
     onUpdateIndividual,
+    onReparentClass,
+    reparentOptimistic,
+    rollbackReparent,
   } = props;
+
+  const toast = useToast();
 
   // Draft badges
   const getDraftIris = useDraftStore((s) => s.getDraftIris);
@@ -95,6 +109,66 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [getDraftIris, projectId, activeBranch, drafts],
   );
+
+  // Drag-and-drop reparenting
+  const handleDndReparent = useCallback(async (
+    classIri: string,
+    oldParentIris: string[],
+    newParentIris: string[],
+    mode: DragMode,
+  ) => {
+    if (!onReparentClass || !reparentOptimistic || !rollbackReparent) return;
+
+    // Optimistic tree update
+    const oldTreeParent = oldParentIris[0] || null;
+    const newTreeParent = newParentIris[0] || null;
+    const snapshot = reparentOptimistic(classIri, oldTreeParent, newTreeParent);
+
+    try {
+      await onReparentClass(classIri, oldParentIris, newParentIris, mode);
+    } catch (err) {
+      rollbackReparent(snapshot);
+      toast.error(
+        "Failed to reparent class",
+        err instanceof Error ? err.message : "Unknown error",
+      );
+    }
+  }, [onReparentClass, reparentOptimistic, rollbackReparent, toast]);
+
+  const {
+    dragState,
+    undoAction,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+    handleDragCancel,
+    handleUndo,
+    clearUndo,
+    handleDragEnterNode,
+    handleDragLeaveNode,
+  } = useTreeDragDrop({
+    nodes,
+    canEdit: canEdit || isSuggestionMode,
+    expandNode,
+    onReparent: handleDndReparent,
+  });
+
+  // Show undo toast when reparent succeeds
+  useEffect(() => {
+    if (undoAction) {
+      const label = undoAction.classLabel || getLocalName(undoAction.classIri);
+      toast.addToast({
+        type: "success",
+        title: `Moved "${label}"`,
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: handleUndo,
+        },
+      });
+      clearUndo();
+    }
+  }, [undoAction, toast, handleUndo, clearUndo]);
 
   // Panel width state (default 320px = w-80)
   const [treePanelWidth, setTreePanelWidth] = useState(320);
@@ -179,24 +253,37 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                   </p>
                 </div>
               ) : (
-                <ClassTree
-                  nodes={nodes}
-                  selectedIri={selectedIri}
-                  onSelect={selectNode}
-                  onExpand={expandNode}
-                  onCollapse={collapseNode}
-                  onAddChild={canEdit ? (parentIri: string) => onAddEntity(parentIri) : undefined}
-                  onCopyIri={onCopyIri}
-                  onDelete={canEdit ? onDeleteClass : undefined}
-                  searchResults={showSearch ? searchResults : undefined}
-                  isSearching={isSearching}
-                  onSearchSelect={handleSearchSelect}
-                  searchQuery={searchQuery}
-                  draftIris={draftIris}
-                  filteredTree={filteredNodes}
-                  isFilteredTreeBuilding={isFilteredTreeBuilding}
-                  filteredTreeTruncated={filteredTreeTruncated}
-                />
+                <DraggableTreeWrapper
+                  isDragActive={dragState.isDragActive}
+                  draggedLabel={dragState.draggedLabel}
+                  dragMode={dragState.dragMode}
+                  onDragStart={handleDragStart}
+                  onDragOver={handleDragOver}
+                  onDragEnd={handleDragEnd}
+                  onDragCancel={handleDragCancel}
+                >
+                  <ClassTree
+                    nodes={nodes}
+                    selectedIri={selectedIri}
+                    onSelect={selectNode}
+                    onExpand={expandNode}
+                    onCollapse={collapseNode}
+                    onAddChild={canEdit ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+                    onCopyIri={onCopyIri}
+                    onDelete={canEdit ? onDeleteClass : undefined}
+                    searchResults={showSearch ? searchResults : undefined}
+                    isSearching={isSearching}
+                    onSearchSelect={handleSearchSelect}
+                    searchQuery={searchQuery}
+                    draftIris={draftIris}
+                    filteredTree={filteredNodes}
+                    isFilteredTreeBuilding={isFilteredTreeBuilding}
+                    filteredTreeTruncated={filteredTreeTruncated}
+                    dragState={!showSearch && (canEdit || isSuggestionMode) ? dragState : undefined}
+                    onDragEnterNode={handleDragEnterNode}
+                    onDragLeaveNode={handleDragLeaveNode}
+                  />
+                </DraggableTreeWrapper>
               )}
             </>
           )}

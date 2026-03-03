@@ -6,6 +6,7 @@ import { EntityTree } from "@/components/editor/shared/EntityTree";
 import { classTreeNodesToEntityNodes } from "@/lib/ontology/types";
 import type { ClassTreeNode, EntityTreeNode } from "@/lib/ontology/types";
 import type { EntitySearchResult } from "@/lib/api/client";
+import type { DragState } from "@/lib/hooks/useTreeDragDrop";
 
 interface ClassTreeProps {
   nodes: ClassTreeNode[];
@@ -29,6 +30,12 @@ interface ClassTreeProps {
   isFilteredTreeBuilding?: boolean;
   /** Whether search results were truncated */
   filteredTreeTruncated?: boolean;
+  /** Drag state for drag-and-drop reparenting. Not passed during search mode. */
+  dragState?: DragState;
+  /** Called when drag hovers over a node (for auto-expand) */
+  onDragEnterNode?: (iri: string) => void;
+  /** Called when drag leaves a node */
+  onDragLeaveNode?: () => void;
 }
 
 export function ClassTree({
@@ -49,6 +56,9 @@ export function ClassTree({
   filteredTree,
   isFilteredTreeBuilding,
   filteredTreeTruncated,
+  dragState,
+  onDragEnterNode,
+  onDragLeaveNode,
 }: ClassTreeProps) {
   // Convert ClassTreeNode[] to EntityTreeNode[]
   const entityNodes = useMemo(
@@ -141,6 +151,9 @@ export function ClassTree({
       onViewInSource={onViewInSource}
       draftIris={draftIris}
       enableKeyboardNav
+      dragState={dragState}
+      onDragEnterNode={onDragEnterNode}
+      onDragLeaveNode={onDragLeaveNode}
     />
   );
 }

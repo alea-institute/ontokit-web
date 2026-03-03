@@ -132,6 +132,8 @@ export default function EditorPage() {
     updateNodeLabel,
     collapseAll,
     expandAll,
+    reparentOptimistic,
+    rollbackReparent,
   } = useOntologyTree({
     projectId,
     accessToken: session?.accessToken,
@@ -719,6 +721,63 @@ export default function EditorPage() {
     iriPatternDetectedRef.current = false;
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, suggestionSession]);
 
+  // Handle drag-and-drop reparent class
+  // Fetches full class detail, modifies parent_iris, then routes through the appropriate save handler
+  const handleReparentClass = useCallback(async (
+    classIri: string,
+    _oldParentIris: string[],
+    newParentIris: string[],
+    mode: "move" | "add",
+  ) => {
+    if (!session?.accessToken) throw new Error("Not authenticated");
+
+    // Fetch the full class detail to get authoritative parent_iris
+    const detail = await projectOntologyApi.getClassDetail(projectId, classIri, session.accessToken, activeBranch);
+
+    // Build new parent list based on mode
+    let updatedParentIris: string[];
+    if (newParentIris.length === 0) {
+      // Dropped on root zone — remove all parents
+      updatedParentIris = [];
+    } else if (mode === "add") {
+      // Add mode — keep existing, add new (deduplicated)
+      const parentSet = new Set(detail.parent_iris);
+      for (const iri of newParentIris) parentSet.add(iri);
+      updatedParentIris = [...parentSet];
+    } else {
+      // Move mode — replace old tree parent with new
+      const oldTreeParent = _oldParentIris[0] || null;
+      if (oldTreeParent && detail.parent_iris.includes(oldTreeParent)) {
+        updatedParentIris = detail.parent_iris.map((p) =>
+          p === oldTreeParent ? newParentIris[0] : p,
+        );
+      } else {
+        // Old parent not in actual parents (e.g., node was at root) — just add new
+        updatedParentIris = [...detail.parent_iris, ...newParentIris];
+      }
+      // Deduplicate
+      updatedParentIris = [...new Set(updatedParentIris)];
+    }
+
+    // Build ClassUpdatePayload from the fetched detail
+    const payload: ClassUpdatePayload = {
+      labels: detail.labels,
+      comments: detail.comments,
+      parent_iris: updatedParentIris,
+      annotations: detail.annotations.map((a) => ({
+        property_iri: a.property_iri,
+        values: a.values,
+      })),
+      deprecated: detail.deprecated,
+      equivalent_iris: detail.equivalent_iris,
+      disjoint_iris: detail.disjoint_iris,
+    };
+
+    // Route through the appropriate save handler
+    const saveHandler = isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass;
+    await saveHandler(classIri, payload);
+  }, [session?.accessToken, projectId, activeBranch, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate]);
+
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
     setActiveBranch(branchName);
@@ -1015,6 +1074,9 @@ export default function EditorPage() {
                   onCloseHealthCheck={() => setShowHealthCheck(false)}
                   onUpdateProperty={handleUpdateProperty}
                   onUpdateIndividual={handleUpdateIndividual}
+                  onReparentClass={handleReparentClass}
+                  reparentOptimistic={reparentOptimistic}
+                  rollbackReparent={rollbackReparent}
                 />
               </div>
             ) : (
@@ -1044,6 +1106,9 @@ export default function EditorPage() {
                 sourceContent={sourceContent}
                 onUpdateProperty={handleUpdateProperty}
                 onUpdateIndividual={handleUpdateIndividual}
+                onReparentClass={handleReparentClass}
+                reparentOptimistic={reparentOptimistic}
+                rollbackReparent={rollbackReparent}
               />
             )}
           </div>

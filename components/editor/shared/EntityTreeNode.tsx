@@ -1,11 +1,13 @@
 "use client";
 
 import { memo, useCallback } from "react";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronRight, ChevronDown, Circle, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { TreeNodeContextMenu } from "@/components/editor/TreeNodeContextMenu";
 import type { EntityTreeNode as EntityTreeNodeType } from "@/lib/ontology/types";
+import type { DragState } from "@/lib/hooks/useTreeDragDrop";
 
 interface EntityTreeNodeProps {
   node: EntityTreeNodeType;
@@ -21,6 +23,12 @@ interface EntityTreeNodeProps {
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
   draftIris?: Set<string>;
+  /** Drag state for drag-and-drop reparenting. Undefined = drag disabled. */
+  dragState?: DragState;
+  /** Called when drag hovers over this node (for auto-expand) */
+  onDragEnterNode?: (iri: string) => void;
+  /** Called when drag leaves this node */
+  onDragLeaveNode?: () => void;
 }
 
 function highlightMatch(text: string, query: string | undefined): React.ReactNode {
@@ -50,11 +58,42 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   onDelete,
   onViewInSource,
   draftIris,
+  dragState,
+  onDragEnterNode,
+  onDragLeaveNode,
 }: EntityTreeNodeProps) {
   const isSelected = selectedIri === node.iri;
   const isFocused = focusedIri === node.iri;
   const hasChildren = node.hasChildren || node.children.length > 0;
   const isRoot = depth === 0;
+
+  // Drag-and-drop hooks (only when dragState is provided)
+  const isDndEnabled = !!dragState;
+  const { attributes: dragAttributes, listeners: dragListeners, setNodeRef: setDragRef } = useDraggable({
+    id: node.iri,
+    disabled: !isDndEnabled,
+  });
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: node.iri,
+    disabled: !isDndEnabled,
+  });
+
+  // Combine refs for the row element
+  const setRowRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (isDndEnabled) {
+        setDragRef(el);
+        setDropRef(el);
+      }
+    },
+    [isDndEnabled, setDragRef, setDropRef],
+  );
+
+  // Drag state for this specific node
+  const isBeingDragged = dragState?.draggedIri === node.iri;
+  const isDropTarget = dragState?.dropTargetIri === node.iri;
+  const isValidDrop = isDropTarget && dragState?.isValidDropTarget;
+  const isInvalidDrop = isDropTarget && !dragState?.isValidDropTarget;
 
   const handleToggle = useCallback(
     (e: React.MouseEvent) => {
@@ -138,6 +177,7 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
 
   const rowContent = (
     <div
+      ref={isDndEnabled ? setRowRef : undefined}
       className={cn(
         "tree-item group",
         isSelected && "selected",
@@ -145,14 +185,19 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
         isFocused && "tree-item-focused",
         node.isSearchMatch && "tree-search-match",
         node.deprecated && "opacity-60",
+        isBeingDragged && "tree-item-dragging",
+        isValidDrop && "tree-item-drop-valid",
+        isInvalidDrop && "tree-item-drop-invalid",
       )}
       style={{ paddingLeft: `${depth * 20 + 8}px` }}
       onClick={() => onSelect(node.iri)}
       onDoubleClick={handleDoubleClick}
-      role="treeitem"
+      onPointerEnter={isOver && isDndEnabled ? () => onDragEnterNode?.(node.iri) : undefined}
+      onPointerLeave={isDndEnabled && dragState?.isDragActive ? onDragLeaveNode : undefined}
       aria-selected={isSelected}
       aria-expanded={hasChildren ? node.isExpanded : undefined}
       data-iri={node.iri}
+      {...(isDndEnabled ? { ...dragAttributes, ...dragListeners, role: "treeitem" } : { role: "treeitem" })}
     >
       {/* Expand/collapse chevron or leaf dot — same 16px box for alignment */}
       {hasChildren ? (
@@ -245,6 +290,9 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
             onDelete={onDelete}
             onViewInSource={onViewInSource}
             draftIris={draftIris}
+            dragState={dragState}
+            onDragEnterNode={onDragEnterNode}
+            onDragLeaveNode={onDragLeaveNode}
           />
         ))}
     </div>

@@ -67,6 +67,17 @@ function ToastItem({ toast }: { toast: Toast }) {
           </p>
         )}
       </div>
+      {toast.action && (
+        <button
+          onClick={() => {
+            toast.action!.onClick();
+            handleDismiss();
+          }}
+          className="shrink-0 rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         onClick={handleDismiss}
         className="shrink-0 rounded p-0.5 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"

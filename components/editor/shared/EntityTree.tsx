@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { EntityTreeNodeRow } from "./EntityTreeNode";
 import type { EntityTreeNode } from "@/lib/ontology/types";
+import type { DragState } from "@/lib/hooks/useTreeDragDrop";
 
 interface EntityTreeProps {
   nodes: EntityTreeNode[];
@@ -17,6 +18,12 @@ interface EntityTreeProps {
   draftIris?: Set<string>;
   searchQuery?: string;
   enableKeyboardNav?: boolean;
+  /** Drag state for drag-and-drop reparenting. Undefined = drag disabled. */
+  dragState?: DragState;
+  /** Called when drag hovers over a node (for auto-expand) */
+  onDragEnterNode?: (iri: string) => void;
+  /** Called when drag leaves a node */
+  onDragLeaveNode?: () => void;
 }
 
 /**
@@ -81,6 +88,9 @@ export function EntityTree({
   draftIris,
   searchQuery,
   enableKeyboardNav = false,
+  dragState,
+  onDragEnterNode,
+  onDragLeaveNode,
 }: EntityTreeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [focusedIri, setFocusedIri] = useState<string | null>(null);
@@ -190,6 +200,9 @@ export function EntityTree({
           onDelete={onDelete}
           onViewInSource={onViewInSource}
           draftIris={draftIris}
+          dragState={dragState}
+          onDragEnterNode={onDragEnterNode}
+          onDragLeaveNode={onDragLeaveNode}
         />
       ))}
     </div>
