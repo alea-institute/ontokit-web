@@ -70,6 +70,7 @@ interface ClassDetailPanelProps {
   onCopyIri?: (iri: string) => void;
   selectedNodeFallback?: TreeNodeFallback | null;
   canEdit?: boolean;
+  isSuggestionMode?: boolean;
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   refreshKey?: number;
 }
@@ -84,6 +85,7 @@ export function ClassDetailPanel({
   onCopyIri,
   selectedNodeFallback,
   canEdit,
+  isSuggestionMode = false,
   onUpdateClass,
   refreshKey,
 }: ClassDetailPanelProps) {
@@ -589,7 +591,7 @@ export function ClassDetailPanel({
                         title="Enter edit mode"
                       >
                         <Pencil className="h-3.5 w-3.5" />
-                        Edit Item
+                        {isSuggestionMode ? "Suggest Changes" : "Edit Item"}
                       </button>
                     )}
                   </div>

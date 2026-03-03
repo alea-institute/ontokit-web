@@ -23,6 +23,8 @@ export interface StandardEditorLayoutProps {
   accessToken?: string;
   activeBranch?: string;
   canEdit: boolean;
+  canSuggest?: boolean;
+  isSuggestionMode?: boolean;
 
   // Tree state (from useOntologyTree)
   nodes: ClassTreeNode[];
@@ -61,6 +63,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     accessToken,
     activeBranch,
     canEdit,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    canSuggest = false,
+    isSuggestionMode = false,
     nodes,
     isTreeLoading,
     treeError,
@@ -237,7 +242,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onNavigateToClass={(iri) => navigateToNode(iri)}
             onCopyIri={onCopyIri}
             selectedNodeFallback={selectedNodeFallback}
-            canEdit={canEdit}
+            canEdit={canEdit || isSuggestionMode}
+            isSuggestionMode={isSuggestionMode}
             onUpdateClass={onUpdateClass}
             refreshKey={detailRefreshKey}
           />

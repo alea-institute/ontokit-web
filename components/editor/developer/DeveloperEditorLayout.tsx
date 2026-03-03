@@ -44,6 +44,8 @@ export interface DeveloperEditorLayoutProps {
   accessToken?: string;
   activeBranch?: string;
   canEdit: boolean;
+  canSuggest?: boolean;
+  isSuggestionMode?: boolean;
   canManage: boolean;
 
   // Tree state (from useOntologyTree)
@@ -98,6 +100,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     accessToken,
     activeBranch,
     canEdit,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    canSuggest = false,
+    isSuggestionMode = false,
     canManage,
     nodes,
     isTreeLoading,
@@ -360,7 +365,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   onNavigateToSource={handleNavigateToSource}
                   onCopyIri={onCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
-                  canEdit={canEdit}
+                  canEdit={canEdit || isSuggestionMode}
+                  isSuggestionMode={isSuggestionMode}
                   onUpdateClass={onUpdateClass}
                   refreshKey={detailRefreshKey}
                 />

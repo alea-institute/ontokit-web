@@ -1,60 +1,103 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useSession } from "next-auth/react";
-import Link from "next/link";
-import { Bell } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
-  joinRequestApi,
-  type PendingJoinRequestsSummary,
-} from "@/lib/api/joinRequests";
-import {
-  pullRequestsApi,
-  type OpenPRsSummary,
-} from "@/lib/api/pullRequests";
+  Bell,
+  Lightbulb,
+  Check,
+  XCircle,
+  MessageSquareWarning,
+  UserPlus,
+  GitPullRequest,
+  GitMerge,
+  AlertCircle,
+} from "lucide-react";
+import { useNotifications, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/hooks/useNotifications";
+import type { NotificationType } from "@/lib/api/notifications";
+import { cn } from "@/lib/utils";
 
-/** Dispatch this event to trigger a notification refetch. */
-export const NOTIFICATIONS_CHANGED_EVENT = "notifications:changed";
+// Re-export for consumers that import from this file
+export { NOTIFICATIONS_CHANGED_EVENT };
+
+const iconByType: Record<NotificationType, React.ComponentType<{ className?: string }>> = {
+  suggestion_submitted: Lightbulb,
+  suggestion_approved: Check,
+  suggestion_rejected: XCircle,
+  suggestion_changes_requested: MessageSquareWarning,
+  suggestion_auto_submitted: AlertCircle,
+  join_request: UserPlus,
+  pr_opened: GitPullRequest,
+  pr_merged: GitMerge,
+  pr_review: MessageSquareWarning,
+};
+
+const colorByType: Record<NotificationType, string> = {
+  suggestion_submitted: "text-amber-500",
+  suggestion_approved: "text-green-500",
+  suggestion_rejected: "text-red-500",
+  suggestion_changes_requested: "text-orange-500",
+  suggestion_auto_submitted: "text-orange-500",
+  join_request: "text-blue-500",
+  pr_opened: "text-indigo-500",
+  pr_merged: "text-purple-500",
+  pr_review: "text-amber-500",
+};
+
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHrs = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+function getTargetUrl(notification: { type: NotificationType; project_id: string; target_id?: string; target_url?: string }): string {
+  if (notification.target_url) return notification.target_url;
+
+  const base = `/projects/${notification.project_id}`;
+
+  switch (notification.type) {
+    case "suggestion_submitted":
+    case "suggestion_auto_submitted":
+      return `${base}/suggestions/review`;
+    case "suggestion_approved":
+    case "suggestion_rejected":
+    case "suggestion_changes_requested":
+      return `${base}/suggestions`;
+    case "join_request":
+      return `${base}/settings#join-requests`;
+    case "pr_opened":
+    case "pr_merged":
+    case "pr_review":
+      return notification.target_id
+        ? `${base}/pull-requests/${notification.target_id}`
+        : `${base}/pull-requests`;
+    default:
+      return base;
+  }
+}
 
 export function NotificationBell() {
-  const { data: session, status } = useSession();
-  const [joinSummary, setJoinSummary] =
-    useState<PendingJoinRequestsSummary | null>(null);
-  const [prSummary, setPrSummary] = useState<OpenPRsSummary | null>(null);
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+  } = useNotifications();
+
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
-  const fetchNotifications = useCallback(() => {
-    if (status !== "authenticated" || !session?.accessToken) return;
-
-    joinRequestApi
-      .getPendingSummary(session.accessToken)
-      .then(setJoinSummary)
-      .catch(() => {
-        // Ignore errors — user may not manage any projects
-      });
-
-    pullRequestsApi
-      .getOpenSummary(session.accessToken)
-      .then(setPrSummary)
-      .catch(() => {
-        // Ignore errors — user may not manage any projects
-      });
-  }, [session?.accessToken, status]);
-
-  // Fetch on mount / session change
-  useEffect(() => {
-    fetchNotifications();
-  }, [fetchNotifications]);
-
-  // Refetch when other components signal a change
-  useEffect(() => {
-    const handler = () => fetchNotifications();
-    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
-    return () => window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
-  }, [fetchNotifications]);
-
-  // Close dropdown when clicking outside
+  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -65,11 +108,17 @@ export function NotificationBell() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  if (status !== "authenticated") return null;
+  const handleNotificationClick = async (id: string, url: string, isRead: boolean) => {
+    setIsOpen(false);
+    if (!isRead) {
+      await markAsRead(id);
+    }
+    router.push(url);
+  };
 
-  const totalPending = joinSummary?.total_pending ?? 0;
-  const totalOpenPRs = prSummary?.total_open ?? 0;
-  const totalCount = totalPending + totalOpenPRs;
+  // Show nothing if no notifications hook data is available
+  // (the hook already checks auth status)
+  const totalCount = notifications.length;
 
   return (
     <div className="relative" ref={menuRef}>
@@ -79,87 +128,78 @@ export function NotificationBell() {
         aria-label="Notifications"
       >
         <Bell className="h-5 w-5" />
-        {totalCount > 0 && (
+        {unreadCount > 0 && (
           <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
-            {totalCount > 99 ? "99+" : totalCount}
+            {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 rounded-md bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black ring-opacity-5 z-50">
-          <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+        <div className="absolute right-0 mt-2 w-80 rounded-md bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black ring-opacity-5 z-50">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700">
             <p className="text-sm font-medium text-slate-900 dark:text-white">
               Notifications
             </p>
+            {unreadCount > 0 && (
+              <button
+                onClick={() => markAllAsRead()}
+                className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+              >
+                Mark all as read
+              </button>
+            )}
           </div>
-          <div className="max-h-64 overflow-y-auto py-1">
+
+          {/* List */}
+          <div className="max-h-80 overflow-y-auto">
             {totalCount === 0 ? (
-              <p className="px-4 py-6 text-center text-sm text-slate-500 dark:text-slate-400">
+              <p className="px-4 py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                 No notifications
               </p>
             ) : (
-              <>
-                {totalPending > 0 && (
-                  <div>
-                    <p className="px-4 pt-2 pb-1 text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      Join Requests
-                    </p>
-                    {joinSummary?.by_project.map((project) => (
-                      <Link
-                        key={`join-${project.project_id}`}
-                        href={`/projects/${project.project_id}/settings#join-requests`}
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                            {project.project_name}
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {project.pending_count} pending join{" "}
-                            {project.pending_count === 1
-                              ? "request"
-                              : "requests"}
-                          </p>
-                        </div>
-                        <span className="ml-2 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                          {project.pending_count}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
+              notifications.map((n) => {
+                const Icon = iconByType[n.type] || Bell;
+                const iconColor = colorByType[n.type] || "text-slate-400";
+                const url = getTargetUrl(n);
 
-                {totalOpenPRs > 0 && (
-                  <div>
-                    <p className="px-4 pt-2 pb-1 text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      Open Pull Requests
-                    </p>
-                    {prSummary?.by_project.map((project) => (
-                      <Link
-                        key={`pr-${project.project_id}`}
-                        href={`/projects/${project.project_id}/pull-requests`}
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center justify-between px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
-                            {project.project_name}
-                          </p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {project.open_count} open{" "}
-                            {project.open_count === 1 ? "PR" : "PRs"}
-                          </p>
-                        </div>
-                        <span className="ml-2 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-indigo-100 px-1.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
-                          {project.open_count}
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </>
+                return (
+                  <button
+                    key={n.id}
+                    onClick={() => handleNotificationClick(n.id, url, n.is_read)}
+                    className={cn(
+                      "flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/50",
+                      !n.is_read && "bg-primary-50/50 dark:bg-primary-900/10",
+                    )}
+                  >
+                    <Icon className={cn("mt-0.5 h-4 w-4 flex-shrink-0", iconColor)} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={cn(
+                          "text-sm truncate",
+                          n.is_read
+                            ? "text-slate-700 dark:text-slate-300"
+                            : "font-medium text-slate-900 dark:text-white",
+                        )}>
+                          {n.title}
+                        </p>
+                        {!n.is_read && (
+                          <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-primary-500" />
+                        )}
+                      </div>
+                      {n.body && (
+                        <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                          {n.body}
+                        </p>
+                      )}
+                      <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
+                        {n.project_name} · {formatTimeAgo(n.created_at)}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>

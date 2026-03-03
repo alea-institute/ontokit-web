@@ -5,7 +5,7 @@
 import { api, type UploadProgress } from "./client";
 
 // Types
-export type ProjectRole = "owner" | "admin" | "editor" | "viewer";
+export type ProjectRole = "owner" | "admin" | "editor" | "suggester" | "viewer";
 
 export interface ProjectOwner {
   id: string;

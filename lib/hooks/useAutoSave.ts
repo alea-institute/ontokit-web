@@ -6,6 +6,8 @@ import type { OWLClassDetail } from "@/lib/api/client";
 
 export type SaveStatus = "idle" | "draft" | "saving" | "saved" | "error";
 
+export type SaveMode = "commit" | "suggest";
+
 interface UseAutoSaveOptions {
   projectId: string;
   branch: string;
@@ -14,6 +16,10 @@ interface UseAutoSaveOptions {
   canEdit: boolean;
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   onError?: (msg: string) => void;
+  /** When "suggest", flushes go through onSuggestSave instead of onUpdateClass */
+  saveMode?: SaveMode;
+  /** Called when saveMode is "suggest" — saves to suggestion branch */
+  onSuggestSave?: (classIri: string, data: ClassUpdatePayload, label: string) => Promise<void>;
 }
 
 interface EditState {
@@ -46,6 +52,8 @@ export function useAutoSave({
   canEdit,
   onUpdateClass,
   onError,
+  saveMode = "commit",
+  onSuggestSave,
 }: UseAutoSaveOptions): UseAutoSaveReturn {
   const { setDraft, clearDraft, getDraft } = useDraftStore();
   const onErrorRef = useRef(onError);
@@ -101,7 +109,8 @@ export function useAutoSave({
 
   // Save edit state to draft store (Tier 1: instant, local)
   const triggerSave = useCallback(() => {
-    if (!classIri || !branch || !canEdit) return;
+    const canSave = canEdit || saveMode === "suggest";
+    if (!classIri || !branch || !canSave) return;
     const state = editStateRef.current;
     if (!state) return;
 
@@ -129,12 +138,14 @@ export function useAutoSave({
 
     // Clear any "saved" fade timer
     if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
-  }, [classIri, branch, projectId, canEdit, setDraft]);
+  }, [classIri, branch, projectId, canEdit, saveMode, setDraft]);
 
   // Flush draft to git (Tier 2: commit on navigate away)
   const flushToGit = useCallback(async () => {
     if (flushingRef.current) return;
-    if (!classIri || !branch || !canEdit || !onUpdateClass) return;
+    const canFlush = canEdit || saveMode === "suggest";
+    const hasHandler = saveMode === "suggest" ? !!onSuggestSave : !!onUpdateClass;
+    if (!classIri || !branch || !canFlush || !hasHandler) return;
 
     const key = draftKey(projectId, branch, classIri);
     const rawDraft = getDraft(key);
@@ -178,7 +189,12 @@ export function useAutoSave({
         disjoint_iris: detail?.disjoint_iris,
       };
 
-      await onUpdateClass(classIri, payload);
+      if (saveMode === "suggest" && onSuggestSave) {
+        const label = validLabels[0]?.value || classIri;
+        await onSuggestSave(classIri, payload, label);
+      } else if (onUpdateClass) {
+        await onUpdateClass(classIri, payload);
+      }
       clearDraft(key);
       setSaveStatus("saved");
 
@@ -192,7 +208,7 @@ export function useAutoSave({
     } finally {
       flushingRef.current = false;
     }
-  }, [classIri, branch, projectId, canEdit, onUpdateClass, getDraft, clearDraft]);
+  }, [classIri, branch, projectId, canEdit, saveMode, onUpdateClass, onSuggestSave, getDraft, clearDraft]);
 
   // Cleanup timer on unmount
   useEffect(() => {

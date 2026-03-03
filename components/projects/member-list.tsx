@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MoreVertical, Shield, Pencil, Eye, UserMinus, Crown, ArrowRightLeft } from "lucide-react";
+import { MoreVertical, Shield, Pencil, Eye, UserMinus, Crown, ArrowRightLeft, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { ProjectMember, ProjectRole, MemberUpdate } from "@/lib/api/projects";
@@ -21,6 +21,7 @@ const roleIcons: Record<ProjectRole, React.ComponentType<{ className?: string }>
   owner: Crown,
   admin: Shield,
   editor: Pencil,
+  suggester: Lightbulb,
   viewer: Eye,
 };
 
@@ -28,6 +29,7 @@ const roleLabels: Record<ProjectRole, string> = {
   owner: "Owner",
   admin: "Admin",
   editor: "Editor",
+  suggester: "Suggester",
   viewer: "Viewer",
 };
 
@@ -35,6 +37,7 @@ const roleColors: Record<ProjectRole, string> = {
   owner: "text-purple-600 dark:text-purple-400",
   admin: "text-blue-600 dark:text-blue-400",
   editor: "text-green-600 dark:text-green-400",
+  suggester: "text-amber-600 dark:text-amber-400",
   viewer: "text-slate-600 dark:text-slate-400",
 };
 
@@ -176,7 +179,7 @@ export function MemberList({
                             <p className="px-3 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400">
                               Change role
                             </p>
-                            {(["admin", "editor", "viewer"] as const)
+                            {(["admin", "editor", "suggester", "viewer"] as const)
                               .filter(
                                 (role) =>
                                   role !== member.role &&

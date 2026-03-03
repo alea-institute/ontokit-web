@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw } from "lucide-react";
+import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -36,6 +36,11 @@ import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib
 import { detectPatternFromIriIndex, type IriSuffixPattern } from "@/lib/ontology/iriGeneration";
 import { commonPrefixes } from "@/lib/editor/languages/turtle";
 
+import { SuggestionSubmitDialog } from "@/components/editor/SuggestionSubmitDialog";
+import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
+import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
+import { suggestionsApi } from "@/lib/api/suggestions";
+
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 import type { IriPosition } from "@/lib/editor/indexWorker";
 
@@ -46,7 +51,9 @@ export default function EditorPage() {
   const router = useRouter();
   const pathname = usePathname();
   const projectId = params.id as string;
-  const initialBranch = searchParams.get("branch")
+  const resumeSessionParam = searchParams.get("resumeSession") || undefined;
+  const resumeBranchParam = searchParams.get("branch") || undefined;
+  const initialBranch = resumeBranchParam
     || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
 
@@ -59,6 +66,7 @@ export default function EditorPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const [openPRCount, setOpenPRCount] = useState(0);
+  const [pendingSuggestionCount, setPendingSuggestionCount] = useState(0);
   const [lintSummary, setLintSummary] = useState<LintSummary | null>(null);
   const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
 
@@ -208,7 +216,42 @@ export default function EditorPage() {
   // If user_role is null but user has access to the project, default to edit (backend enforces actual perms)
   const hasExplicitRole = !!project?.user_role;
   const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin || (!hasExplicitRole && !!session?.accessToken);
+  const isSuggester = project?.user_role === "suggester";
+  const canSuggest = canEdit || isSuggester;
   const hasOntology = project?.source_file_path;
+
+  // Fetch pending suggestion count for editors/admins
+  useEffect(() => {
+    if (!canEdit || !session?.accessToken) return;
+    suggestionsApi
+      .listPending(projectId, session.accessToken)
+      .then((res) => setPendingSuggestionCount(res.items.length))
+      .catch(() => { /* ignore — endpoint may not exist yet */ });
+  }, [canEdit, projectId, session?.accessToken]);
+
+  // Suggestion session (only active for suggesters who can't directly edit)
+  const isSuggestionMode = isSuggester && !canEdit;
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+
+  const suggestionSession = useSuggestionSession({
+    projectId,
+    accessToken: session?.accessToken,
+    resumeSessionId: isSuggestionMode ? resumeSessionParam : undefined,
+    resumeBranch: isSuggestionMode ? resumeBranchParam : undefined,
+    onSubmitted: (prNumber) => {
+      toast.success(`Suggestions submitted as PR #${prNumber}`);
+    },
+    onError: (msg) => toast.error("Suggestion error", msg),
+  });
+
+  // Beacon safety net for browser close
+  useSuggestionBeacon({
+    projectId,
+    sessionId: suggestionSession.sessionId,
+    beaconToken: suggestionSession.beaconToken,
+    getCurrentContent: () => sourceContent || null,
+    enabled: isSuggestionMode && suggestionSession.isActive,
+  });
 
   // Load source content
   const loadSourceContent = useCallback(async (isPreload = false) => {
@@ -642,6 +685,40 @@ export default function EditorPage() {
     iriPatternDetectedRef.current = false;
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast]);
 
+  // Handle suggestion-mode class update
+  // Instead of directly committing, sends modified source to the suggestion branch
+  const handleSuggestClassUpdate = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
+    if (!session?.accessToken) throw new Error("Not authenticated");
+
+    // Ensure session exists
+    if (!suggestionSession.sessionId) {
+      await suggestionSession.startSession();
+    }
+
+    let source = sourceContent;
+    if (!source) {
+      const response = await revisionsApi.getFileAtVersion(
+        projectId,
+        activeBranch!,
+        session.accessToken,
+        project?.git_ontology_path,
+      );
+      source = response.content;
+    }
+
+    const modifiedSource = updateClassInTurtle(source, classIri, data);
+    const label = data.labels[0]?.value || getLocalName(classIri);
+
+    await suggestionSession.saveToSession(modifiedSource, classIri, label);
+
+    setSourceContent(modifiedSource);
+    toast.success(`Suggested update to "${label}"`);
+    updateNodeLabel(classIri, label);
+    setDetailRefreshKey((k) => k + 1);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, suggestionSession]);
+
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
     setActiveBranch(branchName);
@@ -763,9 +840,56 @@ export default function EditorPage() {
 
               {/* Mode Switcher */}
               <ModeSwitcher />
-              {canEdit && <ContinuousEditingToggle />}
+              {canSuggest && <ContinuousEditingToggle />}
+
+              {/* Suggestion mode indicator */}
+              {isSuggestionMode && (
+                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                  <Lightbulb className="h-3 w-3" />
+                  Suggesting
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
+              {/* Submit Suggestions button */}
+              {isSuggestionMode && suggestionSession.changesCount > 0 && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="gap-2 bg-amber-600 hover:bg-amber-700"
+                  onClick={() => setSubmitDialogOpen(true)}
+                >
+                  <Lightbulb className="h-4 w-4" />
+                  {suggestionSession.isResumed ? "Resubmit Suggestions" : "Submit Suggestions"}
+                  <span className="rounded-full bg-amber-500/30 px-1.5 py-0.5 text-xs">
+                    {suggestionSession.changesCount}
+                  </span>
+                </Button>
+              )}
+
+              {/* Suggestions link */}
+              {isSuggestionMode && (
+                <Link href={`/projects/${projectId}/suggestions`}>
+                  <Button variant="ghost" size="sm" className="gap-2 text-amber-600 dark:text-amber-400">
+                    <Lightbulb className="h-4 w-4" />
+                    <span className="hidden sm:inline">My Suggestions</span>
+                  </Button>
+                </Link>
+              )}
+
+              {/* Review Suggestions link (editors/admins only) */}
+              {canEdit && pendingSuggestionCount > 0 && (
+                <Link href={`/projects/${projectId}/suggestions/review`}>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <Eye className="h-4 w-4" />
+                    <span className="hidden sm:inline">Review</span>
+                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                      {pendingSuggestionCount}
+                    </span>
+                  </Button>
+                </Link>
+              )}
+
               {/* WebSocket Connection Status */}
               <div className="flex items-center gap-1">
                 <ConnectionStatus
@@ -857,6 +981,8 @@ export default function EditorPage() {
                   accessToken={session?.accessToken}
                   activeBranch={activeBranch}
                   canEdit={!!canEdit}
+                  canSuggest={!!canSuggest}
+                  isSuggestionMode={isSuggestionMode}
                   canManage={!!canManage}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
@@ -883,7 +1009,7 @@ export default function EditorPage() {
                   onDeleteClass={handleDeleteClass}
                   onCopyIri={handleCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
-                  onUpdateClass={handleUpdateClass}
+                  onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
                   detailRefreshKey={detailRefreshKey}
                   showHealthCheck={showHealthCheck}
                   onCloseHealthCheck={() => setShowHealthCheck(false)}
@@ -897,6 +1023,8 @@ export default function EditorPage() {
                 accessToken={session?.accessToken}
                 activeBranch={activeBranch}
                 canEdit={!!canEdit}
+                canSuggest={!!canSuggest}
+                isSuggestionMode={isSuggestionMode}
                 nodes={nodes}
                 isTreeLoading={isTreeLoading}
                 treeError={treeError}
@@ -911,7 +1039,7 @@ export default function EditorPage() {
                 onDeleteClass={handleDeleteClass}
                 onCopyIri={handleCopyIri}
                 selectedNodeFallback={selectedNodeFallback}
-                onUpdateClass={handleUpdateClass}
+                onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
                 detailRefreshKey={detailRefreshKey}
                 sourceContent={sourceContent}
                 onUpdateProperty={handleUpdateProperty}
@@ -961,6 +1089,17 @@ export default function EditorPage() {
         confirmLabel="Delete"
         variant="danger"
       />
+
+      {/* Suggestion Submit Dialog */}
+      {isSuggestionMode && (
+        <SuggestionSubmitDialog
+          open={submitDialogOpen}
+          onOpenChange={setSubmitDialogOpen}
+          onConfirm={suggestionSession.isResumed ? suggestionSession.resubmitSession : suggestionSession.submitSession}
+          entitiesModified={suggestionSession.entitiesModified}
+          changesCount={suggestionSession.changesCount}
+        />
+      )}
     </BranchProvider>
   );
 }
