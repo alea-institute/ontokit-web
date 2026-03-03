@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import {
   ExternalLink,
   AlertTriangle,
@@ -73,6 +73,8 @@ interface ClassDetailPanelProps {
   isSuggestionMode?: boolean;
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   refreshKey?: number;
+  /** Extra actions rendered in the header row (e.g. Graph button) */
+  headerActions?: ReactNode;
 }
 
 export function ClassDetailPanel({
@@ -88,6 +90,7 @@ export function ClassDetailPanel({
   isSuggestionMode = false,
   onUpdateClass,
   refreshKey,
+  headerActions,
 }: ClassDetailPanelProps) {
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
   const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
@@ -573,29 +576,32 @@ export function ClassDetailPanel({
                     </span>
                   )}
                 </h2>
-                {canEnterEdit && (
-                  <div className="shrink-0">
-                    {isEditing ? (
-                      <button
-                        onClick={cancelEditMode}
-                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
-                        title="Discard changes and return to read-only"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                        Cancel
-                      </button>
-                    ) : (
-                      <button
-                        onClick={enterEditMode}
-                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-                        title="Enter edit mode"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                        {isSuggestionMode ? "Suggest Changes" : "Edit Item"}
-                      </button>
-                    )}
-                  </div>
-                )}
+                <div className="flex shrink-0 items-center gap-1">
+                  {headerActions}
+                  {canEnterEdit && (
+                    <>
+                      {isEditing ? (
+                        <button
+                          onClick={cancelEditMode}
+                          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                          title="Discard changes and return to read-only"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                          Cancel
+                        </button>
+                      ) : (
+                        <button
+                          onClick={enterEditMode}
+                          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                          title="Enter edit mode"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                          {isSuggestionMode ? "Suggest Changes" : "Edit Item"}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
               <div className="mt-1 flex items-center gap-2">
                 <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={classDetail.iri}>

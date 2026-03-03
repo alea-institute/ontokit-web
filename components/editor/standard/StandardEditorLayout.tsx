@@ -366,31 +366,29 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             </div>
           </div>
         ) : activeTab === "classes" ? (
-          <div className="relative h-full">
-            {selectedIri && (
+          <ClassDetailPanel
+            projectId={projectId}
+            classIri={selectedIri}
+            accessToken={accessToken}
+            branch={activeBranch}
+            onNavigateToClass={(iri) => navigateToNode(iri)}
+            onCopyIri={onCopyIri}
+            selectedNodeFallback={selectedNodeFallback}
+            canEdit={canEdit || isSuggestionMode}
+            isSuggestionMode={isSuggestionMode}
+            onUpdateClass={onUpdateClass}
+            refreshKey={detailRefreshKey}
+            headerActions={selectedIri ? (
               <button
                 onClick={() => setShowGraph(true)}
-                className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
                 aria-label="Show relationship graph"
               >
                 <Share2 className="h-3.5 w-3.5" />
                 Graph
               </button>
-            )}
-            <ClassDetailPanel
-              projectId={projectId}
-              classIri={selectedIri}
-              accessToken={accessToken}
-              branch={activeBranch}
-              onNavigateToClass={(iri) => navigateToNode(iri)}
-              onCopyIri={onCopyIri}
-              selectedNodeFallback={selectedNodeFallback}
-              canEdit={canEdit || isSuggestionMode}
-              isSuggestionMode={isSuggestionMode}
-              onUpdateClass={onUpdateClass}
-              refreshKey={detailRefreshKey}
-            />
-          </div>
+            ) : undefined}
+          />
         ) : activeTab === "properties" ? (
           <PropertyDetailPanel
             projectId={projectId}
