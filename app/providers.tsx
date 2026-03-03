@@ -5,6 +5,7 @@ import { SessionProvider } from "next-auth/react";
 import { useState, type ReactNode } from "react";
 import { ToastProvider } from "@/lib/context/ToastContext";
 import { ToastContainer } from "@/components/ui/toast-container";
+import { ScreenReaderAnnouncerProvider } from "@/components/ui/ScreenReaderAnnouncer";
 
 // Import the store module to ensure module-level theme sync runs
 import "@/lib/stores/editorModeStore";
@@ -29,10 +30,12 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
-        <ToastProvider>
-          {children}
-          <ToastContainer />
-        </ToastProvider>
+        <ScreenReaderAnnouncerProvider>
+          <ToastProvider>
+            {children}
+            <ToastContainer />
+          </ToastProvider>
+        </ScreenReaderAnnouncerProvider>
       </QueryClientProvider>
     </SessionProvider>
   );

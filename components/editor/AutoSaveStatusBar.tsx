@@ -15,7 +15,7 @@ export function AutoSaveStatusBar({ status, error, validationError, onRetry }: A
   // Show validation error inline regardless of status
   if (validationError) {
     return (
-      <div className="border-t border-red-200 bg-red-50 px-4 py-2 dark:border-red-900/50 dark:bg-red-900/10">
+      <div className="border-t border-red-200 bg-red-50 px-4 py-2 dark:border-red-900/50 dark:bg-red-900/10" role="status" aria-live="polite">
         <p className="text-xs text-red-600 dark:text-red-400">{validationError}</p>
       </div>
     );
@@ -23,7 +23,7 @@ export function AutoSaveStatusBar({ status, error, validationError, onRetry }: A
 
   if (status === "error") {
     return (
-      <div className="border-t border-red-200 bg-red-50 px-4 py-2 dark:border-red-900/50 dark:bg-red-900/10">
+      <div className="border-t border-red-200 bg-red-50 px-4 py-2 dark:border-red-900/50 dark:bg-red-900/10" role="status" aria-live="assertive">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-500" />
           <span className="flex-1 truncate text-xs text-red-600 dark:text-red-400">
@@ -44,7 +44,7 @@ export function AutoSaveStatusBar({ status, error, validationError, onRetry }: A
 
   if (status === "saving") {
     return (
-      <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/50">
+      <div className="border-t border-slate-200 bg-slate-50 px-4 py-2 dark:border-slate-700 dark:bg-slate-800/50" role="status" aria-live="polite">
         <div className="flex items-center gap-2">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
           <span className="text-xs text-slate-500 dark:text-slate-400">Committing...</span>
@@ -57,7 +57,7 @@ export function AutoSaveStatusBar({ status, error, validationError, onRetry }: A
     return (
       <div className={cn(
         "border-t border-green-200 bg-green-50 px-4 py-2 transition-opacity duration-500 dark:border-green-900/50 dark:bg-green-900/10",
-      )}>
+      )} role="status" aria-live="polite">
         <div className="flex items-center gap-2">
           <Check className="h-3.5 w-3.5 text-green-500" />
           <span className="text-xs text-green-600 dark:text-green-400">Saved</span>

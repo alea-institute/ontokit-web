@@ -50,6 +50,7 @@ export function AnnotationRow({
           onBlur={onBlur}
           placeholder={placeholder}
           rows={2}
+          aria-label={`${displayLabel} value`}
           className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
         />
       ) : (
@@ -59,6 +60,7 @@ export function AnnotationRow({
           onChange={(e) => onValueChange(e.target.value)}
           onBlur={onBlur}
           placeholder={placeholder}
+          aria-label={`${displayLabel} value`}
           className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
         />
       )}
@@ -71,14 +73,14 @@ export function AnnotationRow({
         onChange={(e) => onLangChange(e.target.value)}
         onBlur={onBlur}
         className="w-14 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-        title="Language tag (e.g. en, de, fr)"
+        aria-label="Language tag"
         placeholder="lang"
       />
       {onRemove ? (
         <button
           onClick={onRemove}
           className="mt-1 shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-          title="Remove"
+          aria-label={`Remove ${displayLabel} annotation`}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>

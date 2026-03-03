@@ -174,10 +174,12 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   }
 
   const hasContextMenu = onCopyIri || onDelete || onViewInSource || onAddChild;
+  const treeItemId = `tree-item-${node.iri.replace(/[^a-zA-Z0-9-_]/g, "_")}`;
 
   const rowContent = (
     <div
       ref={isDndEnabled ? setRowRef : undefined}
+      id={treeItemId}
       className={cn(
         "tree-item group",
         isSelected && "selected",
@@ -237,7 +239,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
       {draftIris?.has(node.iri) && (
         <span
           className="h-2 w-2 shrink-0 rounded-full bg-amber-400"
-          title="Unsaved draft"
+          aria-label="Unsaved draft"
+          role="img"
         />
       )}
 
@@ -246,7 +249,7 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
         <button
           onClick={handleAddChild}
           className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
-          title="Add subclass"
+          aria-label="Add subclass"
           tabIndex={-1}
         >
           <Plus className="w-3 h-3" />

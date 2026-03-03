@@ -117,6 +117,7 @@ export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: Inli
                   if (e.key === "Escape") setIsDropdownOpen(false);
                 }}
                 placeholder="Select property..."
+                aria-label="Select annotation property"
                 className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:placeholder:text-slate-500"
               />
             </div>
@@ -188,6 +189,7 @@ export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: Inli
             }}
             placeholder={selectedProperty ? "Enter value..." : "Select a property first"}
             disabled={!selectedProperty}
+            aria-label="Annotation value"
             className={cn(
               "flex-1 rounded-md border px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500",
               selectedProperty
@@ -203,7 +205,7 @@ export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: Inli
             value={lang}
             onChange={(e) => setLang(e.target.value)}
             className="w-14 shrink-0 rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-            title="Language tag (e.g. en, de, fr)"
+            aria-label="Language tag"
             placeholder="lang"
             disabled={!selectedProperty}
           />

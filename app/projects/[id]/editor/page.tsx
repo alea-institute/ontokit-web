@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye } from "lucide-react";
+import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -36,6 +36,8 @@ import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib
 import { detectPatternFromIriIndex, type IriSuffixPattern } from "@/lib/ontology/iriGeneration";
 import { commonPrefixes } from "@/lib/editor/languages/turtle";
 
+import { useKeyboardShortcuts, type ShortcutDefinition } from "@/lib/hooks/useKeyboardShortcuts";
+import { KeyboardShortcutDialog } from "@/components/editor/KeyboardShortcutDialog";
 import { SuggestionSubmitDialog } from "@/components/editor/SuggestionSubmitDialog";
 import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
@@ -230,6 +232,9 @@ export default function EditorPage() {
       .then((res) => setPendingSuggestionCount(res.items.length))
       .catch(() => { /* ignore — endpoint may not exist yet */ });
   }, [canEdit, projectId, session?.accessToken]);
+
+  // Keyboard shortcut help dialog
+  const [shortcutDialogOpen, setShortcutDialogOpen] = useState(false);
 
   // Suggestion session (only active for suggesters who can't directly edit)
   const isSuggestionMode = isSuggester && !canEdit;
@@ -788,6 +793,58 @@ export default function EditorPage() {
     router.replace(`${pathname}?branch=${encodeURIComponent(branchName)}`);
   }, [pathname, router]);
 
+  // --- Keyboard shortcuts ---
+  const keyboardShortcuts = useMemo((): ShortcutDefinition[] => [
+    {
+      id: "save",
+      key: "s",
+      modifiers: { ctrl: true },
+      description: "Save / flush draft",
+      category: "Editing",
+      action: () => {
+        // Trigger a blur on active element to flush auto-save drafts
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
+      },
+      global: true,
+      ignoreWhenEditorFocused: true,
+    },
+    {
+      id: "add-entity",
+      key: "n",
+      modifiers: { ctrl: true },
+      description: "Add new entity",
+      category: "Editing",
+      action: () => handleAddEntity(),
+      global: true,
+    },
+    {
+      id: "help",
+      key: "?",
+      description: "Show keyboard shortcuts",
+      category: "General",
+      action: () => setShortcutDialogOpen(true),
+    },
+    {
+      id: "escape",
+      key: "Escape",
+      description: "Close topmost overlay",
+      category: "General",
+      action: () => {
+        if (shortcutDialogOpen) {
+          setShortcutDialogOpen(false);
+        } else if (showHistory) {
+          setShowHistory(false);
+        }
+      },
+      global: true,
+      ignoreWhenEditorFocused: false,
+    },
+  ], [handleAddEntity, shortcutDialogOpen, showHistory]);
+
+  useKeyboardShortcuts(keyboardShortcuts);
+
   // --- Render ---
 
   if (isLoading || status === "loading") {
@@ -880,7 +937,7 @@ export default function EditorPage() {
   return (
     <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch}>
       <Header />
-      <main className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
+      <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {/* Editor Header */}
         <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center justify-between">
@@ -1018,6 +1075,15 @@ export default function EditorPage() {
                   )}
                 </Button>
               </Link>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShortcutDialogOpen(true)}
+                aria-label="Keyboard shortcuts"
+              >
+                <Keyboard className="h-4 w-4" />
+              </Button>
 
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
@@ -1165,6 +1231,13 @@ export default function EditorPage() {
           changesCount={suggestionSession.changesCount}
         />
       )}
+
+      {/* Keyboard Shortcut Help Dialog */}
+      <KeyboardShortcutDialog
+        open={shortcutDialogOpen}
+        onOpenChange={setShortcutDialogOpen}
+        shortcuts={keyboardShortcuts}
+      />
     </BranchProvider>
   );
 }

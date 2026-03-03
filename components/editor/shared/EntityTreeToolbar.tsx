@@ -46,7 +46,7 @@ export function EntityTreeToolbar({
           <button
             onClick={onAdd}
             className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
-            title="Add entity"
+            aria-label="Add entity"
           >
             <Plus className="h-4 w-4 text-slate-500" />
           </button>
@@ -55,7 +55,7 @@ export function EntityTreeToolbar({
           <button
             onClick={onExpandAll}
             className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
-            title="Expand all"
+            aria-label="Expand all"
           >
             <ChevronsDownUp className="h-4 w-4 text-slate-500" />
           </button>
@@ -64,7 +64,7 @@ export function EntityTreeToolbar({
           <button
             onClick={onCollapseAll}
             className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
-            title="Collapse all"
+            aria-label="Collapse all"
           >
             <ChevronsUpDown className="h-4 w-4 text-slate-500" />
           </button>
@@ -72,15 +72,19 @@ export function EntityTreeToolbar({
         <button
           onClick={handleToggle}
           className={cn(
-            "rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
+            "flex items-center gap-0.5 rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
             showSearch && "bg-slate-100 dark:bg-slate-700",
           )}
-          title={showSearch ? "Close search" : "Search"}
+          title={showSearch ? "Close search" : "Search (Ctrl+K)"}
+          aria-label={showSearch ? "Close search" : "Search entities"}
         >
           {showSearch ? (
             <X className="h-4 w-4 text-slate-500" />
           ) : (
-            <Search className="h-4 w-4 text-slate-500" />
+            <>
+              <Search className="h-4 w-4 text-slate-500" />
+              <kbd className="hidden text-[9px] text-slate-400 sm:inline">K</kbd>
+            </>
           )}
         </button>
       </div>

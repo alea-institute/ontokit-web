@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
@@ -12,15 +13,29 @@ import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
 import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
 import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
+import { Share2, ArrowLeft } from "lucide-react";
 import { DraggableTreeWrapper } from "@/components/editor/shared/DraggableTreeWrapper";
 import { useTreeDragDrop, type DragMode } from "@/lib/hooks/useTreeDragDrop";
 import { useToast } from "@/lib/context/ToastContext";
+
+const OntologyGraph = dynamic(
+  () => import("@/components/graph/OntologyGraph").then((mod) => mod.OntologyGraph),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center bg-white dark:bg-slate-800">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+      </div>
+    ),
+  }
+);
 import type { ClassUpdatePayload } from "@/lib/api/client";
 import type { TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import type { TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import { useDraftStore } from "@/lib/stores/draftStore";
 import { getLocalName } from "@/lib/utils";
+import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
 
 export interface StandardEditorLayoutProps {
   projectId: string;
@@ -100,6 +115,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   } = props;
 
   const toast = useToast();
+  const { announce } = useAnnounce();
 
   // Draft badges
   const getDraftIris = useDraftStore((s) => s.getDraftIris);
@@ -151,6 +167,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     canEdit: canEdit || isSuggestionMode,
     expandNode,
     onReparent: handleDndReparent,
+    onAnnounce: announce,
   });
 
   // Show undo toast when reparent succeeds
@@ -172,6 +189,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
 
   // Panel width state (default 320px = w-80)
   const [treePanelWidth, setTreePanelWidth] = useState(320);
+
+  // Graph view state
+  const [showGraph, setShowGraph] = useState(false);
 
   // Entity tab state
   const [activeTab, setActiveTab] = useState<EntityTab>("classes");
@@ -318,22 +338,59 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         maxWidth={600}
       />
 
-      {/* Right Panel - Entity Details */}
+      {/* Right Panel - Entity Details or Graph */}
       <div className="min-w-0 flex-1 bg-white dark:bg-slate-800">
-        {activeTab === "classes" ? (
-          <ClassDetailPanel
-            projectId={projectId}
-            classIri={selectedIri}
-            accessToken={accessToken}
-            branch={activeBranch}
-            onNavigateToClass={(iri) => navigateToNode(iri)}
-            onCopyIri={onCopyIri}
-            selectedNodeFallback={selectedNodeFallback}
-            canEdit={canEdit || isSuggestionMode}
-            isSuggestionMode={isSuggestionMode}
-            onUpdateClass={onUpdateClass}
-            refreshKey={detailRefreshKey}
-          />
+        {showGraph ? (
+          <div className="flex h-full flex-col">
+            <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
+              <button
+                onClick={() => setShowGraph(false)}
+                className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                aria-label="Back to details"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Back to Details
+              </button>
+            </div>
+            <div className="flex-1">
+              <OntologyGraph
+                focusIri={selectedIri}
+                projectId={projectId}
+                accessToken={accessToken}
+                branch={activeBranch}
+                onNavigateToClass={(iri) => {
+                  setShowGraph(false);
+                  navigateToNode(iri);
+                }}
+              />
+            </div>
+          </div>
+        ) : activeTab === "classes" ? (
+          <div className="relative h-full">
+            {selectedIri && (
+              <button
+                onClick={() => setShowGraph(true)}
+                className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700"
+                aria-label="Show relationship graph"
+              >
+                <Share2 className="h-3.5 w-3.5" />
+                Graph
+              </button>
+            )}
+            <ClassDetailPanel
+              projectId={projectId}
+              classIri={selectedIri}
+              accessToken={accessToken}
+              branch={activeBranch}
+              onNavigateToClass={(iri) => navigateToNode(iri)}
+              onCopyIri={onCopyIri}
+              selectedNodeFallback={selectedNodeFallback}
+              canEdit={canEdit || isSuggestionMode}
+              isSuggestionMode={isSuggestionMode}
+              onUpdateClass={onUpdateClass}
+              refreshKey={detailRefreshKey}
+            />
+          </div>
         ) : activeTab === "properties" ? (
           <PropertyDetailPanel
             projectId={projectId}

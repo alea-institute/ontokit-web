@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { FileCode, TreePine, Code } from "lucide-react";
+import { FileCode, TreePine, Code, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
@@ -28,6 +28,7 @@ import type { OntologySourceEditorRef } from "@/components/editor/OntologySource
 import type { IriPosition } from "@/lib/editor/indexWorker";
 import { useDraftStore } from "@/lib/stores/draftStore";
 import { getLocalName } from "@/lib/utils";
+import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
 
 const OntologySourceEditor = dynamic(
   () => import("@/components/editor/OntologySourceEditor").then((mod) => mod.OntologySourceEditor),
@@ -41,7 +42,19 @@ const OntologySourceEditor = dynamic(
   }
 );
 
-type DeveloperView = "tree" | "source";
+const OntologyGraph = dynamic(
+  () => import("@/components/graph/OntologyGraph").then((mod) => mod.OntologyGraph),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-full items-center justify-center bg-white dark:bg-slate-800">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+      </div>
+    ),
+  }
+);
+
+type DeveloperView = "tree" | "source" | "graph";
 
 export interface DeveloperEditorLayoutProps {
   projectId: string;
@@ -150,6 +163,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   } = props;
 
   const toast = useToast();
+  const { announce } = useAnnounce();
 
   // Draft badges
   const getDraftIris = useDraftStore((s) => s.getDraftIris);
@@ -200,6 +214,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     canEdit: canEdit || isSuggestionMode,
     expandNode,
     onReparent: handleDndReparent,
+    onAnnounce: announce,
   });
 
   // Show undo toast when reparent succeeds
@@ -326,12 +341,37 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               <span className="h-2 w-2 animate-pulse rounded-full bg-primary-400" />
             )}
           </button>
+          <button
+            onClick={() => handleViewModeChange("graph")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+              viewMode === "graph"
+                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
+            )}
+          >
+            <Share2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Graph</span>
+          </button>
         </div>
       </div>
 
       {/* Content Area */}
       <div className="relative flex flex-1 overflow-hidden">
-        {viewMode === "tree" ? (
+        {viewMode === "graph" ? (
+          <div className="flex-1 bg-white dark:bg-slate-800">
+            <OntologyGraph
+              focusIri={selectedIri}
+              projectId={projectId}
+              accessToken={accessToken}
+              branch={activeBranch}
+              onNavigateToClass={(iri) => {
+                handleViewModeChange("tree");
+                navigateToNode(iri);
+              }}
+            />
+          </div>
+        ) : viewMode === "tree" ? (
           <>
             {/* Left Panel - Entity Tree/List with tabs */}
             <div className="flex-shrink-0 bg-white dark:bg-slate-800" style={{ width: treePanelWidth }}>

@@ -175,10 +175,16 @@ export function EntityTree({
     el?.scrollIntoView({ block: "nearest" });
   };
 
+  const activeDescendantId = focusedIri
+    ? `tree-item-${focusedIri.replace(/[^a-zA-Z0-9-_]/g, "_")}`
+    : undefined;
+
   return (
     <div
       ref={containerRef}
       role="tree"
+      aria-label="Ontology class hierarchy"
+      aria-activedescendant={enableKeyboardNav ? activeDescendantId : undefined}
       tabIndex={enableKeyboardNav ? 0 : undefined}
       onKeyDown={enableKeyboardNav ? handleKeyDown : undefined}
       onBlur={() => setFocusedIri(null)}

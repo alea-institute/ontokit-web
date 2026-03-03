@@ -39,6 +39,8 @@ interface UseTreeDragDropOptions {
     newParentIris: string[],
     mode: DragMode,
   ) => Promise<void>;
+  /** Optional screen reader announcement callback */
+  onAnnounce?: (message: string) => void;
 }
 
 interface UseTreeDragDropReturn {
@@ -118,6 +120,7 @@ export function useTreeDragDrop({
   editingIri,
   expandNode,
   onReparent,
+  onAnnounce,
 }: UseTreeDragDropOptions): UseTreeDragDropReturn {
   const [dragState, setDragState] = useState<DragState>({
     draggedIri: null,
@@ -337,12 +340,15 @@ export function useTreeDragDrop({
       // Execute reparent
       try {
         await onReparent(draggedIri, oldParentIris, newParentIris, mode);
+        const targetNode = targetIri ? findNode(nodes, targetIri) : null;
+        const targetLabel = targetNode?.label ?? (targetIri ? "root" : "root");
+        onAnnounce?.(`Moved ${undoInfo.classLabel} under ${targetLabel}`);
       } catch {
         // Error handled by caller (toast + rollback)
         setUndoAction(null);
       }
     },
-    [dragState.draggedIri, dragState.dragMode, nodes, validateDrop, cancelAutoExpand, onReparent],
+    [dragState.draggedIri, dragState.dragMode, nodes, validateDrop, cancelAutoExpand, onReparent, onAnnounce],
   );
 
   const handleDragCancel = useCallback(() => {

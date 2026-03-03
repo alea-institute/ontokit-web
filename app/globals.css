@@ -116,6 +116,30 @@ body {
   max-width: 260px;
 }
 
+/* Skip link for accessibility */
+.skip-link {
+  @apply absolute -translate-y-full bg-primary-600 text-white px-4 py-2 z-[200] focus:translate-y-0 transition-transform;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast preference */
+@media (prefers-contrast: more) {
+  :root {
+    --focus-ring-width: 3px;
+  }
+}
+
 /* Collaboration cursor colors */
 .collab-cursor {
   @apply absolute pointer-events-none z-50;

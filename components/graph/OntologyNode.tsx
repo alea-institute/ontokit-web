@@ -1,0 +1,94 @@
+"use client";
+
+import { memo } from "react";
+import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { ExternalLink, Expand } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { GraphNodeType } from "@/lib/graph/types";
+
+export interface OntologyNodeData {
+  [key: string]: unknown;
+  label: string;
+  nodeType: GraphNodeType;
+  deprecated?: boolean;
+  childCount?: number;
+  isExpanded?: boolean;
+  onNavigate?: (iri: string) => void;
+  onExpandNode?: (iri: string) => void;
+}
+
+type OntologyNodeProps = NodeProps & {
+  data: OntologyNodeData;
+};
+
+const nodeStyles: Record<GraphNodeType, string> = {
+  focus:
+    "border-2 border-primary-500 bg-primary-50 dark:bg-primary-950/40 dark:border-primary-400 font-semibold shadow-md",
+  class:
+    "border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-600",
+  root:
+    "border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-600 border-l-4 border-l-primary-400",
+  external:
+    "border border-slate-200 bg-slate-50 dark:bg-slate-900 dark:border-slate-700 text-slate-500 dark:text-slate-400",
+  unexplored:
+    "border border-dashed border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-600",
+};
+
+export const OntologyNode = memo(function OntologyNode({
+  data,
+  id,
+}: OntologyNodeProps) {
+  const { label, nodeType, deprecated, childCount, isExpanded, onNavigate, onExpandNode } = data;
+
+  const handleClick = () => {
+    if (nodeType === "external") return;
+    onNavigate?.(id);
+  };
+
+  const handleDoubleClick = () => {
+    if (nodeType === "unexplored") {
+      onExpandNode?.(id);
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg px-3 py-2 text-sm transition-shadow hover:shadow-lg cursor-pointer min-w-[120px] max-w-[200px]",
+        nodeStyles[nodeType],
+      )}
+      onClick={handleClick}
+      onDoubleClick={handleDoubleClick}
+    >
+      <Handle type="target" position={Position.Bottom} className="!bg-slate-400 !w-2 !h-2 !border-0" />
+
+      <div className="flex items-center gap-1.5">
+        <span
+          className={cn(
+            "flex-1 truncate text-slate-900 dark:text-white",
+            deprecated && "line-through opacity-60",
+            nodeType === "focus" && "font-semibold",
+            nodeType === "external" && "text-slate-500 dark:text-slate-400",
+          )}
+        >
+          {label}
+        </span>
+
+        {nodeType === "external" && (
+          <ExternalLink className="h-3 w-3 shrink-0 text-slate-400" />
+        )}
+        {nodeType === "unexplored" && !isExpanded && (
+          <Expand className="h-3 w-3 shrink-0 text-slate-400" />
+        )}
+      </div>
+
+      {childCount !== undefined && childCount > 0 && nodeType !== "external" && (
+        <span className="mt-0.5 block text-[10px] text-slate-400 dark:text-slate-500">
+          {childCount} {childCount === 1 ? "child" : "children"}
+        </span>
+      )}
+
+      <Handle type="source" position={Position.Top} className="!bg-slate-400 !w-2 !h-2 !border-0" />
+    </div>
+  );
+});
