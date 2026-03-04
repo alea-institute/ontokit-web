@@ -137,8 +137,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     [getDraftIris, projectId, activeBranch, drafts],
   );
 
-  // Tree label hints for graph nodes
+  // Tree label hints for graph nodes and detail panels
   const treeLabelHints = useMemo(() => extractTreeLabelMap(nodes), [nodes]);
+  const treeLabelHintsRecord = useMemo(() => Object.fromEntries(treeLabelHints), [treeLabelHints]);
 
   // Drag-and-drop reparenting
   const handleDndReparent = useCallback(async (
@@ -421,6 +422,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onNavigateToEntity={(iri) => navigateToNode(iri)}
             onCopyIri={onCopyIri}
             accessToken={accessToken}
+            labelHints={treeLabelHintsRecord}
           />
         ) : (
           <IndividualDetailPanel
@@ -434,6 +436,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onNavigateToEntity={(iri) => navigateToNode(iri)}
             onCopyIri={onCopyIri}
             accessToken={accessToken}
+            labelHints={treeLabelHintsRecord}
           />
         )}
       </div>

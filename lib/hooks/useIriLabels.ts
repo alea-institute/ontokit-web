@@ -14,16 +14,17 @@ export function useIriLabels(
     projectId: string;
     accessToken?: string;
     branch?: string;
+    labelHints?: Record<string, string>;
   },
 ): Record<string, string> {
-  const { projectId, accessToken, branch } = opts;
+  const { projectId, accessToken, branch, labelHints } = opts;
   const [labels, setLabels] = useState<Record<string, string>>({});
   const pendingRef = useRef(new Set<string>());
 
   useEffect(() => {
     // Determine which IRIs we haven't resolved yet
     const unresolved = iris.filter(
-      (iri) => iri && !labels[iri] && !pendingRef.current.has(iri),
+      (iri) => iri && !labels[iri] && !pendingRef.current.has(iri) && !(labelHints && labelHints[iri]),
     );
     if (unresolved.length === 0) return;
 
@@ -77,5 +78,5 @@ export function useIriLabels(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [iris.join(","), projectId, accessToken, branch]);
 
-  return labels;
+  return labelHints ? { ...labelHints, ...labels } : labels;
 }

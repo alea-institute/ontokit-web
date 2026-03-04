@@ -65,6 +65,7 @@ interface PropertyDetailPanelProps {
   onNavigateToEntity?: (iri: string) => void;
   onCopyIri?: (iri: string) => void;
   accessToken?: string;
+  labelHints?: Record<string, string>;
 }
 
 export function PropertyDetailPanel({
@@ -78,6 +79,7 @@ export function PropertyDetailPanel({
   onNavigateToEntity,
   onCopyIri,
   accessToken,
+  labelHints,
 }: PropertyDetailPanelProps) {
   // Parse property detail from source
   const detail = useMemo((): ParsedPropertyDetail | null => {
@@ -105,7 +107,7 @@ export function PropertyDetailPanel({
     return iris;
   }, [detail]);
 
-  const resolvedLabels = useIriLabels(allDisplayedIris, { projectId, accessToken, branch });
+  const resolvedLabels = useIriLabels(allDisplayedIris, { projectId, accessToken, branch, labelHints });
 
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false);

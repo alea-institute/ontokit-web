@@ -57,6 +57,7 @@ interface IndividualDetailPanelProps {
   onNavigateToEntity?: (iri: string) => void;
   onCopyIri?: (iri: string) => void;
   accessToken?: string;
+  labelHints?: Record<string, string>;
 }
 
 export function IndividualDetailPanel({
@@ -70,6 +71,7 @@ export function IndividualDetailPanel({
   onNavigateToEntity,
   onCopyIri,
   accessToken,
+  labelHints,
 }: IndividualDetailPanelProps) {
   const detail = useMemo((): ParsedIndividualDetail | null => {
     if (!individualIri || !sourceContent) return null;
@@ -102,7 +104,7 @@ export function IndividualDetailPanel({
     return iris;
   }, [detail]);
 
-  const resolvedLabels = useIriLabels(allDisplayedIris, { projectId, accessToken, branch });
+  const resolvedLabels = useIriLabels(allDisplayedIris, { projectId, accessToken, branch, labelHints });
 
   const [isEditing, setIsEditing] = useState(false);
   const [editLabels, setEditLabels] = useState<LocalizedString[]>([]);
