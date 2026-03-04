@@ -224,8 +224,8 @@ export default function EditorPage() {
   const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
   // If user_role is null but user has access to the project, default to edit (backend enforces actual perms)
   const hasExplicitRole = !!project?.user_role;
-  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin || (!hasExplicitRole && !!session?.accessToken);
-  const isSuggester = project?.user_role === "suggester";
+  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
+  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!session?.accessToken);
   const canSuggest = canEdit || isSuggester;
   const hasOntology = project?.source_file_path;
 

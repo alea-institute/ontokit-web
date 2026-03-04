@@ -115,8 +115,9 @@ export default function ProjectPage() {
     project?.user_role === "owner" ||
     project?.user_role === "admin" ||
     project?.user_role === "editor" ||
-    project?.is_superadmin ||
-    (!hasExplicitRole && !!session?.accessToken);
+    project?.is_superadmin;
+  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!session?.accessToken);
+  const canSuggest = canEdit || isSuggester;
 
   const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
 
@@ -319,7 +320,7 @@ export default function ProjectPage() {
                     </Button>
                   </Link>
                 )}
-                {canEdit && (
+                {canSuggest && (
                   <Link href={`/projects/${project.id}/editor`}>
                     <Button size="sm">
                       <Pencil className="mr-2 h-4 w-4" />
@@ -327,7 +328,7 @@ export default function ProjectPage() {
                     </Button>
                   </Link>
                 )}
-                {!canEdit && !showJoinRequestSection && (
+                {!canSuggest && !showJoinRequestSection && (
                   <Link href={`/projects/${project.id}/editor`}>
                     <Button variant="outline" size="sm">
                       <ExternalLink className="mr-2 h-4 w-4" />
@@ -470,7 +471,7 @@ export default function ProjectPage() {
                 Ontology Editor
               </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {canEdit ? "Edit classes, properties, and individuals" : "View the ontology structure"}
+                {canEdit ? "Edit classes, properties, and individuals" : canSuggest ? "Suggest changes to classes, properties, and individuals" : "View the ontology structure"}
               </p>
             </Link>
 

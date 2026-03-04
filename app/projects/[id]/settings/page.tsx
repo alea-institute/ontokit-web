@@ -78,7 +78,7 @@ export default function ProjectSettingsPage() {
   // Add member form state
   const [showAddMember, setShowAddMember] = useState(false);
   const [newMemberUserId, setNewMemberUserId] = useState("");
-  const [newMemberRole, setNewMemberRole] = useState<"admin" | "editor" | "viewer">("editor");
+  const [newMemberRole, setNewMemberRole] = useState<"admin" | "editor" | "suggester" | "viewer">("suggester");
   const [addMemberError, setAddMemberError] = useState<string | null>(null);
   const [isAddingMember, setIsAddingMember] = useState(false);
 
@@ -266,7 +266,7 @@ export default function ProjectSettingsPage() {
       setProject({ ...project, member_count: project.member_count + 1 });
       setShowAddMember(false);
       setNewMemberUserId("");
-      setNewMemberRole("editor");
+      setNewMemberRole("suggester");
       setSuccessMessage("Member added successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -535,7 +535,7 @@ export default function ProjectSettingsPage() {
       const membersData = await projectApi.listMembers(project.id, session.accessToken);
       setMembers(membersData.items);
       setProject({ ...project, member_count: membersData.total });
-      setSuccessMessage("Join request approved — user added as editor");
+      setSuccessMessage("Join request approved — user added as suggester");
       setTimeout(() => setSuccessMessage(null), 3000);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch (err) {
@@ -1314,7 +1314,7 @@ export default function ProjectSettingsPage() {
                     <select
                       value={newMemberRole}
                       onChange={(e) =>
-                        setNewMemberRole(e.target.value as "admin" | "editor" | "viewer")
+                        setNewMemberRole(e.target.value as "admin" | "editor" | "suggester" | "viewer")
                       }
                       className={cn(
                         "rounded-md border px-3 py-2 text-sm",
@@ -1325,6 +1325,7 @@ export default function ProjectSettingsPage() {
                     >
                       {isOwner && <option value="admin">Admin</option>}
                       <option value="editor">Editor</option>
+                      <option value="suggester">Suggester</option>
                       {!project.is_public && <option value="viewer">Viewer</option>}
                     </select>
                     <Button type="submit" size="sm" disabled={isAddingMember || !newMemberUserId}>
