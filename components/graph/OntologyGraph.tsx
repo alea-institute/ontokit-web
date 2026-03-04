@@ -14,7 +14,7 @@ import {
   type ColorMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowDown, ArrowRight, Maximize2, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowRight, ChevronDown, ChevronUp, Maximize2, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGraphData } from "@/lib/hooks/useGraphData";
 import { computeLayout } from "@/lib/graph/elkLayout";
@@ -32,6 +32,103 @@ interface OntologyGraphProps {
 
 const nodeTypes = { ontology: OntologyNode };
 const edgeTypes = { ontology: OntologyEdge };
+
+function GraphLegend() {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="absolute bottom-2 right-2 z-20">
+      <div className="rounded-lg border border-slate-200 bg-white/95 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-800/95">
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
+          aria-label={expanded ? "Collapse legend" : "Expand legend"}
+        >
+          Legend
+          {expanded ? <ChevronDown className="ml-auto h-3 w-3" /> : <ChevronUp className="ml-auto h-3 w-3" />}
+        </button>
+        {expanded && (
+          <div className="border-t border-slate-200 px-2.5 pb-2 pt-1.5 dark:border-slate-700">
+            {/* Node types */}
+            <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Nodes
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              <LegendNodeItem color="border-2 border-primary-500 bg-primary-50 dark:bg-primary-950/40" label="Focus" />
+              <LegendNodeItem color="border border-slate-300 bg-white dark:bg-slate-800" label="Class" />
+              <LegendNodeItem color="border border-slate-300 bg-white dark:bg-slate-800 border-l-2 border-l-primary-400" label="Root" />
+              <LegendNodeItem color="border border-pink-300 bg-pink-50 dark:bg-pink-950/30" label="Individual" badge="I" badgeColor="bg-pink-200 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300" />
+              <LegendNodeItem color="border border-blue-300 bg-blue-50 dark:bg-blue-950/30" label="Property" badge="P" badgeColor="bg-blue-200 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300" />
+              <LegendNodeItem color="border border-slate-200 bg-slate-50 dark:bg-slate-900" label="External" />
+              <LegendNodeItem color="border border-dashed border-slate-300 bg-white dark:bg-slate-800" label="Unexplored" />
+            </div>
+            {/* Edge types */}
+            <div className="mb-1 mt-2 text-[9px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              Edges
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              <LegendEdgeItem stroke="#94a3b8" label="subClassOf" />
+              <LegendEdgeItem stroke="#3b82f6" dasharray="5 3" label="equivalentTo" />
+              <LegendEdgeItem stroke="#ef4444" dasharray="5 3" label="disjointWith" />
+              <LegendEdgeItem stroke="#9ca3af" dasharray="2 4" label="seeAlso" />
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LegendNodeItem({
+  color,
+  label,
+  badge,
+  badgeColor,
+}: {
+  color: string;
+  label: string;
+  badge?: string;
+  badgeColor?: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className={cn("h-3 w-5 shrink-0 rounded-sm", color)} />
+      {badge && badgeColor && (
+        <span className={cn("flex h-3 w-3 shrink-0 items-center justify-center rounded-full text-[7px] font-bold", badgeColor)}>
+          {badge}
+        </span>
+      )}
+      <span className="text-[10px] text-slate-600 dark:text-slate-400">{label}</span>
+    </div>
+  );
+}
+
+function LegendEdgeItem({
+  stroke,
+  dasharray,
+  label,
+}: {
+  stroke: string;
+  dasharray?: string;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <svg className="h-3 w-5 shrink-0" viewBox="0 0 20 12">
+        <line
+          x1="0"
+          y1="6"
+          x2="20"
+          y2="6"
+          stroke={stroke}
+          strokeWidth={1.5}
+          strokeDasharray={dasharray}
+        />
+      </svg>
+      <span className="text-[10px] text-slate-600 dark:text-slate-400">{label}</span>
+    </div>
+  );
+}
 
 export function OntologyGraph({
   focusIri,
@@ -252,6 +349,7 @@ export function OntologyGraph({
             className="!bg-slate-100 dark:!bg-slate-800"
           />
         </ReactFlow>
+        <GraphLegend />
       </div>
     </div>
   );

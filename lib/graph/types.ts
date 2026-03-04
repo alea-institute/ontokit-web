@@ -1,4 +1,4 @@
-export type GraphNodeType = "focus" | "class" | "root" | "external" | "unexplored";
+export type GraphNodeType = "focus" | "class" | "root" | "individual" | "property" | "external" | "unexplored";
 export type GraphEdgeType = "subClassOf" | "equivalentClass" | "disjointWith" | "seeAlso";
 
 export interface OntologyGraphNode {

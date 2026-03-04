@@ -21,6 +21,7 @@ function isExternalIri(iri: string): boolean {
   return false;
 }
 
+const OWL_THING_IRI = "http://www.w3.org/2002/07/owl#Thing";
 const SEEALSO_IRI = "http://www.w3.org/2000/01/rdf-schema#seeAlso";
 const IS_DEFINED_BY_IRI = "http://www.w3.org/2000/01/rdf-schema#isDefinedBy";
 const MAX_CHILDREN_PER_NODE = 20;
@@ -65,6 +66,7 @@ export function buildGraphFromClassDetail(
   focusIri: string,
   resolvedNodes: Map<string, OWLClassDetail>,
   labelHints?: Map<string, string>,
+  entityTypes?: Map<string, string>,
 ): GraphData {
   const visited = new Set<string>();
   const nodeMap = new Map<string, OntologyGraphNode>();
@@ -83,6 +85,7 @@ export function buildGraphFromClassDetail(
   }
 
   function addEdge(source: string, target: string, edgeType: OntologyGraphEdge["edgeType"]) {
+    if (source === OWL_THING_IRI || target === OWL_THING_IRI) return;
     const key = `${edgeType}:${source}:${target}`;
     if (edgeSet.has(key)) return;
     edgeSet.add(key);
@@ -92,6 +95,10 @@ export function buildGraphFromClassDetail(
   function getNodeType(iri: string): GraphNodeType {
     if (iri === focusIri) return "focus";
     if (isExternalIri(iri)) return "external";
+    // Check entity type for non-class entities
+    const et = entityTypes?.get(iri);
+    if (et === "individual") return "individual";
+    if (et === "property") return "property";
     if (!resolvedNodes.has(iri)) return "unexplored";
     const detail = resolvedNodes.get(iri)!;
     if (detail.parent_iris.length === 0) return "root";
@@ -113,6 +120,7 @@ export function buildGraphFromClassDetail(
   }
 
   function ensureNode(iri: string): void {
+    if (iri === OWL_THING_IRI) return;
     if (nodeMap.has(iri)) return;
     const detail = resolvedNodes.get(iri);
     nodeMap.set(iri, {
