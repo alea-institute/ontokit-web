@@ -133,7 +133,12 @@ export default function EditorPage() {
     removeOptimisticNode,
     updateNodeLabel,
     collapseAll,
-    expandAll,
+    collapseOneLevel,
+    expandOneLevel,
+    expandAllFully,
+    hasExpandableNodes,
+    hasExpandedNodes,
+    isExpandingAll,
     reparentOptimistic,
     rollbackReparent,
   } = useOntologyTree({
@@ -1116,8 +1121,13 @@ export default function EditorPage() {
                   selectNode={selectNode}
                   expandNode={expandNode}
                   collapseNode={collapseNode}
-                  expandAll={expandAll}
+                  expandOneLevel={expandOneLevel}
+                  expandAllFully={expandAllFully}
                   collapseAll={collapseAll}
+                  collapseOneLevel={collapseOneLevel}
+                  hasExpandableNodes={hasExpandableNodes}
+                  hasExpandedNodes={hasExpandedNodes}
+                  isExpandingAll={isExpandingAll}
                   navigateToNode={navigateToNode}
                   sourceContent={sourceContent}
                   setSourceContent={setSourceContent as (content: string | ((prev: string) => string)) => void}
@@ -1160,8 +1170,13 @@ export default function EditorPage() {
                 selectNode={selectNode}
                 expandNode={expandNode}
                 collapseNode={collapseNode}
-                expandAll={expandAll}
+                expandOneLevel={expandOneLevel}
+                expandAllFully={expandAllFully}
                 collapseAll={collapseAll}
+                collapseOneLevel={collapseOneLevel}
+                hasExpandableNodes={hasExpandableNodes}
+                hasExpandedNodes={hasExpandedNodes}
+                isExpandingAll={isExpandingAll}
                 navigateToNode={navigateToNode}
                 onAddEntity={handleAddEntity}
                 onDeleteClass={handleDeleteClass}

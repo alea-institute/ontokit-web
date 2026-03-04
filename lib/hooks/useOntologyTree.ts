@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { projectOntologyApi, type OWLClassTreeNode as ApiTreeNode } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 
@@ -34,8 +34,18 @@ interface UseOntologyTreeReturn {
   updateNodeLabel: (iri: string, newLabel: string) => void;
   /** Collapse all expanded nodes */
   collapseAll: () => void;
-  /** Expand all visible nodes with children (one level deeper) */
-  expandAll: () => Promise<void>;
+  /** Collapse one level: collapse leaf-expanded nodes (expanded with no expanded children) */
+  collapseOneLevel: () => void;
+  /** Expand one level deeper (visible unexpanded nodes) */
+  expandOneLevel: () => Promise<void>;
+  /** Expand all nodes fully (loops until tree is fully expanded) */
+  expandAllFully: () => Promise<void>;
+  /** Whether any visible node can still be expanded */
+  hasExpandableNodes: boolean;
+  /** Whether any node is currently expanded */
+  hasExpandedNodes: boolean;
+  /** Whether expandAllFully is currently running */
+  isExpandingAll: boolean;
   /** Optimistically move a node from one parent to another. Returns snapshot for rollback. */
   reparentOptimistic: (iri: string, oldParentIri: string | null, newParentIri: string | null) => ReparentSnapshot;
   /** Rollback a reparent using the snapshot */
@@ -295,27 +305,102 @@ export function useOntologyTree({
   }, []);
 
   /**
-   * Expand all visible nodes that have children but are not yet expanded.
-   * Expands one additional level (visible nodes + their direct children).
+   * Collapse one level: collapses "leaf-expanded" nodes (expanded with no expanded children).
+   * This is the inverse of expandOneLevel — it peels back the expansion frontier.
    */
-  const expandAll = useCallback(async () => {
-    const collectUnexpanded = (items: ClassTreeNode[]): string[] => {
-      const result: string[] = [];
-      for (const node of items) {
-        if ((node.hasChildren || node.children.length > 0) && !node.isExpanded) {
-          result.push(node.iri);
-        }
-        if (node.isExpanded && node.children.length > 0) {
-          result.push(...collectUnexpanded(node.children));
-        }
-      }
-      return result;
-    };
+  const collapseOneLevel = useCallback(() => {
+    setNodes((prev) => {
+      const collapse = (items: ClassTreeNode[]): ClassTreeNode[] =>
+        items.map((node) => {
+          if (!node.isExpanded) return node;
+          const hasExpandedChild = node.children.some((c) => c.isExpanded);
+          if (!hasExpandedChild) return { ...node, isExpanded: false };
+          return { ...node, children: collapse(node.children) };
+        });
+      return collapse(prev);
+    });
+  }, []);
 
+  /**
+   * Collect all visible unexpanded nodes that have children.
+   */
+  const collectUnexpanded = useCallback((items: ClassTreeNode[]): string[] => {
+    const result: string[] = [];
+    for (const node of items) {
+      if ((node.hasChildren || node.children.length > 0) && !node.isExpanded) {
+        result.push(node.iri);
+      }
+      if (node.isExpanded && node.children.length > 0) {
+        result.push(...collectUnexpanded(node.children));
+      }
+    }
+    return result;
+  }, []);
+
+  /**
+   * Expand one level deeper (visible unexpanded nodes).
+   */
+  const expandOneLevel = useCallback(async () => {
     const irisToExpand = collectUnexpanded(nodes);
-    // Expand in parallel (all at once)
     await Promise.all(irisToExpand.map((iri) => expandNode(iri)));
-  }, [nodes, expandNode]);
+  }, [nodes, expandNode, collectUnexpanded]);
+
+  // Loading state for expandAllFully
+  const [isExpandingAll, setIsExpandingAll] = useState(false);
+
+  /**
+   * Expand all nodes fully by looping expansion rounds until the tree is fully expanded.
+   * Caps at MAX_ROUNDS rounds or MAX_NODES visible nodes to avoid runaway expansion.
+   */
+  const expandAllFully = useCallback(async () => {
+    const MAX_ROUNDS = 20;
+    const MAX_NODES = 500;
+    setIsExpandingAll(true);
+    try {
+      for (let round = 0; round < MAX_ROUNDS; round++) {
+        // Peek at latest state via setNodes functional updater
+        const frontier = await new Promise<string[]>((resolve) => {
+          setNodes((currentNodes) => {
+            const countVisible = (items: ClassTreeNode[]): number => {
+              let count = items.length;
+              for (const node of items) {
+                if (node.isExpanded && node.children.length > 0) {
+                  count += countVisible(node.children);
+                }
+              }
+              return count;
+            };
+            if (countVisible(currentNodes) >= MAX_NODES) {
+              resolve([]);
+              return currentNodes;
+            }
+            resolve(collectUnexpanded(currentNodes));
+            return currentNodes; // no-op — same reference, no re-render
+          });
+        });
+        if (frontier.length === 0) break;
+        await Promise.all(frontier.map((iri) => expandNode(iri)));
+      }
+    } finally {
+      setIsExpandingAll(false);
+    }
+  }, [expandNode, collectUnexpanded]);
+
+  // Computed booleans for disabled state
+  const hasExpandableNodes = useMemo(() => {
+    const check = (items: ClassTreeNode[]): boolean => {
+      for (const node of items) {
+        if ((node.hasChildren || node.children.length > 0) && !node.isExpanded) return true;
+        if (node.isExpanded && node.children.length > 0 && check(node.children)) return true;
+      }
+      return false;
+    };
+    return check(nodes);
+  }, [nodes]);
+
+  const hasExpandedNodes = useMemo(() => {
+    return nodes.some((node) => node.isExpanded);
+  }, [nodes]);
 
   /**
    * Optimistically reparent a node: remove from old parent, add under new parent.
@@ -410,7 +495,12 @@ export function useOntologyTree({
     removeOptimisticNode,
     updateNodeLabel,
     collapseAll,
-    expandAll,
+    collapseOneLevel,
+    expandOneLevel,
+    expandAllFully,
+    hasExpandableNodes,
+    hasExpandedNodes,
+    isExpandingAll,
     reparentOptimistic,
     rollbackReparent,
   };

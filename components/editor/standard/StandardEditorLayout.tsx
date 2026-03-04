@@ -53,8 +53,13 @@ export interface StandardEditorLayoutProps {
   selectNode: (iri: string) => void;
   expandNode: (iri: string) => void;
   collapseNode: (iri: string) => void;
-  expandAll: () => Promise<void>;
+  expandOneLevel: () => Promise<void>;
+  expandAllFully: () => Promise<void>;
   collapseAll: () => void;
+  collapseOneLevel: () => void;
+  hasExpandableNodes: boolean;
+  hasExpandedNodes: boolean;
+  isExpandingAll: boolean;
   navigateToNode: (iri: string) => Promise<void>;
 
   // Actions
@@ -97,8 +102,13 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     selectNode,
     expandNode,
     collapseNode,
-    expandAll,
+    expandOneLevel,
+    expandAllFully,
     collapseAll,
+    collapseOneLevel,
+    hasExpandableNodes,
+    hasExpandedNodes,
+    isExpandingAll,
     navigateToNode,
     onAddEntity,
     onDeleteClass,
@@ -248,8 +258,13 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           onSearchChange={setSearchQuery}
           onCloseSearch={closeSearch}
           searchInputRef={searchInputRef}
-          onExpandAll={activeTab === "classes" ? expandAll : undefined}
+          onExpandOneLevel={activeTab === "classes" ? expandOneLevel : undefined}
+          onExpandAllFully={activeTab === "classes" ? expandAllFully : undefined}
           onCollapseAll={activeTab === "classes" ? collapseAll : undefined}
+          onCollapseOneLevel={activeTab === "classes" ? collapseOneLevel : undefined}
+          hasExpandableNodes={activeTab === "classes" ? hasExpandableNodes : false}
+          hasExpandedNodes={activeTab === "classes" ? hasExpandedNodes : false}
+          isExpandingAll={activeTab === "classes" ? isExpandingAll : false}
         />
 
         {/* Tab Content */}
