@@ -28,6 +28,7 @@ import type { OntologySourceEditorRef } from "@/components/editor/OntologySource
 import type { IriPosition } from "@/lib/editor/indexWorker";
 import { useDraftStore } from "@/lib/stores/draftStore";
 import { getLocalName } from "@/lib/utils";
+import { extractTreeLabelMap } from "@/lib/graph/buildGraphData";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
 
 const OntologySourceEditor = dynamic(
@@ -183,6 +184,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [getDraftIris, projectId, activeBranch, drafts],
   );
+
+  // Tree label hints for graph nodes
+  const treeLabelHints = useMemo(() => extractTreeLabelMap(nodes), [nodes]);
 
   // Drag-and-drop reparenting
   const handleDndReparent = useCallback(async (
@@ -375,6 +379,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               projectId={projectId}
               accessToken={accessToken}
               branch={activeBranch}
+              labelHints={treeLabelHints}
               onNavigateToClass={(iri) => {
                 handleViewModeChange("tree");
                 navigateToNode(iri);

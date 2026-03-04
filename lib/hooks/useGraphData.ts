@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
 import { buildGraphFromClassDetail, getSeeAlsoIris } from "@/lib/graph/buildGraphData";
+import { getLocalName } from "@/lib/utils";
 import type { GraphData } from "@/lib/graph/types";
 
 const MAX_RESOLVED_NODES = 100;
@@ -13,6 +14,7 @@ interface UseGraphDataOptions {
   accessToken?: string;
   branch?: string;
   initialDepth?: number;
+  labelHints?: Map<string, string>;
 }
 
 interface UseGraphDataReturn {
@@ -29,10 +31,15 @@ export function useGraphData({
   accessToken,
   branch,
   initialDepth = 2,
+  labelHints,
 }: UseGraphDataOptions): UseGraphDataReturn {
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const resolvedNodesRef = useRef<Map<string, OWLClassDetail>>(new Map());
+  // IRIs that failed getClassDetail (non-class entities) — don't retry
+  const failedIrisRef = useRef<Set<string>>(new Set());
+  // Labels discovered for non-class entities via search API
+  const nonClassLabelsRef = useRef<Map<string, string>>(new Map());
   const [resolvedCount, setResolvedCount] = useState(0);
 
   const fetchDetail = useCallback(
@@ -40,6 +47,7 @@ export function useGraphData({
       if (resolvedNodesRef.current.has(iri)) {
         return resolvedNodesRef.current.get(iri)!;
       }
+      if (failedIrisRef.current.has(iri)) return null;
       if (resolvedNodesRef.current.size >= MAX_RESOLVED_NODES) return null;
       try {
         const detail = await projectOntologyApi.getClassDetail(
@@ -51,6 +59,7 @@ export function useGraphData({
         resolvedNodesRef.current.set(iri, detail);
         return detail;
       } catch {
+        failedIrisRef.current.add(iri);
         return null;
       }
     },
@@ -62,6 +71,7 @@ export function useGraphData({
       const unresolved = iris.filter(
         (iri) =>
           !resolvedNodesRef.current.has(iri) &&
+          !failedIrisRef.current.has(iri) &&
           resolvedNodesRef.current.size < MAX_RESOLVED_NODES,
       );
       if (unresolved.length === 0) return [];
@@ -101,13 +111,66 @@ export function useGraphData({
     [fetchDetail],
   );
 
+  /** Collect all IRIs referenced by resolved nodes that are still unresolved. */
+  const getUnresolvedReferenced = useCallback((): string[] => {
+    const referenced = new Set<string>();
+    for (const detail of resolvedNodesRef.current.values()) {
+      for (const iri of detail.parent_iris) referenced.add(iri);
+      for (const iri of detail.equivalent_iris) referenced.add(iri);
+      for (const iri of detail.disjoint_iris) referenced.add(iri);
+      for (const iri of getSeeAlsoIris(detail)) referenced.add(iri);
+    }
+    return [...referenced].filter(
+      (iri) => !resolvedNodesRef.current.has(iri) && !failedIrisRef.current.has(iri),
+    );
+  }, []);
+
+  /**
+   * Resolve labels for non-class entities (individuals, properties) via search API.
+   * Searches by each IRI's local name and matches by exact IRI in results.
+   */
+  const resolveNonClassLabels = useCallback(async () => {
+    const needLabels = [...failedIrisRef.current].filter(
+      (iri) => !nonClassLabelsRef.current.has(iri),
+    );
+    if (needLabels.length === 0) return;
+
+    await Promise.allSettled(
+      needLabels.map(async (iri) => {
+        try {
+          const localName = getLocalName(iri);
+          const response = await projectOntologyApi.searchEntities(
+            projectId,
+            localName,
+            accessToken,
+            branch,
+          );
+          const match = response.results.find((r) => r.iri === iri);
+          if (match?.label) {
+            nonClassLabelsRef.current.set(iri, match.label);
+          }
+        } catch {
+          // Search failed for this IRI — label will fall back to getLocalName
+        }
+      }),
+    );
+  }, [projectId, accessToken, branch]);
+
   const buildGraph = useCallback(
     (focus: string) => {
-      const data = buildGraphFromClassDetail(focus, resolvedNodesRef.current);
+      // Merge all label sources: caller hints + non-class entity labels
+      let mergedHints = labelHints;
+      if (nonClassLabelsRef.current.size > 0) {
+        mergedHints = new Map(labelHints);
+        for (const [iri, label] of nonClassLabelsRef.current) {
+          if (!mergedHints.has(iri)) mergedHints.set(iri, label);
+        }
+      }
+      const data = buildGraphFromClassDetail(focus, resolvedNodesRef.current, mergedHints);
       setGraphData(data);
       setResolvedCount(resolvedNodesRef.current.size);
     },
-    [],
+    [labelHints],
   );
 
   // Initial load when focus changes
@@ -122,6 +185,8 @@ export function useGraphData({
     async function loadGraph() {
       setIsLoading(true);
       resolvedNodesRef.current = new Map();
+      failedIrisRef.current = new Set();
+      nonClassLabelsRef.current = new Map();
 
       try {
         // Depth 0: focus node
@@ -150,6 +215,20 @@ export function useGraphData({
           if (cancelled) return;
         }
 
+        // Label resolution pass: fetch details for any remaining unresolved
+        // relationship targets so graph nodes show labels instead of opaque IDs
+        const unresolved = getUnresolvedReferenced();
+        if (unresolved.length > 0) {
+          await Promise.allSettled(unresolved.map((iri) => fetchDetail(iri)));
+          if (cancelled) return;
+        }
+
+        // Resolve labels for non-class entities (individuals/properties)
+        if (failedIrisRef.current.size > 0) {
+          await resolveNonClassLabels();
+          if (cancelled) return;
+        }
+
         buildGraph(focusIri!);
       } finally {
         if (!cancelled) setIsLoading(false);
@@ -160,7 +239,7 @@ export function useGraphData({
     return () => {
       cancelled = true;
     };
-  }, [focusIri, accessToken, branch, fetchDetail, fetchNeighbors, buildGraph, initialDepth]);
+  }, [focusIri, accessToken, branch, fetchDetail, fetchNeighbors, getUnresolvedReferenced, resolveNonClassLabels, buildGraph, initialDepth]);
 
   const expandNode = useCallback(
     async (iri: string) => {
@@ -177,6 +256,17 @@ export function useGraphData({
             ...getSeeAlsoIris(detail),
           ];
           await fetchNeighbors(neighborIris);
+
+          // Label resolution pass for newly discovered relationship targets
+          const unresolved = getUnresolvedReferenced();
+          if (unresolved.length > 0) {
+            await Promise.allSettled(unresolved.map((i) => fetchDetail(i)));
+          }
+
+          // Resolve labels for non-class entities
+          if (failedIrisRef.current.size > 0) {
+            await resolveNonClassLabels();
+          }
         }
 
         buildGraph(focusIri);
@@ -184,11 +274,13 @@ export function useGraphData({
         setIsLoading(false);
       }
     },
-    [focusIri, fetchDetail, fetchNeighbors, buildGraph],
+    [focusIri, fetchDetail, fetchNeighbors, getUnresolvedReferenced, resolveNonClassLabels, buildGraph],
   );
 
   const resetGraph = useCallback(() => {
     resolvedNodesRef.current = new Map();
+    failedIrisRef.current = new Set();
+    nonClassLabelsRef.current = new Map();
     setGraphData(null);
     setResolvedCount(0);
   }, []);

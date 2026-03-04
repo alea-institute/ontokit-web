@@ -27,6 +27,7 @@ interface OntologyGraphProps {
   accessToken?: string;
   branch?: string;
   onNavigateToClass?: (iri: string) => void;
+  labelHints?: Map<string, string>;
 }
 
 const nodeTypes = { ontology: OntologyNode };
@@ -38,6 +39,7 @@ export function OntologyGraph({
   accessToken,
   branch,
   onNavigateToClass,
+  labelHints,
 }: OntologyGraphProps) {
   const { graphData, isLoading, expandNode, resetGraph, resolvedCount } =
     useGraphData({
@@ -45,6 +47,7 @@ export function OntologyGraph({
       projectId,
       accessToken,
       branch,
+      labelHints,
     });
 
   const [direction, setDirection] = useState<"TB" | "LR">("TB");

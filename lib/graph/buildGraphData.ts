@@ -1,5 +1,6 @@
 import { getLocalName } from "@/lib/utils";
 import type { OWLClassDetail } from "@/lib/api/client";
+import type { ClassTreeNode } from "@/lib/ontology/types";
 import type { GraphData, OntologyGraphNode, OntologyGraphEdge, GraphNodeType } from "./types";
 
 const WELL_KNOWN_NAMESPACES = new Set([
@@ -43,11 +44,27 @@ export function getSeeAlsoIris(detail: OWLClassDetail): string[] {
 }
 
 /**
+ * Recursively walk tree nodes to build an IRI → label map.
+ */
+export function extractTreeLabelMap(nodes: ClassTreeNode[]): Map<string, string> {
+  const map = new Map<string, string>();
+  function walk(list: ClassTreeNode[]) {
+    for (const node of list) {
+      if (node.label) map.set(node.iri, node.label);
+      if (node.children.length > 0) walk(node.children);
+    }
+  }
+  walk(nodes);
+  return map;
+}
+
+/**
  * Build graph data from a set of resolved class details centered on a focus IRI.
  */
 export function buildGraphFromClassDetail(
   focusIri: string,
   resolvedNodes: Map<string, OWLClassDetail>,
+  labelHints?: Map<string, string>,
 ): GraphData {
   const visited = new Set<string>();
   const nodeMap = new Map<string, OntologyGraphNode>();
@@ -88,7 +105,10 @@ export function buildGraphFromClassDetail(
     // 2. Label from another node's parent_labels map
     const known = knownLabels.get(iri);
     if (known) return known;
-    // 3. Fallback to local name
+    // 3. Label from tree nodes already in memory
+    const hint = labelHints?.get(iri);
+    if (hint) return hint;
+    // 4. Fallback to local name
     return getLocalName(iri);
   }
 

@@ -35,6 +35,7 @@ import type { TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividual
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import { useDraftStore } from "@/lib/stores/draftStore";
 import { getLocalName } from "@/lib/utils";
+import { extractTreeLabelMap } from "@/lib/graph/buildGraphData";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
 
 export interface StandardEditorLayoutProps {
@@ -135,6 +136,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [getDraftIris, projectId, activeBranch, drafts],
   );
+
+  // Tree label hints for graph nodes
+  const treeLabelHints = useMemo(() => extractTreeLabelMap(nodes), [nodes]);
 
   // Drag-and-drop reparenting
   const handleDndReparent = useCallback(async (
@@ -373,6 +377,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                 projectId={projectId}
                 accessToken={accessToken}
                 branch={activeBranch}
+                labelHints={treeLabelHints}
                 onNavigateToClass={(iri) => {
                   setShowGraph(false);
                   navigateToNode(iri);
