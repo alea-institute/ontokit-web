@@ -101,7 +101,7 @@ export function buildGraphFromClassDetail(
     if (et === "property") return "property";
     if (!resolvedNodes.has(iri)) return "unexplored";
     const detail = resolvedNodes.get(iri)!;
-    if (detail.parent_iris.length === 0) return "root";
+    if (detail.parent_iris.length === 0 || detail.parent_iris.every(p => p === OWL_THING_IRI)) return "root";
     return "class";
   }
 
