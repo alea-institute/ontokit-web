@@ -40,6 +40,9 @@ import { InlineAnnotationAdder } from "@/components/editor/standard/InlineAnnota
 import { RelationshipSection, type RelationshipGroup, type RelationshipTarget } from "@/components/editor/standard/RelationshipSection";
 import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, RELATIONSHIP_PROPERTY_IRIS, SEE_ALSO_IRI, getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
 import { AutoSaveStatusBar } from "@/components/editor/AutoSaveStatusBar";
+import { CrossReferencesPanel } from "@/components/editor/CrossReferencesPanel";
+import { SimilarConceptsPanel } from "@/components/editor/SimilarConceptsPanel";
+import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
@@ -918,6 +921,7 @@ export function ClassDetailPanel({
                       accessToken={accessToken}
                       branch={branch}
                       excludeIris={[classDetail.iri, ...editParentIris]}
+                      contextIri={classDetail.iri}
                       onSelect={addParent}
                       onClose={() => setShowParentPicker(false)}
                     />
@@ -995,6 +999,32 @@ export function ClassDetailPanel({
               <StatItem label="instances" value={classDetail.instance_count} />
             </div>
           </Section>
+
+          {/* Cross-References ("Used By") */}
+          <CrossReferencesPanel
+            projectId={projectId}
+            entityIri={classIri}
+            accessToken={accessToken}
+            branch={branch}
+            onNavigateToClass={onNavigateToClass}
+          />
+
+          {/* Entity History */}
+          <EntityHistoryTab
+            projectId={projectId}
+            entityIri={classIri}
+            accessToken={accessToken}
+            branch={branch}
+          />
+
+          {/* Similar Concepts */}
+          <SimilarConceptsPanel
+            projectId={projectId}
+            classIri={classIri}
+            accessToken={accessToken}
+            branch={branch}
+            onNavigateToClass={onNavigateToClass}
+          />
 
           {/* Equivalent Classes (read-only) */}
           {classDetail.equivalent_iris.length > 0 && (

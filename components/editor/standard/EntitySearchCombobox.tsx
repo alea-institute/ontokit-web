@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Brain } from "lucide-react";
 import { cn, getLocalName } from "@/lib/utils";
 import { projectOntologyApi, type EntitySearchResult } from "@/lib/api/client";
+import { embeddingsApi } from "@/lib/api/embeddings";
 
 /** Entity type icon badge */
 const entityTypeIcons: Record<string, { letter: string; className: string }> = {
@@ -28,6 +29,10 @@ interface EntitySearchComboboxProps {
   placeholder?: string;
 }
 
+interface SearchResultWithScore extends EntitySearchResult {
+  score?: number;
+}
+
 export function EntitySearchCombobox({
   projectId,
   accessToken,
@@ -39,8 +44,9 @@ export function EntitySearchCombobox({
   placeholder = "Search entities...",
 }: EntitySearchComboboxProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<EntitySearchResult[]>([]);
+  const [results, setResults] = useState<SearchResultWithScore[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchMode, setSearchMode] = useState<"text" | "semantic">("text");
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -68,6 +74,35 @@ export function EntitySearchCombobox({
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
+        const excludeSet = new Set(excludeIris || []);
+
+        if (searchMode === "semantic") {
+          try {
+            const response = await embeddingsApi.semanticSearch(
+              projectId,
+              query.trim(),
+              accessToken,
+              branch,
+              20,
+              0.3
+            );
+            setResults(
+              response.results
+                .filter((r) => !excludeSet.has(r.iri))
+                .map((r) => ({
+                  iri: r.iri,
+                  label: r.label,
+                  entity_type: r.entity_type,
+                  deprecated: r.deprecated,
+                  score: r.score,
+                }))
+            );
+            return;
+          } catch {
+            // Fall back to text search if semantic unavailable
+          }
+        }
+
         const response = await projectOntologyApi.searchEntities(
           projectId,
           query.trim(),
@@ -75,7 +110,6 @@ export function EntitySearchCombobox({
           branch,
           entityTypes,
         );
-        const excludeSet = new Set(excludeIris || []);
         setResults(response.results.filter((r) => !excludeSet.has(r.iri)));
       } catch {
         setResults([]);
@@ -84,7 +118,7 @@ export function EntitySearchCombobox({
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [query, projectId, accessToken, branch, entityTypes, excludeIris]);
+  }, [query, projectId, accessToken, branch, entityTypes, excludeIris, searchMode]);
 
   const handleSelect = useCallback(
     (result: EntitySearchResult) => {
@@ -112,6 +146,19 @@ export function EntitySearchCombobox({
           placeholder={placeholder}
           className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-slate-500"
         />
+        <button
+          onClick={() => setSearchMode((m) => (m === "text" ? "semantic" : "text"))}
+          className={cn(
+            "rounded p-1 transition-colors",
+            searchMode === "semantic"
+              ? "bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-400"
+              : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600"
+          )}
+          title={searchMode === "semantic" ? "Semantic search (on)" : "Switch to semantic search"}
+          aria-label="Toggle semantic search"
+        >
+          <Brain className="h-3.5 w-3.5" />
+        </button>
         <button onClick={onClose} className="rounded p-0.5 hover:bg-slate-100 dark:hover:bg-slate-600">
           <X className="h-3.5 w-3.5 text-slate-400" />
         </button>
@@ -151,6 +198,11 @@ export function EntitySearchCombobox({
                       {result.iri}
                     </p>
                   </div>
+                  {result.score != null && result.score < 1 && (
+                    <span className="shrink-0 rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                      {Math.round(result.score * 100)}%
+                    </span>
+                  )}
                 </button>
               );
             })}

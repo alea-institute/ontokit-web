@@ -554,6 +554,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 <HealthCheckPanel
                   projectId={projectId}
                   accessToken={accessToken}
+                  branch={activeBranch}
                   isOpen={showHealthCheck}
                   onClose={onCloseHealthCheck}
                   onNavigateToClass={(iri) => navigateToNode(iri)}

@@ -13,12 +13,22 @@ function ErrorContent() {
   const RETRY_SECONDS = 10;
   const MAX_RETRIES = 6;
 
+  // Persist retry count in sessionStorage so it survives navigation loops
+  const storageKey = "auth-error-retry-count";
+  const getStoredRetries = () => {
+    try { return Number(sessionStorage.getItem(storageKey)) || 0; } catch { return 0; }
+  };
+
   const [countdown, setCountdown] = useState(isTransient ? RETRY_SECONDS : 0);
-  const [retryCount, setRetryCount] = useState(0);
+  const [retryCount, setRetryCount] = useState(() => getStoredRetries());
   const [retrying, setRetrying] = useState(false);
 
   const retry = useCallback(() => {
     setRetrying(true);
+    const next = getStoredRetries() + 1;
+    try { sessionStorage.setItem(storageKey, String(next)); } catch {}
+    setRetryCount(next);
+    if (next >= MAX_RETRIES) return; // stop — don't navigate again
     router.push("/auth/signin");
   }, [router]);
 
@@ -72,6 +82,13 @@ function ErrorContent() {
   const errorInfo = errorMessages[error || "Default"] || errorMessages.Default;
   const exhaustedRetries = retryCount >= MAX_RETRIES;
 
+  // Clear stored count once we've given up, so a future visit starts fresh
+  useEffect(() => {
+    if (exhaustedRetries) {
+      try { sessionStorage.removeItem(storageKey); } catch {}
+    }
+  }, [exhaustedRetries]);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8 text-center">
@@ -109,10 +126,11 @@ function ErrorContent() {
         <div className="mt-8 space-y-4">
           <button
             onClick={() => {
+              try { sessionStorage.removeItem(storageKey); } catch {}
               setRetryCount(0);
               setCountdown(RETRY_SECONDS);
               setRetrying(false);
-              retry();
+              router.push("/auth/signin");
             }}
             className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
           >
