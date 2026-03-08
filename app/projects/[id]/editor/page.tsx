@@ -42,6 +42,8 @@ import { SuggestionSubmitDialog } from "@/components/editor/SuggestionSubmitDial
 import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
 import { suggestionsApi } from "@/lib/api/suggestions";
+import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
+import { UpstreamSyncIndicator } from "@/components/editor/UpstreamSyncIndicator";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 import type { IriPosition } from "@/lib/editor/indexWorker";
@@ -110,6 +112,7 @@ export default function EditorPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTargetIri, setDeleteTargetIri] = useState<string | null>(null);
   const [deleteTargetLabel, setDeleteTargetLabel] = useState<string>("");
+  const [deleteImpactAcknowledged, setDeleteImpactAcknowledged] = useState(false);
 
   // Toast
   const toast = useToast();
@@ -1031,6 +1034,12 @@ export default function EditorPage() {
               {/* History Button */}
               <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
 
+              {/* Upstream Sync Status */}
+              <UpstreamSyncIndicator
+                projectId={projectId}
+                accessToken={session?.accessToken}
+              />
+
               {/* Normalization Status */}
               {normalizationStatus?.needs_normalization && (
                 <Link href={`/projects/${projectId}/settings#normalization`}>
@@ -1228,13 +1237,24 @@ export default function EditorPage() {
       {/* Delete Class Confirmation Dialog */}
       <ConfirmDialog
         open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setDeleteImpactAcknowledged(false);
+        }}
         onConfirm={handleDeleteConfirm}
         title="Delete Class"
         description={`Are you sure you want to delete "${deleteTargetLabel}"? This action cannot be undone.`}
         confirmLabel="Delete"
         variant="danger"
-      />
+      >
+        <DeleteImpactAnalysis
+          projectId={projectId}
+          entityIri={deleteTargetIri}
+          accessToken={session?.accessToken}
+          branch={activeBranch}
+          onAcknowledge={setDeleteImpactAcknowledged}
+        />
+      </ConfirmDialog>
 
       {/* Suggestion Submit Dialog */}
       {isSuggestionMode && (

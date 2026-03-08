@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/components/projects/project-form";
@@ -42,9 +42,21 @@ import {
   joinRequestApi,
   type JoinRequest as JoinRequestType,
 } from "@/lib/api/joinRequests";
+import { useUpstreamSync } from "@/lib/hooks/useUpstreamSync";
+import type {
+  SyncFrequency,
+  SyncUpdateMode,
+} from "@/lib/api/upstreamSync";
 import { NOTIFICATIONS_CHANGED_EVENT } from "@/components/layout/notification-bell";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
+import {
+  embeddingsApi,
+  type EmbeddingConfig,
+  type EmbeddingConfigUpdate,
+  type EmbeddingProvider,
+  type EmbeddingStatus,
+} from "@/lib/api/embeddings";
 
 // Dynamically import the diff viewer to avoid SSR issues with Monaco
 const NormalizationDiffViewer = dynamic(
@@ -225,6 +237,13 @@ export default function ProjectSettingsPage() {
   const canManage =
     project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
   const isOwner = project?.user_role === "owner";
+
+  // Upstream sync hook
+  const upstreamSync = useUpstreamSync({
+    projectId,
+    accessToken: session?.accessToken,
+    enabled: canManage ?? false,
+  });
 
   const handleUpdateProject = async (data: { name: string; description?: string; is_public: boolean }) => {
     if (!session?.accessToken || !project) return;
@@ -1666,6 +1685,22 @@ export default function ProjectSettingsPage() {
             </section>
           )}
 
+          {/* Upstream Source Tracking - only for owners/admins */}
+          {canManage && (
+            <UpstreamSyncSection
+              projectId={projectId}
+              upstreamSync={upstreamSync}
+            />
+          )}
+
+          {/* Intelligence Features (Embeddings) */}
+          {canManage && (
+            <EmbeddingSettingsSection
+              projectId={projectId}
+              accessToken={session?.accessToken}
+            />
+          )}
+
           {/* Danger Zone */}
           {(isOwner || project?.is_superadmin) && (
             <section className="rounded-lg border border-red-200 bg-white p-6 dark:border-red-900/50 dark:bg-slate-800">
@@ -1750,5 +1785,800 @@ export default function ProjectSettingsPage() {
         />
       )}
     </>
+  );
+}
+
+// --- Upstream Sync Section ---
+
+const FREQUENCY_OPTIONS: { value: SyncFrequency; label: string }[] = [
+  { value: "6h", label: "Every 6 hours" },
+  { value: "12h", label: "Every 12 hours" },
+  { value: "24h", label: "Every 24 hours" },
+  { value: "48h", label: "Every 48 hours" },
+  { value: "weekly", label: "Weekly" },
+  { value: "manual", label: "Manual only" },
+];
+
+const UPDATE_MODE_OPTIONS: { value: SyncUpdateMode; label: string; description: string }[] = [
+  { value: "auto_apply", label: "Auto-apply if clean", description: "Automatically apply updates when there are no conflicts" },
+  { value: "review_required", label: "Always create PR", description: "Create a pull request for every upstream change" },
+];
+
+function formatTimeAgo(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHrs = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
+function formatTimeUntil(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = date.getTime() - now.getTime();
+  if (diffMs <= 0) return "any moment";
+  const diffMin = Math.floor(diffMs / 60000);
+  const diffHrs = Math.floor(diffMs / 3600000);
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHrs < 24) return `${diffHrs}h`;
+  return `${Math.floor(diffHrs / 24)}d`;
+}
+
+function UpstreamSyncSection({
+  projectId,
+  upstreamSync,
+}: {
+  projectId: string;
+  upstreamSync: ReturnType<typeof useUpstreamSync>;
+}) {
+  const {
+    config,
+    history,
+    isLoading: isSyncLoading,
+    isChecking,
+    error: syncError,
+    triggerCheck,
+    saveConfig,
+    deleteConfig,
+  } = upstreamSync;
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Form state
+  const [enabled, setEnabled] = useState(true);
+  const [repoOwner, setRepoOwner] = useState("");
+  const [repoName, setRepoName] = useState("");
+  const [branch, setBranch] = useState("main");
+  const [filePath, setFilePath] = useState("");
+  const [frequency, setFrequency] = useState<SyncFrequency>("24h");
+  const [updateMode, setUpdateMode] = useState<SyncUpdateMode>("auto_apply");
+
+  // Populate form from existing config
+  useEffect(() => {
+    if (config) {
+      setEnabled(config.enabled);
+      setRepoOwner(config.repo_owner);
+      setRepoName(config.repo_name);
+      setBranch(config.branch);
+      setFilePath(config.file_path);
+      setFrequency(config.frequency);
+      setUpdateMode(config.update_mode);
+    }
+  }, [config]);
+
+  const handleSave = async () => {
+    setFormError(null);
+
+    if (!repoOwner.trim() || !repoName.trim() || !filePath.trim()) {
+      setFormError("Repository owner, name, and file path are required.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await saveConfig({
+        repo_owner: repoOwner.trim(),
+        repo_name: repoName.trim(),
+        branch: branch.trim() || "main",
+        file_path: filePath.trim(),
+        frequency,
+        enabled,
+        update_mode: updateMode,
+      });
+      setIsEditing(false);
+    } catch {
+      // Error is set by the hook
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setIsSaving(true);
+    try {
+      await deleteConfig();
+      setIsEditing(false);
+      setRepoOwner("");
+      setRepoName("");
+      setBranch("main");
+      setFilePath("");
+      setFrequency("24h");
+      setUpdateMode("auto_apply");
+      setEnabled(true);
+    } catch {
+      // Error is set by the hook
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const eventIcon = (type: string) => {
+    switch (type) {
+      case "auto_applied":
+        return <Download className="h-3.5 w-3.5 text-green-500" />;
+      case "pr_created":
+        return <GitPullRequest className="h-3.5 w-3.5 text-indigo-500" />;
+      case "check_no_changes":
+        return <CheckCircle className="h-3.5 w-3.5 text-slate-400" />;
+      case "error":
+        return <AlertCircle className="h-3.5 w-3.5 text-red-500" />;
+      default:
+        return <RefreshCw className="h-3.5 w-3.5 text-slate-400" />;
+    }
+  };
+
+  return (
+    <section
+      id="upstream-sync"
+      className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+    >
+      <div className="mb-4 flex items-center gap-2">
+        <Download className="h-5 w-5 text-slate-500" />
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          Upstream Source Tracking
+        </h2>
+      </div>
+
+      {isSyncLoading ? (
+        <div className="flex items-center justify-center py-8">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+        </div>
+      ) : config && !isEditing ? (
+        /* Configured state */
+        <div className="space-y-4">
+          {/* Config summary */}
+          <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-700/50">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-slate-900 dark:text-white">
+                  {config.repo_owner}/{config.repo_name}
+                </p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  {config.file_path} · {config.branch} branch
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">
+                  {config.enabled
+                    ? `Checking ${FREQUENCY_OPTIONS.find((f) => f.value === config.frequency)?.label?.toLowerCase() || config.frequency}`
+                    : "Disabled"}
+                  {" · "}
+                  {config.update_mode === "auto_apply"
+                    ? "Auto-apply clean updates"
+                    : "Always create PR"}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditing(true)}
+                  className="text-sm"
+                >
+                  Edit
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Status indicator */}
+          {config.status === "up_to_date" && (
+            <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900/50 dark:bg-green-900/20">
+              <div className="h-2 w-2 rounded-full bg-green-500" />
+              <p className="text-sm text-green-700 dark:text-green-300">
+                Up to date
+                {config.last_check_at && (
+                  <span className="ml-1 text-green-600 dark:text-green-400">
+                    &mdash; last checked {formatTimeAgo(config.last_check_at)}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+          {config.status === "idle" && (
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-700/50">
+              <div className="h-2 w-2 rounded-full bg-slate-400" />
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                Idle
+                {config.last_check_at && (
+                  <span className="ml-1 text-slate-500 dark:text-slate-400">
+                    &mdash; last checked {formatTimeAgo(config.last_check_at)}
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+          {(config.status === "checking" || isChecking) && (
+            <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/50 dark:bg-blue-900/20">
+              <RefreshCw className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                Checking for upstream changes...
+              </p>
+            </div>
+          )}
+          {config.status === "update_available" && (
+            <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/50 dark:bg-indigo-900/20">
+              <Download className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+              <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                Upstream update available
+                {config.pending_pr_id && (
+                  <span className="ml-1">
+                    &mdash;{" "}
+                    <a
+                      href={`/projects/${projectId}/pull-requests/${config.pending_pr_id}`}
+                      className="font-medium underline"
+                    >
+                      Review PR
+                    </a>
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
+          {config.status === "error" && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-900/20">
+              <div className="flex items-center gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <p className="text-sm font-medium text-red-700 dark:text-red-300">
+                  Sync error
+                </p>
+              </div>
+              {config.error_message && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {config.error_message}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Next check info */}
+          {config.enabled && config.next_check_at && config.status !== "checking" && !isChecking && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Next check in {formatTimeUntil(config.next_check_at)}
+            </p>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => triggerCheck()}
+              disabled={isChecking || config.status === "checking"}
+            >
+              <RefreshCw className={cn("mr-2 h-4 w-4", isChecking && "animate-spin")} />
+              {isChecking ? "Checking..." : "Check Now"}
+            </Button>
+
+            {history.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowHistory(!showHistory)}
+              >
+                <History className="mr-2 h-4 w-4" />
+                {showHistory ? "Hide History" : "Recent Activity"}
+              </Button>
+            )}
+          </div>
+
+          {/* Error from hook */}
+          {syncError && (
+            <p className="text-sm text-red-600 dark:text-red-400">{syncError}</p>
+          )}
+
+          {/* History */}
+          {showHistory && history.length > 0 && (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-600">
+              <div className="max-h-48 overflow-y-auto">
+                {history.map((event) => (
+                  <div
+                    key={event.id}
+                    className="flex items-start gap-3 border-b border-slate-100 px-4 py-2.5 last:border-b-0 dark:border-slate-700"
+                  >
+                    <div className="mt-0.5">{eventIcon(event.event_type)}</div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        {event.event_type === "check_no_changes" && "No changes found"}
+                        {event.event_type === "auto_applied" && "Auto-applied update"}
+                        {event.event_type === "pr_created" && "Created PR for review"}
+                        {event.event_type === "update_found" && "Update found"}
+                        {event.event_type === "error" && "Error"}
+                      </p>
+                      {event.changes_summary && (
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                          {event.changes_summary}
+                        </p>
+                      )}
+                      {event.error_message && (
+                        <p className="text-xs text-red-500 dark:text-red-400">
+                          {event.error_message}
+                        </p>
+                      )}
+                    </div>
+                    <p className="flex-shrink-0 text-xs text-slate-400 dark:text-slate-500">
+                      {new Date(event.created_at).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Setup / edit form */
+        <div className="space-y-4">
+          {!config && !isEditing ? (
+            <div>
+              <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                Track an external GitHub repository for upstream changes.
+                When updates are detected, they can be auto-applied or routed through a pull request.
+              </p>
+              <Button variant="outline" onClick={() => setIsEditing(true)}>
+                <Download className="mr-2 h-4 w-4" />
+                Configure Upstream Source
+              </Button>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                {config ? "Edit upstream source configuration." : "Configure which external repository to track."}
+              </p>
+
+              {/* Enable toggle */}
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={(e) => setEnabled(e.target.checked)}
+                  className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700"
+                />
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Enable upstream tracking
+                </span>
+              </label>
+
+              {/* Repository */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Repository owner
+                  </label>
+                  <input
+                    type="text"
+                    value={repoOwner}
+                    onChange={(e) => setRepoOwner(e.target.value)}
+                    placeholder="e.g. alea-institute"
+                    className={cn(
+                      "w-full rounded-md border px-3 py-2 text-sm",
+                      "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                    )}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Repository name
+                  </label>
+                  <input
+                    type="text"
+                    value={repoName}
+                    onChange={(e) => setRepoName(e.target.value)}
+                    placeholder="e.g. FOLIO"
+                    className={cn(
+                      "w-full rounded-md border px-3 py-2 text-sm",
+                      "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Branch + File path */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Branch
+                  </label>
+                  <input
+                    type="text"
+                    value={branch}
+                    onChange={(e) => setBranch(e.target.value)}
+                    placeholder="main"
+                    className={cn(
+                      "w-full rounded-md border px-3 py-2 text-sm",
+                      "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                    )}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    File path
+                  </label>
+                  <input
+                    type="text"
+                    value={filePath}
+                    onChange={(e) => setFilePath(e.target.value)}
+                    placeholder="e.g. FOLIO.owl"
+                    className={cn(
+                      "w-full rounded-md border px-3 py-2 text-sm",
+                      "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Frequency + Update mode */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Check frequency
+                  </label>
+                  <select
+                    value={frequency}
+                    onChange={(e) => setFrequency(e.target.value as SyncFrequency)}
+                    className={cn(
+                      "w-full rounded-md border px-3 py-2 text-sm",
+                      "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                    )}
+                  >
+                    {FREQUENCY_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                    When updates found
+                  </label>
+                  <select
+                    value={updateMode}
+                    onChange={(e) => setUpdateMode(e.target.value as SyncUpdateMode)}
+                    className={cn(
+                      "w-full rounded-md border px-3 py-2 text-sm",
+                      "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                    )}
+                  >
+                    {UPDATE_MODE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {UPDATE_MODE_OPTIONS.find((o) => o.value === updateMode)?.description}
+                  </p>
+                </div>
+              </div>
+
+              {/* Form errors */}
+              {formError && (
+                <p className="text-sm text-red-600 dark:text-red-400">{formError}</p>
+              )}
+              {syncError && (
+                <p className="text-sm text-red-600 dark:text-red-400">{syncError}</p>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <Button onClick={handleSave} disabled={isSaving}>
+                  {isSaving ? "Saving..." : config ? "Update Configuration" : "Enable Tracking"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditing(false);
+                    setFormError(null);
+                    // Reset form to config values if cancelling
+                    if (config) {
+                      setEnabled(config.enabled);
+                      setRepoOwner(config.repo_owner);
+                      setRepoName(config.repo_name);
+                      setBranch(config.branch);
+                      setFilePath(config.file_path);
+                      setFrequency(config.frequency);
+                      setUpdateMode(config.update_mode);
+                    }
+                  }}
+                  disabled={isSaving}
+                >
+                  Cancel
+                </Button>
+                {config && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleRemove}
+                    disabled={isSaving}
+                    className="ml-auto text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const PROVIDER_OPTIONS: { value: EmbeddingProvider; label: string; description: string }[] = [
+  { value: "local", label: "Local (CPU)", description: "all-MiniLM-L6-v2 — no API key needed" },
+  { value: "openai", label: "OpenAI", description: "text-embedding-3-small" },
+  { value: "voyage", label: "Voyage AI", description: "voyage-3-lite" },
+  { value: "anthropic", label: "Anthropic", description: "voyager-instruct-3" },
+];
+
+const MODEL_DEFAULTS: Record<EmbeddingProvider, string> = {
+  local: "all-MiniLM-L6-v2",
+  openai: "text-embedding-3-small",
+  voyage: "voyage-3-lite",
+  anthropic: "voyager-instruct-3",
+};
+
+function EmbeddingSettingsSection({
+  projectId,
+  accessToken,
+}: {
+  projectId: string;
+  accessToken?: string;
+}) {
+  const [config, setConfig] = useState<EmbeddingConfig | null>(null);
+  const [status, setStatus] = useState<EmbeddingStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Editable form state
+  const [provider, setProvider] = useState<EmbeddingProvider>("local");
+  const [apiKey, setApiKey] = useState("");
+  const [autoEmbed, setAutoEmbed] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const [cfg, st] = await Promise.all([
+          embeddingsApi.getConfig(projectId, accessToken).catch(() => null),
+          embeddingsApi.getStatus(projectId, accessToken).catch(() => null),
+        ]);
+        if (cfg) {
+          setConfig(cfg);
+          setProvider(cfg.provider);
+          setAutoEmbed(cfg.auto_embed_on_save);
+        }
+        if (st) setStatus(st);
+      } catch {
+        // Config may not exist yet
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, [projectId, accessToken]);
+
+  const handleSave = async () => {
+    if (!accessToken) return;
+    setIsSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const update: EmbeddingConfigUpdate = {
+        provider,
+        model_name: MODEL_DEFAULTS[provider],
+        auto_embed_on_save: autoEmbed,
+      };
+      if (apiKey.trim()) {
+        update.api_key = apiKey.trim();
+      }
+      const updated = await embeddingsApi.updateConfig(projectId, update, accessToken);
+      setConfig(updated);
+      setApiKey("");
+      setSuccess("Embedding configuration saved");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleGenerate = async () => {
+    if (!accessToken) return;
+    setIsGenerating(true);
+    setError(null);
+    try {
+      await embeddingsApi.triggerGeneration(projectId, accessToken);
+      setSuccess("Embedding generation started");
+      setTimeout(() => setSuccess(null), 3000);
+      // Refresh status
+      const st = await embeddingsApi.getStatus(projectId, accessToken).catch(() => null);
+      if (st) setStatus(st);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start generation");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const needsApiKey = provider !== "local";
+  const coveragePercent = status?.coverage_percent ?? 0;
+
+  return (
+    <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-4 flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          Intelligence Features
+        </h2>
+        <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+          Embeddings
+        </span>
+      </div>
+      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        Generate vector embeddings to enable semantic search, similar entity discovery, and smart suggestions.
+      </p>
+
+      {isLoading ? (
+        <div className="flex h-16 items-center justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Provider selector */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Embedding Provider
+            </label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {PROVIDER_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setProvider(opt.value)}
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-all",
+                    provider === opt.value
+                      ? "border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:border-primary-400 dark:bg-primary-900/20"
+                      : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500"
+                  )}
+                >
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {opt.label}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {opt.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* API Key input (only for cloud providers) */}
+          {needsApiKey && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+                API Key
+                {config?.api_key_set && (
+                  <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                    (key set)
+                  </span>
+                )}
+              </label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder={config?.api_key_set ? "Enter new key to replace" : "Enter API key"}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+          )}
+
+          {/* Auto-embed toggle */}
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={autoEmbed}
+              onChange={(e) => setAutoEmbed(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span className="text-sm text-slate-700 dark:text-slate-300">
+              Auto-embed on save (~50ms for local model)
+            </span>
+          </label>
+
+          {/* Save button */}
+          <div className="flex items-center gap-3">
+            <Button onClick={handleSave} disabled={isSaving}>
+              {isSaving ? "Saving..." : "Save Configuration"}
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={handleGenerate}
+              disabled={isGenerating || !config}
+            >
+              <Play className="mr-1.5 h-4 w-4" />
+              {isGenerating ? "Starting..." : "Generate Embeddings"}
+            </Button>
+          </div>
+
+          {/* Coverage stats */}
+          {status && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800">
+              <div className="mb-1 flex items-center justify-between text-sm">
+                <span className="text-slate-600 dark:text-slate-400">
+                  {status.embedded_entities} of {status.total_entities} entities embedded
+                </span>
+                <span className="font-medium text-slate-700 dark:text-slate-300">
+                  {Math.round(coveragePercent)}%
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                <div
+                  className="h-full rounded-full bg-primary-500 transition-all"
+                  style={{ width: `${coveragePercent}%` }}
+                />
+              </div>
+              {status.job_in_progress && status.job_progress_percent != null && (
+                <p className="mt-1 text-xs text-primary-600 dark:text-primary-400">
+                  Job in progress: {Math.round(status.job_progress_percent)}%
+                </p>
+              )}
+            </div>
+          )}
+
+          {error && (
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          )}
+          {success && (
+            <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+          )}
+        </div>
+      )}
+    </section>
   );
 }

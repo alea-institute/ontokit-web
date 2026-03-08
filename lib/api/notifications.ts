@@ -18,7 +18,10 @@ export type NotificationType =
   | "join_request"
   | "pr_opened"
   | "pr_merged"
-  | "pr_review";
+  | "pr_review"
+  | "upstream_update_applied"
+  | "upstream_update_available"
+  | "upstream_sync_error";
 
 export interface Notification {
   id: string;

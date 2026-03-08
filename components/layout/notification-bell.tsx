@@ -12,6 +12,8 @@ import {
   GitPullRequest,
   GitMerge,
   AlertCircle,
+  RefreshCw,
+  Download,
 } from "lucide-react";
 import { useNotifications, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/hooks/useNotifications";
 import type { NotificationType } from "@/lib/api/notifications";
@@ -30,6 +32,9 @@ const iconByType: Record<NotificationType, React.ComponentType<{ className?: str
   pr_opened: GitPullRequest,
   pr_merged: GitMerge,
   pr_review: MessageSquareWarning,
+  upstream_update_applied: RefreshCw,
+  upstream_update_available: Download,
+  upstream_sync_error: AlertCircle,
 };
 
 const colorByType: Record<NotificationType, string> = {
@@ -42,6 +47,9 @@ const colorByType: Record<NotificationType, string> = {
   pr_opened: "text-indigo-500",
   pr_merged: "text-purple-500",
   pr_review: "text-amber-500",
+  upstream_update_applied: "text-blue-500",
+  upstream_update_available: "text-indigo-500",
+  upstream_sync_error: "text-red-500",
 };
 
 function formatTimeAgo(dateStr: string): string {
@@ -80,6 +88,14 @@ function getTargetUrl(notification: { type: NotificationType; project_id: string
       return notification.target_id
         ? `${base}/pull-requests/${notification.target_id}`
         : `${base}/pull-requests`;
+    case "upstream_update_applied":
+      return `${base}/settings#upstream-sync`;
+    case "upstream_update_available":
+      return notification.target_id
+        ? `${base}/pull-requests/${notification.target_id}`
+        : `${base}/settings#upstream-sync`;
+    case "upstream_sync_error":
+      return `${base}/settings#upstream-sync`;
     default:
       return base;
   }
