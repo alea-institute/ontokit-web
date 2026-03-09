@@ -27,6 +27,7 @@ import {
   Hash,
   Link2,
   Pencil,
+  Save,
   X,
 } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail, type ClassUpdatePayload, type AnnotationUpdate } from "@/lib/api/client";
@@ -195,6 +196,13 @@ export function ClassDetailPanel({
     setIsEditing(false);
     cancelledIriRef.current = classIri;
   }, [classIri, classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Explicit save: flush draft to git and exit edit mode
+  const saveAndExitEditMode = useCallback(async () => {
+    triggerSave();
+    await flushToGit();
+    setIsEditing(false);
+  }, [triggerSave, flushToGit]);
 
   // Auto-enter edit mode based on continuous editing or restored draft
   useEffect(() => {
@@ -588,18 +596,28 @@ export function ClassDetailPanel({
                   )}
                 </h2>
                 <div className="flex shrink-0 items-center gap-1">
-                  {headerActions}
                   {canEnterEdit && (
                     <>
                       {isEditing ? (
-                        <button
-                          onClick={cancelEditMode}
-                          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
-                          title="Discard changes and return to read-only"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Cancel
-                        </button>
+                        <>
+                          <button
+                            onClick={saveAndExitEditMode}
+                            disabled={saveStatus === "saving"}
+                            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50 disabled:opacity-50 dark:text-green-400 dark:hover:bg-green-900/20"
+                            title="Save changes and return to read-only"
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                            {saveStatus === "saving" ? "Saving..." : "Save"}
+                          </button>
+                          <button
+                            onClick={cancelEditMode}
+                            className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                            title="Discard changes and return to read-only"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                            Cancel
+                          </button>
+                        </>
                       ) : (
                         <button
                           onClick={enterEditMode}
@@ -612,6 +630,7 @@ export function ClassDetailPanel({
                       )}
                     </>
                   )}
+                  {headerActions}
                 </div>
               </div>
               <div className="mt-1 flex items-center gap-2">

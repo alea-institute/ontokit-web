@@ -9,6 +9,7 @@ import {
   Trash2,
   AlertTriangle,
   Pencil,
+  Save,
   X,
   Lightbulb,
   StickyNote,
@@ -266,6 +267,13 @@ export function IndividualDetailPanel({
     cancelledIriRef.current = individualIri;
   }, [individualIri, detail, discardDraft, initEditState]);
 
+  // Explicit save: flush draft to git and exit edit mode
+  const saveAndExitEditMode = useCallback(async () => {
+    triggerSave();
+    await flushToGit();
+    setIsEditing(false);
+  }, [triggerSave, flushToGit]);
+
   useEffect(() => {
     if (isEditing || editInitializedRef.current) return;
     if (!canEdit || !detail) return;
@@ -419,9 +427,14 @@ export function IndividualDetailPanel({
                   )}
                 </h2>
                 {canEnterEdit && (
-                  <div className="shrink-0">
+                  <div className="flex shrink-0 items-center gap-1">
                     {isEditing ? (
-                      <button onClick={cancelEditMode} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"><X className="h-3.5 w-3.5" />Cancel</button>
+                      <>
+                        <button onClick={saveAndExitEditMode} disabled={saveStatus === "saving"} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-green-600 hover:bg-green-50 disabled:opacity-50 dark:text-green-400 dark:hover:bg-green-900/20" title="Save changes and return to read-only">
+                          <Save className="h-3.5 w-3.5" />{saveStatus === "saving" ? "Saving..." : "Save"}
+                        </button>
+                        <button onClick={cancelEditMode} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"><X className="h-3.5 w-3.5" />Cancel</button>
+                      </>
                     ) : (
                       <button onClick={enterEditMode} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"><Pencil className="h-3.5 w-3.5" />Edit Item</button>
                     )}
