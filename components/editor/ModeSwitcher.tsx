@@ -19,6 +19,8 @@ export function ModeSwitcher({ className }: ModeSwitcherProps) {
 
   return (
     <div
+      role="group"
+      aria-label="Editor mode"
       className={cn(
         "flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-800",
         className,
@@ -26,8 +28,11 @@ export function ModeSwitcher({ className }: ModeSwitcherProps) {
     >
       {modes.map(({ value, label, icon: Icon }) => (
         <button
+          type="button"
           key={value}
           onClick={() => setEditorMode(value)}
+          aria-label={label}
+          aria-pressed={editorMode === value}
           className={cn(
             "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
             editorMode === value
