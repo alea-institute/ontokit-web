@@ -112,7 +112,7 @@ export default function EditorPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTargetIri, setDeleteTargetIri] = useState<string | null>(null);
   const [deleteTargetLabel, setDeleteTargetLabel] = useState<string>("");
-  const [deleteImpactAcknowledged, setDeleteImpactAcknowledged] = useState(false);
+  const [deleteImpactAcknowledged, setDeleteImpactAcknowledged] = useState(true);
 
   // Toast
   const toast = useToast();
@@ -1253,13 +1253,14 @@ export default function EditorPage() {
         open={deleteDialogOpen}
         onOpenChange={(open) => {
           setDeleteDialogOpen(open);
-          if (!open) setDeleteImpactAcknowledged(false);
+          if (!open) setDeleteImpactAcknowledged(true);
         }}
         onConfirm={handleDeleteConfirm}
         title="Delete Class"
         description={`Are you sure you want to delete "${deleteTargetLabel}"? This action cannot be undone.`}
         confirmLabel="Delete"
         variant="danger"
+        confirmDisabled={!deleteImpactAcknowledged}
       >
         <DeleteImpactAnalysis
           projectId={projectId}
