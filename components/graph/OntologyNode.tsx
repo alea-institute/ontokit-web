@@ -66,14 +66,29 @@ export const OntologyNode = memo(function OntologyNode({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (nodeType === "unexplored") {
+        onExpandNode?.(id);
+      } else {
+        handleClick();
+      }
+    }
+  };
+
   return (
     <div
+      role="button"
+      tabIndex={0}
       className={cn(
         "rounded-lg px-3 py-2 text-sm transition-shadow hover:shadow-lg cursor-pointer min-w-[120px] max-w-[200px]",
         nodeStyles[nodeType],
       )}
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
+      onKeyDown={handleKeyDown}
+      aria-label={`${label}${nodeType === "unexplored" ? " (click to expand)" : ""}`}
     >
       <Handle type="target" position={Position.Bottom} className="!bg-slate-400 !w-2 !h-2 !border-0" />
 
