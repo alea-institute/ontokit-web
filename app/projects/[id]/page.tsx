@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -30,7 +30,6 @@ import { cn, formatDate } from "@/lib/utils";
 
 export default function ProjectPage() {
   const { data: session, status } = useSession();
-  const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
 
