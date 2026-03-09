@@ -104,6 +104,9 @@ export function EntityHistoryTab({
             <div className="h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
           </div>
         )}
+        {error && !isLoading && (
+          <p className="py-1 text-xs text-red-500">Failed to load history</p>
+        )}
         {isExpanded && events.length > 0 && (
           <div className="relative space-y-0">
             {/* Timeline line */}
