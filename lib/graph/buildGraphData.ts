@@ -195,7 +195,13 @@ export function buildGraphFromClassDetail(
     return true;
   });
 
-  const nodes = Array.from(nodeMap.values());
+  // Prune nodes that are not connected after child-cap filtering
+  const visibleNodeIds = new Set<string>([focusIri]);
+  for (const edge of filteredEdges) {
+    visibleNodeIds.add(edge.source);
+    visibleNodeIds.add(edge.target);
+  }
+  const nodes = Array.from(nodeMap.values()).filter((node) => visibleNodeIds.has(node.id));
 
   // If no relationships at all
   if (filteredEdges.length === 0 && nodes.length <= 1) {
