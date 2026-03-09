@@ -11,6 +11,7 @@ import {
   type GitHubTokenStatus,
   type GitHubTokenResponse,
 } from "@/lib/api/userSettings";
+import { ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import {
   useEditorModeStore,
@@ -36,14 +37,21 @@ export default function UserSettingsPage() {
 
   useEffect(() => {
     const fetchTokenStatus = async () => {
-      if (!session?.accessToken) return;
+      if (!session?.accessToken) {
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       try {
         const result = await userSettingsApi.getGitHubTokenStatus(session.accessToken);
         setTokenStatus(result);
-      } catch {
-        // No token yet is fine
-        setTokenStatus({ has_token: false });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          setTokenStatus({ has_token: false });
+        } else {
+          setError("Failed to check GitHub token status");
+          setTokenStatus(null);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -162,7 +170,7 @@ export default function UserSettingsPage() {
 
           {/* Success / Error Messages */}
           {successMessage && (
-            <div className="mb-6 rounded-lg bg-green-50 p-4 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400">
+            <div role="status" aria-live="polite" className="mb-6 rounded-lg bg-green-50 p-4 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400">
               <div className="flex items-center gap-2">
                 <Check className="h-4 w-4" />
                 {successMessage}
@@ -170,7 +178,7 @@ export default function UserSettingsPage() {
             </div>
           )}
           {error && (
-            <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+            <div role="alert" className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
                 {error}
