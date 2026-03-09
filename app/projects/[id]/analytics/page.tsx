@@ -19,17 +19,17 @@ export default function ProjectAnalyticsPage() {
   const projectId = params.id as string;
   const token = session?.accessToken;
 
-  const { data: activity, isLoading: loadingActivity } = useProjectActivity(
+  const { data: activity, isLoading: loadingActivity, error: activityError } = useProjectActivity(
     projectId,
     token,
     30
   );
-  const { data: hotEntities, isLoading: loadingHot } = useHotEntities(
+  const { data: hotEntities, isLoading: loadingHot, error: hotError } = useHotEntities(
     projectId,
     token,
     20
   );
-  const { data: contributors, isLoading: loadingContributors } = useContributors(
+  const { data: contributors, isLoading: loadingContributors, error: contributorsError } = useContributors(
     projectId,
     token,
     30
@@ -95,6 +95,10 @@ export default function ProjectAnalyticsPage() {
                 </div>
               ))}
             </div>
+          ) : activityError ? (
+            <p className="py-8 text-center text-sm text-red-500">
+              Failed to load activity data
+            </p>
           ) : (
             <p className="py-8 text-center text-sm text-slate-500">
               No activity data available
@@ -146,6 +150,10 @@ export default function ProjectAnalyticsPage() {
                   </button>
                 ))}
               </div>
+            ) : hotError ? (
+              <p className="py-8 text-center text-sm text-red-500">
+                Failed to load hot entities
+              </p>
             ) : (
               <p className="py-8 text-center text-sm text-slate-500">
                 No recent edits
@@ -209,6 +217,10 @@ export default function ProjectAnalyticsPage() {
                   </div>
                 ))}
               </div>
+            ) : contributorsError ? (
+              <p className="py-8 text-center text-sm text-red-500">
+                Failed to load contributors
+              </p>
             ) : (
               <p className="py-8 text-center text-sm text-slate-500">
                 No contributor data

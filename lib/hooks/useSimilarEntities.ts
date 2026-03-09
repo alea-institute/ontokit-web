@@ -9,7 +9,7 @@ export function useSimilarEntities(
   limit = 10
 ) {
   return useQuery({
-    queryKey: ["similar", projectId, entityIri, branch, limit],
+    queryKey: ["similar", projectId, entityIri, accessToken, branch, limit],
     queryFn: () =>
       embeddingsApi.getSimilarEntities(
         projectId,
