@@ -722,7 +722,10 @@ export function IndividualDetailPanel({
           {(isEditing || detail.seeAlsoIris.length > 0 || detail.isDefinedByIris.length > 0) && (
             <Section title="Relationships" icon={<Link2 className="h-4 w-4" />}>
               <RelationshipSection
-                groups={editRelationships} isEditing={isEditing}
+                groups={isEditing ? editRelationships : [
+                  ...(detail.seeAlsoIris.length > 0 ? [{ property_iri: SEE_ALSO_IRI, property_label: "See Also", targets: detail.seeAlsoIris.map((iri) => ({ iri, label: resolvedLabels?.[iri] || getLocalName(iri) })) }] : []),
+                  ...(detail.isDefinedByIris.length > 0 ? [{ property_iri: "http://www.w3.org/2000/01/rdf-schema#isDefinedBy", property_label: "Defined By", targets: detail.isDefinedByIris.map((iri) => ({ iri, label: resolvedLabels?.[iri] || getLocalName(iri) })) }] : []),
+                ]} isEditing={isEditing}
                 projectId={projectId} accessToken={accessToken} branch={branch}
                 onAddTarget={addRelationshipTarget} onRemoveTarget={removeRelationshipTarget}
                 onChangeProperty={changeRelationshipProperty} onAddGroup={addRelationshipGroup}
