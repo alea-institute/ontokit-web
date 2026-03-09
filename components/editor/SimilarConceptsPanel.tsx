@@ -44,9 +44,13 @@ export function SimilarConceptsPanel({
 
   const entities = data ?? [];
   const hasResults = !isLoading && entities.length > 0;
-  const noEmbeddings = error && !isLoading;
+  // Only show "generate embeddings" hint for 404 (no embeddings configured),
+  // not for generic network/auth/server errors
+  const is404 = error && "status" in error && (error as { status: number }).status === 404;
+  const noEmbeddings = is404 && !isLoading;
+  const fetchError = error && !is404 && !isLoading;
 
-  if (!isLoading && !hasResults && !noEmbeddings) return null;
+  if (!isLoading && !hasResults && !noEmbeddings && !fetchError) return null;
 
   return (
     <div className="flex gap-4">
@@ -75,6 +79,11 @@ export function SimilarConceptsPanel({
         {isExpanded && noEmbeddings && (
           <p className="py-1 text-xs text-slate-500 dark:text-slate-400">
             Generate embeddings in project settings to see similar concepts.
+          </p>
+        )}
+        {isExpanded && fetchError && (
+          <p className="py-1 text-xs text-red-500 dark:text-red-400">
+            Failed to load similar concepts.
           </p>
         )}
         {isExpanded && hasResults && (
