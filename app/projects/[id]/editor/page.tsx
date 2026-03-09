@@ -513,7 +513,7 @@ export default function EditorPage() {
   }, [nodes]);
 
   const handleEntityConfirm = useCallback(
-    (entity: NewEntityInfo) => {
+    async (entity: NewEntityInfo) => {
       const snippet = generateTurtleSnippet({
         iri: entity.iri,
         label: entity.label,
@@ -526,15 +526,30 @@ export default function EditorPage() {
       if (sourceEditorRef.current) {
         sourceEditorRef.current.insertAtEnd(snippet);
         setSourceContent(sourceEditorRef.current.getValue());
-      } else {
+      } else if (sourceContent) {
         setSourceContent((prev) => prev + snippet);
+      } else {
+        // Source not yet loaded — fetch it first to avoid overwriting with just the snippet
+        if (!projectId || !session?.accessToken || !activeBranch) return;
+        try {
+          const response = await revisionsApi.getFileAtVersion(
+            projectId,
+            activeBranch,
+            session.accessToken,
+            project?.git_ontology_path
+          );
+          setSourceContent(response.content + snippet);
+        } catch {
+          toast.error("Failed to load source before adding entity");
+          return;
+        }
       }
 
       if (entity.entityType === "class") {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [ontologyPrefix, ontologyNamespace, addOptimisticNode],
+    [ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session?.accessToken, activeBranch, project?.git_ontology_path, toast],
   );
 
   // Handle copy IRI
