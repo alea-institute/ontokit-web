@@ -149,9 +149,9 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
         </button>
         {node.isExpanded && node.children.length > 0 && (
           <div>
-            {node.children.map((child) => (
+            {node.children.map((child, index) => (
               <EntityTreeNodeRow
-                key={child.iri}
+                key={`${child.iri}-${index}`}
                 node={child}
                 depth={depth + 1}
                 selectedIri={selectedIri}

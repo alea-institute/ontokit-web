@@ -107,9 +107,9 @@ export function ClassTree({
 
             {/* Flat list fallback for class results when no filtered tree */}
             {(!filteredTree || filteredTree.length === 0) && classResults.length > 0 && (
-              classResults.map((result) => (
+              classResults.map((result, index) => (
                 <SearchResultItem
-                  key={result.iri}
+                  key={`${result.iri}-${index}`}
                   result={result}
                   onSelect={onSearchSelect || onSelect}
                 />
@@ -122,9 +122,9 @@ export function ClassTree({
                 {((filteredTree && filteredTree.length > 0) || classResults.length > 0) && nonClassResults.length > 0 && (
                   <div className="mx-4 my-2 border-t border-slate-200 dark:border-slate-700" />
                 )}
-                {nonClassResults.map((result) => (
+                {nonClassResults.map((result, index) => (
                   <SearchResultItem
-                    key={result.iri}
+                    key={`${result.iri}-${index}`}
                     result={result}
                     onSelect={onSearchSelect || onSelect}
                   />

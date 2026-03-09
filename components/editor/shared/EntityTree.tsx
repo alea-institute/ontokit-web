@@ -190,9 +190,9 @@ export function EntityTree({
       onBlur={() => setFocusedIri(null)}
       className="py-2 outline-none"
     >
-      {nodes.map((node) => (
+      {nodes.map((node, index) => (
         <EntityTreeNodeRow
-          key={node.iri}
+          key={`${node.iri}-${index}`}
           node={node}
           depth={0}
           selectedIri={selectedIri}
