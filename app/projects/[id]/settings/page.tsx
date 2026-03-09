@@ -2371,6 +2371,16 @@ function EmbeddingSettingsSection({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+      }
+    };
+  }, []);
 
   // Editable form state
   const [provider, setProvider] = useState<EmbeddingProvider>("local");
@@ -2397,7 +2407,29 @@ function EmbeddingSettingsSection({
           setProvider(cfg.provider);
           setAutoEmbed(cfg.auto_embed_on_save);
         }
-        if (st) setStatus(st);
+        if (st) {
+          setStatus(st);
+          // Resume polling if a job is already in progress
+          if (st.job_in_progress) {
+            setIsGenerating(true);
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            pollTimerRef.current = setInterval(async () => {
+              try {
+                const updated = await embeddingsApi.getStatus(projectId, accessToken!);
+                setStatus(updated);
+                if (!updated.job_in_progress) {
+                  if (pollTimerRef.current) {
+                    clearInterval(pollTimerRef.current);
+                    pollTimerRef.current = null;
+                  }
+                  setIsGenerating(false);
+                }
+              } catch {
+                // Ignore polling errors
+              }
+            }, 2000);
+          }
+        }
       } catch {
         // Config may not exist yet
       } finally {
@@ -2450,12 +2482,28 @@ function EmbeddingSettingsSection({
       await embeddingsApi.triggerGeneration(projectId, accessToken);
       setSuccess("Embedding generation started");
       setTimeout(() => setSuccess(null), 3000);
-      // Refresh status
+      // Refresh status immediately
       const st = await embeddingsApi.getStatus(projectId, accessToken).catch(() => null);
       if (st) setStatus(st);
+      // Start polling for progress updates
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+      pollTimerRef.current = setInterval(async () => {
+        try {
+          const updated = await embeddingsApi.getStatus(projectId, accessToken);
+          setStatus(updated);
+          if (!updated.job_in_progress) {
+            if (pollTimerRef.current) {
+              clearInterval(pollTimerRef.current);
+              pollTimerRef.current = null;
+            }
+            setIsGenerating(false);
+          }
+        } catch {
+          // Ignore polling errors
+        }
+      }, 2000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start generation");
-    } finally {
       setIsGenerating(false);
     }
   };
@@ -2557,7 +2605,7 @@ function EmbeddingSettingsSection({
               disabled={isGenerating || !config}
             >
               <Play className="mr-1.5 h-4 w-4" />
-              {isGenerating ? "Starting..." : "Generate Embeddings"}
+              {isGenerating ? "Generating..." : "Generate Embeddings"}
             </Button>
           </div>
 
