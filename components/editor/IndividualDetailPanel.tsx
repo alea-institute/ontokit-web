@@ -788,15 +788,16 @@ function IriList({ iris, onRemove, onAdd, onNavigate, projectId, accessToken, br
 
   useEffect(() => {
     if (!query.trim()) { setResults([]); setIsSearching(false); return; }
+    let cancelled = false;
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
         const { projectOntologyApi } = await import("@/lib/api/client");
         const response = await projectOntologyApi.searchEntities(projectId, query.trim(), accessToken, branch, entityFilter);
-        setResults(response.results.filter((r: { iri: string }) => !iris.includes(r.iri)));
-      } catch { setResults([]); } finally { setIsSearching(false); }
+        if (!cancelled) setResults(response.results.filter((r: { iri: string }) => !iris.includes(r.iri)));
+      } catch { if (!cancelled) setResults([]); } finally { if (!cancelled) setIsSearching(false); }
     }, 300);
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [query, projectId, accessToken, branch, entityFilter, iris]);
 
   useEffect(() => {
