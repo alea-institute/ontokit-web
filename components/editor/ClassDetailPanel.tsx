@@ -141,7 +141,7 @@ export function ClassDetailPanel({
     branch: branch || "main",
     classIri,
     classDetail,
-    canEdit: !!canEdit,
+    canEdit: !!canEdit && !!onUpdateClass,
     onUpdateClass,
     onError: (msg) => toast.error(msg),
   });
@@ -199,11 +199,11 @@ export function ClassDetailPanel({
   // Auto-enter edit mode based on continuous editing or restored draft
   useEffect(() => {
     if (isEditing || editInitializedRef.current) return;
-    if (!canEdit || !classDetail) return;
+    if (!canEdit || !onUpdateClass || !classDetail) return;
 
     // Restored draft → always auto-enter
     if (restoredDraft && classIri) {
-      setEditLabels(restoredDraft.labels);
+      setEditLabels(restoredDraft.labels.length > 0 ? restoredDraft.labels : [{ value: "", lang: "en" }]);
       setEditComments(ensureTrailingEmpty(restoredDraft.comments));
       setEditParentIris(restoredDraft.parentIris);
       setEditParentLabels(restoredDraft.parentLabels);
@@ -224,7 +224,7 @@ export function ClassDetailPanel({
 
   // Initialize edit state from OWLClassDetail
   const initEditState = useCallback((detail: OWLClassDetail) => {
-    setEditLabels(detail.labels.map((l) => ({ ...l })));
+    setEditLabels(detail.labels.length > 0 ? detail.labels.map((l) => ({ ...l })) : [{ value: "", lang: "en" }]);
     setEditComments(ensureTrailingEmpty(detail.comments.map((c) => ({ ...c }))));
     setEditParentIris([...detail.parent_iris]);
     setEditParentLabels({ ...detail.parent_labels });
