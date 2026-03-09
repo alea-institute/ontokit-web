@@ -345,8 +345,10 @@ function EditorPreferencesSection() {
         <div className="grid grid-cols-2 gap-3">
           {modeOptions.map(({ value, label, description, icon: Icon }) => (
             <button
+              type="button"
               key={value}
               onClick={() => setEditorMode(value)}
+              aria-pressed={editorMode === value}
               className={cn(
                 "flex items-start gap-3 rounded-lg border p-4 text-left transition-colors",
                 editorMode === value
@@ -386,8 +388,10 @@ function EditorPreferencesSection() {
         <div className="flex gap-2">
           {themeOptions.map(({ value, label, icon: Icon }) => (
             <button
+              type="button"
               key={value}
               onClick={() => setTheme(value)}
+              aria-pressed={theme === value}
               className={cn(
                 "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
                 theme === value
@@ -408,6 +412,9 @@ function EditorPreferencesSection() {
           Continuous Editing
         </label>
         <button
+          type="button"
+          role="switch"
+          aria-checked={continuousEditing}
           onClick={() => setContinuousEditing(!continuousEditing)}
           className={cn(
             "flex items-center gap-3 rounded-lg border p-4 text-left transition-colors w-full",
