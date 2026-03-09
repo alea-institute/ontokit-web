@@ -23,18 +23,28 @@ export function DeleteImpactAnalysis({
 }: DeleteImpactAnalysisProps) {
   const [data, setData] = useState<CrossReferencesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
 
   useEffect(() => {
-    if (!entityIri || !projectId) return;
+    if (!entityIri || !projectId) {
+      setData(null);
+      setIsExpanded(false);
+      setAcknowledged(false);
+      onAcknowledge(false);
+      setIsLoading(false);
+      setFetchError(false);
+      return;
+    }
     setIsLoading(true);
     setAcknowledged(false);
     onAcknowledge(false);
+    setFetchError(false);
     qualityApi
       .getCrossReferences(projectId, entityIri, accessToken, branch)
       .then(setData)
-      .catch(() => setData(null))
+      .catch(() => setFetchError(true))
       .finally(() => setIsLoading(false));
   }, [entityIri, projectId, accessToken, branch]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -45,6 +55,19 @@ export function DeleteImpactAnalysis({
       <div className="flex items-center gap-2 py-2 text-sm text-slate-500">
         <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
         Checking references...
+      </div>
+    );
+  }
+
+  if (fetchError) {
+    return (
+      <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900/50 dark:bg-red-900/10">
+        <div className="flex items-start gap-2">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
+          <p className="text-sm text-red-800 dark:text-red-300">
+            Failed to check references. Proceed with caution.
+          </p>
+        </div>
       </div>
     );
   }
