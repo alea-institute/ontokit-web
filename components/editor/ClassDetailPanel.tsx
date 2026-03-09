@@ -271,6 +271,7 @@ export function ClassDetailPanel({
       return;
     }
 
+    let cancelled = false;
     const fetchClassData = async () => {
       setIsLoading(true);
       setError(null);
@@ -280,9 +281,11 @@ export function ClassDetailPanel({
           projectOntologyApi.getClassDetail(projectId, classIri, accessToken, branch),
           lintApi.getIssues(projectId, accessToken, { subject_iri: classIri, limit: 50 }).catch(() => ({ items: [] })),
         ]);
+        if (cancelled) return;
         setClassDetail(detail);
         setClassIssues(issuesResponse.items);
       } catch (err) {
+        if (cancelled) return;
         const is404 = err instanceof Error &&
           (err.message.includes("Class not found") || err.message.includes("404"));
 
@@ -299,11 +302,16 @@ export function ClassDetailPanel({
         setClassDetail(null);
         setClassIssues([]);
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchClassData();
+    return () => {
+      cancelled = true;
+    };
   }, [projectId, classIri, accessToken, branch, selectedNodeFallback, refreshKey]);
 
   // Resolve labels for relationship target IRIs
