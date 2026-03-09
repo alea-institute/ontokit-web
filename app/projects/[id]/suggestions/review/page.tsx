@@ -248,20 +248,34 @@ export default function SuggestionReviewPage() {
 
   const handleReject = async (reason: string) => {
     if (!selectedSession || !session?.accessToken) return;
-    await suggestionsApi.reject(projectId, selectedSession.session_id, { reason }, session.accessToken);
-    window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
-    setSelectedSession(null);
-    setDiff(null);
-    fetchData();
+    setActionInProgress(true);
+    try {
+      await suggestionsApi.reject(projectId, selectedSession.session_id, { reason }, session.accessToken);
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+      setSelectedSession(null);
+      setDiff(null);
+      fetchData();
+    } catch {
+      // Error handled in UI
+    } finally {
+      setActionInProgress(false);
+    }
   };
 
   const handleRequestChanges = async (feedback: string) => {
     if (!selectedSession || !session?.accessToken) return;
-    await suggestionsApi.requestChanges(projectId, selectedSession.session_id, { feedback }, session.accessToken);
-    window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
-    setSelectedSession(null);
-    setDiff(null);
-    fetchData();
+    setActionInProgress(true);
+    try {
+      await suggestionsApi.requestChanges(projectId, selectedSession.session_id, { feedback }, session.accessToken);
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+      setSelectedSession(null);
+      setDiff(null);
+      fetchData();
+    } catch {
+      // Error handled in UI
+    } finally {
+      setActionInProgress(false);
+    }
   };
 
   if (isLoading || status === "loading") {
