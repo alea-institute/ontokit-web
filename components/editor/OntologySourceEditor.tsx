@@ -185,8 +185,11 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
     ed.focus();
   }, []);
 
-  // Get current editor content
-  const getValue = useCallback(() => value, [value]);
+  // Get current editor content — read from Monaco directly for same-tick accuracy
+  const getValue = useCallback(() => {
+    const model = editorRef.current?.getModel();
+    return model?.getValue() ?? value;
+  }, [value]);
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
