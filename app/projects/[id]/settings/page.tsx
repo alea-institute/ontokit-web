@@ -2383,8 +2383,14 @@ function EmbeddingSettingsSection({
       setIsLoading(true);
       try {
         const [cfg, st] = await Promise.all([
-          embeddingsApi.getConfig(projectId, accessToken).catch(() => null),
-          embeddingsApi.getStatus(projectId, accessToken).catch(() => null),
+          embeddingsApi.getConfig(projectId, accessToken).catch((err) => {
+            if (err instanceof ApiError && err.status === 404) return null;
+            throw err;
+          }),
+          embeddingsApi.getStatus(projectId, accessToken).catch((err) => {
+            if (err instanceof ApiError && err.status === 404) return null;
+            throw err;
+          }),
         ]);
         if (cfg) {
           setConfig(cfg);
