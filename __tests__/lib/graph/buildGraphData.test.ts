@@ -261,6 +261,11 @@ describe("buildGraphFromClassDetail", () => {
         expect(nodeIds.has(orphan)).toBe(false);
       }
     }
+
+    // The focus node's edge to its parent must survive the cap
+    expect(
+      result.edges.some((e) => e.source === focusIri && e.target === parentIri),
+    ).toBe(true);
   });
 
   it("excludes owl:Thing from nodes and edges", () => {
