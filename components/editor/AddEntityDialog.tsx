@@ -66,6 +66,7 @@ export function AddEntityDialog({
   const [iri, setIri] = useState("");
   const [showAdvanced, setShowAdvanced] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const iriManuallyEdited = useRef(false);
 
   // Generate a stable UUID IRI once when the dialog opens
   const stableUuidIriRef = useRef("");
@@ -95,6 +96,7 @@ export function AddEntityDialog({
       setLabel("");
       setEntityType(parentIri ? "class" : "class");
       setShowAdvanced(false);
+      iriManuallyEdited.current = false;
 
       // Generate a fresh UUID IRI for this dialog session
       stableUuidIriRef.current = ontologyNamespace + uuidToBase62();
@@ -114,7 +116,7 @@ export function AddEntityDialog({
   // Update IRI reactively when label changes (named pattern only)
   useEffect(() => {
     if (!open) return;
-    if (iriPattern === "named") {
+    if (iriPattern === "named" && !iriManuallyEdited.current) {
       setIri(generateIri(label));
     }
   }, [label, open, iriPattern, generateIri]);
@@ -246,7 +248,10 @@ export function AddEntityDialog({
                     id="entity-iri"
                     type="text"
                     value={iri}
-                    onChange={(e) => setIri(e.target.value)}
+                    onChange={(e) => {
+                      iriManuallyEdited.current = true;
+                      setIri(e.target.value);
+                    }}
                     className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
