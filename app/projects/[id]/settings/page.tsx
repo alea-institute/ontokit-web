@@ -2403,6 +2403,15 @@ function EmbeddingSettingsSection({
 
   const handleSave = async () => {
     if (!accessToken) return;
+    // Require API key when switching to a cloud provider without an existing key
+    const requiresApiKey =
+      provider !== "local" &&
+      (!config?.api_key_set || config.provider !== provider) &&
+      !apiKey.trim();
+    if (requiresApiKey) {
+      setError("API key is required for the selected provider");
+      return;
+    }
     setIsSaving(true);
     setError(null);
     setSuccess(null);
