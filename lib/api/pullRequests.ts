@@ -160,6 +160,7 @@ export interface GitHubIntegration {
   repo_url?: string;
   connected_by_user_id?: string;
   webhooks_enabled: boolean;
+  github_hook_id?: number;
   default_branch: string;
   ontology_file_path?: string;
   turtle_file_path?: string;
@@ -503,6 +504,29 @@ export const githubIntegrationApi = {
     api.delete(`/api/v1/projects/${projectId}/github-integration`, {
       headers: { Authorization: `Bearer ${token}` },
     }),
+
+  /**
+   * Get webhook secret and URL for configuring GitHub webhooks
+   */
+  getWebhookSecret: (projectId: string, token: string) =>
+    api.get<{ webhook_secret: string | null; webhook_url: string }>(
+      `/api/v1/projects/${projectId}/github-integration/webhook-secret`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    ),
+
+  /**
+   * Auto-detect or auto-create a GitHub webhook
+   */
+  setupWebhook: (projectId: string, token: string) =>
+    api.post<{ status: string; github_hook_id: number | null; message: string }>(
+      `/api/v1/projects/${projectId}/github-integration/webhook-setup`,
+      undefined,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    ),
 };
 
 // PR Settings API

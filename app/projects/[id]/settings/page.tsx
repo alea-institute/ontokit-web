@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/components/projects/project-form";
@@ -1492,7 +1492,33 @@ export default function ProjectSettingsPage() {
                     </div>
                   </div>
 
-                  {/* Sync status indicator */}
+                  {/* PR sync info */}
+                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-900/20">
+                    <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                    <p className="text-amber-700 dark:text-amber-300">
+                      Pull requests created in OntoKit will be synced to GitHub.
+                    </p>
+                  </div>
+
+                  {/* Webhook Configuration */}
+                  <WebhookConfigPanel
+                    projectId={projectId}
+                    githubIntegration={githubIntegration}
+                    accessToken={session?.accessToken}
+                    onIntegrationUpdate={setGithubIntegration}
+                  />
+
+                  {/* Upstream sync info (shown when webhooks enabled) */}
+                  {githubIntegration.webhooks_enabled && (
+                    <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-900/50 dark:bg-blue-900/20">
+                      <Download className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                      <p className="text-blue-700 dark:text-blue-300">
+                        Changes pushed to the upstream repository will be synced back to OntoKit.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Sync status indicators */}
                   {githubIntegration.sync_status === "idle" && (
                     <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-900/50 dark:bg-green-900/20">
                       <div className="h-2 w-2 rounded-full bg-green-500" />
@@ -1545,13 +1571,6 @@ export default function ProjectSettingsPage() {
                       )}
                     </div>
                   )}
-
-                  <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-900/20">
-                    <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
-                    <p className="text-amber-700 dark:text-amber-300">
-                      Pull requests created in OntoKit will be synced to GitHub.
-                    </p>
-                  </div>
                 </div>
               ) : showGitHubSetup ? (
                 <div className="space-y-4">
@@ -1789,6 +1808,286 @@ export default function ProjectSettingsPage() {
   );
 }
 
+// --- Webhook Configuration Panel ---
+
+type WebhookStatus = "unknown" | "checking" | "configured" | "created" | "manual_required" | "no_scope" | "no_token" | "error";
+
+function WebhookConfigPanel({
+  projectId,
+  githubIntegration,
+  accessToken,
+  onIntegrationUpdate,
+}: {
+  projectId: string;
+  githubIntegration: GitHubIntegration;
+  accessToken?: string;
+  onIntegrationUpdate: (integration: GitHubIntegration) => void;
+}) {
+  const [isToggling, setIsToggling] = useState(false);
+  const [webhookSecret, setWebhookSecret] = useState<string | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
+  const [showSecret, setShowSecret] = useState(false);
+  const [copied, setCopied] = useState<"url" | "secret" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [webhookStatus, setWebhookStatus] = useState<WebhookStatus>("unknown");
+  const [webhookMessage, setWebhookMessage] = useState<string | null>(null);
+
+  const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+  // On mount: determine initial webhook status
+  useEffect(() => {
+    if (githubIntegration.webhooks_enabled && githubIntegration.github_hook_id) {
+      setWebhookStatus("configured");
+    } else if (githubIntegration.webhooks_enabled && !githubIntegration.github_hook_id) {
+      setWebhookStatus("unknown");
+    }
+  }, [githubIntegration.webhooks_enabled, githubIntegration.github_hook_id]);
+
+  const runWebhookSetup = async () => {
+    if (!accessToken) return;
+    setWebhookStatus("checking");
+    setWebhookMessage(null);
+    try {
+      const result = await githubIntegrationApi.setupWebhook(projectId, accessToken);
+      setWebhookStatus(result.status as WebhookStatus);
+      setWebhookMessage(result.message);
+      if (result.github_hook_id) {
+        onIntegrationUpdate({
+          ...githubIntegration,
+          github_hook_id: result.github_hook_id,
+        });
+      }
+    } catch {
+      setWebhookStatus("error");
+      setWebhookMessage("Failed to setup webhook.");
+    }
+  };
+
+  const handleToggleWebhooks = async () => {
+    if (!accessToken) return;
+    setIsToggling(true);
+    setError(null);
+    try {
+      const updated = await githubIntegrationApi.update(
+        projectId,
+        { webhooks_enabled: !githubIntegration.webhooks_enabled },
+        accessToken
+      );
+      onIntegrationUpdate(updated);
+      // Clear state when disabling
+      if (!updated.webhooks_enabled) {
+        setWebhookSecret(null);
+        setWebhookUrl(null);
+        setWebhookStatus("unknown");
+        setWebhookMessage(null);
+      } else {
+        // When enabling, attempt auto-setup
+        setIsToggling(false);
+        // Small delay to let state settle
+        setTimeout(async () => {
+          try {
+            const result = await githubIntegrationApi.setupWebhook(projectId, accessToken);
+            setWebhookStatus(result.status as WebhookStatus);
+            setWebhookMessage(result.message);
+            if (result.github_hook_id) {
+              onIntegrationUpdate({
+                ...updated,
+                github_hook_id: result.github_hook_id,
+              });
+            }
+          } catch {
+            setWebhookStatus("unknown");
+          }
+        }, 100);
+        return;
+      }
+    } catch {
+      setError("Failed to update webhook settings");
+    } finally {
+      setIsToggling(false);
+    }
+  };
+
+  const handleRevealSecret = async () => {
+    if (!accessToken) return;
+    setError(null);
+    try {
+      const data = await githubIntegrationApi.getWebhookSecret(projectId, accessToken);
+      setWebhookSecret(data.webhook_secret);
+      setWebhookUrl(data.webhook_url);
+      setShowSecret(true);
+    } catch {
+      setError("Failed to retrieve webhook secret");
+    }
+  };
+
+  const copyToClipboard = async (text: string, type: "url" | "secret") => {
+    await navigator.clipboard.writeText(text);
+    setCopied(type);
+    setTimeout(() => setCopied(null), 2000);
+  };
+
+  const fullWebhookUrl = webhookUrl ? `${apiBaseUrl}${webhookUrl}` : null;
+
+  const showManualSetup = githubIntegration.webhooks_enabled &&
+    !["configured", "created", "checking"].includes(webhookStatus);
+
+  return (
+    <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-600">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-900 dark:text-white">
+            Webhooks
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Receive push events from GitHub for instant upstream sync
+          </p>
+        </div>
+        <label className="relative inline-flex cursor-pointer items-center">
+          <input
+            type="checkbox"
+            checked={githubIntegration.webhooks_enabled}
+            onChange={handleToggleWebhooks}
+            disabled={isToggling}
+            className="peer sr-only"
+          />
+          <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:bg-primary-600 peer-checked:after:translate-x-full peer-focus:ring-2 peer-focus:ring-primary-300 dark:bg-slate-600 dark:peer-checked:bg-primary-500" />
+        </label>
+      </div>
+
+      {githubIntegration.webhooks_enabled && (
+        <div className="mt-3 space-y-3">
+          {/* Webhook auto-setup status */}
+          {webhookStatus === "checking" && (
+            <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+              Checking webhook status...
+            </div>
+          )}
+
+          {(webhookStatus === "configured" || webhookStatus === "created") && (
+            <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-2.5 dark:border-green-900/50 dark:bg-green-900/20">
+              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <p className="text-sm text-green-700 dark:text-green-300">
+                {webhookStatus === "created"
+                  ? "Webhook auto-created on GitHub"
+                  : "Webhook configured on GitHub"}
+              </p>
+            </div>
+          )}
+
+          {webhookMessage && !["configured", "created"].includes(webhookStatus) && webhookStatus !== "checking" && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {webhookMessage}
+            </p>
+          )}
+
+          {/* Manual setup UI */}
+          {showManualSetup && (
+            <>
+              {webhookStatus !== "unknown" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={runWebhookSetup}
+                >
+                  <RefreshCw className="mr-2 h-3.5 w-3.5" />
+                  Retry auto-setup
+                </Button>
+              )}
+
+              {webhookSecret === null ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRevealSecret}
+                >
+                  <Eye className="mr-2 h-3.5 w-3.5" />
+                  Show manual setup details
+                </Button>
+              ) : (
+                <>
+                  {/* Webhook URL */}
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                      Payload URL
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 truncate rounded bg-slate-100 px-2 py-1.5 text-xs text-slate-800 dark:bg-slate-700 dark:text-slate-200">
+                        {fullWebhookUrl}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => fullWebhookUrl && copyToClipboard(fullWebhookUrl, "url")}
+                      >
+                        {copied === "url" ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Webhook Secret */}
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">
+                      Secret
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 truncate rounded bg-slate-100 px-2 py-1.5 text-xs text-slate-800 dark:bg-slate-700 dark:text-slate-200">
+                        {showSecret ? webhookSecret : "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => setShowSecret(!showSecret)}
+                      >
+                        {showSecret ? (
+                          <EyeOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => webhookSecret && copyToClipboard(webhookSecret, "secret")}
+                      >
+                        {copied === "secret" ? (
+                          <Check className="h-3.5 w-3.5 text-green-600" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Setup instructions */}
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Add this URL and secret in your GitHub repository under{" "}
+                    <span className="font-medium">Settings &rarr; Webhooks</span>.
+                    Select <span className="font-medium">application/json</span> content type
+                    and the <span className="font-medium">push</span> event.
+                  </p>
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {error && (
+        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+      )}
+    </div>
+  );
+}
+
 // --- Upstream Sync Section ---
 
 const FREQUENCY_OPTIONS: { value: SyncFrequency; label: string }[] = [
@@ -1798,6 +2097,7 @@ const FREQUENCY_OPTIONS: { value: SyncFrequency; label: string }[] = [
   { value: "48h", label: "Every 48 hours" },
   { value: "weekly", label: "Weekly" },
   { value: "manual", label: "Manual only" },
+  { value: "webhook", label: "Webhook (instant)" },
 ];
 
 const UPDATE_MODE_OPTIONS: { value: SyncUpdateMode; label: string; description: string }[] = [
@@ -1980,7 +2280,9 @@ function UpstreamSyncSection({
                 </p>
                 <p className="text-xs text-slate-400 dark:text-slate-500">
                   {config.enabled
-                    ? `Checking ${FREQUENCY_OPTIONS.find((f) => f.value === config.frequency)?.label?.toLowerCase() || config.frequency}`
+                    ? config.frequency === "webhook"
+                      ? "Webhook (instant)"
+                      : `Checking ${FREQUENCY_OPTIONS.find((f) => f.value === config.frequency)?.label?.toLowerCase() || config.frequency}`
                     : "Disabled"}
                   {" · "}
                   {config.update_mode === "auto_apply"
@@ -2270,7 +2572,11 @@ function UpstreamSyncSection({
                       "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
                     )}
                   >
-                    {FREQUENCY_OPTIONS.map((opt) => (
+                    {FREQUENCY_OPTIONS.filter(
+                      (opt) =>
+                        opt.value !== "webhook" ||
+                        githubIntegration?.webhooks_enabled
+                    ).map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>

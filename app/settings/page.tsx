@@ -264,6 +264,10 @@ export default function UserSettingsPage() {
                   </a>{" "}
                   with the <code className="rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">repo</code> scope.
                 </p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Optional: add the <code className="rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">admin:repo_hook</code> scope
+                  to allow OntoKit to auto-configure GitHub webhooks for instant upstream sync.
+                </p>
 
                 <form onSubmit={handleSaveToken} className="space-y-3">
                   <div>

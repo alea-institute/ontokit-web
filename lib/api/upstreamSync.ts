@@ -9,7 +9,7 @@ import { api } from "./client";
 
 // --- Types ---
 
-export type SyncFrequency = "6h" | "12h" | "24h" | "48h" | "weekly" | "manual";
+export type SyncFrequency = "6h" | "12h" | "24h" | "48h" | "weekly" | "manual" | "webhook";
 export type SyncUpdateMode = "auto_apply" | "review_required";
 export type UpstreamSyncStatus =
   | "idle"
