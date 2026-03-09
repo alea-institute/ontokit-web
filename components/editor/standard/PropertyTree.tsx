@@ -72,9 +72,9 @@ export function PropertyTree({
           } else if (
             iri.includes("annotationproperty") ||
             iri.includes("annotation-property") ||
-            iri.includes("http://www.w3.org/2000/01/rdf-schema#") ||
-            iri.includes("http://www.w3.org/2004/02/skos/core#") ||
-            iri.includes("http://purl.org/dc/")
+            iri.startsWith("http://www.w3.org/2000/01/rdf-schema#") ||
+            iri.startsWith("http://www.w3.org/2004/02/skos/core#") ||
+            iri.startsWith("http://purl.org/dc/")
           ) {
             annotationProps.push(prop);
           } else {
