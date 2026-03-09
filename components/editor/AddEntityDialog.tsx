@@ -123,11 +123,13 @@ export function AddEntityDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!label.trim()) return;
+    const trimmedLabel = label.trim();
+    const trimmedIri = iri.trim();
+    if (!trimmedLabel || !trimmedIri) return;
 
     onConfirm({
-      iri,
-      label: label.trim(),
+      iri: trimmedIri,
+      label: trimmedLabel,
       entityType,
       parentIri,
     });
