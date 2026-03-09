@@ -375,76 +375,80 @@ export default function SuggestionReviewPage() {
                 return (
                   <div key={s.session_id}>
                     {/* Row */}
-                    <button
-                      onClick={() => handleSelectSession(s)}
+                    <div
                       className={cn(
-                        "w-full rounded-lg border bg-white p-4 text-left transition-colors dark:bg-slate-800",
+                        "flex items-center rounded-lg border bg-white transition-colors dark:bg-slate-800",
                         isSelected
                           ? "border-primary-300 ring-1 ring-primary-300 dark:border-primary-600 dark:ring-primary-600"
                           : "border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600",
                       )}
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-slate-900 dark:text-white">
-                              {s.submitter?.name || s.submitter?.email || "Unknown user"}
-                            </span>
-                            {(s.revision ?? 1) > 1 && (
-                              <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                v{s.revision}
+                      <button
+                        onClick={() => handleSelectSession(s)}
+                        className="flex-1 p-4 text-left"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium text-slate-900 dark:text-white">
+                                {s.submitter?.name || s.submitter?.email || "Unknown user"}
                               </span>
+                              {(s.revision ?? 1) > 1 && (
+                                <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                                  v{s.revision}
+                                </span>
+                              )}
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                {s.changes_count} {s.changes_count === 1 ? "change" : "changes"}
+                              </span>
+                            </div>
+
+                            {/* Summary */}
+                            {s.summary && (
+                              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
+                                {s.summary}
+                              </p>
                             )}
-                            <span className="text-xs text-slate-500 dark:text-slate-400">
-                              {s.changes_count} {s.changes_count === 1 ? "change" : "changes"}
-                            </span>
+
+                            {/* Entities */}
+                            {s.entities_modified.length > 0 && (
+                              <div className="mt-2 flex flex-wrap gap-1.5">
+                                {s.entities_modified.map((label) => (
+                                  <span
+                                    key={label}
+                                    className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                                  >
+                                    {label}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
-                          {/* Summary */}
-                          {s.summary && (
-                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
-                              {s.summary}
-                            </p>
-                          )}
-
-                          {/* Entities */}
-                          {s.entities_modified.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1.5">
-                              {s.entities_modified.map((label) => (
-                                <span
-                                  key={label}
-                                  className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-300"
-                                >
-                                  {label}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500 dark:text-slate-400">
+                              {timeAgo}
+                            </span>
+                            {isSelected ? (
+                              <ChevronDown className="h-4 w-4 text-slate-400" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 text-slate-400" />
+                            )}
+                          </div>
                         </div>
-
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {timeAgo}
-                          </span>
-                          {s.github_pr_url && (
-                            <a
-                              href={s.github_pr_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
-                          )}
-                          {isSelected ? (
-                            <ChevronDown className="h-4 w-4 text-slate-400" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4 text-slate-400" />
-                          )}
-                        </div>
-                      </div>
-                    </button>
+                      </button>
+                      {s.github_pr_url && (
+                        <a
+                          href={s.github_pr_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mr-4 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                          aria-label="View on GitHub"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </div>
 
                     {/* Detail panel */}
                     {isSelected && (
