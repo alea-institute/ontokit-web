@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter, useParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -30,7 +30,6 @@ import { cn, formatDate } from "@/lib/utils";
 
 export default function ProjectPage() {
   const { data: session, status } = useSession();
-  const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
 
@@ -110,10 +109,14 @@ export default function ProjectPage() {
     }
   }, [projectId, session?.accessToken, status]);
 
+  const hasExplicitRole = !!project?.user_role;
   const canEdit =
     project?.user_role === "owner" ||
     project?.user_role === "admin" ||
-    project?.user_role === "editor";
+    project?.user_role === "editor" ||
+    project?.is_superadmin;
+  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!session?.accessToken);
+  const canSuggest = canEdit || isSuggester;
 
   const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
 
@@ -180,7 +183,7 @@ export default function ProjectPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
             <div className="flex h-64 items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
@@ -195,7 +198,7 @@ export default function ProjectPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
             <Link
               href="/projects"
@@ -222,7 +225,7 @@ export default function ProjectPage() {
   return (
     <>
       <Header />
-      <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+      <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
           {/* Back link */}
           <Link
@@ -316,7 +319,7 @@ export default function ProjectPage() {
                     </Button>
                   </Link>
                 )}
-                {canEdit && (
+                {canSuggest && (
                   <Link href={`/projects/${project.id}/editor`}>
                     <Button size="sm">
                       <Pencil className="mr-2 h-4 w-4" />
@@ -324,7 +327,7 @@ export default function ProjectPage() {
                     </Button>
                   </Link>
                 )}
-                {!canEdit && !showJoinRequestSection && (
+                {!canSuggest && !showJoinRequestSection && (
                   <Link href={`/projects/${project.id}/editor`}>
                     <Button variant="outline" size="sm">
                       <ExternalLink className="mr-2 h-4 w-4" />
@@ -467,7 +470,7 @@ export default function ProjectPage() {
                 Ontology Editor
               </h3>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                {canEdit ? "Edit classes, properties, and individuals" : "View the ontology structure"}
+                {canEdit ? "Edit classes, properties, and individuals" : canSuggest ? "Suggest changes to classes, properties, and individuals" : "View the ontology structure"}
               </p>
             </Link>
 

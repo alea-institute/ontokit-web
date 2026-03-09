@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "./button";
 
 const SUPPORTED_EXTENSIONS = [".owl", ".rdf", ".ttl", ".n3", ".jsonld"];
-const SUPPORTED_MIME_TYPES = [
+const _SUPPORTED_MIME_TYPES = [
   "application/rdf+xml",
   "application/owl+xml",
   "text/turtle",

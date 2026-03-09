@@ -8,7 +8,7 @@ import {
 } from "@/lib/api/pullRequests";
 import { PRListItem } from "./PRListItem";
 import { cn } from "@/lib/utils";
-import { GitPullRequest, Search } from "lucide-react";
+import { GitPullRequest } from "lucide-react";
 
 interface PRListProps {
   projectId: string;

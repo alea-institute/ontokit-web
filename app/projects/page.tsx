@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { Plus, Search, Filter, Globe, User, FolderOpen } from "lucide-react";
+import { Plus, Search, Globe, User, FolderOpen } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
@@ -63,7 +63,7 @@ export default function ProjectsPage() {
   return (
     <>
       <Header />
-      <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+      <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
         <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
           {/* Page Header */}
           <div className="flex items-center justify-between">

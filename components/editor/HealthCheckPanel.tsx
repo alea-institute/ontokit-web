@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   Clock,
   Loader2,
+  ShieldCheck,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,11 +23,14 @@ import {
   type LintSummary,
   type LintWebSocketMessage,
 } from "@/lib/api/lint";
+import { qualityApi } from "@/lib/api/quality";
+import type { ConsistencyIssue, DuplicateCluster } from "@/lib/ontology/qualityTypes";
 import { cn, formatDateTime, getLocalName } from "@/lib/utils";
 
 interface HealthCheckPanelProps {
   projectId: string;
   accessToken?: string;
+  branch?: string;
   isOpen: boolean;
   onClose: () => void;
   onNavigateToClass?: (iri: string) => void;
@@ -33,6 +38,7 @@ interface HealthCheckPanelProps {
   canRunLint?: boolean;
 }
 
+type HealthTab = "lint" | "consistency" | "duplicates";
 type IssueFilter = "all" | "error" | "warning" | "info";
 
 const issueIcons = {
@@ -50,17 +56,28 @@ const issueColors = {
 export function HealthCheckPanel({
   projectId,
   accessToken,
+  branch,
   canRunLint = false,
   isOpen,
   onClose,
   onNavigateToClass,
 }: HealthCheckPanelProps) {
+  const [activeTab, setActiveTab] = useState<HealthTab>("lint");
   const [summary, setSummary] = useState<LintSummary | null>(null);
   const [issues, setIssues] = useState<LintIssue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<IssueFilter>("all");
+
+  // Consistency check state
+  const [consistencyIssues, setConsistencyIssues] = useState<ConsistencyIssue[]>([]);
+  const [isCheckingConsistency, setIsCheckingConsistency] = useState(false);
+  const [consistencyError, setConsistencyError] = useState<string | null>(null);
+
+  // Duplicate detection state
+  const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([]);
+  const [isDetectingDuplicates, setIsDetectingDuplicates] = useState(false);
 
   // Fetch lint status and issues
   const fetchData = useCallback(async (issueFilter?: IssueFilter) => {
@@ -164,6 +181,46 @@ export function HealthCheckPanel({
     }
   };
 
+  // Fetch consistency issues
+  const handleRunConsistencyCheck = async () => {
+    if (!accessToken) return;
+    setIsCheckingConsistency(true);
+    setConsistencyError(null);
+    try {
+      await qualityApi.triggerConsistencyCheck(projectId, accessToken, branch);
+      // Fetch results after triggering
+      const result = await qualityApi.getConsistencyIssues(projectId, accessToken, branch);
+      setConsistencyIssues(result.issues);
+    } catch (err) {
+      setConsistencyError(err instanceof Error ? err.message : "Consistency check failed");
+    } finally {
+      setIsCheckingConsistency(false);
+    }
+  };
+
+  // Fetch duplicate candidates
+  const handleDetectDuplicates = async () => {
+    if (!accessToken) return;
+    setIsDetectingDuplicates(true);
+    try {
+      const result = await qualityApi.getDuplicateCandidates(projectId, accessToken, branch);
+      setDuplicateClusters(result.clusters);
+    } catch {
+      // Duplicates detection may not be available
+    } finally {
+      setIsDetectingDuplicates(false);
+    }
+  };
+
+  // Load consistency data when tab changes
+  useEffect(() => {
+    if (activeTab === "consistency" && consistencyIssues.length === 0 && !isCheckingConsistency) {
+      qualityApi.getConsistencyIssues(projectId, accessToken, branch)
+        .then((r) => setConsistencyIssues(r.issues))
+        .catch(() => {});
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Dismiss an issue
   const handleDismissIssue = async (issueId: string) => {
     if (!accessToken) return;
@@ -213,35 +270,83 @@ export function HealthCheckPanel({
   return (
     <div className="flex h-full flex-col border-l border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-700">
-        <div className="flex items-center gap-2">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-            Health Check
-          </h2>
-          {isRunning && (
-            <span className="flex items-center gap-1 rounded-full bg-primary-100 px-2 py-0.5 text-xs text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
-              <Loader2 className="h-3 w-3 animate-spin" />
-              Running
-            </span>
-          )}
+      <div className="border-b border-slate-200 dark:border-slate-700">
+        <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
+              Health Check
+            </h2>
+            {isRunning && (
+              <span className="flex items-center gap-1 rounded-full bg-primary-100 px-2 py-0.5 text-xs text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Running
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {activeTab === "lint" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRunLint}
+                disabled={isRunning || !accessToken || !canRunLint}
+                className="gap-1"
+              >
+                <RefreshCw className={cn("h-4 w-4", isRunning && "animate-spin")} />
+                {isRunning ? "Running..." : "Run Lint"}
+              </Button>
+            )}
+            {activeTab === "consistency" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRunConsistencyCheck}
+                disabled={isCheckingConsistency || !accessToken}
+                className="gap-1"
+              >
+                <ShieldCheck className={cn("h-4 w-4", isCheckingConsistency && "animate-spin")} />
+                {isCheckingConsistency ? "Checking..." : "Run Check"}
+              </Button>
+            )}
+            {activeTab === "duplicates" && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDetectDuplicates}
+                disabled={isDetectingDuplicates || !accessToken}
+                className="gap-1"
+              >
+                <Copy className={cn("h-4 w-4", isDetectingDuplicates && "animate-spin")} />
+                {isDetectingDuplicates ? "Detecting..." : "Find Duplicates"}
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRunLint}
-            disabled={isRunning || !accessToken || !canRunLint}
-            className="gap-1"
-          >
-            <RefreshCw className={cn("h-4 w-4", isRunning && "animate-spin")} />
-            {isRunning ? "Running..." : "Run Lint"}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-            <X className="h-4 w-4" />
-          </Button>
+        {/* Tabs */}
+        <div className="flex px-4">
+          {(["lint", "consistency", "duplicates"] as HealthTab[]).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "border-b-2 px-3 py-1.5 text-xs font-medium transition-colors",
+                activeTab === tab
+                  ? "border-primary-500 text-primary-600 dark:text-primary-400"
+                  : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+              )}
+            >
+              {tab === "lint" ? "Lint" : tab === "consistency" ? "Consistency" : "Duplicates"}
+            </button>
+          ))}
         </div>
       </div>
 
+      {/* Lint Tab */}
+      {activeTab === "lint" && (
+      <>
       {/* Summary */}
       {summary && (
         <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-700">
@@ -343,6 +448,124 @@ export function HealthCheckPanel({
               />
             ))}
           </div>
+        </div>
+      )}
+      </>
+      )}
+
+      {/* Consistency Tab */}
+      {activeTab === "consistency" && (
+        <div className="flex-1 overflow-y-auto p-4">
+          {consistencyError && (
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+              {consistencyError}
+            </div>
+          )}
+          {isCheckingConsistency && (
+            <div className="flex items-center justify-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+            </div>
+          )}
+          {!isCheckingConsistency && consistencyIssues.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <ShieldCheck className="h-12 w-12 text-green-500" />
+              <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
+                No consistency issues
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Run a consistency check to validate your ontology structure.
+              </p>
+            </div>
+          )}
+          {consistencyIssues.length > 0 && (
+            <div className="space-y-2">
+              {consistencyIssues.map((issue, idx) => (
+                <div
+                  key={`${issue.rule_id}-${issue.entity_iri}-${idx}`}
+                  className={cn(
+                    "rounded-lg border p-3",
+                    issue.severity === "error" && "border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-900/10",
+                    issue.severity === "warning" && "border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/10",
+                    issue.severity === "info" && "border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-900/10"
+                  )}
+                >
+                  <div className="flex items-start gap-2">
+                    {issue.severity === "error" && <XCircle className="h-4 w-4 shrink-0 text-red-500" />}
+                    {issue.severity === "warning" && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />}
+                    {issue.severity === "info" && <Info className="h-4 w-4 shrink-0 text-blue-500" />}
+                    <div className="min-w-0 flex-1">
+                      <span className="rounded bg-slate-200/50 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
+                        {issue.rule_id}
+                      </span>
+                      <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+                        {issue.message}
+                      </p>
+                      {issue.entity_iri && (
+                        <button
+                          onClick={() => onNavigateToClass?.(issue.entity_iri)}
+                          className="mt-1 text-xs text-primary-600 hover:underline dark:text-primary-400"
+                        >
+                          {getLocalName(issue.entity_iri)}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Duplicates Tab */}
+      {activeTab === "duplicates" && (
+        <div className="flex-1 overflow-y-auto p-4">
+          {isDetectingDuplicates && (
+            <div className="flex items-center justify-center py-8">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+            </div>
+          )}
+          {!isDetectingDuplicates && duplicateClusters.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <CheckCircle2 className="h-12 w-12 text-green-500" />
+              <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
+                No duplicates detected
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Click &ldquo;Find Duplicates&rdquo; to scan for near-duplicate entities.
+              </p>
+            </div>
+          )}
+          {duplicateClusters.length > 0 && (
+            <div className="space-y-3">
+              {duplicateClusters.map((cluster, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/10"
+                >
+                  <div className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                    {Math.round(cluster.similarity * 100)}% similar
+                  </div>
+                  <div className="space-y-1">
+                    {cluster.entities.map((entity) => (
+                      <button
+                        key={entity.iri}
+                        onClick={() => onNavigateToClass?.(entity.iri)}
+                        className="flex w-full items-center gap-2 text-left text-sm text-primary-600 hover:underline dark:text-primary-400"
+                      >
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-owl-class/10 border border-owl-class/50">
+                          <span className="text-[8px] font-bold text-owl-class">
+                            {entity.entity_type === "class" ? "C" : entity.entity_type === "property" ? "P" : "I"}
+                          </span>
+                        </span>
+                        {entity.label || getLocalName(entity.iri)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -50,7 +50,7 @@ export default function PullRequestDetailPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
           </div>
@@ -63,7 +63,7 @@ export default function PullRequestDetailPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
             <Link
               href="/projects"
@@ -90,7 +90,7 @@ export default function PullRequestDetailPage() {
   return (
     <>
       <Header />
-      <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+      <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
           {/* Breadcrumb */}
           <div className="mb-6 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">

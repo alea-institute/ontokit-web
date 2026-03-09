@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, Github, Trash2, Check, AlertCircle } from "lucide-react";
+import { ArrowLeft, Github, Trash2, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Pencil } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +11,13 @@ import {
   type GitHubTokenStatus,
   type GitHubTokenResponse,
 } from "@/lib/api/userSettings";
+import { ApiError } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import {
+  useEditorModeStore,
+  type EditorMode,
+  type ThemePreference,
+} from "@/lib/stores/editorModeStore";
 
 export default function UserSettingsPage() {
   const { data: session, status } = useSession();
@@ -31,14 +37,21 @@ export default function UserSettingsPage() {
 
   useEffect(() => {
     const fetchTokenStatus = async () => {
-      if (!session?.accessToken) return;
+      if (!session?.accessToken) {
+        setIsLoading(false);
+        return;
+      }
       setIsLoading(true);
       try {
         const result = await userSettingsApi.getGitHubTokenStatus(session.accessToken);
         setTokenStatus(result);
-      } catch {
-        // No token yet is fine
-        setTokenStatus({ has_token: false });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          setTokenStatus({ has_token: false });
+        } else {
+          setError("Failed to check GitHub token status");
+          setTokenStatus(null);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -100,7 +113,7 @@ export default function UserSettingsPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
             <div className="flex h-64 items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
@@ -115,7 +128,7 @@ export default function UserSettingsPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-900/50 dark:bg-amber-900/20">
               <h2 className="text-xl font-semibold text-amber-700 dark:text-amber-400">
@@ -134,7 +147,7 @@ export default function UserSettingsPage() {
   return (
     <>
       <Header />
-      <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+      <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
         <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
           {/* Back link */}
           <Link
@@ -157,7 +170,7 @@ export default function UserSettingsPage() {
 
           {/* Success / Error Messages */}
           {successMessage && (
-            <div className="mb-6 rounded-lg bg-green-50 p-4 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400">
+            <div role="status" aria-live="polite" className="mb-6 rounded-lg bg-green-50 p-4 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400">
               <div className="flex items-center gap-2">
                 <Check className="h-4 w-4" />
                 {successMessage}
@@ -165,7 +178,7 @@ export default function UserSettingsPage() {
             </div>
           )}
           {error && (
-            <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+            <div role="alert" className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
               <div className="flex items-center gap-2">
                 <AlertCircle className="h-4 w-4" />
                 {error}
@@ -173,8 +186,11 @@ export default function UserSettingsPage() {
             </div>
           )}
 
+          {/* Editor Preferences */}
+          <EditorPreferencesSection />
+
           {/* Connected Accounts */}
-          <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+          <section className="mt-6 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
             <div className="mb-4 flex items-center gap-2">
               <Github className="h-5 w-5 text-slate-500" />
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
@@ -248,6 +264,10 @@ export default function UserSettingsPage() {
                   </a>{" "}
                   with the <code className="rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">repo</code> scope.
                 </p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Optional: add the <code className="rounded bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">admin:repo_hook</code> scope
+                  to allow OntoKit to auto-configure GitHub webhooks for instant upstream sync.
+                </p>
 
                 <form onSubmit={handleSaveToken} className="space-y-3">
                   <div>
@@ -286,5 +306,149 @@ export default function UserSettingsPage() {
         </div>
       </main>
     </>
+  );
+}
+
+// --- Editor Preferences Section ---
+
+const modeOptions: { value: EditorMode; label: string; description: string; icon: typeof Code }[] = [
+  { value: "standard", label: "Standard", description: "Form-based editing with visual controls", icon: LayoutGrid },
+  { value: "developer", label: "Developer", description: "Source-code editor with Turtle syntax", icon: Code },
+];
+
+const themeOptions: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "System", icon: Monitor },
+];
+
+function EditorPreferencesSection() {
+  const editorMode = useEditorModeStore((s) => s.editorMode);
+  const setEditorMode = useEditorModeStore((s) => s.setEditorMode);
+  const theme = useEditorModeStore((s) => s.theme);
+  const setTheme = useEditorModeStore((s) => s.setTheme);
+  const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
+  const setContinuousEditing = useEditorModeStore((s) => s.setContinuousEditing);
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mb-4">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          Editor Preferences
+        </h2>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Choose your preferred editing mode and theme.
+        </p>
+      </div>
+
+      {/* Editor Mode */}
+      <div className="mb-6">
+        <span id="editor-mode-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Editor Mode
+        </span>
+        <div className="grid grid-cols-2 gap-3" role="group" aria-labelledby="editor-mode-label">
+          {modeOptions.map(({ value, label, description, icon: Icon }) => (
+            <button
+              type="button"
+              key={value}
+              onClick={() => setEditorMode(value)}
+              aria-pressed={editorMode === value}
+              className={cn(
+                "flex items-start gap-3 rounded-lg border p-4 text-left transition-colors",
+                editorMode === value
+                  ? "border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/20"
+                  : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
+              )}
+            >
+              <Icon className={cn(
+                "mt-0.5 h-5 w-5 flex-shrink-0",
+                editorMode === value
+                  ? "text-primary-600 dark:text-primary-400"
+                  : "text-slate-400",
+              )} />
+              <div>
+                <p className={cn(
+                  "font-medium",
+                  editorMode === value
+                    ? "text-primary-700 dark:text-primary-300"
+                    : "text-slate-900 dark:text-white",
+                )}>
+                  {label}
+                </p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  {description}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Theme */}
+      <div>
+        <span id="theme-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Theme
+        </span>
+        <div className="flex gap-2" role="group" aria-labelledby="theme-label">
+          {themeOptions.map(({ value, label, icon: Icon }) => (
+            <button
+              type="button"
+              key={value}
+              onClick={() => setTheme(value)}
+              aria-pressed={theme === value}
+              className={cn(
+                "flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors",
+                theme === value
+                  ? "border-primary-500 bg-primary-50 text-primary-700 dark:border-primary-400 dark:bg-primary-900/20 dark:text-primary-300"
+                  : "border-slate-200 text-slate-600 hover:border-slate-300 dark:border-slate-600 dark:text-slate-400 dark:hover:border-slate-500",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Continuous Editing */}
+      <div className="mt-6">
+        <span id="continuous-editing-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Continuous Editing
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={continuousEditing}
+          aria-labelledby="continuous-editing-label"
+          onClick={() => setContinuousEditing(!continuousEditing)}
+          className={cn(
+            "flex items-center gap-3 rounded-lg border p-4 text-left transition-colors w-full",
+            continuousEditing
+              ? "border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/20"
+              : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
+          )}
+        >
+          <Pencil className={cn(
+            "h-5 w-5 flex-shrink-0",
+            continuousEditing
+              ? "text-primary-600 dark:text-primary-400"
+              : "text-slate-400",
+          )} />
+          <div>
+            <p className={cn(
+              "font-medium",
+              continuousEditing
+                ? "text-primary-700 dark:text-primary-300"
+                : "text-slate-900 dark:text-white",
+            )}>
+              {continuousEditing ? "On" : "Off"}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              When enabled, classes open in edit mode automatically. When disabled, classes open read-only until you click &ldquo;Edit Item&rdquo;.
+            </p>
+          </div>
+        </button>
+      </div>
+    </section>
   );
 }

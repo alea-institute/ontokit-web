@@ -39,7 +39,7 @@ export function BranchSelector({
   const {
     branches,
     currentBranch,
-    defaultBranch,
+    defaultBranch: _defaultBranch,
     isLoading,
     isFeatureBranch,
     switchBranch,

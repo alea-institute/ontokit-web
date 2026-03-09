@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserMenu } from "@/components/auth/user-menu";
 import { NotificationBell } from "@/components/layout/notification-bell";
+import { ThemeToggle } from "@/components/editor/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -45,6 +46,7 @@ export function Header() {
           </nav>
         </div>
         <div className="flex items-center gap-4">
+          <ThemeToggle />
           <NotificationBell />
           <UserMenu />
         </div>

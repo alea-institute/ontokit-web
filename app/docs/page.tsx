@@ -25,11 +25,12 @@ export default function DocsPage() {
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Quick Start</h3>
                   <ol className="list-decimal list-inside text-slate-600 dark:text-slate-400 space-y-2">
-                    <li>Sign in with your account</li>
+                    <li>Browse public projects without signing in, or sign in to create and contribute</li>
                     <li>Create a new project or join an existing one</li>
                     <li>Upload an ontology file (Turtle, RDF/XML, OWL/XML) or start from scratch</li>
-                    <li>Use the visual editor to browse and modify classes, properties, and individuals</li>
-                    <li>Create branches and pull requests for collaborative changes</li>
+                    <li>Use the form-based editor to browse and modify classes, properties, and individuals</li>
+                    <li>Changes are auto-saved as drafts; navigate away to commit them to git</li>
+                    <li>Create branches and pull requests, or submit suggestions for review</li>
                   </ol>
                 </div>
               </div>
@@ -63,10 +64,26 @@ export default function DocsPage() {
                   </p>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
+                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Suggestions</h3>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm">
+                    Suggesters can propose changes without direct edit access. Suggestions are
+                    auto-saved as you work and submitted for editor review with approve, reject, or
+                    request-changes outcomes.
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Linting</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
                     Automatic validation checks your ontology for common issues, missing labels,
                     and best practice violations.
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
+                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Auto-Save</h3>
+                  <p className="text-slate-600 dark:text-slate-400 text-sm">
+                    A two-tier auto-save system protects your work: edits are cached locally on blur,
+                    and committed to git when you navigate away. Draft indicators show unsaved changes
+                    on tree nodes.
                   </p>
                 </div>
               </div>
@@ -109,7 +126,17 @@ export default function DocsPage() {
                         <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Editor</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
                           Create branches, edit ontology source, and create pull requests.
+                          Review and approve/reject suggestions from suggesters.
                           Cannot manage members, change settings, or run the health check.
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Suggester</td>
+                        <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
+                          Propose changes via suggestion sessions that are reviewed by editors.
+                          Can browse the ontology, create and submit suggestions, and view their
+                          own suggestion history. Cannot directly edit the ontology or create branches.
+                          This is the default role for new project members.
                         </td>
                       </tr>
                       <tr>
@@ -128,9 +155,42 @@ export default function DocsPage() {
                   </h4>
                   <ul className="list-disc list-inside text-blue-700 dark:text-blue-300 text-sm space-y-1">
                     <li>The person who creates a project automatically becomes its Owner</li>
+                    <li>New project members are assigned the Suggester role by default</li>
                     <li>Public projects can be viewed by anyone, but only members can edit</li>
                     <li>Private projects are only visible to their members</li>
                   </ul>
+                </div>
+              </div>
+            </section>
+
+            {/* Editor Modes */}
+            <section>
+              <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mb-4">
+                Editor Modes
+              </h2>
+              <div className="space-y-4">
+                <p className="text-slate-600 dark:text-slate-400">
+                  OntoKit offers two editing modes to suit different workflows. Your preference
+                  is saved and persists across sessions.
+                </p>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Standard Mode</h3>
+                    <p className="text-slate-600 dark:text-slate-400 text-sm">
+                      A form-based editing experience for classes, properties, and individuals.
+                      Edit labels, comments, annotations, and relationships through structured
+                      fields. Entities are read-only by default &mdash; click &quot;Edit Item&quot; to
+                      start editing, with changes auto-saved as you work.
+                    </p>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Developer Mode</h3>
+                    <p className="text-slate-600 dark:text-slate-400 text-sm">
+                      Direct access to the Turtle source with full syntax highlighting,
+                      auto-completion, and inline validation in a Monaco-based editor. Ideal for
+                      power users who prefer working with raw RDF/OWL syntax.
+                    </p>
+                  </div>
                 </div>
               </div>
             </section>
@@ -142,15 +202,55 @@ export default function DocsPage() {
               </h2>
               <div className="space-y-4">
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Class Tree</h3>
+                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Entity Tree</h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
-                    Navigate your ontology using the hierarchical class tree. Classes are organized
-                    by their subclass relationships, with lazy loading for large ontologies.
+                    Navigate your ontology using hierarchical trees for classes, properties, and
+                    individuals. Entities are organized by their subclass/subproperty relationships,
+                    with lazy loading for large ontologies.
                   </p>
                   <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
-                    <li>Expand/collapse class hierarchies</li>
+                    <li>Expand/collapse hierarchies with multi-level controls (one level, all, or none)</li>
                     <li>View subclass counts at each level</li>
-                    <li>Search for classes by name or IRI</li>
+                    <li>Search for entities by name or IRI</li>
+                    <li>Drag-and-drop reparenting with cycle detection and undo</li>
+                    <li>Right-click context menus for Add Subclass, Copy IRI, View in Source, and Delete</li>
+                    <li>Draft indicators on nodes with unsaved changes</li>
+                    <li>Language tags displayed as country flag emojis</li>
+                    <li>Keyboard navigation with arrow keys and aria-activedescendant</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Detail Panel</h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-3">
+                    View and edit entity metadata through structured forms. Separate panels are
+                    provided for classes, properties, and individuals, each tailored to their
+                    specific OWL constructs.
+                  </p>
+                  <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
+                    <li>Multi-language label and comment editing with inline annotation adder</li>
+                    <li>Superclass/subclass and equivalent/disjoint relationships</li>
+                    <li>Annotation properties with IRI-valued relationship editing</li>
+                    <li>Property assertions for individuals</li>
+                    <li>Entity history tab with revision tracking</li>
+                    <li>Similar concepts panel for discovering related entities</li>
+                    <li>Cross-references panel showing where an entity is used</li>
+                    <li>Delete impact analysis before entity removal</li>
+                    <li>Resizable panel dividers for customizing the layout</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
+                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Graph Visualization</h3>
+                  <p className="text-slate-600 dark:text-slate-400 mb-3">
+                    Explore ontology relationships visually with an interactive graph view powered
+                    by React Flow and ELK layout.
+                  </p>
+                  <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
+                    <li>Depth-2 neighbor fetching with expandable nodes</li>
+                    <li>Custom node styling for focus, parent, child, equivalent, and disjoint classes</li>
+                    <li>Color-coded edges for different relationship types with hover labels</li>
+                    <li>Root nodes highlighted with distinct amber/gold styling</li>
                   </ul>
                 </div>
 
@@ -158,29 +258,51 @@ export default function DocsPage() {
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Source Editor</h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
                     Edit your ontology directly in Turtle syntax with full syntax highlighting,
-                    auto-completion, and inline validation.
+                    auto-completion, and inline validation. Available in Developer mode or via
+                    the Source tab.
                   </p>
                   <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
                     <li>Turtle syntax highlighting</li>
                     <li>Hover over IRIs to see full definitions</li>
-                    <li>Ctrl+Click to navigate to class definitions</li>
+                    <li>Ctrl+Click to navigate to class definitions or open external IRIs in a new tab</li>
                     <li>Real-time linting with inline error markers</li>
                   </ul>
                 </div>
+              </div>
+            </section>
 
-                <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
-                  <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Detail Panel</h3>
-                  <p className="text-slate-600 dark:text-slate-400 mb-3">
-                    View and edit class metadata including labels, comments, annotations,
-                    and relationships.
-                  </p>
-                  <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
-                    <li>Multi-language label support</li>
-                    <li>Superclass and subclass relationships</li>
-                    <li>Annotation properties</li>
-                    <li>Usage statistics</li>
-                  </ul>
-                </div>
+            {/* Keyboard Shortcuts */}
+            <section>
+              <h2 className="text-2xl font-semibold text-slate-800 dark:text-slate-200 mb-4">
+                Keyboard Shortcuts
+              </h2>
+              <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 dark:bg-slate-700">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Shortcut</th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    <tr>
+                      <td className="px-4 py-3 text-slate-900 dark:text-white font-mono text-xs">Ctrl+S / Cmd+S</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">Save current drafts</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 text-slate-900 dark:text-white font-mono text-xs">Ctrl+N / Cmd+N</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">Create a new entity</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 text-slate-900 dark:text-white font-mono text-xs">?</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">Show keyboard shortcuts help</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 text-slate-900 dark:text-white font-mono text-xs">Escape</td>
+                      <td className="px-4 py-3 text-slate-600 dark:text-slate-400">Close overlays and dialogs</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </section>
 

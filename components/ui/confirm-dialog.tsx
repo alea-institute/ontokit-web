@@ -21,6 +21,7 @@ interface ConfirmDialogProps {
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: "danger" | "warning" | "default";
+  confirmDisabled?: boolean;
   children?: React.ReactNode;
 }
 
@@ -33,6 +34,7 @@ export function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   variant = "default",
+  confirmDisabled = false,
   children,
 }: ConfirmDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,7 +98,7 @@ export function ConfirmDialog({
             type="button"
             variant={variant === "danger" ? "danger" : "primary"}
             onClick={handleConfirm}
-            disabled={isSubmitting}
+            disabled={isSubmitting || confirmDisabled}
           >
             {isSubmitting ? (
               <>

@@ -111,7 +111,7 @@ export function TripleChange({ change, className }: TripleChangeProps) {
               className="text-amber-600 dark:text-amber-400"
               title={change.object}
             >
-              "{change.object}"
+              &ldquo;{change.object}&rdquo;
             </span>
           )}
           <span className="text-slate-500">.</span>

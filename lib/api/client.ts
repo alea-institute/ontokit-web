@@ -41,23 +41,44 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(url.toString(), {
-    ...fetchOptions,
-    headers,
-  });
+  // Retry loop for 5xx errors (max 2 retries with exponential backoff)
+  for (let attempt = 0; attempt <= 2; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-  if (!response.ok) {
-    const message = await response.text();
-    throw new ApiError(response.status, response.statusText, message);
+    try {
+      const response = await fetch(url.toString(), {
+        ...fetchOptions,
+        headers,
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new ApiError(response.status, response.statusText, message);
+      }
+
+      // Handle empty responses
+      const text = await response.text();
+      if (!text) {
+        return undefined as T;
+      }
+
+      return JSON.parse(text);
+    } catch (error) {
+      if (error instanceof ApiError && error.status >= 500 && attempt < 2) {
+        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
+        continue;
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
-  // Handle empty responses
-  const text = await response.text();
-  if (!text) {
-    return undefined as T;
-  }
-
-  return JSON.parse(text);
+  // This should never be reached due to the throw in the catch block,
+  // but TypeScript needs it for type safety
+  throw new Error("Unexpected: retry loop exited without returning or throwing");
 }
 
 /**
@@ -444,6 +465,41 @@ export const projectOntologyApi = {
     ),
 
   /**
+   * Update a class in the ontology (labels, comments, parent classes)
+   */
+  updateClass: (
+    projectId: string,
+    classIri: string,
+    data: ClassUpdatePayload,
+    commitMessage: string,
+    token: string,
+    branch?: string
+  ) =>
+    api.patch<OWLClassDetail>(
+      `/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}`,
+      { ...data, commit_message: commitMessage },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { branch },
+      }
+    ),
+
+  /**
+   * Delete a class from the ontology
+   */
+  deleteClass: (
+    projectId: string,
+    classIri: string,
+    commitMessage: string,
+    token: string,
+    branch?: string
+  ) =>
+    api.delete(`/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { commit_message: commitMessage, branch },
+    }),
+
+  /**
    * Save ontology source content
    */
   saveSource: (
@@ -462,6 +518,30 @@ export const projectOntologyApi = {
       }
     ),
 };
+
+// Re-export semantic search / quality / analytics / upstream sync APIs for convenience
+export { embeddingsApi } from "./embeddings";
+export { qualityApi } from "./quality";
+export { analyticsApi } from "./analytics";
+export { upstreamSyncApi } from "./upstreamSync";
+
+// Annotation update — a single annotation property with its values
+export interface AnnotationUpdate {
+  property_iri: string;
+  values: LocalizedString[];
+}
+
+// Class update payload for structured editing
+export interface ClassUpdatePayload {
+  labels: LocalizedString[];
+  comments: LocalizedString[];
+  parent_iris: string[];
+  annotations?: AnnotationUpdate[];
+  // Preserved fields (not edited by form, but needed for Turtle source generation)
+  deprecated?: boolean;
+  equivalent_iris?: string[];
+  disjoint_iris?: string[];
+}
 
 // Entity search types
 export interface EntitySearchResult {

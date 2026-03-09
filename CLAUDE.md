@@ -28,9 +28,10 @@ Use the `ontokit-web.sh` script to manage the development server:
 **Important usage notes:**
 - Always use this script instead of `npm run dev` directly for background server management
 - The script handles port conflicts interactively (kill blocking process, use random port, or quit)
-- When running non-interactively, first kill any process on port 3000, then run `start`:
+- **Non-interactive mode is auto-detected** when stdin is not a terminal — the script automatically enables `--force` mode, killing any blocking process without prompting
+- You can also explicitly use `--force` / `-f` to force-kill blocking processes:
   ```bash
-  lsof -ti:3000 | xargs -r kill -9; sleep 2; ./ontokit-web.sh start
+  ./ontokit-web.sh restart --force
   ```
 - To clear Next.js cache before starting: `rm -rf .next && ./ontokit-web.sh start`
 - Log file: `.ontokit-web.log`

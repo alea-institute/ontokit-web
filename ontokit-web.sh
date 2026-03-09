@@ -8,6 +8,11 @@ LOG_FILE="$SCRIPT_DIR/.ontokit-web.log"
 PORT="${PORT:-3000}"
 FORCE_MODE=false
 
+# Auto-detect non-interactive mode (no tty on stdin)
+if [ ! -t 0 ]; then
+    FORCE_MODE=true
+fi
+
 # Parse flags
 for arg in "$@"; do
     case $arg in

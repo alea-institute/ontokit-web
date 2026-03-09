@@ -8,12 +8,10 @@
   --background-end-rgb: 255, 255, 255;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 15, 23, 42;
-    --background-end-rgb: 30, 41, 59;
-  }
+.dark {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 15, 23, 42;
+  --background-end-rgb: 30, 41, 59;
 }
 
 body {
@@ -46,14 +44,12 @@ body {
   background: rgb(148 163 184);
 }
 
-@media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb {
-    background: rgb(71 85 105);
-  }
+.dark ::-webkit-scrollbar-thumb {
+  background: rgb(71 85 105);
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgb(100 116 139);
-  }
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgb(100 116 139);
 }
 
 /* Class tree item styling */
@@ -67,6 +63,81 @@ body {
 
 .tree-item.selected {
   @apply bg-primary-100 dark:bg-primary-900/30;
+}
+
+/* Root-level tree item emphasis */
+.tree-item-root {
+  @apply font-semibold border-l-2 border-transparent;
+  background: rgb(248 250 252 / 0.5);
+}
+
+.dark .tree-item-root {
+  background: rgb(30 41 59 / 0.3);
+}
+
+.tree-item-root.selected {
+  @apply border-primary-500;
+}
+
+/* Leaf dot for nodes without children */
+.tree-leaf-dot {
+  @apply h-1.5 w-1.5 rounded-full bg-gray-300 dark:bg-slate-500 flex-shrink-0;
+}
+
+.tree-item.selected .tree-leaf-dot {
+  @apply bg-white dark:bg-white;
+}
+
+/* Search match highlight */
+.tree-search-match mark {
+  @apply bg-yellow-200 dark:bg-yellow-800/60 text-inherit rounded-sm px-0.5;
+}
+
+/* Keyboard focus ring for tree navigation */
+.tree-item-focused {
+  @apply ring-2 ring-primary-500/50 ring-inset;
+}
+
+/* Drag-and-drop tree reparenting */
+.tree-item-dragging {
+  @apply opacity-30;
+}
+
+.tree-item-drop-valid {
+  @apply ring-2 ring-primary-500 ring-inset bg-primary-50 dark:bg-primary-900/20;
+}
+
+.tree-item-drop-invalid {
+  @apply ring-2 ring-red-400 ring-inset bg-red-50 dark:bg-red-900/20 cursor-not-allowed;
+}
+
+.tree-drag-overlay {
+  @apply flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg dark:border-slate-600 dark:bg-slate-800;
+  max-width: 260px;
+}
+
+/* Skip link for accessibility */
+.skip-link {
+  @apply absolute -translate-y-full bg-primary-600 text-white px-4 py-2 z-[200] focus:translate-y-0 transition-transform;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast preference */
+@media (prefers-contrast: more) {
+  :root {
+    --focus-ring-width: 3px;
+  }
 }
 
 /* Collaboration cursor colors */
