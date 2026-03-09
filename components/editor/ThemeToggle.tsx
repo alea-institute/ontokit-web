@@ -20,6 +20,8 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
 
   return (
     <div
+      role="group"
+      aria-label="Theme"
       className={cn(
         "flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-800",
         className,
@@ -27,9 +29,12 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
     >
       {themes.map(({ value, label, icon: Icon }) => (
         <button
+          type="button"
           key={value}
           onClick={() => setTheme(value)}
           title={label}
+          aria-label={label}
+          aria-pressed={theme === value}
           className={cn(
             "flex items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors",
             theme === value
