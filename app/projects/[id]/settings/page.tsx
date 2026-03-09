@@ -2166,6 +2166,8 @@ function UpstreamSyncSection({
   const [frequency, setFrequency] = useState<SyncFrequency>("24h");
   const [updateMode, setUpdateMode] = useState<SyncUpdateMode>("auto_apply");
 
+  const isWebhookDriven = !!(githubIntegration?.webhooks_enabled && config?.frequency === "webhook");
+
   // Populate form from existing config, or autofill from GitHub integration
   useEffect(() => {
     if (config) {
@@ -2289,6 +2291,11 @@ function UpstreamSyncSection({
                     ? "Auto-apply clean updates"
                     : "Always create PR"}
                 </p>
+                {githubIntegration?.webhooks_enabled && config.frequency === "webhook" && (
+                  <p className="mt-1 text-xs text-indigo-500 dark:text-indigo-400">
+                    Automatically triggered by GitHub webhooks
+                  </p>
+                )}
               </div>
               <div className="flex gap-2">
                 <Button
@@ -2495,11 +2502,13 @@ function UpstreamSyncSection({
                     type="text"
                     value={repoOwner}
                     onChange={(e) => setRepoOwner(e.target.value)}
+                    readOnly={isWebhookDriven}
                     placeholder="e.g. alea-institute"
                     className={cn(
                       "w-full rounded-md border px-3 py-2 text-sm",
                       "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100",
+                      isWebhookDriven && "cursor-not-allowed opacity-60"
                     )}
                   />
                 </div>
@@ -2511,15 +2520,23 @@ function UpstreamSyncSection({
                     type="text"
                     value={repoName}
                     onChange={(e) => setRepoName(e.target.value)}
+                    readOnly={isWebhookDriven}
                     placeholder="e.g. FOLIO"
                     className={cn(
                       "w-full rounded-md border px-3 py-2 text-sm",
                       "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100",
+                      isWebhookDriven && "cursor-not-allowed opacity-60"
                     )}
                   />
                 </div>
               </div>
+
+              {isWebhookDriven && (
+                <p className="text-xs text-indigo-500 dark:text-indigo-400">
+                  Repository fields are managed by the GitHub integration.
+                </p>
+              )}
 
               {/* Branch + File path */}
               <div className="grid grid-cols-2 gap-3">
@@ -2531,11 +2548,13 @@ function UpstreamSyncSection({
                     type="text"
                     value={branch}
                     onChange={(e) => setBranch(e.target.value)}
+                    readOnly={isWebhookDriven}
                     placeholder="main"
                     className={cn(
                       "w-full rounded-md border px-3 py-2 text-sm",
                       "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100",
+                      isWebhookDriven && "cursor-not-allowed opacity-60"
                     )}
                   />
                 </div>
@@ -2547,11 +2566,13 @@ function UpstreamSyncSection({
                     type="text"
                     value={filePath}
                     onChange={(e) => setFilePath(e.target.value)}
+                    readOnly={isWebhookDriven}
                     placeholder="e.g. FOLIO.owl"
                     className={cn(
                       "w-full rounded-md border px-3 py-2 text-sm",
                       "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                      "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100",
+                      isWebhookDriven && "cursor-not-allowed opacity-60"
                     )}
                   />
                 </div>
