@@ -22,6 +22,7 @@ import {
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { projectApi, type Project } from "@/lib/api/projects";
+import { ApiError } from "@/lib/api/client";
 import {
   suggestionsApi,
   type SuggestionSessionSummary,
@@ -188,9 +189,9 @@ export default function SuggestionReviewPage() {
       setProject(proj);
       setSessions(pendingList.items);
     } catch (err) {
-      if (err instanceof Error && err.message.includes("403")) {
+      if (err instanceof ApiError && err.status === 403) {
         setError("You don't have access to review suggestions for this project");
-      } else if (err instanceof Error && err.message.includes("404")) {
+      } else if (err instanceof ApiError && err.status === 404) {
         setError("Project not found");
       } else {
         setError(err instanceof Error ? err.message : "Failed to load suggestions");
