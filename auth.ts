@@ -90,7 +90,7 @@ export const authConfig: NextAuthConfig = {
       session.accessToken = token.accessToken as string;
       session.error = token.error as string | undefined;
       if (token.user) {
-        session.user = token.user as User;
+        Object.assign(session.user, token.user);
       }
       return session;
     },
