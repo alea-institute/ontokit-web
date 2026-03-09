@@ -144,4 +144,29 @@ describe("mergePathsIntoTree", () => {
     expect(tree[0].isSearchMatch).toBe(true);
     expect(tree[0].children).toHaveLength(0);
   });
+
+  it("does not duplicate a node as root when ancestor fetch fails but another path attaches it as child", () => {
+    // Path 1: urn:child has ancestors (attached under urn:root)
+    // Path 2: urn:child has empty ancestors (failed fetch) — should NOT become a second root
+    const paths: AncestorPath[] = [
+      {
+        matchIri: "urn:child",
+        matchLabel: "Child",
+        ancestors: [{ iri: "urn:root", label: "Root", child_count: 1 }],
+      },
+      {
+        matchIri: "urn:child",
+        matchLabel: "Child",
+        ancestors: [],
+      },
+    ];
+
+    const tree = mergePathsIntoTree(paths);
+
+    // urn:child should appear only as a child of urn:root, not as a separate root
+    expect(tree).toHaveLength(1);
+    expect(tree[0].iri).toBe("urn:root");
+    expect(tree[0].children).toHaveLength(1);
+    expect(tree[0].children[0].iri).toBe("urn:child");
+  });
 });
