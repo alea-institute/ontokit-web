@@ -295,7 +295,7 @@ export function IndividualDetailPanel({
 
   // ── Edit helpers ──
   const updateLabel = useCallback((index: number, field: "value" | "lang", val: string) => {
-    setEditLabels((prev) => prev.map((l, i) => (i === index ? { ...l, [field]: val } : l)));
+    setEditLabels((prev) => ensureTrailingEmpty(prev.map((l, i) => (i === index ? { ...l, [field]: val } : l))));
   }, []);
   const removeLabel = useCallback((index: number) => {
     setEditLabels((prev) => prev.filter((_, i) => i !== index));
