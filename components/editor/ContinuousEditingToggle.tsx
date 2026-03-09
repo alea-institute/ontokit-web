@@ -10,6 +10,13 @@ export function ContinuousEditingToggle() {
 
   return (
     <button
+      type="button"
+      aria-pressed={continuousEditing}
+      aria-label={
+        continuousEditing
+          ? "Continuous editing ON — classes open in edit mode"
+          : "Continuous editing OFF — classes open read-only"
+      }
       onClick={() => setContinuousEditing(!continuousEditing)}
       className={cn(
         "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
