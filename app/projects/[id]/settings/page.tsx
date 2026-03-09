@@ -712,7 +712,7 @@ export default function ProjectSettingsPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
             <div className="flex h-64 items-center justify-center">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
@@ -727,7 +727,7 @@ export default function ProjectSettingsPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
             <Link
               href="/projects"
@@ -755,7 +755,7 @@ export default function ProjectSettingsPage() {
     return (
       <>
         <Header />
-        <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-900/50 dark:bg-amber-900/20">
               <h2 className="text-xl font-semibold text-amber-700 dark:text-amber-400">
@@ -777,7 +777,7 @@ export default function ProjectSettingsPage() {
   return (
     <>
       <Header />
-      <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+      <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
         <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
           {/* Back link */}
           <Link

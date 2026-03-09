@@ -5,7 +5,7 @@ export default function HomePage() {
   return (
     <>
       <Header />
-      <main className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center p-24">
+      <main id="main-content" className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center p-24">
         <div className="text-center">
         <h1 className="text-5xl font-bold tracking-tight text-slate-900 dark:text-white">
           OntoKit

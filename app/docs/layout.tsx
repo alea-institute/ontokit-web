@@ -37,7 +37,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
           })}
         </div>
       </nav>
-      <main className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+      <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
         {children}
       </main>
     </>
