@@ -177,7 +177,11 @@ export default function SuggestionReviewPage() {
   const canReview = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
 
   const fetchData = useCallback(async () => {
-    if (status === "loading" || !session?.accessToken) return;
+    if (status === "loading") return;
+    if (!session?.accessToken) {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     setError(null);
 
