@@ -1244,7 +1244,6 @@ export default function EditorPage() {
         iriPattern={iriPattern}
         nextNumeric={nextNumeric}
         ontologyNamespace={ontologyNamespace}
-        ontologyPrefix={ontologyPrefix}
         parentIri={addEntityParentIri}
         parentLabel={addEntityParentLabel}
       />

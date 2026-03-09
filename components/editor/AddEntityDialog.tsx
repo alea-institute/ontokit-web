@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import {
   type EntityType,
   type IriSuffixPattern,
-  generateEntityIri,
   labelToLocalName,
   uuidToBase62,
 } from "@/lib/ontology/iriGeneration";
@@ -35,7 +34,6 @@ interface AddEntityDialogProps {
   iriPattern: IriSuffixPattern;
   nextNumeric?: number;
   ontologyNamespace: string;
-  ontologyPrefix?: string;
   parentIri?: string;
   /** Human-readable label for the parent entity (shown in dialog description) */
   parentLabel?: string;
@@ -60,7 +58,6 @@ export function AddEntityDialog({
   iriPattern,
   nextNumeric,
   ontologyNamespace,
-  ontologyPrefix,
   parentIri,
   parentLabel,
 }: AddEntityDialogProps) {
@@ -207,7 +204,8 @@ export function AddEntityDialog({
                 id="entity-type"
                 value={entityType}
                 onChange={(e) => setEntityType(e.target.value as EntityType)}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                disabled={!!parentIri}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
               >
                 {ENTITY_TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -215,6 +213,11 @@ export function AddEntityDialog({
                   </option>
                 ))}
               </select>
+              {parentIri && (
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Type is locked to Class when creating a subclass.
+                </p>
+              )}
             </div>
 
             {/* Advanced: IRI */}
