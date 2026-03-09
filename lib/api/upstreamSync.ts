@@ -104,7 +104,7 @@ export const upstreamSyncApi = {
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
-    return api.get<UpstreamSyncConfig>(
+    return api.get<UpstreamSyncConfig | null>(
       `/api/v1/projects/${projectId}/upstream-sync`,
       { headers }
     );

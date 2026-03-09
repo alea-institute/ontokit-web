@@ -13,7 +13,7 @@ import {
   type UpstreamSyncConfigUpdate,
   type SyncEvent,
 } from "@/lib/api/upstreamSync";
-import { ApiError } from "@/lib/api/client";
+
 
 const JOB_POLL_INTERVAL = 2000; // 2 seconds
 
@@ -71,20 +71,18 @@ export function useUpstreamSync({
       setConfig(configData);
 
       // Fetch history if config exists
-      try {
-        const historyData = await upstreamSyncApi.getHistory(projectId, 20, accessToken);
-        setHistory(historyData.items);
-      } catch {
-        // History may be empty, ignore
+      if (configData) {
+        try {
+          const historyData = await upstreamSyncApi.getHistory(projectId, 20, accessToken);
+          setHistory(historyData.items);
+        } catch {
+          // History may be empty, ignore
+        }
+      } else {
+        setHistory([]);
       }
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) {
-        // No config — that's fine
-        setConfig(null);
-        setHistory([]);
-      } else {
-        setError(err instanceof Error ? err.message : "Failed to load upstream sync config");
-      }
+      setError(err instanceof Error ? err.message : "Failed to load upstream sync config");
     } finally {
       setIsLoading(false);
     }

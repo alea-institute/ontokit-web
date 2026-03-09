@@ -1690,6 +1690,7 @@ export default function ProjectSettingsPage() {
             <UpstreamSyncSection
               projectId={projectId}
               upstreamSync={upstreamSync}
+              githubIntegration={githubIntegration}
             />
           )}
 
@@ -1834,9 +1835,11 @@ function formatTimeUntil(dateStr: string): string {
 function UpstreamSyncSection({
   projectId,
   upstreamSync,
+  githubIntegration,
 }: {
   projectId: string;
   upstreamSync: ReturnType<typeof useUpstreamSync>;
+  githubIntegration: GitHubIntegration | null;
 }) {
   const {
     config,
@@ -1863,7 +1866,7 @@ function UpstreamSyncSection({
   const [frequency, setFrequency] = useState<SyncFrequency>("24h");
   const [updateMode, setUpdateMode] = useState<SyncUpdateMode>("auto_apply");
 
-  // Populate form from existing config
+  // Populate form from existing config, or autofill from GitHub integration
   useEffect(() => {
     if (config) {
       setEnabled(config.enabled);
@@ -1873,8 +1876,17 @@ function UpstreamSyncSection({
       setFilePath(config.file_path);
       setFrequency(config.frequency);
       setUpdateMode(config.update_mode);
+    } else if (githubIntegration) {
+      setRepoOwner(githubIntegration.repo_owner);
+      setRepoName(githubIntegration.repo_name);
+      if (githubIntegration.default_branch) {
+        setBranch(githubIntegration.default_branch);
+      }
+      if (githubIntegration.ontology_file_path) {
+        setFilePath(githubIntegration.ontology_file_path);
+      }
     }
-  }, [config]);
+  }, [config, githubIntegration]);
 
   const handleSave = async () => {
     setFormError(null);
