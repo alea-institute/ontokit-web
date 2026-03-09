@@ -202,7 +202,7 @@ export function IndividualDetailPanel({
   });
 
   const initEditState = useCallback((d: ParsedIndividualDetail) => {
-    setEditLabels(d.labels.length > 0 ? d.labels.map((l) => ({ ...l })) : [{ value: "", lang: "en" }]);
+    setEditLabels(ensureTrailingEmpty(d.labels.map((l) => ({ ...l }))));
     setEditComments(ensureTrailingEmpty(d.comments.map((c) => ({ ...c }))));
     setEditDefinitions(ensureTrailingEmpty(d.definitions.map((def) => ({ ...def }))));
     setEditTypeIris([...d.typeIris]);
