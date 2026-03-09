@@ -127,8 +127,8 @@ export function mergePathsIntoTree(paths: AncestorPath[]): EntityTreeNode[] {
   const nodeMap = new Map<string, EntityTreeNode>();
   // childrenMap: parentIri -> Set<childIri>
   const childrenMap = new Map<string, Set<string>>();
-  // rootIris: nodes with no parent in the tree
-  const rootIris = new Set<string>();
+  // Track all IRIs that appear as children (have a parent in the tree)
+  const hasParent = new Set<string>();
   // matchIris: the actual search result IRIs
   const matchIris = new Set<string>();
 
@@ -163,19 +163,22 @@ export function mergePathsIntoTree(paths: AncestorPath[]): EntityTreeNode[] {
         }
       }
 
-      if (i === 0) {
-        rootIris.add(item.iri);
-      }
-
       if (i > 0) {
         const parentIri = fullPath[i - 1].iri;
         if (!childrenMap.has(parentIri)) {
           childrenMap.set(parentIri, new Set());
         }
         childrenMap.get(parentIri)!.add(item.iri);
-        // Remove from roots if it has a parent
-        rootIris.delete(item.iri);
+        hasParent.add(item.iri);
       }
+    }
+  }
+
+  // Derive roots: any node that never appears as a child
+  const rootIris = new Set<string>();
+  for (const iri of nodeMap.keys()) {
+    if (!hasParent.has(iri)) {
+      rootIris.add(iri);
     }
   }
 
