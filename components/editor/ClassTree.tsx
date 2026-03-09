@@ -106,7 +106,7 @@ export function ClassTree({
             )}
 
             {/* Flat list fallback for class results when no filtered tree */}
-            {!filteredTree && classResults.length > 0 && (
+            {(!filteredTree || filteredTree.length === 0) && classResults.length > 0 && (
               classResults.map((result) => (
                 <SearchResultItem
                   key={result.iri}
@@ -119,7 +119,7 @@ export function ClassTree({
             {/* Non-class results always shown as flat list */}
             {nonClassResults.length > 0 && (
               <>
-                {(filteredTree || classResults.length > 0) && nonClassResults.length > 0 && (
+                {((filteredTree && filteredTree.length > 0) || classResults.length > 0) && nonClassResults.length > 0 && (
                   <div className="mx-4 my-2 border-t border-slate-200 dark:border-slate-700" />
                 )}
                 {nonClassResults.map((result) => (
