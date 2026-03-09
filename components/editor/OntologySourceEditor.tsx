@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef, useImperativeHandle, forwardRef } from "react";
 import type { editor } from "monaco-editor";
-import { Save, RotateCcw, AlertCircle, CheckCircle, Loader2, FileText, GitBranch } from "lucide-react";
+import { Save, RotateCcw, AlertCircle, CheckCircle, Loader2, FileText } from "lucide-react";
 import { TurtleEditor, type TurtleDiagnostic } from "./TurtleEditor";
 import { Button } from "@/components/ui/button";
 import { lintApi, type LintIssue } from "@/lib/api/lint";
