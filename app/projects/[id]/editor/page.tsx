@@ -584,6 +584,8 @@ export default function EditorPage() {
         activeBranch
       );
       toast.success(`Deleted "${deleteTargetLabel}"`);
+      // Invalidate cached source so the next edit re-fetches from the server
+      setSourceContent("");
       // Reload tree to ensure consistency
       loadRootClasses();
     } catch (err) {
