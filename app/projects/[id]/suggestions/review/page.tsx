@@ -214,14 +214,16 @@ export default function SuggestionReviewPage() {
     if (!selectedSession?.pr_number || activeTab !== "files" || diff || isDiffLoading) return;
     if (!session?.accessToken) return;
 
+    let cancelled = false;
     setIsDiffLoading(true);
     pullRequestsApi
       .getDiff(projectId, selectedSession.pr_number, session.accessToken)
-      .then(setDiff)
+      .then((data) => { if (!cancelled) setDiff(data); })
       .catch(() => {
         // Diff may not be available
       })
-      .finally(() => setIsDiffLoading(false));
+      .finally(() => { if (!cancelled) setIsDiffLoading(false); });
+    return () => { cancelled = true; };
   }, [selectedSession, activeTab, diff, isDiffLoading, projectId, session?.accessToken]);
 
   const handleSelectSession = (s: SuggestionSessionSummary) => {
