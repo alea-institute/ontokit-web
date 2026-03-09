@@ -761,6 +761,64 @@ export default function EditorPage() {
     iriPatternDetectedRef.current = false;
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, suggestionSession]);
 
+  // Handle suggestion-mode property update
+  const handleSuggestPropertyUpdate = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
+    if (!session?.accessToken) throw new Error("Not authenticated");
+    if (!activeBranch) throw new Error("No branch selected");
+
+    if (!suggestionSession.sessionId) {
+      await suggestionSession.startSession();
+    }
+
+    let source = sourceContent;
+    if (!source) {
+      const response = await revisionsApi.getFileAtVersion(
+        projectId, activeBranch, session.accessToken, project?.git_ontology_path,
+      );
+      source = response.content;
+    }
+
+    const modifiedSource = updatePropertyInTurtle(source, propertyIri, data);
+    const label = data.labels[0]?.value || getLocalName(propertyIri);
+
+    await suggestionSession.saveToSession(modifiedSource, propertyIri, label);
+
+    setSourceContent(modifiedSource);
+    toast.success(`Suggested update to "${label}"`);
+    setDetailRefreshKey((k) => k + 1);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, suggestionSession]);
+
+  // Handle suggestion-mode individual update
+  const handleSuggestIndividualUpdate = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
+    if (!session?.accessToken) throw new Error("Not authenticated");
+    if (!activeBranch) throw new Error("No branch selected");
+
+    if (!suggestionSession.sessionId) {
+      await suggestionSession.startSession();
+    }
+
+    let source = sourceContent;
+    if (!source) {
+      const response = await revisionsApi.getFileAtVersion(
+        projectId, activeBranch, session.accessToken, project?.git_ontology_path,
+      );
+      source = response.content;
+    }
+
+    const modifiedSource = updateIndividualInTurtle(source, individualIri, data);
+    const label = data.labels[0]?.value || getLocalName(individualIri);
+
+    await suggestionSession.saveToSession(modifiedSource, individualIri, label);
+
+    setSourceContent(modifiedSource);
+    toast.success(`Suggested update to "${label}"`);
+    setDetailRefreshKey((k) => k + 1);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, suggestionSession]);
+
   // Handle drag-and-drop reparent class
   // Fetches full class detail, modifies parent_iris, then routes through the appropriate save handler
   const handleReparentClass = useCallback(async (
@@ -1184,8 +1242,8 @@ export default function EditorPage() {
                   detailRefreshKey={detailRefreshKey}
                   showHealthCheck={showHealthCheck}
                   onCloseHealthCheck={() => setShowHealthCheck(false)}
-                  onUpdateProperty={handleUpdateProperty}
-                  onUpdateIndividual={handleUpdateIndividual}
+                  onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
+                  onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
                   onReparentClass={handleReparentClass}
                   reparentOptimistic={reparentOptimistic}
                   rollbackReparent={rollbackReparent}
@@ -1221,8 +1279,8 @@ export default function EditorPage() {
                 onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
                 detailRefreshKey={detailRefreshKey}
                 sourceContent={sourceContent}
-                onUpdateProperty={handleUpdateProperty}
-                onUpdateIndividual={handleUpdateIndividual}
+                onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
+                onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
                 onReparentClass={handleReparentClass}
                 reparentOptimistic={reparentOptimistic}
                 rollbackReparent={rollbackReparent}
