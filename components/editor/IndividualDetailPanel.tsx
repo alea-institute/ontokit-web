@@ -188,8 +188,12 @@ export function IndividualDetailPanel({
         dataPropertyAssertions: draft.dataPropertyAssertions,
         annotations: [...cleanAnnotations, ...relationshipAnnotations],
         deprecated: draft.deprecated,
-        seeAlsoIris: detail?.seeAlsoIris,
-        isDefinedByIris: detail?.isDefinedByIris,
+        seeAlsoIris: draft.relationships
+          .filter((g) => g.property_iri === SEE_ALSO_IRI)
+          .flatMap((g) => g.targets.map((t) => t.iri)),
+        isDefinedByIris: draft.relationships
+          .filter((g) => g.property_iri === "http://www.w3.org/2000/01/rdf-schema#isDefinedBy")
+          .flatMap((g) => g.targets.map((t) => t.iri)),
       });
     } : undefined,
     onError: (msg) => toast.error(msg),
