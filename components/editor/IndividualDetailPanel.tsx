@@ -118,7 +118,7 @@ export function IndividualDetailPanel({
   const [editAnnotations, setEditAnnotations] = useState<AnnotationUpdate[]>([]);
   const [editRelationships, setEditRelationships] = useState<RelationshipGroup[]>([]);
 
-  const prevIriRef = useRef<string | null>(null);
+
   const editInitializedRef = useRef(false);
   const cancelledIriRef = useRef<string | null>(null);
   const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
@@ -237,15 +237,20 @@ export function IndividualDetailPanel({
     setEditAnnotations(regularAnnotations);
   }, []);
 
+  // Flush the current entity when navigating away (cleanup runs with the old closure)
   useEffect(() => {
-    if (prevIriRef.current && prevIriRef.current !== individualIri) {
+    return () => {
       flushToGit();
-    }
-    prevIriRef.current = individualIri;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush must capture the current entity's closure
+  }, [individualIri]);
+
+  // Reset edit state when the selected individual changes
+  useEffect(() => {
     editInitializedRef.current = false;
     setIsEditing(false);
     cancelledIriRef.current = null;
-  }, [individualIri, flushToGit]);
+  }, [individualIri]);
 
   const enterEditMode = useCallback(() => {
     if (!detail) return;
