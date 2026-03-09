@@ -225,6 +225,7 @@ function RelationshipPropertyPicker({
       setIsSearching(false);
       return;
     }
+    let cancelled = false;
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
@@ -235,14 +236,14 @@ function RelationshipPropertyPicker({
           branch,
           "property",
         );
-        setApiResults(response.results);
+        if (!cancelled) setApiResults(response.results);
       } catch {
-        setApiResults([]);
+        if (!cancelled) setApiResults([]);
       } finally {
-        setIsSearching(false);
+        if (!cancelled) setIsSearching(false);
       }
     }, 300);
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [query, projectId, accessToken, branch]);
 
   const filteredBuiltIn = BUILT_IN_RELATIONSHIP_PROPERTIES.filter((p) => {
@@ -378,6 +379,7 @@ function RelationshipEntitySearch({
       setIsSearching(false);
       return;
     }
+    let cancelled = false;
     setIsSearching(true);
     const timer = setTimeout(async () => {
       try {
@@ -387,15 +389,17 @@ function RelationshipEntitySearch({
           accessToken,
           branch,
         );
-        const excludeSet = new Set(excludeIris || []);
-        setResults(response.results.filter((r) => !excludeSet.has(r.iri)));
+        if (!cancelled) {
+          const excludeSet = new Set(excludeIris || []);
+          setResults(response.results.filter((r) => !excludeSet.has(r.iri)));
+        }
       } catch {
-        setResults([]);
+        if (!cancelled) setResults([]);
       } finally {
-        setIsSearching(false);
+        if (!cancelled) setIsSearching(false);
       }
     }, 300);
-    return () => clearTimeout(timer);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [query, projectId, accessToken, branch, excludeIris]);
 
   useEffect(() => {
