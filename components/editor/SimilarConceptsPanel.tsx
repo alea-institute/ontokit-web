@@ -60,6 +60,8 @@ export function SimilarConceptsPanel({
         </span>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
+          aria-expanded={isExpanded}
+          aria-controls="similar-concepts-panel"
           className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
         >
           {isExpanded ? (
@@ -70,7 +72,7 @@ export function SimilarConceptsPanel({
           Similar ({isLoading ? "..." : entities.length})
         </button>
       </div>
-      <div className="min-w-0 flex-1">
+      <div id="similar-concepts-panel" className="min-w-0 flex-1">
         {isLoading && (
           <div className="py-1">
             <div className="h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
