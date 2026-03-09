@@ -189,13 +189,15 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   useEffect(() => {
     if (undoAction) {
       const label = undoAction.classLabel || getLocalName(undoAction.classIri);
+      // Capture handleUndo before clearing so the toast closure has a valid reference
+      const undoFn = handleUndo;
       toast.addToast({
         type: "success",
         title: `Moved "${label}"`,
         duration: 5000,
         action: {
           label: "Undo",
-          onClick: handleUndo,
+          onClick: undoFn,
         },
       });
       clearUndo();
