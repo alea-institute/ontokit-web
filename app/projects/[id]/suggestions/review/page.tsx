@@ -246,8 +246,8 @@ export default function SuggestionReviewPage() {
       setSelectedSession(null);
       setDiff(null);
       fetchData();
-    } catch {
-      // Error handled in UI
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to approve suggestion");
     } finally {
       setActionInProgress(false);
     }
@@ -262,8 +262,8 @@ export default function SuggestionReviewPage() {
       setSelectedSession(null);
       setDiff(null);
       fetchData();
-    } catch {
-      // Error handled in UI
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to reject suggestion");
     } finally {
       setActionInProgress(false);
     }
@@ -278,8 +278,8 @@ export default function SuggestionReviewPage() {
       setSelectedSession(null);
       setDiff(null);
       fetchData();
-    } catch {
-      // Error handled in UI
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to request changes");
     } finally {
       setActionInProgress(false);
     }
