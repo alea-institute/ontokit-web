@@ -11,8 +11,83 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: "0.2.0",
+    date: "2026-03-09",
+    categories: [
+      {
+        title: "New features",
+        items: [
+          "Form-based entity editing for classes, properties, and individuals replacing raw Turtle source editing.",
+          "Standard/Developer mode toggle with persistent preference for simplified or advanced editing views.",
+          "Suggestion workflow: new 'suggester' role allows non-editors to propose changes with mandatory editor review.",
+          "Two-tier auto-save system: blur saves drafts to localStorage, navigation commits to git.",
+          "Interactive graph visualization using React Flow with ELK layout for exploring ontology relationships.",
+          "Drag-and-drop class reparenting with cycle detection and undo support.",
+          "Context menus (right-click) for Add Subclass, Copy IRI, View in Source, and Delete operations.",
+          "Notification system with polling and event-driven refetch for suggestion and collaboration updates.",
+          "Entity history tab with revision tracking.",
+          "Similar concepts panel and cross-references panel for entity discovery.",
+          "SPARQL query execution support (SELECT/ASK/CONSTRUCT) on the backend.",
+          "Semantic search using vector similarity with pluggable embedding providers (OpenAI, Voyage, local).",
+          "Duplicate detection with union-find clustering and similarity scoring.",
+          "Consistency checking: cycle detection, class hierarchy validation, and deprecated entity tracking.",
+          "Full dark mode support with theme sync preventing flash of unstyled content.",
+          "Keyboard shortcuts: Ctrl+S to flush drafts, Ctrl+N to create entities, ? for help.",
+        ],
+      },
+      {
+        title: "Improvements",
+        items: [
+          "Shared FOLIO-style tree renderer reused across Classes, Properties, and Individuals.",
+          "Multi-level expand/collapse controls with split-button for one level or all/none.",
+          "Auto-expand on 800ms hover during drag operations.",
+          "Language tags displayed as country flag emojis.",
+          "Resizable panel dividers for tree/detail layout.",
+          "Delete impact analysis before entity removal.",
+          "API retry logic with 30s timeout and exponential backoff.",
+          "Rate limiting via slowapi (100 req/min default).",
+          "Security headers: X-Content-Type-Options, X-Frame-Options, HSTS, CSP.",
+          "Request ID middleware with unique X-Request-ID header and access logging.",
+          "Zod-based environment variable validation on the frontend.",
+          "ESLint flat config migration with stricter TypeScript rules.",
+        ],
+      },
+      {
+        title: "Accessibility",
+        items: [
+          "Skip links in layout for keyboard navigation.",
+          "Screen reader announcer with polite and assertive live regions.",
+          "ARIA labels on all icon buttons.",
+          "Reduced motion and high contrast media query support.",
+          "Tree keyboard navigation with aria-activedescendant.",
+        ],
+      },
+      {
+        title: "Testing & Quality",
+        items: [
+          "111 new tests added across frontend (26) and backend (85).",
+          "CI/CD pipeline with GitHub Actions: lint, type-check, test, and build stages.",
+          "All 178 mypy strict-mode errors fixed on the backend.",
+          "Pre-commit hooks with ruff and mypy for the backend.",
+        ],
+      },
+      {
+        title: "Bug fixes",
+        items: [
+          "Fixed session expiry guard detecting RefreshAccessTokenError and auto-redirecting to login.",
+          "Fixed HttpUrl crash in class tree sort keys.",
+          "Fixed stale search/autocomplete responses with proper IRI handling.",
+          "Fixed language flag alignment with invisible placeholders.",
+          "Fixed falsy 0.0 similarity lookup in semantic search.",
+          "Fixed beacon token payload type validation.",
+          "Fixed branch cleanup on suggestion commit failures.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.1.0",
-    date: "2025-06-15",
+    date: "2026-02-18",
     categories: [
       {
         title: "New features",
