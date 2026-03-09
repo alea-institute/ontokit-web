@@ -602,13 +602,16 @@ export default function EditorPage() {
     if (!session?.accessToken) {
       throw new Error("Not authenticated");
     }
+    if (!activeBranch) {
+      throw new Error("No branch selected");
+    }
 
     // Ensure source content is loaded
     let source = sourceContent;
     if (!source) {
       const response = await revisionsApi.getFileAtVersion(
         projectId,
-        activeBranch!,
+        activeBranch,
         session.accessToken,
         project?.git_ontology_path,
       );
@@ -648,12 +651,15 @@ export default function EditorPage() {
     if (!session?.accessToken) {
       throw new Error("Not authenticated");
     }
+    if (!activeBranch) {
+      throw new Error("No branch selected");
+    }
 
     let source = sourceContent;
     if (!source) {
       const response = await revisionsApi.getFileAtVersion(
         projectId,
-        activeBranch!,
+        activeBranch,
         session.accessToken,
         project?.git_ontology_path,
       );
@@ -684,12 +690,15 @@ export default function EditorPage() {
     if (!session?.accessToken) {
       throw new Error("Not authenticated");
     }
+    if (!activeBranch) {
+      throw new Error("No branch selected");
+    }
 
     let source = sourceContent;
     if (!source) {
       const response = await revisionsApi.getFileAtVersion(
         projectId,
-        activeBranch!,
+        activeBranch,
         session.accessToken,
         project?.git_ontology_path,
       );
@@ -719,6 +728,7 @@ export default function EditorPage() {
   // Instead of directly committing, sends modified source to the suggestion branch
   const handleSuggestClassUpdate = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
     if (!session?.accessToken) throw new Error("Not authenticated");
+    if (!activeBranch) throw new Error("No branch selected");
 
     // Ensure session exists
     if (!suggestionSession.sessionId) {
@@ -729,7 +739,7 @@ export default function EditorPage() {
     if (!source) {
       const response = await revisionsApi.getFileAtVersion(
         projectId,
-        activeBranch!,
+        activeBranch,
         session.accessToken,
         project?.git_ontology_path,
       );
