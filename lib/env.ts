@@ -30,25 +30,26 @@ function validateServerEnv(): ServerEnv {
         return `  ${key}: ${errors.join(", ")}`;
       })
       .join("\n");
-    console.warn(
-      `⚠️  Missing or invalid server environment variables:\n${messages}\n` +
-        `Some features may not work correctly.`
+    throw new Error(
+      `Missing or invalid server environment variables:\n${messages}\n` +
+        `Set the required variables before starting the server.`
     );
-    return process.env as unknown as ServerEnv;
   }
   return result.data;
 }
 
 function validateClientEnv(): ClientEnv {
-  const result = clientSchema.safeParse({
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
+  const raw = {
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
     NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
-  });
+  };
+  const result = clientSchema.safeParse(raw);
   if (!result.success) {
-    console.warn("⚠️  Invalid client environment variables:", result.error.flatten().fieldErrors);
-    return {
-      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
-    } as ClientEnv;
+    throw new Error(
+      `Invalid client environment variables: ${JSON.stringify(
+        result.error.flatten().fieldErrors
+      )}`
+    );
   }
   return result.data;
 }
