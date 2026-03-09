@@ -878,13 +878,17 @@ export default function EditorPage() {
 
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
+    // Discard any active suggestion session tied to the old branch
+    if (suggestionSession.isActive) {
+      suggestionSession.discardSession();
+    }
     setActiveBranch(branchName);
     setSourceContent("");
     setSourceError(null);
     setSourceIriIndex(new Map());
     preloadStartedRef.current = false;
     router.replace(`${pathname}?branch=${encodeURIComponent(branchName)}`);
-  }, [pathname, router]);
+  }, [pathname, router, suggestionSession]);
 
   // --- Keyboard shortcuts ---
   const keyboardShortcuts = useMemo((): ShortcutDefinition[] => [
