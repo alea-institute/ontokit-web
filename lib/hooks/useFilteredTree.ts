@@ -155,9 +155,12 @@ function mergePathsIntoTree(paths: AncestorPath[]): EntityTreeNode[] {
           entityType: "class",
           isSearchMatch: matchIris.has(item.iri),
         });
-      } else if (matchIris.has(item.iri)) {
+      } else {
         const existing = nodeMap.get(item.iri)!;
-        existing.isSearchMatch = true;
+        existing.hasChildren = existing.hasChildren || item.hasChildren;
+        if (matchIris.has(item.iri)) {
+          existing.isSearchMatch = true;
+        }
       }
 
       if (i === 0) {
