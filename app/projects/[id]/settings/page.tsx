@@ -2427,7 +2427,7 @@ function EmbeddingSettingsSection({
         model_name: MODEL_DEFAULTS[provider],
         auto_embed_on_save: autoEmbed,
       };
-      if (apiKey.trim()) {
+      if (provider !== "local" && apiKey.trim()) {
         update.api_key = apiKey.trim();
       }
       const updated = await embeddingsApi.updateConfig(projectId, update, accessToken);
