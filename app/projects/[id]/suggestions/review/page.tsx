@@ -468,9 +468,12 @@ export default function SuggestionReviewPage() {
                     {isSelected && (
                       <div className="mt-2 rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
                         {/* Tabs */}
-                        <div className="flex border-b border-slate-200 dark:border-slate-700">
+                        <div className="flex border-b border-slate-200 dark:border-slate-700" role="tablist">
                           <button
                             onClick={() => setActiveTab("summary")}
+                            role="tab"
+                            id="tab-summary"
+                            aria-selected={activeTab === "summary"}
                             className={cn(
                               "px-4 py-2.5 text-sm font-medium transition-colors",
                               activeTab === "summary"
@@ -482,6 +485,9 @@ export default function SuggestionReviewPage() {
                           </button>
                           <button
                             onClick={() => setActiveTab("files")}
+                            role="tab"
+                            id="tab-files"
+                            aria-selected={activeTab === "files"}
                             className={cn(
                               "px-4 py-2.5 text-sm font-medium transition-colors",
                               activeTab === "files"
@@ -494,7 +500,7 @@ export default function SuggestionReviewPage() {
                         </div>
 
                         {/* Tab content */}
-                        <div className="p-4">
+                        <div className="p-4" role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
                           {activeTab === "summary" ? (
                             <div className="space-y-4">
                               {/* Submitter info */}
