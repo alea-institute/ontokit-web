@@ -339,10 +339,10 @@ function EditorPreferencesSection() {
 
       {/* Editor Mode */}
       <div className="mb-6">
-        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <span id="editor-mode-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
           Editor Mode
-        </label>
-        <div className="grid grid-cols-2 gap-3">
+        </span>
+        <div className="grid grid-cols-2 gap-3" role="group" aria-labelledby="editor-mode-label">
           {modeOptions.map(({ value, label, description, icon: Icon }) => (
             <button
               type="button"
@@ -382,10 +382,10 @@ function EditorPreferencesSection() {
 
       {/* Theme */}
       <div>
-        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <span id="theme-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
           Theme
-        </label>
-        <div className="flex gap-2">
+        </span>
+        <div className="flex gap-2" role="group" aria-labelledby="theme-label">
           {themeOptions.map(({ value, label, icon: Icon }) => (
             <button
               type="button"
@@ -408,13 +408,14 @@ function EditorPreferencesSection() {
 
       {/* Continuous Editing */}
       <div className="mt-6">
-        <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+        <span id="continuous-editing-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
           Continuous Editing
-        </label>
+        </span>
         <button
           type="button"
           role="switch"
           aria-checked={continuousEditing}
+          aria-labelledby="continuous-editing-label"
           onClick={() => setContinuousEditing(!continuousEditing)}
           className={cn(
             "flex items-center gap-3 rounded-lg border p-4 text-left transition-colors w-full",
