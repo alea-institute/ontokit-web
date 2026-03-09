@@ -38,6 +38,7 @@ export function useFilteredTree({
 
   useEffect(() => {
     if (!searchResults) {
+      ++buildIdRef.current;
       setFilteredNodes(null);
       setIsBuilding(false);
       setFirstMatchIri(null);
@@ -47,6 +48,7 @@ export function useFilteredTree({
 
     const classResults = searchResults.filter((r) => r.entity_type === "class");
     if (classResults.length === 0) {
+      ++buildIdRef.current;
       setFilteredNodes(null);
       setIsBuilding(false);
       setFirstMatchIri(null);
