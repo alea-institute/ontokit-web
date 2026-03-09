@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { projectOntologyApi, type OWLClassTreeNode as ApiTreeNode } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 
@@ -97,6 +97,9 @@ export function useOntologyTree({
   branchKey,
 }: UseOntologyTreeOptions): UseOntologyTreeReturn {
   const [nodes, setNodes] = useState<ClassTreeNode[]>([]);
+  const nodesRef = useRef<ClassTreeNode[]>([]);
+  // Keep ref in sync with state
+  nodesRef.current = nodes;
   const [totalClasses, setTotalClasses] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -408,10 +411,10 @@ export function useOntologyTree({
    */
   const reparentOptimistic = useCallback(
     (iri: string, oldParentIri: string | null, newParentIri: string | null): ReparentSnapshot => {
-      let snapshot: ReparentSnapshot = { previousNodes: [] };
+      // Capture snapshot synchronously before React processes the updater
+      const snapshot: ReparentSnapshot = { previousNodes: nodesRef.current };
 
       setNodes((prev) => {
-        snapshot = { previousNodes: prev };
 
         // Find the node to move (deep clone its subtree)
         const findAndClone = (items: ClassTreeNode[]): ClassTreeNode | null => {
