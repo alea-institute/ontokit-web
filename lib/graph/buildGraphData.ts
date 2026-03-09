@@ -182,11 +182,13 @@ export function buildGraphFromClassDetail(
   // Ensure focus node exists even if not in resolvedNodes
   ensureNode(focusIri);
 
-  // Cap children: for any parent with more than MAX_CHILDREN_PER_NODE children shown, trim
+  // Cap children: for any parent with more than MAX_CHILDREN_PER_NODE children shown, trim.
+  // Always preserve edges involving the focus node so it's never pruned.
   const childrenCount = new Map<string, number>();
   const filteredEdges = edges.filter((edge) => {
     if (edge.edgeType === "subClassOf") {
-      // source is child, target is parent
+      // source is child, target is parent — always keep the focus node's edges
+      if (edge.source === focusIri) return true;
       const parent = edge.target;
       const count = (childrenCount.get(parent) || 0) + 1;
       childrenCount.set(parent, count);

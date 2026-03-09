@@ -229,7 +229,9 @@ describe("buildGraphFromClassDetail", () => {
       ]);
     }
 
+    // Insert focus AFTER the 21 siblings so it's not kept just by insertion order
     const resolved = new Map<string, OWLClassDetail>([
+      ...childDetails,
       [
         focusIri,
         makeClassDetail({
@@ -238,16 +240,15 @@ describe("buildGraphFromClassDetail", () => {
           labels: [{ value: "Focus", lang: "" }],
         }),
       ],
-      ...childDetails,
     ]);
 
     const result = buildGraphFromClassDetail(focusIri, resolved);
 
-    // At most 20 subClassOf edges should point to the parent
+    // At most 20 capped siblings + the focus edge (always preserved)
     const subClassEdges = result.edges.filter(
       (e) => e.target === parentIri && e.edgeType === "subClassOf",
     );
-    expect(subClassEdges.length).toBeLessThanOrEqual(20);
+    expect(subClassEdges.length).toBeLessThanOrEqual(21);
 
     // Pruned children should not appear in nodes
     const nodeIds = new Set(result.nodes.map((n) => n.id));
