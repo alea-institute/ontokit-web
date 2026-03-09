@@ -87,7 +87,7 @@ export class CollaborationClient {
           this.attemptReconnect();
         };
 
-        this.ws.onerror = (event) => {
+        this.ws.onerror = (_event) => {
           this.options.onError?.("WebSocket error");
           reject(new Error("WebSocket connection failed"));
         };

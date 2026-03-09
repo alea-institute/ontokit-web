@@ -54,7 +54,6 @@ export function PRActions({
   const canMerge = userRole === "owner" || userRole === "admin";
   const canReview = userRole === "owner" || userRole === "admin";
   const canReopen = userRole === "owner" || userRole === "admin";
-  const isOpen = pr.status === "open";
   const isClosed = pr.status === "closed";
   const isMerged = pr.status === "merged";
 
@@ -192,14 +191,14 @@ export function PRActions({
                 className="gap-1"
               >
                 <Trash2 className="h-4 w-4" />
-                Delete Branch "{pr.source_branch}"
+                Delete Branch &ldquo;{pr.source_branch}&rdquo;
               </Button>
             )}
 
             {sourceBranchExists === false && (
               <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-100 px-3 py-1.5 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
                 <Check className="h-4 w-4" />
-                Branch "{pr.source_branch}" deleted
+                Branch &ldquo;{pr.source_branch}&rdquo; deleted
               </span>
             )}
           </div>
@@ -396,7 +395,7 @@ export function PRActions({
             className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
           />
           <span className="text-sm text-slate-700 dark:text-slate-300">
-            Delete source branch "{pr.source_branch}" after merging
+            Delete source branch &ldquo;{pr.source_branch}&rdquo; after merging
           </span>
         </label>
       </ConfirmDialog>

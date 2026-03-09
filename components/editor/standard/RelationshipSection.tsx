@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Trash2, Search, ChevronDown, X } from "lucide-react";
+import { Trash2, Search, ChevronDown } from "lucide-react";
 import { cn, getLocalName } from "@/lib/utils";
 import { projectOntologyApi, type EntitySearchResult } from "@/lib/api/client";
 import {

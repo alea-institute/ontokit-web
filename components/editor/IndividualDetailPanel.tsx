@@ -241,7 +241,7 @@ export function IndividualDetailPanel({
     editInitializedRef.current = false;
     setIsEditing(false);
     cancelledIriRef.current = null;
-  }, [individualIri, flushToGit]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [individualIri, flushToGit]);
 
   const enterEditMode = useCallback(() => {
     if (!detail) return;

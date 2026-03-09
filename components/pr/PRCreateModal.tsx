@@ -4,7 +4,6 @@ import { useState } from "react";
 import { pullRequestsApi, type PullRequest } from "@/lib/api/pullRequests";
 import { useBranch } from "@/lib/context/BranchContext";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { X, GitBranch, ArrowRight } from "lucide-react";
 
 interface PRCreateModalProps {

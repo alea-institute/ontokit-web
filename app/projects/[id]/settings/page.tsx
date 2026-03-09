@@ -30,7 +30,7 @@ import {
 } from "@/lib/api/pullRequests";
 import {
   userSettingsApi,
-  type GitHubTokenStatus,
+
   type GitHubRepoInfo,
 } from "@/lib/api/userSettings";
 import {
@@ -127,7 +127,7 @@ export default function ProjectSettingsPage() {
 
   // GitHub integration state
   const [githubIntegration, setGithubIntegration] = useState<GitHubIntegration | null>(null);
-  const [prSettings, setPrSettings] = useState<PRSettings | null>(null);
+  const [, setPrSettings] = useState<PRSettings | null>(null);
   const [showGitHubSetup, setShowGitHubSetup] = useState(false);
   const [isSetupGitHub, setIsSetupGitHub] = useState(false);
   const [prApprovalRequired, setPrApprovalRequired] = useState(0);

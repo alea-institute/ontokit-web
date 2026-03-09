@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { Plus, Search, Filter, Globe, User, FolderOpen } from "lucide-react";
+import { Plus, Search, Globe, User, FolderOpen } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";

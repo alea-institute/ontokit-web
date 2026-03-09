@@ -159,7 +159,7 @@ export function DiffViewer({
 
       {/* File list */}
       <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-        {diff.changes.map((change, index) => (
+        {diff.changes.map((change) => (
           <div
             key={change.path}
             className={cn(

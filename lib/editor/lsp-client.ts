@@ -94,7 +94,7 @@ export class LspClient {
         this.options.onConnectionChange?.(false);
       };
 
-      this.ws.onerror = (error) => {
+      this.ws.onerror = (_error) => {
         reject(new Error('WebSocket connection failed'));
       };
 

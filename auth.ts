@@ -1,6 +1,5 @@
 import NextAuth from "next-auth";
-import type { NextAuthConfig, Session, User } from "next-auth";
-import type { JWT } from "next-auth/jwt";
+import type { NextAuthConfig, User } from "next-auth";
 
 // Zitadel provider configuration
 const zitadelProvider = {
@@ -28,7 +27,7 @@ const zitadelProvider = {
 export const authConfig: NextAuthConfig = {
   providers: [zitadelProvider],
   events: {
-    async signOut(message) {
+    async signOut(_message) {
       // This event fires after local session is cleared
       // The actual redirect to Zitadel's end_session happens in the component
     },
