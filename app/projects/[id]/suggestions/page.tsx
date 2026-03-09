@@ -17,6 +17,7 @@ import {
   PenLine,
   MessageCircle,
 } from "lucide-react";
+import { ApiError } from "@/lib/api/client";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { projectApi, type Project } from "@/lib/api/projects";
@@ -93,9 +94,9 @@ export default function SuggestionsPage() {
         setProject(proj);
         setSessions(sessionList.items);
       } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
+        if (err instanceof ApiError && err.status === 403) {
           setError("You don't have access to this project");
-        } else if (err instanceof Error && err.message.includes("404")) {
+        } else if (err instanceof ApiError && err.status === 404) {
           setError("Project not found");
         } else {
           setError(err instanceof Error ? err.message : "Failed to load suggestions");
