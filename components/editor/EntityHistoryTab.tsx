@@ -66,7 +66,7 @@ export function EntityHistoryTab({
   branch,
 }: EntityHistoryTabProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { data, isLoading } = useEntityHistory(
+  const { data, isLoading, error } = useEntityHistory(
     projectId,
     entityIri,
     accessToken,
@@ -78,7 +78,7 @@ export function EntityHistoryTab({
   const events = data?.events ?? [];
   const total = data?.total ?? 0;
 
-  if (!isLoading && total === 0) return null;
+  if (!isLoading && !error && data && total === 0) return null;
 
   return (
     <div className="flex gap-4">
