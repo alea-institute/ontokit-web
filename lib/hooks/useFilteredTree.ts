@@ -112,7 +112,7 @@ export function useFilteredTree({
   return { filteredNodes, isBuilding, firstMatchIri, truncated };
 }
 
-interface AncestorPath {
+export interface AncestorPath {
   matchIri: string;
   matchLabel: string;
   ancestors: Array<{ iri: string; label: string; child_count: number }>;
@@ -122,7 +122,7 @@ interface AncestorPath {
  * Merge multiple ancestor paths into a unified EntityTreeNode tree.
  * Matched nodes get `isSearchMatch: true`, all ancestors are `isExpanded: true`.
  */
-function mergePathsIntoTree(paths: AncestorPath[]): EntityTreeNode[] {
+export function mergePathsIntoTree(paths: AncestorPath[]): EntityTreeNode[] {
   // nodeMap: iri -> EntityTreeNode
   const nodeMap = new Map<string, EntityTreeNode>();
   // childrenMap: parentIri -> Set<childIri>

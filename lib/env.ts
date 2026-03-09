@@ -54,5 +54,26 @@ function validateClientEnv(): ClientEnv {
   return result.data;
 }
 
-export const serverEnv = validateServerEnv();
-export const clientEnv = validateClientEnv();
+export { validateServerEnv, validateClientEnv };
+
+// Guard module-level validation so tests can import the functions without triggering throws.
+// In test environments (VITEST / NODE_ENV=test), these are set lazily on first access.
+function isTestEnv(): boolean {
+  return !!(process.env.VITEST || process.env.NODE_ENV === "test");
+}
+
+export const serverEnv: ServerEnv = isTestEnv()
+  ? (new Proxy({} as ServerEnv, {
+      get(_, prop: string) {
+        return validateServerEnv()[prop as keyof ServerEnv];
+      },
+    }))
+  : validateServerEnv();
+
+export const clientEnv: ClientEnv = isTestEnv()
+  ? (new Proxy({} as ClientEnv, {
+      get(_, prop: string) {
+        return validateClientEnv()[prop as keyof ClientEnv];
+      },
+    }))
+  : validateClientEnv();
