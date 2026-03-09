@@ -301,6 +301,7 @@ export default function SuggestionsPage() {
                                 rel="noopener noreferrer"
                                 className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
                                 title="View on GitHub"
+                                aria-label="View pull request on GitHub"
                               >
                                 <ExternalLink className="h-3.5 w-3.5" />
                               </a>
