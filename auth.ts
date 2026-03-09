@@ -1,5 +1,6 @@
 import NextAuth from "next-auth";
 import type { NextAuthConfig, User } from "next-auth";
+import "next-auth/jwt";
 
 // Zitadel provider configuration
 const zitadelProvider = {
