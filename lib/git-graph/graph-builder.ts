@@ -152,7 +152,7 @@ function assignLanesAndColors(
 ): void {
   // Track which lanes are occupied at each row
   const activeLanes = new Map<number, { lane: number; color: number }>();
-  let nextColor = 0;
+  let nextColor = 1;
 
   // Process commits from newest to oldest (top to bottom)
   for (let i = 0; i < vertices.length; i++) {
@@ -168,7 +168,9 @@ function assignLanesAndColors(
     // correct lane even when a child on a different branch continues here.
     if (hintedLane !== undefined) {
       const usedLanes = new Set<number>();
-      activeLanes.forEach(({ lane }) => usedLanes.add(lane));
+      activeLanes.forEach(({ lane }) => {
+        usedLanes.add(lane);
+      });
 
       if (!usedLanes.has(hintedLane)) {
         assignedLane = hintedLane;
@@ -207,7 +209,9 @@ function assignLanesAndColors(
     if (assignedLane === null) {
       // Find first available lane
       const usedLanes = new Set<number>();
-      activeLanes.forEach(({ lane }) => usedLanes.add(lane));
+      activeLanes.forEach(({ lane }) => {
+        usedLanes.add(lane);
+      });
 
       assignedLane = 0;
       while (usedLanes.has(assignedLane)) {
