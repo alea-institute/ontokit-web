@@ -147,6 +147,15 @@ export function useAutoSave({
     const hasHandler = saveMode === "suggest" ? !!onSuggestSave : !!onUpdateClass;
     if (!classIri || !branch || !canFlush || !hasHandler) return false;
 
+    // Re-validate current edit state to prevent flushing a stale draft
+    // after triggerSave() aborted on validation
+    const state = editStateRef.current;
+    if (state && state.labels.every((l) => !l.value.trim())) {
+      setValidationError("At least one label is required");
+      return false;
+    }
+    setValidationError(null);
+
     const key = draftKey(projectId, branch, classIri);
     const rawDraft = getDraft(key);
     if (!rawDraft) return false;
