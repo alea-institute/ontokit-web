@@ -2,6 +2,9 @@
   "name": "ontokit-web",
   "version": "0.3.0-dev",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
