@@ -197,11 +197,13 @@ export function ClassDetailPanel({
     cancelledIriRef.current = classIri;
   }, [classIri, classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Explicit save: flush draft to git and exit edit mode
+  // Explicit save: flush draft to git and exit edit mode only on success
   const saveAndExitEditMode = useCallback(async () => {
     triggerSave();
-    await flushToGit();
-    setIsEditing(false);
+    const success = await flushToGit();
+    if (success) {
+      setIsEditing(false);
+    }
   }, [triggerSave, flushToGit]);
 
   // Auto-enter edit mode based on continuous editing or restored draft

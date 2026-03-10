@@ -280,11 +280,13 @@ export function PropertyDetailPanel({
     cancelledIriRef.current = propertyIri;
   }, [propertyIri, detail, discardDraft, initEditState]);
 
-  // Explicit save: flush draft to git and exit edit mode
+  // Explicit save: flush draft to git and exit edit mode only on success
   const saveAndExitEditMode = useCallback(async () => {
     triggerSave();
-    await flushToGit();
-    setIsEditing(false);
+    const success = await flushToGit();
+    if (success) {
+      setIsEditing(false);
+    }
   }, [triggerSave, flushToGit]);
 
   // Auto-enter edit mode

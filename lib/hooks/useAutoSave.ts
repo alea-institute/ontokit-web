@@ -36,7 +36,7 @@ export interface UseAutoSaveReturn {
   saveError: string | null;
   validationError: string | null;
   triggerSave: () => void;
-  flushToGit: () => Promise<void>;
+  flushToGit: () => Promise<boolean>;
   discardDraft: () => void;
   editStateRef: React.MutableRefObject<EditState | null>;
   classDetailRef: React.MutableRefObject<OWLClassDetail | null>;
@@ -141,17 +141,17 @@ export function useAutoSave({
   }, [classIri, branch, projectId, canEdit, saveMode, setDraft]);
 
   // Flush draft to git (Tier 2: commit on navigate away)
-  const flushToGit = useCallback(async () => {
-    if (flushingRef.current) return;
+  const flushToGit = useCallback(async (): Promise<boolean> => {
+    if (flushingRef.current) return false;
     const canFlush = canEdit || saveMode === "suggest";
     const hasHandler = saveMode === "suggest" ? !!onSuggestSave : !!onUpdateClass;
-    if (!classIri || !branch || !canFlush || !hasHandler) return;
+    if (!classIri || !branch || !canFlush || !hasHandler) return false;
 
     const key = draftKey(projectId, branch, classIri);
     const rawDraft = getDraft(key);
-    if (!rawDraft) return;
+    if (!rawDraft) return false;
     // Only flush class drafts
-    if (rawDraft.entityType && rawDraft.entityType !== "class") return;
+    if (rawDraft.entityType && rawDraft.entityType !== "class") return false;
     const draft = rawDraft as DraftEntry;
 
     const detail = classDetailRef.current;
@@ -200,11 +200,13 @@ export function useAutoSave({
 
       // Fade "saved" indicator after 2s
       savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save";
       setSaveStatus("error");
       setSaveError(msg);
       onErrorRef.current?.(msg);
+      return false;
     } finally {
       flushingRef.current = false;
     }
