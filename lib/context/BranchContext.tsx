@@ -5,8 +5,10 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useImperativeHandle,
   useState,
   type ReactNode,
+  type Ref,
 } from "react";
 import {
   branchesApi,
@@ -56,10 +58,15 @@ interface BranchContextValue {
 
 const BranchContext = createContext<BranchContextValue | null>(null);
 
+export interface BranchProviderHandle {
+  refreshBranches: () => Promise<void>;
+}
+
 interface BranchProviderProps {
   projectId: string;
   accessToken?: string;
   initialBranch?: string;
+  refreshRef?: Ref<BranchProviderHandle>;
   children: ReactNode;
 }
 
@@ -67,6 +74,7 @@ export function BranchProvider({
   projectId,
   accessToken,
   initialBranch,
+  refreshRef,
   children,
 }: BranchProviderProps) {
   const [branches, setBranches] = useState<BranchInfo[]>([]);
@@ -217,6 +225,10 @@ export function BranchProvider({
       setInitialBranchHandled(true);
     }
   }, [initialBranch, initialBranchHandled, isLoading, branches, currentBranch]);
+
+  useImperativeHandle(refreshRef, () => ({
+    refreshBranches: loadBranches,
+  }), [loadBranches]);
 
   const value: BranchContextValue = {
     branches,

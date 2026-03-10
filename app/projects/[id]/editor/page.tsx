@@ -17,7 +17,7 @@ import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingTo
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
-import { BranchProvider } from "@/lib/context/BranchContext";
+import { BranchProvider, type BranchProviderHandle } from "@/lib/context/BranchContext";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
@@ -75,6 +75,7 @@ export default function EditorPage() {
   const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
 
   // Branch state
+  const branchRef = useRef<BranchProviderHandle>(null);
   const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
 
   // Source state (shared across modes)
@@ -335,6 +336,7 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     loadRootClasses();
     iriPatternDetectedRef.current = false;
+    branchRef.current?.refreshBranches();
 
     pendingSaveResolveRef.current?.();
     pendingSaveResolveRef.current = null;
@@ -588,6 +590,7 @@ export default function EditorPage() {
       setSourceContent("");
       // Reload tree to ensure consistency
       loadRootClasses();
+      branchRef.current?.refreshBranches();
     } catch (err) {
       toast.error(
         "Failed to delete class",
@@ -646,6 +649,7 @@ export default function EditorPage() {
     // Re-index source IRIs
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
+    branchRef.current?.refreshBranches();
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel]);
 
   // Handle update property (form-based editing)
@@ -685,6 +689,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
+    branchRef.current?.refreshBranches();
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast]);
 
   // Handle update individual (form-based editing)
@@ -724,6 +729,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
+    branchRef.current?.refreshBranches();
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast]);
 
   // Handle suggestion-mode class update
@@ -1032,7 +1038,7 @@ export default function EditorPage() {
   }
 
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch} refreshRef={branchRef}>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {/* Editor Header */}

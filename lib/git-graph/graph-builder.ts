@@ -16,9 +16,15 @@ import type {
  * Commits should be ordered from newest to oldest (as returned by git log).
  *
  * @param commits - Array of commits with parent_hashes
+ * @param refs - Optional map of commit hash → branch names
+ * @param defaultBranch - Name of the default branch (e.g. "main")
  * @returns GraphLayout with vertices and segments for rendering
  */
-export function buildGraphLayout(commits: RevisionCommit[]): GraphLayout {
+export function buildGraphLayout(
+  commits: RevisionCommit[],
+  refs?: Record<string, string[]>,
+  defaultBranch?: string
+): GraphLayout {
   if (commits.length === 0) {
     return { vertices: [], segments: [], width: 0, height: 0 };
   }
@@ -42,6 +48,7 @@ export function buildGraphLayout(commits: RevisionCommit[]): GraphLayout {
       lane: 0,
       color: 0,
       isMerge: parentHashes.length > 1,
+      refs: refs?.[commit.hash] ?? [],
     };
   });
 
@@ -54,8 +61,11 @@ export function buildGraphLayout(commits: RevisionCommit[]): GraphLayout {
     });
   });
 
+  // Compute branch hints from refs
+  const hints = computeBranchHints(vertices, defaultBranch);
+
   // Assign lanes and colors
-  assignLanesAndColors(vertices);
+  assignLanesAndColors(vertices, hints);
 
   // Generate branch segments
   const segments = generateSegments(vertices);
@@ -72,10 +82,74 @@ export function buildGraphLayout(commits: RevisionCommit[]): GraphLayout {
 }
 
 /**
+ * Compute lane hints based on branch refs.
+ *
+ * Walks first-parents from the default branch tip to build a "main line" set.
+ * Non-default branch tips get assigned to separate lanes so their exclusive
+ * commits visually separate from the main line.
+ *
+ * @returns Map from vertex index to suggested lane number
+ */
+function computeBranchHints(
+  vertices: GraphVertex[],
+  defaultBranch?: string
+): Map<number, number> {
+  const hints = new Map<number, number>();
+  if (!defaultBranch || vertices.length === 0) return hints;
+
+  // Find the default branch tip
+  let mainTipIdx: number | null = null;
+  for (const v of vertices) {
+    if (v.refs.includes(defaultBranch)) {
+      mainTipIdx = v.id;
+      break;
+    }
+  }
+
+  if (mainTipIdx === null) return hints;
+
+  // Walk first-parents from the main tip to build the main line set
+  const mainLine = new Set<number>();
+  let current: number | null = mainTipIdx;
+  while (current !== null) {
+    mainLine.add(current);
+    hints.set(current, 0); // main line → lane 0
+    const v: GraphVertex = vertices[current];
+    // Follow first parent (branch continuation)
+    current =
+      v.parentIndices.length > 0 ? v.parentIndices[0] : null;
+  }
+
+  // Find non-default branch tips and assign them to separate lanes
+  let nextLane = 1;
+  for (const v of vertices) {
+    if (v.refs.length === 0 || v.id === mainTipIdx) continue;
+    // Skip if all refs on this commit are the default branch
+    if (v.refs.every((r) => r === defaultBranch)) continue;
+
+    // Walk first-parents backward until hitting a main-line commit
+    const lane = nextLane++;
+    let walk: number | null = v.id;
+    while (walk !== null && !mainLine.has(walk)) {
+      hints.set(walk, lane);
+      const wv: GraphVertex = vertices[walk];
+      walk =
+        wv.parentIndices.length > 0 ? wv.parentIndices[0] : null;
+    }
+  }
+
+  return hints;
+}
+
+/**
  * Assign lanes (columns) and colors to vertices.
  * Uses an algorithm that follows branch continuation, prioritizing the main lane (lane 0).
+ * Accepts optional lane hints from branch ref analysis.
  */
-function assignLanesAndColors(vertices: GraphVertex[]): void {
+function assignLanesAndColors(
+  vertices: GraphVertex[],
+  hints: Map<number, number>
+): void {
   // Track which lanes are occupied at each row
   const activeLanes = new Map<number, { lane: number; color: number }>();
   let nextColor = 0;
@@ -84,25 +158,50 @@ function assignLanesAndColors(vertices: GraphVertex[]): void {
   for (let i = 0; i < vertices.length; i++) {
     const vertex = vertices[i];
 
-    // Find if any child continues to this commit (first parent relationship)
+    // Check if we have a hint for this vertex (from branch ref analysis)
+    const hintedLane = hints.get(i);
+
     let assignedLane: number | null = null;
     let assignedColor: number | null = null;
 
-    // Collect all children where this vertex is their first parent
-    const continuingChildren: GraphVertex[] = [];
-    for (const childIdx of vertex.childIndices) {
-      const child = vertices[childIdx];
-      if (child.parentIndices[0] === i) {
-        continuingChildren.push(child);
+    // Hints take priority — they ensure ref-bearing commits land on the
+    // correct lane even when a child on a different branch continues here.
+    if (hintedLane !== undefined) {
+      const usedLanes = new Set<number>();
+      activeLanes.forEach(({ lane }) => usedLanes.add(lane));
+
+      if (!usedLanes.has(hintedLane)) {
+        assignedLane = hintedLane;
+        // Inherit color from a child on the same lane if possible
+        for (const childIdx of vertex.childIndices) {
+          const child = vertices[childIdx];
+          if (child.lane === hintedLane && child.parentIndices[0] === i) {
+            assignedColor = child.color;
+            break;
+          }
+        }
+        if (assignedColor === null) {
+          assignedColor = hintedLane === 0 ? 0 : nextColor++;
+        }
       }
     }
 
-    if (continuingChildren.length > 0) {
-      // Prioritize children on lane 0 (main branch) to keep main line straight
-      // Sort by lane so lane 0 comes first
-      continuingChildren.sort((a, b) => a.lane - b.lane);
-      assignedLane = continuingChildren[0].lane;
-      assignedColor = continuingChildren[0].color;
+    // Fall back to child continuation (first-parent relationship)
+    if (assignedLane === null) {
+      const continuingChildren: GraphVertex[] = [];
+      for (const childIdx of vertex.childIndices) {
+        const child = vertices[childIdx];
+        if (child.parentIndices[0] === i) {
+          continuingChildren.push(child);
+        }
+      }
+
+      if (continuingChildren.length > 0) {
+        // Prioritize children on lane 0 (main branch) to keep main line straight
+        continuingChildren.sort((a, b) => a.lane - b.lane);
+        assignedLane = continuingChildren[0].lane;
+        assignedColor = continuingChildren[0].color;
+      }
     }
 
     if (assignedLane === null) {
