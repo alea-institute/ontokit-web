@@ -217,7 +217,7 @@ function assignLanesAndColors(
       while (usedLanes.has(assignedLane)) {
         assignedLane++;
       }
-      assignedColor = nextColor++;
+      assignedColor = assignedLane === 0 ? 0 : nextColor++;
     }
 
     vertex.lane = assignedLane;
