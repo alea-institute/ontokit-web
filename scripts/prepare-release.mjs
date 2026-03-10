@@ -13,7 +13,7 @@
  */
 
 import { readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -32,12 +32,12 @@ if (!current.includes("-dev") && !current.includes("-rc")) {
 
 const release = current.replace("-dev", "").replace("-rc", "");
 
-execSync(`npm pkg set version=${release}`, { stdio: "inherit" });
+execFileSync("npm", ["pkg", "set", `version=${release}`], { stdio: "inherit" });
 console.log(`Updated package.json: ${current} -> ${release}`);
 
 // Git commit
-execSync(`git add ${packagePath}`, { stdio: "inherit" });
-execSync(`git commit -m "chore: releasing ${release}"`, { stdio: "inherit" });
+execFileSync("git", ["add", packagePath], { stdio: "inherit" });
+execFileSync("git", ["commit", "-m", `chore: releasing ${release}`], { stdio: "inherit" });
 console.log(`Created commit: chore: releasing ${release}`);
 console.log();
 console.log("Next steps:");
