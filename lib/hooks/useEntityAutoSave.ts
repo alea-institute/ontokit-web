@@ -119,6 +119,15 @@ export function useEntityAutoSave({
     if (flushingRef.current) return false;
     if (!entityIri || !branch || !canEdit || !onFlushRef.current) return false;
 
+    // Re-validate current edit state to prevent flushing a stale draft
+    // after triggerSave() aborted on validation
+    const error = validateRef.current?.();
+    if (error) {
+      setValidationError(error);
+      return false;
+    }
+    setValidationError(null);
+
     const key = draftKey(projectId, branch, entityIri);
     const draft = getDraft(key);
     if (!draft) return false;
