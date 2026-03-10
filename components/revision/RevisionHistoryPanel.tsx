@@ -194,15 +194,20 @@ export function RevisionHistoryPanel({
                           </p>
 
                           {/* Branch ref badges */}
-                          {refs?.[commit.hash]?.map((ref) => (
-                            <span
-                              key={ref}
-                              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
-                            >
-                              <GitBranch className="h-2.5 w-2.5" />
-                              {ref}
-                            </span>
-                          ))}
+                          {(refs?.[commit.hash] ?? []).length > 0 && (
+                            <div className="mt-0.5 flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap">
+                              {(refs?.[commit.hash] ?? []).map((ref) => (
+                                <span
+                                  key={ref}
+                                  title={ref}
+                                  className="inline-flex max-w-[160px] items-center gap-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                >
+                                  <GitBranch className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="truncate">{ref}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
 
                           {/* Merge badge */}
                           {commit.is_merge && commit.merged_branch && (
