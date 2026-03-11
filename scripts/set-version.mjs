@@ -11,7 +11,7 @@
  */
 
 import { resolve, dirname } from "node:path";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -34,12 +34,12 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) {
 
 const devVersion = `${version}-dev`;
 
-execSync(`npm pkg set version=${devVersion}`, { stdio: "inherit" });
+execFileSync("npm", ["pkg", "set", `version=${devVersion}`], { stdio: "inherit" });
 console.log(`Updated package.json to ${devVersion}`);
 
 // Git commit
-execSync(`git add ${packagePath}`, { stdio: "inherit" });
-execSync(`git commit -m "chore: setting version to ${devVersion}"`, {
+execFileSync("git", ["add", packagePath], { stdio: "inherit" });
+execFileSync("git", ["commit", "-m", `chore: setting version to ${devVersion}`], {
   stdio: "inherit",
 });
 console.log(`Created commit: chore: setting version to ${devVersion}`);

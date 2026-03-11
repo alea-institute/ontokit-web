@@ -25,7 +25,7 @@ export default function HomePage() {
             Get Started
           </Link>
           <Link
-            href="https://github.com/ontokit"
+            href="https://github.com/CatholicOS/ontokit-web"
             className="rounded-lg border border-slate-300 dark:border-slate-600 px-6 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
             target="_blank"
             rel="noopener noreferrer"
