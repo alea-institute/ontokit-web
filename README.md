@@ -31,7 +31,7 @@ The web frontend for OntoKit - a collaborative OWL ontology curation platform.
 
 ```bash
 # Clone the repository
-git clone https://github.com/ontokit/ontokit-web.git
+git clone https://github.com/CatholicOS/ontokit-web.git
 cd ontokit-web
 
 # Install dependencies
