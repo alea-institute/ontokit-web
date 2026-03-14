@@ -131,6 +131,7 @@ function computeBranchHints(
     const lane = nextLane++;
     let walk: number | null = v.id;
     while (walk !== null && !mainLine.has(walk)) {
+      if (hints.has(walk)) break; // already claimed by an earlier branch
       hints.set(walk, lane);
       const wv: GraphVertex = vertices[walk];
       walk =
