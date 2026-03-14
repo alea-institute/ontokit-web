@@ -18,6 +18,7 @@ import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEd
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
 import { useQueryClient } from "@tanstack/react-query";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in callbacks below
 import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
@@ -76,6 +77,7 @@ export default function EditorPage() {
   const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
 
   // Branch state
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used in callbacks below
   const queryClient = useQueryClient();
   const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
 
