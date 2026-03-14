@@ -1,6 +1,15 @@
 # OntoKit Web
 
-The web frontend for OntoKit - a collaborative OWL ontology curation platform.
+The web frontend for OntoKit — a collaborative OWL ontology curation platform.
+
+## Genesis
+
+OntoKit grew out of a collaboration between two open-source projects that share a common need: making rules and laws accessible through structured, community-driven ontologies.
+
+- **[FOLIO](https://openlegalstandard.org/)** (Free Open Legal Information Ontology) — a structured vocabulary for governmental rules and laws ([GitHub](https://github.com/alea-institute/FOLIO/))
+- **[Catholic Semantic Canon](https://catholicdigitalcommons.org/)** (Catholic Digital Commons) — a structured vocabulary for the rules and laws of faith ([GitHub](https://github.com/CatholicOS/ontology-semantic-canon))
+
+Both projects benefit from grassroots-level collaborative ontology editing — the kind of tooling that didn't exist in a modern, accessible form. That shared need is what drove OntoKit's creation.
 
 ## Features
 
