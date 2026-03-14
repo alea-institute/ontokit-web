@@ -28,7 +28,7 @@ export interface UseEntityAutoSaveReturn {
   saveError: string | null;
   validationError: string | null;
   triggerSave: () => void;
-  flushToGit: () => Promise<void>;
+  flushToGit: () => Promise<boolean>;
   discardDraft: () => void;
   restoredDraft: AnyDraftEntry | null;
   clearRestoredDraft: () => void;
@@ -115,13 +115,14 @@ export function useEntityAutoSave({
   }, [entityIri, branch, projectId, canEdit, setDraft]);
 
   // Flush draft to git (Tier 2: commit on navigate away)
-  const flushToGit = useCallback(async () => {
-    if (flushingRef.current) return;
-    if (!entityIri || !branch || !canEdit || !onFlushRef.current) return;
+  // Returns true on success, false on error or no-op
+  const flushToGit = useCallback(async (): Promise<boolean> => {
+    if (flushingRef.current) return false;
+    if (!entityIri || !branch || !canEdit || !onFlushRef.current) return false;
 
     const key = draftKey(projectId, branch, entityIri);
     const draft = getDraft(key);
-    if (!draft) return;
+    if (!draft) return false;
 
     flushingRef.current = true;
     setSaveStatus("saving");
@@ -133,11 +134,13 @@ export function useEntityAutoSave({
       setSaveStatus("saved");
 
       savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save";
       setSaveStatus("error");
       setSaveError(msg);
       onErrorRef.current?.(msg);
+      return false;
     } finally {
       flushingRef.current = false;
     }
