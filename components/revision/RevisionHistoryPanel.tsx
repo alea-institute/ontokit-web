@@ -42,7 +42,7 @@ export function RevisionHistoryPanel({
   const [error, setError] = useState<string | null>(null);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [selectedCommit, setSelectedCommit] = useState<RevisionCommit | null>(null);
-  const { defaultBranch, loadBranches } = useBranch();
+  const { defaultBranch } = useBranch();
 
   const loadHistory = useCallback(async () => {
     if (!projectId) return;
@@ -66,9 +66,8 @@ export function RevisionHistoryPanel({
   useEffect(() => {
     if (isOpen) {
       loadHistory();
-      loadBranches();
     }
-  }, [isOpen, loadHistory, loadBranches]);
+  }, [isOpen, loadHistory]);
 
   const handleSelectCommit = (commit: RevisionCommit) => {
     setSelectedHash(commit.hash);
