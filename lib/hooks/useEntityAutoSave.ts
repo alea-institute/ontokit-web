@@ -115,6 +115,7 @@ export function useEntityAutoSave({
   }, [entityIri, branch, projectId, canEdit, setDraft]);
 
   // Flush draft to git (Tier 2: commit on navigate away)
+  // Returns true on success, false on error or no-op
   const flushToGit = useCallback(async (): Promise<boolean> => {
     if (flushingRef.current) return false;
     if (!entityIri || !branch || !canEdit || !onFlushRef.current) return false;

@@ -141,6 +141,7 @@ export function useAutoSave({
   }, [classIri, branch, projectId, canEdit, saveMode, setDraft]);
 
   // Flush draft to git (Tier 2: commit on navigate away)
+  // Returns true on success, false on error or no-op
   const flushToGit = useCallback(async (): Promise<boolean> => {
     if (flushingRef.current) return false;
     const canFlush = canEdit || saveMode === "suggest";
