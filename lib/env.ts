@@ -40,8 +40,8 @@ function validateServerEnv(): ServerEnv {
 
 function validateClientEnv(): ClientEnv {
   const raw = {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000",
-    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || undefined,
+    NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL || undefined,
   };
   const result = clientSchema.safeParse(raw);
   if (!result.success) {
