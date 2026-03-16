@@ -337,7 +337,7 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     loadRootClasses();
     iriPatternDetectedRef.current = false;
-    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId) });
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
 
     pendingSaveResolveRef.current?.();
     pendingSaveResolveRef.current = null;
@@ -591,7 +591,7 @@ export default function EditorPage() {
       setSourceContent("");
       // Reload tree to ensure consistency
       loadRootClasses();
-      queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
     } catch (err) {
       toast.error(
         "Failed to delete class",
@@ -650,7 +650,7 @@ export default function EditorPage() {
     // Re-index source IRIs
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId) });
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, queryClient]);
 
   // Handle update property (form-based editing)
@@ -690,7 +690,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId) });
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, queryClient]);
 
   // Handle update individual (form-based editing)
@@ -730,7 +730,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId) });
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
   }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, queryClient]);
 
   // Handle suggestion-mode class update

@@ -18,7 +18,7 @@ import {
 // --- Query key factory ---
 
 export const branchQueryKeys = {
-  list: (projectId: string) => ["branches", projectId] as const,
+  list: (projectId: string, accessToken?: string) => ["branches", projectId, accessToken] as const,
 };
 
 // --- sessionStorage helpers ---
@@ -85,7 +85,7 @@ export function BranchProvider({
     isLoading,
     error: queryError,
   } = useQuery({
-    queryKey: branchQueryKeys.list(projectId),
+    queryKey: branchQueryKeys.list(projectId, accessToken),
     queryFn: () => branchesApi.list(projectId, accessToken),
     enabled: !!projectId,
   });
@@ -150,9 +150,9 @@ export function BranchProvider({
 
   const refreshBranches = useCallback(async () => {
     await queryClient.invalidateQueries({
-      queryKey: branchQueryKeys.list(projectId),
+      queryKey: branchQueryKeys.list(projectId, accessToken),
     });
-  }, [queryClient, projectId]);
+  }, [queryClient, projectId, accessToken]);
 
   const createBranch = useCallback(
     async (name: string, fromBranch?: string): Promise<BranchInfo> => {
