@@ -21,6 +21,7 @@ export function GuideSidebar() {
             <Link
               key={chapter.slug}
               href={href}
+              aria-current={isActive ? "page" : undefined}
               className={cn(
                 "flex items-start gap-2.5 px-3 py-2 rounded-md text-sm transition-colors",
                 isActive

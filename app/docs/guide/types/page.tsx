@@ -130,10 +130,10 @@ export default function TypesPage() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 dark:bg-slate-700">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Type</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Expressiveness</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Reasoning</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Example</th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Type</th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Expressiveness</th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Reasoning</th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Example</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">

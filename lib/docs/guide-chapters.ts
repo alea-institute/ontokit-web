@@ -45,6 +45,9 @@ export const guideChapters: GuideChapter[] = [
 
 export function getAdjacentChapters(currentSlug: string) {
   const index = guideChapters.findIndex((c) => c.slug === currentSlug);
+  if (index === -1) {
+    return { prev: null, next: null };
+  }
   return {
     prev: index > 0 ? guideChapters[index - 1] : null,
     next: index < guideChapters.length - 1 ? guideChapters[index + 1] : null,
