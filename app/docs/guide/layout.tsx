@@ -1,5 +1,3 @@
-"use client";
-
 import { GuideSidebar } from "@/components/docs/GuideSidebar";
 
 export default function GuideLayout({ children }: { children: React.ReactNode }) {

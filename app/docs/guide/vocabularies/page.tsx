@@ -211,9 +211,9 @@ ex:Mammals a skos:Concept ;
             <table className="w-full text-sm">
               <thead className="bg-slate-50 dark:bg-slate-700">
                 <tr>
-                  <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Vocabulary</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Prefix</th>
-                  <th className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Purpose</th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Vocabulary</th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Prefix</th>
+                  <th scope="col" className="px-4 py-3 text-left font-medium text-slate-900 dark:text-white">Purpose</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
