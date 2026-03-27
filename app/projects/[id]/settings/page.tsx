@@ -1,5 +1,14 @@
 "use client";
 
+function isHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
@@ -821,15 +830,21 @@ export default function ProjectSettingsPage() {
                   <Github className="h-4 w-4" />
                   <span className="font-medium">Exemplar ontology</span>
                   <span className="text-indigo-500 dark:text-indigo-500">—</span>
-                  <a
-                    href={project.exemplar_source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 hover:underline"
-                  >
-                    View upstream source
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                  {isHttpUrl(project.exemplar_source_url) ? (
+                    <a
+                      href={project.exemplar_source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 hover:underline"
+                    >
+                      View upstream source
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-indigo-500">
+                      {project.exemplar_source_url}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
