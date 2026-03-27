@@ -195,8 +195,8 @@ function uploadFileWithProgress<T>(
       // to distinguish the two cases so the user gets an actionable message.
       let serverReachable = false;
       try {
-        const probe = await fetch(`${API_BASE}/`, { method: "HEAD", mode: "cors" });
-        serverReachable = probe.ok;
+        await fetch(`${API_BASE}/`, { method: "HEAD", mode: "cors" });
+        serverReachable = true;
       } catch {
         // probe failed — server truly unreachable
       }
