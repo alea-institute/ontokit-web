@@ -1,11 +1,8 @@
 import { z } from "zod";
 
 const serverSchema = z.object({
-  ZITADEL_ISSUER: z.string().url("ZITADEL_ISSUER must be a valid URL"),
-  ZITADEL_CLIENT_ID: z.string().min(1, "ZITADEL_CLIENT_ID is required"),
-  ZITADEL_CLIENT_SECRET: z.string().min(1, "ZITADEL_CLIENT_SECRET is required"),
   NEXTAUTH_URL: z.string().url().optional(),
-  NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required"),
+  NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required").default("folio-dev-secret"),
 });
 
 const clientSchema = z.object({
