@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 
 const docsNavLinks = [
   { href: "/docs", label: "Documentation" },
+  { href: "/docs/guide", label: "Ontology Guide" },
   { href: "/docs/changelog", label: "Changelog" },
 ];
 
@@ -19,7 +20,8 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       <nav className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
         <div className="container mx-auto flex items-center gap-4 px-4">
           {docsNavLinks.map(({ href, label }) => {
-            const isActive = pathname === href;
+            const isActive =
+              href === "/docs" ? pathname === href : pathname.startsWith(href);
             return (
               <Link
                 key={href}
