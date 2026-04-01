@@ -22,6 +22,7 @@ export interface GraphVertex {
   lane: number; // x position (column)
   color: number; // branch color index (for consistent coloring)
   isMerge: boolean; // true if this is a merge commit (2+ parents)
+  refs: string[]; // branch names pointing at this commit
 }
 
 /**

@@ -47,6 +47,10 @@ export interface Project {
   label_preferences?: string[];
   // Normalization report from initial import
   normalization_report?: NormalizationReport;
+  // Exemplar ontology fields
+  is_exemplar?: boolean;
+  exemplar_slug?: string;
+  exemplar_source_url?: string;
 }
 
 export interface ProjectListResponse {
