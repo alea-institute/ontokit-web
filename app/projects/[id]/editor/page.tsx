@@ -1092,13 +1092,15 @@ export default function EditorPage() {
 
               {/* Sign-in CTA for unauthenticated users */}
               {!hasValidAccess && (
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => signIn("zitadel")}
-                  className="flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                  className="gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 >
                   <LogIn className="h-3 w-3" />
                   Sign in to suggest edits
-                </button>
+                </Button>
               )}
             </div>
             <div className="flex items-center gap-2">
