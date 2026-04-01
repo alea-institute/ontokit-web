@@ -236,7 +236,7 @@ export default function EditorPage() {
   const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
   const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!session?.accessToken);
   const canSuggest = canEdit || isSuggester;
-  const isAuthenticated = status === "authenticated";
+  const hasValidAccess = status === "authenticated" && !!session?.accessToken;
   const hasOntology = project?.source_file_path;
 
   // Fetch pending suggestion count for editors/admins
@@ -522,6 +522,7 @@ export default function EditorPage() {
 
   const handleEntityConfirm = useCallback(
     async (entity: NewEntityInfo) => {
+      if (!canSuggest) return;
       const snippet = generateTurtleSnippet({
         iri: entity.iri,
         label: entity.label,
@@ -557,7 +558,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session?.accessToken, activeBranch, project?.git_ontology_path, toast],
+    [canSuggest, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session?.accessToken, activeBranch, project?.git_ontology_path, toast],
   );
 
   // Handle copy IRI
@@ -919,7 +920,7 @@ export default function EditorPage() {
       global: true,
       ignoreWhenEditorFocused: true,
     },
-    {
+    ...(canSuggest ? [{
       id: "add-entity",
       key: "n",
       modifiers: { ctrl: true },
@@ -927,7 +928,7 @@ export default function EditorPage() {
       category: "Editing",
       action: () => handleAddEntity(),
       global: true,
-    },
+    }] : []),
     {
       id: "help",
       key: "?",
@@ -950,7 +951,7 @@ export default function EditorPage() {
       global: true,
       ignoreWhenEditorFocused: false,
     },
-  ], [handleAddEntity, shortcutDialogOpen, showHistory]);
+  ], [handleAddEntity, shortcutDialogOpen, showHistory, canSuggest]);
 
   useKeyboardShortcuts(keyboardShortcuts);
 
@@ -987,7 +988,7 @@ export default function EditorPage() {
                 {error || "Project not found"}
               </h2>
               <div className="mt-4 flex items-center justify-center gap-3">
-                {!isAuthenticated && (
+                {!hasValidAccess && (
                   <Button onClick={() => signIn("zitadel")} className="gap-2">
                     <LogIn className="h-4 w-4" />
                     Sign In
@@ -1084,7 +1085,7 @@ export default function EditorPage() {
               )}
 
               {/* Sign-in CTA for unauthenticated users */}
-              {!isAuthenticated && (
+              {!hasValidAccess && (
                 <button
                   onClick={() => signIn("zitadel")}
                   className="flex items-center gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
@@ -1155,7 +1156,7 @@ export default function EditorPage() {
               <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
 
               {/* Upstream Sync Status (auth-only) */}
-              {isAuthenticated && (
+              {hasValidAccess && (
                 <UpstreamSyncIndicator
                   projectId={projectId}
                   accessToken={session?.accessToken}
@@ -1163,7 +1164,7 @@ export default function EditorPage() {
               )}
 
               {/* Normalization Status (auth-only) */}
-              {isAuthenticated && normalizationStatus?.needs_normalization && (
+              {hasValidAccess && normalizationStatus?.needs_normalization && (
                 <Link href={`/projects/${projectId}/settings#normalization`}>
                   <Button
                     variant="ghost"
@@ -1343,17 +1344,19 @@ export default function EditorPage() {
         defaultMessage="Update ontology"
       />
 
-      {/* Add Entity Dialog */}
-      <AddEntityDialog
-        open={addEntityDialogOpen}
-        onOpenChange={setAddEntityDialogOpen}
-        onConfirm={handleEntityConfirm}
-        iriPattern={iriPattern}
-        nextNumeric={nextNumeric}
-        ontologyNamespace={ontologyNamespace}
-        parentIri={addEntityParentIri}
-        parentLabel={addEntityParentLabel}
-      />
+      {/* Add Entity Dialog (only for users with edit/suggest permissions) */}
+      {canSuggest && (
+        <AddEntityDialog
+          open={addEntityDialogOpen}
+          onOpenChange={setAddEntityDialogOpen}
+          onConfirm={handleEntityConfirm}
+          iriPattern={iriPattern}
+          nextNumeric={nextNumeric}
+          ontologyNamespace={ontologyNamespace}
+          parentIri={addEntityParentIri}
+          parentLabel={addEntityParentLabel}
+        />
+      )}
 
       {/* Delete Class Confirmation Dialog */}
       <ConfirmDialog
