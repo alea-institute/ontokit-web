@@ -123,6 +123,16 @@ export default function ProjectSettingsPage() {
   // Ontology index state
   const [indexStatus, setIndexStatus] = useState<IndexStatusResponse | null>(null);
   const [isReindexing, setIsReindexing] = useState(false);
+  const reindexPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clean up reindex polling on unmount
+  useEffect(() => {
+    return () => {
+      if (reindexPollRef.current) {
+        clearInterval(reindexPollRef.current);
+      }
+    };
+  }, []);
 
   // Join requests state
   const [joinRequests, setJoinRequests] = useState<JoinRequestType[]>([]);
@@ -608,8 +618,13 @@ export default function ProjectSettingsPage() {
       setSuccessMessage("Reindex job queued. The index will update in the background.");
       setTimeout(() => setSuccessMessage(null), 5000);
 
+      // Clear any existing poll before starting a new one
+      if (reindexPollRef.current) {
+        clearInterval(reindexPollRef.current);
+      }
+
       // Poll for completion
-      const pollInterval = setInterval(async () => {
+      reindexPollRef.current = setInterval(async () => {
         try {
           const status = await projectOntologyApi.getIndexStatus(
             project.id,
@@ -617,11 +632,13 @@ export default function ProjectSettingsPage() {
           );
           setIndexStatus(status);
           if (status.status === "ready" || status.status === "failed") {
-            clearInterval(pollInterval);
+            clearInterval(reindexPollRef.current!);
+            reindexPollRef.current = null;
             setIsReindexing(false);
           }
         } catch {
-          clearInterval(pollInterval);
+          clearInterval(reindexPollRef.current!);
+          reindexPollRef.current = null;
           setIsReindexing(false);
         }
       }, 3000);
