@@ -500,6 +500,33 @@ export const projectOntologyApi = {
     }),
 
   /**
+   * Trigger a reindex of the ontology's PostgreSQL search index.
+   * Only available to project owners and admins.
+   * Returns 202 Accepted when the reindex job is queued.
+   */
+  reindex: (projectId: string, token: string, branch?: string) =>
+    api.post<ReindexResponse>(
+      `/api/v1/projects/${projectId}/ontology/reindex`,
+      undefined,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { branch },
+      }
+    ),
+
+  /**
+   * Get the current index status for a project branch.
+   */
+  getIndexStatus: (projectId: string, token?: string, branch?: string) =>
+    api.get<IndexStatusResponse>(
+      `/api/v1/projects/${projectId}/ontology/index-status`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        params: { branch },
+      }
+    ),
+
+  /**
    * Save ontology source content
    */
   saveSource: (
@@ -554,6 +581,24 @@ export interface EntitySearchResult {
 export interface EntitySearchResponse {
   results: EntitySearchResult[];
   total: number;
+}
+
+// Ontology index types
+export interface ReindexResponse {
+  status: "accepted";
+  branch: string;
+}
+
+export type IndexStatus = "pending" | "indexing" | "ready" | "failed";
+
+export interface IndexStatusResponse {
+  project_id: string;
+  branch: string;
+  status: IndexStatus;
+  entity_count: number | null;
+  commit_hash: string | null;
+  error_message: string | null;
+  indexed_at: string | null;
 }
 
 // Source content types
