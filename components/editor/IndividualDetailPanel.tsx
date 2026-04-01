@@ -433,7 +433,7 @@ export function IndividualDetailPanel({
               <span className="rounded-full px-2 py-0.5 text-[10px] font-medium border bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-400">Individual</span>
               <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={individualIri}>{individualIri}</p>
               {onCopyIri && (
-                <button onClick={() => onCopyIri(individualIri)} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700" title="Copy IRI">
+                <button onClick={() => onCopyIri(individualIri)} className="flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700" title="Copy IRI">
                   <Copy className="h-3 w-3" />
                 </button>
               )}
@@ -462,12 +462,12 @@ export function IndividualDetailPanel({
               <div className="space-y-2">
                 {editLabels.map((label, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <input type="text" value={label.value} onChange={(e) => updateLabel(index, "value", e.target.value)} onBlur={() => triggerSave()} placeholder="Label text" className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                    <input type="text" value={label.value} onChange={(e) => updateLabel(index, "value", e.target.value)} onBlur={() => triggerSave()} placeholder="Label text" className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
                     <LanguageFlag lang={label.lang} />
-                    <input type="text" value={label.lang} onChange={(e) => updateLabel(index, "lang", e.target.value)} onBlur={() => triggerSave()} className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" title="Language tag" />
+                    <input type="text" value={label.lang} onChange={(e) => updateLabel(index, "lang", e.target.value)} onBlur={() => triggerSave()} className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" title="Language tag" />
                     {editLabels.length > 1 ? (
-                      <button onClick={() => removeLabel(index)} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></button>
-                    ) : <div className="rounded p-1"><div className="h-3.5 w-3.5" /></div>}
+                      <button onClick={() => removeLabel(index)} className="rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></button>
+                    ) : <div className="rounded-xs p-1"><div className="h-3.5 w-3.5" /></div>}
                   </div>
                 ))}
               </div>
@@ -614,7 +614,7 @@ export function IndividualDetailPanel({
               {detail.objectPropertyAssertions.map((a, idx) => (
                 <div key={idx} className="flex gap-4">
                   <div className="w-40 shrink-0 flex items-center">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={a.propertyIri}>
+                    <span className="rounded-xs bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={a.propertyIri}>
                       {resolvedLabels?.[a.propertyIri] || getLocalName(a.propertyIri)}
                     </span>
                   </div>
@@ -661,7 +661,7 @@ export function IndividualDetailPanel({
               {detail.dataPropertyAssertions.map((a, idx) => (
                 <div key={idx} className="flex gap-4">
                   <div className="w-40 shrink-0 flex items-center">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={a.propertyIri}>
+                    <span className="rounded-xs bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={a.propertyIri}>
                       {resolvedLabels?.[a.propertyIri] || getLocalName(a.propertyIri)}
                     </span>
                   </div>
@@ -669,7 +669,7 @@ export function IndividualDetailPanel({
                     {a.lang && <LanguageFlag lang={a.lang} />}
                     <span className="text-sm text-slate-700 dark:text-slate-300">{a.value}</span>
                     {a.datatype && (
-                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>{getLocalName(a.datatype)}</span>
+                      <span className="shrink-0 rounded-xs bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>{getLocalName(a.datatype)}</span>
                     )}
                   </div>
                 </div>
@@ -724,7 +724,7 @@ export function IndividualDetailPanel({
                   return (
                     <div key={`${ann.property_iri}-${vi}`} className="flex gap-4">
                       <div className="w-40 shrink-0 flex items-center">
-                        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={curie}>{effectiveLabel}</span>
+                        <span className="rounded-xs bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={curie}>{effectiveLabel}</span>
                       </div>
                       <div className="min-w-0 flex-1 flex items-center gap-2">
                         {v.lang && <LanguageFlag lang={v.lang} />}
@@ -828,12 +828,12 @@ function IriList({ iris, onRemove, onAdd, onNavigate, projectId, accessToken, br
       {iris.map((iri) => (
         <div key={iri} className="flex items-center gap-2">
           <button onClick={() => onNavigate?.(iri)} className="flex-1 truncate text-sm text-primary-600 hover:underline dark:text-primary-400" title={iri}>{resolvedLabels?.[iri] || getLocalName(iri)}</button>
-          <button onClick={() => onRemove(iri)} className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" title="Remove"><Trash2 className="h-3.5 w-3.5" /></button>
+          <button onClick={() => onRemove(iri)} className="shrink-0 rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" title="Remove"><Trash2 className="h-3.5 w-3.5" /></button>
         </div>
       ))}
       <div ref={containerRef} className="relative">
         <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} onFocus={() => setIsFocused(true)} placeholder={placeholder || "Search to add..."}
-          className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500" />
+          className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500" />
         {isFocused && query.trim() && (
           <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-700">
             <div className="max-h-48 overflow-y-auto">

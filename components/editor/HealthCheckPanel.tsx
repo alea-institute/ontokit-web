@@ -494,7 +494,7 @@ export function HealthCheckPanel({
                     {issue.severity === "warning" && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />}
                     {issue.severity === "info" && <Info className="h-4 w-4 shrink-0 text-blue-500" />}
                     <div className="min-w-0 flex-1">
-                      <span className="rounded bg-slate-200/50 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
+                      <span className="rounded-xs bg-slate-200/50 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
                         {issue.rule_id}
                       </span>
                       <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
@@ -628,7 +628,7 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
         {issueIcons[issue.issue_type]}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-slate-200/50 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
+            <span className="rounded-xs bg-slate-200/50 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
               {issue.rule_id}
             </span>
           </div>
@@ -652,7 +652,7 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="rounded p-1 text-slate-400 hover:bg-slate-200/50 hover:text-slate-600 dark:hover:bg-slate-700/50 dark:hover:text-slate-300"
+            className="rounded-xs p-1 text-slate-400 hover:bg-slate-200/50 hover:text-slate-600 dark:hover:bg-slate-700/50 dark:hover:text-slate-300"
             title="Dismiss issue"
           >
             <X className="h-4 w-4" />

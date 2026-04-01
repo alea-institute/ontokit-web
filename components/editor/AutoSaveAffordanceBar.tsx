@@ -44,7 +44,7 @@ export function AutoSaveAffordanceBar({
       role="status"
       aria-live={effectiveStatus === "error" || effectiveStatus === "validationError" ? "assertive" : "polite"}
     >
-      <div className="flex items-center justify-between gap-3 min-h-[1.25rem]">
+      <div className="flex items-center justify-between gap-3 min-h-5">
         {/* Left side — status */}
         <div className="flex items-center gap-2 min-w-0">
           {effectiveStatus === "validationError" && (

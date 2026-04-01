@@ -81,7 +81,7 @@ export function LabelPreferences({
             The system tries each preference in order until it finds a matching label.
           </p>
           <p className="mt-1">
-            For example, <code className="rounded bg-blue-100 px-1 dark:bg-blue-800">rdfs:label@en</code> will
+            For example, <code className="rounded-xs bg-blue-100 px-1 dark:bg-blue-800">rdfs:label@en</code> will
             look for English labels first.
           </p>
         </div>
@@ -132,7 +132,7 @@ export function LabelPreferences({
                       </span>
                     )}
                   </span>
-                  <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-600 dark:text-slate-400">
+                  <span className="rounded-xs bg-slate-100 px-2 py-0.5 text-xs text-slate-500 dark:bg-slate-600 dark:text-slate-400">
                     #{index + 1}
                   </span>
                   <button

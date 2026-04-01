@@ -192,12 +192,12 @@ export function CommitDetailView({
           <div className="flex items-center gap-3">
             <Hash className="h-4 w-4 flex-shrink-0 text-slate-400" />
             <div className="flex items-center gap-2">
-              <code className="rounded bg-slate-200 px-2 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+              <code className="rounded-xs bg-slate-200 px-2 py-0.5 font-mono text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-300">
                 {commit.hash}
               </code>
               <button
                 onClick={copyHash}
-                className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-600 dark:hover:text-slate-300"
+                className="rounded-xs p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-600 dark:hover:text-slate-300"
                 title="Copy full hash"
               >
                 {copiedHash ? (
@@ -222,7 +222,7 @@ export function CommitDetailView({
                     const parent = getParentCommit(parentHash);
                     return (
                       <div key={parentHash} className="flex items-center gap-2">
-                        <code className="rounded bg-slate-200 px-1.5 py-0.5 font-mono text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                        <code className="rounded-xs bg-slate-200 px-1.5 py-0.5 font-mono text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                           {parentHash.slice(0, 8)}
                         </code>
                         {parent && (
@@ -336,7 +336,7 @@ export function CommitDetailView({
                           </div>
                           <span
                             className={cn(
-                              "flex-shrink-0 rounded px-1.5 py-0.5 text-xs font-medium",
+                              "flex-shrink-0 rounded-xs px-1.5 py-0.5 text-xs font-medium",
                               typeInfo.className
                             )}
                           >

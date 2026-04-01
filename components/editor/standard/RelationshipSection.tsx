@@ -137,7 +137,7 @@ export function RelationshipSection({
                 </button>
                 <button
                   onClick={() => { onRemoveTarget?.(gIdx, tIdx); onSaveNeeded?.(); }}
-                  className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                  className="shrink-0 rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                   title="Remove"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -275,7 +275,7 @@ function RelationshipPropertyPicker({
                 if (e.key === "Escape") setIsOpen(false);
               }}
               placeholder="Search properties..."
-              className="flex-1 bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-slate-500"
+              className="flex-1 bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden dark:text-white dark:placeholder:text-slate-500"
             />
           </div>
           <div className="max-h-48 overflow-y-auto py-1">
@@ -438,10 +438,10 @@ function RelationshipEntitySearch({
           }
         }}
         placeholder="Search entities to add..."
-        className="flex-1 rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500"
+        className="flex-1 rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500"
       />
       {/* Placeholder to align with the delete button column */}
-      <div className="shrink-0 rounded p-1">
+      <div className="shrink-0 rounded-xs p-1">
         <div className="h-3.5 w-3.5" />
       </div>
 

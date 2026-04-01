@@ -79,7 +79,7 @@ export function ResizablePanelDivider({
       />
       {/* Grip handle — visible on hover/drag */}
       <div
-        className={`relative z-10 flex h-8 w-4 items-center justify-center rounded-sm transition-opacity ${
+        className={`relative z-10 flex h-8 w-4 items-center justify-center rounded-xs transition-opacity ${
           isDragging
             ? "bg-primary-500 text-white opacity-100"
             : "bg-slate-200 text-slate-400 opacity-0 group-hover:opacity-100 dark:bg-slate-600 dark:text-slate-400"

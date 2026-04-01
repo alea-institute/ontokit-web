@@ -93,7 +93,7 @@ export const OntologyEdge = memo(function OntologyEdge({
       {hovered && (
         <EdgeLabelRenderer>
           <div
-            className="pointer-events-none absolute rounded bg-white/90 px-1.5 py-0.5 text-[10px] text-slate-600 shadow-sm dark:bg-slate-800/90 dark:text-slate-300"
+            className="pointer-events-none absolute rounded-xs bg-white/90 px-1.5 py-0.5 text-[10px] text-slate-600 shadow-xs dark:bg-slate-800/90 dark:text-slate-300"
             style={{
               transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
             }}

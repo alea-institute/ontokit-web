@@ -333,7 +333,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               viewMode === "tree"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
             )}
           >
@@ -346,7 +346,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               viewMode === "source"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
             )}
           >
@@ -361,7 +361,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               viewMode === "graph"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
             )}
           >

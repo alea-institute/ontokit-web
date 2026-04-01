@@ -43,7 +43,7 @@ export function PropertyAssertionSection({
         return (
           <div key={idx} className="contents">
             <span
-              className="self-center rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+              className="self-center rounded-xs bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
               title={a.propertyIri}
             >
               {propLabel}
@@ -62,7 +62,7 @@ export function PropertyAssertionSection({
                   {a.lang && <LanguageFlag lang={a.lang} />}
                   <span className="text-sm text-slate-700 dark:text-slate-300">{a.value}</span>
                   {a.datatype && (
-                    <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>
+                    <span className="shrink-0 rounded-xs bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>
                       {getLocalName(a.datatype)}
                     </span>
                   )}
@@ -71,7 +71,7 @@ export function PropertyAssertionSection({
               {isEditing && onRemove && (
                 <button
                   onClick={() => { onRemove(idx); onSaveNeeded?.(); }}
-                  className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                  className="shrink-0 rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                   title="Remove"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -210,7 +210,7 @@ function AssertionAdder({ assertionType, projectId, accessToken, branch, onAdd }
             onChange={(e) => setPropQuery(e.target.value)}
             onFocus={() => setIsPropFocused(true)}
             placeholder="Select property..."
-            className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 text-xs placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500"
+            className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 text-xs placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500"
           />
         )}
         {isPropFocused && propQuery.trim() && (
@@ -243,7 +243,7 @@ function AssertionAdder({ assertionType, projectId, accessToken, branch, onAdd }
               onFocus={() => setIsValueFocused(true)}
               placeholder={selectedPropIri ? "Search entity..." : "Select a property first"}
               disabled={!selectedPropIri}
-              className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500 dark:disabled:bg-slate-800"
+              className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500 dark:disabled:bg-slate-800"
             />
             {isValueFocused && valueQuery.trim() && (
               <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-700">
@@ -276,7 +276,7 @@ function AssertionAdder({ assertionType, projectId, accessToken, branch, onAdd }
               onBlur={() => { if (dataValue.trim()) handleAddData(); }}
               placeholder={selectedPropIri ? "Enter value..." : "Select a property first"}
               disabled={!selectedPropIri}
-              className="flex-1 rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500 dark:disabled:bg-slate-800"
+              className="flex-1 rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:bg-slate-50 disabled:text-slate-400 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500 dark:disabled:bg-slate-800"
             />
             <div className="mt-1 shrink-0">
               <LanguageFlag lang={dataLang} />
@@ -285,7 +285,7 @@ function AssertionAdder({ assertionType, projectId, accessToken, branch, onAdd }
               type="text"
               value={dataLang}
               onChange={(e) => setDataLang(e.target.value)}
-              className="w-14 shrink-0 rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+              className="w-14 shrink-0 rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:border-solid focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
               title="Language tag"
               placeholder="lang"
               disabled={!selectedPropIri}

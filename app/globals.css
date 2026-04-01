@@ -1,6 +1,46 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-primary-50: #f0f9ff;
+  --color-primary-100: #e0f2fe;
+  --color-primary-200: #bae6fd;
+  --color-primary-300: #7dd3fc;
+  --color-primary-400: #38bdf8;
+  --color-primary-500: #0ea5e9;
+  --color-primary-600: #0284c7;
+  --color-primary-700: #0369a1;
+  --color-primary-800: #075985;
+  --color-primary-900: #0c4a6e;
+  --color-primary-950: #082f49;
+
+  --color-owl-class: #4ade80;
+  --color-owl-property: #60a5fa;
+  --color-owl-individual: #f472b6;
+  --color-owl-axiom: #fbbf24;
+
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+  --font-mono: var(--font-mono), monospace;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 :root {
   --foreground-rgb: 0, 0, 0;
@@ -90,7 +130,7 @@ body {
 
 /* Search match highlight */
 .tree-search-match mark {
-  @apply bg-yellow-200 dark:bg-yellow-800/60 text-inherit rounded-sm px-0.5;
+  @apply bg-yellow-200 dark:bg-yellow-800/60 text-inherit rounded-xs px-0.5;
 }
 
 /* Keyboard focus ring for tree navigation */
@@ -118,7 +158,7 @@ body {
 
 /* Skip link for accessibility */
 .skip-link {
-  @apply absolute -translate-y-full bg-primary-600 text-white px-4 py-2 z-[200] focus:translate-y-0 transition-transform;
+  @apply absolute -translate-y-full bg-primary-600 text-white px-4 py-2 z-200 focus:translate-y-0 transition-transform;
 }
 
 /* Reduced motion preference */
@@ -150,5 +190,5 @@ body {
 }
 
 .collab-cursor-label {
-  @apply absolute -top-5 left-0 px-1.5 py-0.5 text-xs text-white rounded whitespace-nowrap;
+  @apply absolute -top-5 left-0 px-1.5 py-0.5 text-xs text-white rounded-sm whitespace-nowrap;
 }

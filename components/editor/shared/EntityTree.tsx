@@ -188,7 +188,7 @@ export function EntityTree({
       tabIndex={enableKeyboardNav ? 0 : undefined}
       onKeyDown={enableKeyboardNav ? handleKeyDown : undefined}
       onBlur={() => setFocusedIri(null)}
-      className="py-2 outline-none"
+      className="py-2 outline-hidden"
     >
       {nodes.map((node, index) => (
         <EntityTreeNodeRow

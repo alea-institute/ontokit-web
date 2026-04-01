@@ -367,7 +367,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
               <button
                 onClick={() => setShowGraph(false)}
-                className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                className="flex items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
                 aria-label="Back to details"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />

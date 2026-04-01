@@ -84,7 +84,7 @@ export function ProjectForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           className={cn(
-            "mt-1 block w-full rounded-md border px-3 py-2 text-sm shadow-sm",
+            "mt-1 block w-full rounded-md border px-3 py-2 text-sm shadow-xs",
             "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
             "dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           )}
@@ -108,7 +108,7 @@ export function ProjectForm({
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
           className={cn(
-            "mt-1 block w-full rounded-md border px-3 py-2 text-sm shadow-sm",
+            "mt-1 block w-full rounded-md border px-3 py-2 text-sm shadow-xs",
             "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
             "dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           )}

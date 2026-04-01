@@ -128,7 +128,7 @@ export function RevisionHistoryPanel({
         </div>
         <button
           onClick={onClose}
-          className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
+          className="rounded-xs p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
         >
           <X className="h-5 w-5" />
         </button>

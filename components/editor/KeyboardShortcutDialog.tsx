@@ -52,7 +52,7 @@ export function KeyboardShortcutDialog({
                     <span className="text-sm text-slate-700 dark:text-slate-300">
                       {shortcut.description}
                     </span>
-                    <kbd className="rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-xs text-slate-600 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                    <kbd className="rounded-xs border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-mono text-xs text-slate-600 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300">
                       {formatShortcut(shortcut)}
                     </kbd>
                   </div>

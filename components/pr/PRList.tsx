@@ -85,7 +85,7 @@ export function PRList({
               className={cn(
                 "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                 statusFilter === tab.value
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100"
+                  ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-slate-100"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
               )}
               onClick={() => handleStatusChange(tab.value)}

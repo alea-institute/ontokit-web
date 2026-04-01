@@ -25,7 +25,7 @@ export function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">
+    <div className="fixed bottom-4 right-4 z-100 flex flex-col gap-2">
       {toasts.map((toast) => (
         <ToastItem key={toast.id} toast={toast} />
       ))}
@@ -80,7 +80,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       )}
       <button
         onClick={handleDismiss}
-        className="shrink-0 rounded p-0.5 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+        className="shrink-0 rounded-xs p-0.5 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
       >
         <X className="h-3.5 w-3.5" />
       </button>

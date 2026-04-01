@@ -45,7 +45,7 @@ export function UserMenu() {
     return (
       <button
         onClick={() => signIn("zitadel")}
-        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
       >
         Sign in
       </button>
@@ -56,7 +56,7 @@ export function UserMenu() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+        className="flex items-center gap-2 rounded-full focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
       >
         {session.user?.image ? (
           <Image
@@ -74,7 +74,7 @@ export function UserMenu() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+        <div className="absolute right-0 mt-2 w-56 rounded-md bg-white dark:bg-slate-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-hidden z-50">
           <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700">
             <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
               {session.user?.name}

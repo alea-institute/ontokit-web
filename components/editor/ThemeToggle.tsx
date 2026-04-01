@@ -38,7 +38,7 @@ export function ThemeToggle({ className }: ThemeToggleProps) {
           className={cn(
             "flex items-center gap-1 rounded-md px-2 py-1.5 text-sm transition-colors",
             theme === value
-              ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+              ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
               : "text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
           )}
         >
