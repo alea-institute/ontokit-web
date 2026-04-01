@@ -24,6 +24,7 @@ interface ProjectFormProps {
   nameRequired?: boolean;
   namePlaceholder?: string;
   descriptionPlaceholder?: string;
+  disableVisibility?: boolean;
 }
 
 export function ProjectForm({
@@ -35,6 +36,7 @@ export function ProjectForm({
   nameRequired = true,
   namePlaceholder = "My Ontology Project",
   descriptionPlaceholder = "A brief description of your project...",
+  disableVisibility = false,
 }: ProjectFormProps) {
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -123,7 +125,7 @@ export function ProjectForm({
           <button
             type="button"
             onClick={() => setIsPublic(false)}
-            disabled={isLoading}
+            disabled={isLoading || disableVisibility}
             className={cn(
               "flex flex-1 items-center gap-3 rounded-lg border p-4 text-left transition-all",
               !isPublic
@@ -152,7 +154,7 @@ export function ProjectForm({
           <button
             type="button"
             onClick={() => setIsPublic(true)}
-            disabled={isLoading}
+            disabled={isLoading || disableVisibility}
             className={cn(
               "flex flex-1 items-center gap-3 rounded-lg border p-4 text-left transition-all",
               isPublic

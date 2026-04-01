@@ -4,6 +4,9 @@ import createNextIntlPlugin from "next-intl/plugin";
 const withNextIntl = createNextIntlPlugin("./lib/i18n/request.ts");
 
 const nextConfig: NextConfig = {
+  // Standalone output for Docker deployments (copies only needed files to .next/standalone)
+  output: "standalone",
+
   // Enable React strict mode for better development experience
   reactStrictMode: true,
 

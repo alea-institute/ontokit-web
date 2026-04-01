@@ -1,10 +1,19 @@
 "use client";
 
+function isHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff, ExternalLink } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/components/projects/project-form";
@@ -815,6 +824,30 @@ export default function ProjectSettingsPage() {
             <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">
               General
             </h2>
+            {project.exemplar_source_url && (
+              <div className="mb-4 rounded-md bg-indigo-50 px-4 py-3 dark:bg-indigo-900/20">
+                <div className="flex items-center gap-2 text-sm text-indigo-700 dark:text-indigo-400">
+                  <Github className="h-4 w-4" />
+                  <span className="font-medium">Exemplar ontology</span>
+                  <span className="text-indigo-500 dark:text-indigo-500">—</span>
+                  {isHttpUrl(project.exemplar_source_url) ? (
+                    <a
+                      href={project.exemplar_source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 hover:underline"
+                    >
+                      View upstream source
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : (
+                    <span className="text-indigo-500">
+                      {project.exemplar_source_url}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
             <ProjectForm
               initialData={{
                 name: project.name,
@@ -824,6 +857,7 @@ export default function ProjectSettingsPage() {
               onSubmit={handleUpdateProject}
               submitLabel="Save Changes"
               isLoading={isSaving}
+              disableVisibility={!!project.is_exemplar}
             />
           </section>
 
@@ -1721,8 +1755,8 @@ export default function ProjectSettingsPage() {
             />
           )}
 
-          {/* Danger Zone */}
-          {(isOwner || project?.is_superadmin) && (
+          {/* Danger Zone — hidden for exemplar projects unless superadmin */}
+          {(isOwner || project?.is_superadmin) && !(project?.is_exemplar && !project?.is_superadmin) && (
             <section className="rounded-lg border border-red-200 bg-white p-6 dark:border-red-900/50 dark:bg-slate-800">
               <h2 className="mb-4 text-lg font-semibold text-red-600 dark:text-red-400">
                 Danger Zone

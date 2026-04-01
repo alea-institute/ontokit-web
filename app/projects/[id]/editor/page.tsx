@@ -17,7 +17,8 @@ import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingTo
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
-import { BranchProvider } from "@/lib/context/BranchContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
@@ -75,6 +76,7 @@ export default function EditorPage() {
   const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
 
   // Branch state
+  const queryClient = useQueryClient();
   const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
 
   // Source state (shared across modes)
@@ -335,12 +337,13 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     loadRootClasses();
     iriPatternDetectedRef.current = false;
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
 
     pendingSaveResolveRef.current?.();
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session?.accessToken, pendingSaveContent, activeBranch, loadRootClasses]);
+  }, [projectId, session?.accessToken, pendingSaveContent, activeBranch, loadRootClasses, queryClient]);
 
   const handleCommitDialogClose = useCallback((open: boolean) => {
     setCommitDialogOpen(open);
@@ -588,6 +591,7 @@ export default function EditorPage() {
       setSourceContent("");
       // Reload tree to ensure consistency
       loadRootClasses();
+      queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
     } catch (err) {
       toast.error(
         "Failed to delete class",
@@ -596,7 +600,7 @@ export default function EditorPage() {
       // Reload tree to restore state
       loadRootClasses();
     }
-  }, [deleteTargetIri, deleteTargetLabel, session?.accessToken, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses]);
+  }, [deleteTargetIri, deleteTargetLabel, session?.accessToken, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient]);
 
   // Handle update class (form-based editing)
   // Routes through source save: modifies the Turtle text and commits via PUT /source
@@ -646,7 +650,8 @@ export default function EditorPage() {
     // Re-index source IRIs
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel]);
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, queryClient]);
 
   // Handle update property (form-based editing)
   const handleUpdateProperty = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
@@ -685,7 +690,8 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast]);
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, queryClient]);
 
   // Handle update individual (form-based editing)
   const handleUpdateIndividual = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
@@ -724,7 +730,8 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast]);
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
+  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, queryClient]);
 
   // Handle suggestion-mode class update
   // Instead of directly committing, sends modified source to the suggestion branch
