@@ -68,6 +68,7 @@ export default function EditorPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"private-403" | "no-access" | "not-found" | "generic" | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const [openPRCount, setOpenPRCount] = useState(0);
@@ -187,6 +188,7 @@ export default function EditorPage() {
     const fetchProject = async () => {
       setIsLoading(true);
       setError(null);
+      setErrorKind(null);
 
       try {
         const data = await projectApi.get(projectId, session?.accessToken);
@@ -212,13 +214,17 @@ export default function EditorPage() {
         if (err instanceof Error && err.message.includes("403")) {
           if (!session?.accessToken) {
             setError("This is a private project. Sign in to request access.");
+            setErrorKind("private-403");
           } else {
             setError("You don't have access to this project");
+            setErrorKind("no-access");
           }
         } else if (err instanceof Error && err.message.includes("404")) {
           setError("Project not found");
+          setErrorKind("not-found");
         } else {
           setError(err instanceof Error ? err.message : "Failed to load project");
+          setErrorKind("generic");
         }
       } finally {
         setIsLoading(false);
@@ -988,7 +994,7 @@ export default function EditorPage() {
                 {error || "Project not found"}
               </h2>
               <div className="mt-4 flex items-center justify-center gap-3">
-                {!hasValidAccess && (
+                {errorKind === "private-403" && (
                   <Button onClick={() => signIn("zitadel")} className="gap-2">
                     <LogIn className="h-4 w-4" />
                     Sign In
