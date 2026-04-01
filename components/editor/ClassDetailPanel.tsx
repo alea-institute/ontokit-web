@@ -27,7 +27,6 @@ import {
   Hash,
   Link2,
   Pencil,
-  X,
 } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail, type ClassUpdatePayload, type AnnotationUpdate } from "@/lib/api/client";
 import type { LocalizedString } from "@/lib/api/client";
@@ -39,7 +38,7 @@ import { AnnotationRow } from "@/components/editor/standard/AnnotationRow";
 import { InlineAnnotationAdder } from "@/components/editor/standard/InlineAnnotationAdder";
 import { RelationshipSection, type RelationshipGroup, type RelationshipTarget } from "@/components/editor/standard/RelationshipSection";
 import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, RELATIONSHIP_PROPERTY_IRIS, SEE_ALSO_IRI, getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
-import { AutoSaveStatusBar } from "@/components/editor/AutoSaveStatusBar";
+import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar";
 import { CrossReferencesPanel } from "@/components/editor/CrossReferencesPanel";
 import { SimilarConceptsPanel } from "@/components/editor/SimilarConceptsPanel";
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
@@ -195,6 +194,13 @@ export function ClassDetailPanel({
     setIsEditing(false);
     cancelledIriRef.current = classIri;
   }, [classIri, classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Manual save: trigger draft save, flush to git, exit edit mode on success
+  const saveAndExitEditMode = useCallback(async () => {
+    triggerSave();
+    const ok = await flushToGit();
+    if (ok) setIsEditing(false);
+  }, [triggerSave, flushToGit]);
 
   // Auto-enter edit mode based on continuous editing or restored draft
   useEffect(() => {
@@ -569,78 +575,78 @@ export function ClassDetailPanel({
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex-1 overflow-y-auto">
-        {/* Header */}
-        <div className="border-b border-slate-200 p-4 dark:border-slate-700">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-owl-class/20 border border-owl-class">
-              <span className="text-sm font-bold text-owl-class">C</span>
+      {/* Header — pinned, always visible */}
+      <div className="shrink-0 border-b border-slate-200 p-4 dark:border-slate-700">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full bg-owl-class/20 border border-owl-class">
+            <span className="text-sm font-bold text-owl-class">C</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
+                {displayLabel}
+                {classDetail.deprecated && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                    <AlertTriangle className="mr-1 h-3 w-3" />
+                    Deprecated
+                  </span>
+                )}
+              </h2>
+              <div className="flex shrink-0 items-center gap-1">
+                {headerActions}
+                {canEnterEdit && !isEditing && (
+                  <button
+                    onClick={enterEditMode}
+                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                    title="Enter edit mode"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    {isSuggestionMode ? "Suggest Changes" : "Edit Item"}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
-                  {displayLabel}
-                  {classDetail.deprecated && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                      <AlertTriangle className="mr-1 h-3 w-3" />
-                      Deprecated
-                    </span>
-                  )}
-                </h2>
-                <div className="flex shrink-0 items-center gap-1">
-                  {headerActions}
-                  {canEnterEdit && (
-                    <>
-                      {isEditing ? (
-                        <button
-                          onClick={cancelEditMode}
-                          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
-                          title="Discard changes and return to read-only"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                          Cancel
-                        </button>
-                      ) : (
-                        <button
-                          onClick={enterEditMode}
-                          className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-                          title="Enter edit mode"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                          {isSuggestionMode ? "Suggest Changes" : "Edit Item"}
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="mt-1 flex items-center gap-2">
-                <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={classDetail.iri}>
-                  {classDetail.iri}
-                </p>
-                {onCopyIri && (
-                  <button
-                    onClick={() => onCopyIri(classDetail.iri)}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300"
-                    title="Copy IRI"
-                  >
-                    <Copy className="h-3 w-3" />
-                  </button>
-                )}
-                {onNavigateToSource && (
-                  <button
-                    onClick={() => onNavigateToSource(classDetail.iri)}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
-                    title="View in Source"
-                  >
-                    <Code className="h-3 w-3" />
-                    <span>Source</span>
-                  </button>
-                )}
-              </div>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={classDetail.iri}>
+                {classDetail.iri}
+              </p>
+              {onCopyIri && (
+                <button
+                  onClick={() => onCopyIri(classDetail.iri)}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                  title="Copy IRI"
+                >
+                  <Copy className="h-3 w-3" />
+                </button>
+              )}
+              {onNavigateToSource && (
+                <button
+                  onClick={() => onNavigateToSource(classDetail.iri)}
+                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                  title="View in Source"
+                >
+                  <Code className="h-3 w-3" />
+                  <span>Source</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ═══ AUTO-SAVE AFFORDANCE BAR — pinned edit toolbar ═══ */}
+      {isEditing && (
+        <AutoSaveAffordanceBar
+          status={saveStatus}
+          error={saveError}
+          validationError={validationError}
+          onRetry={() => flushToGit()}
+          onManualSave={saveAndExitEditMode}
+          onCancel={cancelEditMode}
+        />
+      )}
+
+      <div className="flex-1 overflow-y-auto">
 
         {/* Content */}
         <div className="p-4 space-y-3">
@@ -1058,15 +1064,6 @@ export function ClassDetailPanel({
         </div>
       </div>
 
-      {/* ═══ AUTO-SAVE STATUS BAR ═══ */}
-      {isEditing && (
-        <AutoSaveStatusBar
-          status={saveStatus}
-          error={saveError}
-          validationError={validationError}
-          onRetry={() => flushToGit()}
-        />
-      )}
     </div>
   );
 }
