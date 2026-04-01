@@ -2168,6 +2168,13 @@ function UpstreamSyncSection({
 
   const isWebhookDriven = !!(githubIntegration?.webhooks_enabled && config?.frequency === "webhook");
 
+  // Detect when upstream sync points to the same repo as the GitHub integration
+  const isLinkedToSameRepo = !!(
+    githubIntegration &&
+    ((config && config.repo_owner === githubIntegration.repo_owner && config.repo_name === githubIntegration.repo_name) ||
+     (!config && !isEditing))
+  );
+
   // Populate form from existing config, or autofill from GitHub integration
   useEffect(() => {
     if (config) {
@@ -2262,6 +2269,23 @@ function UpstreamSyncSection({
           Upstream Source Tracking
         </h2>
       </div>
+
+      {/* Clarification when tracking the same repo as GitHub integration */}
+      {isLinkedToSameRepo && (
+        <div className="mb-4 rounded-md border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/50 dark:bg-amber-900/20">
+          <div className="flex gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+            <div className="text-sm text-amber-700 dark:text-amber-300">
+              <p className="font-medium">Tracking the same repo as your GitHub integration</p>
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                This detects <strong>external changes</strong> pushed to GitHub outside of OntoKit
+                (e.g. by CI pipelines, scripts, or other contributors). Commits that OntoKit itself
+                pushed are automatically filtered out to prevent feedback loops.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isSyncLoading ? (
         <div className="flex items-center justify-center py-8">
@@ -2465,8 +2489,9 @@ function UpstreamSyncSection({
           {!config && !isEditing ? (
             <div>
               <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-                Track an external GitHub repository for upstream changes.
-                When updates are detected, they can be auto-applied or routed through a pull request.
+                {githubIntegration
+                  ? "Track the linked GitHub repository for changes made outside of OntoKit. When external updates are detected, they can be auto-applied or routed through a pull request. OntoKit's own commits are filtered out to prevent circular syncing."
+                  : "Track an external GitHub repository for upstream changes. When updates are detected, they can be auto-applied or routed through a pull request."}
               </p>
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 <Download className="mr-2 h-4 w-4" />
@@ -2535,6 +2560,16 @@ function UpstreamSyncSection({
               {isWebhookDriven && (
                 <p className="text-xs text-indigo-500 dark:text-indigo-400">
                   Repository fields are managed by the GitHub integration.
+                </p>
+              )}
+
+              {/* Same-repo info when editing form matches GitHub integration */}
+              {!isWebhookDriven && githubIntegration &&
+                repoOwner === githubIntegration.repo_owner &&
+                repoName === githubIntegration.repo_name && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  This is the same repository as your GitHub integration. Upstream tracking will only
+                  detect changes made outside of OntoKit &mdash; OntoKit&apos;s own pushes are excluded.
                 </p>
               )}
 
