@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, Github, Trash2, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Pencil } from "lucide-react";
+import { ArrowLeft, Github, Trash2, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Pencil, Save } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
@@ -329,6 +329,8 @@ function EditorPreferencesSection() {
   const setTheme = useEditorModeStore((s) => s.setTheme);
   const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
   const setContinuousEditing = useEditorModeStore((s) => s.setContinuousEditing);
+  const manualSave = useEditorModeStore((s) => s.manualSave);
+  const setManualSave = useEditorModeStore((s) => s.setManualSave);
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
@@ -445,6 +447,46 @@ function EditorPreferencesSection() {
             </p>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
               When enabled, classes open in edit mode automatically. When disabled, classes open read-only until you click &ldquo;Edit Item&rdquo;.
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {/* Manual Save Button */}
+      <div className="mt-6">
+        <span id="manual-save-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Manual Save Button
+        </span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={manualSave}
+          aria-labelledby="manual-save-label"
+          onClick={() => setManualSave(!manualSave)}
+          className={cn(
+            "flex items-center gap-3 rounded-lg border p-4 text-left transition-colors w-full",
+            manualSave
+              ? "border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/20"
+              : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
+          )}
+        >
+          <Save className={cn(
+            "h-5 w-5 flex-shrink-0",
+            manualSave
+              ? "text-primary-600 dark:text-primary-400"
+              : "text-slate-400",
+          )} />
+          <div>
+            <p className={cn(
+              "font-medium",
+              manualSave
+                ? "text-primary-700 dark:text-primary-300"
+                : "text-slate-900 dark:text-white",
+            )}>
+              {manualSave ? "On" : "Off"}
+            </p>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+              Show a Save button in the editor. Auto-save still works in the background &mdash; the button provides an explicit way to save and exit editing.
             </p>
           </div>
         </button>
