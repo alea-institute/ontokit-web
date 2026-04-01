@@ -22,6 +22,7 @@ export interface RevisionHistoryResponse {
   project_id: string;
   commits: RevisionCommit[];
   total: number;
+  refs?: Record<string, string[]>;
 }
 
 export interface RevisionDiffChange {

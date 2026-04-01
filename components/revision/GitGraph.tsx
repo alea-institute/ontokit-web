@@ -16,6 +16,8 @@ interface GitGraphProps {
   onSelectCommit?: (hash: string) => void;
   config?: Partial<GraphConfig>;
   className?: string;
+  refs?: Record<string, string[]>;
+  defaultBranch?: string;
 }
 
 export function GitGraph({
@@ -24,13 +26,18 @@ export function GitGraph({
   onSelectCommit,
   config: configOverrides,
   className,
+  refs,
+  defaultBranch,
 }: GitGraphProps) {
   const config = useMemo(
     () => ({ ...DEFAULT_GRAPH_CONFIG, ...configOverrides }),
     [configOverrides]
   );
 
-  const layout = useMemo(() => buildGraphLayout(commits), [commits]);
+  const layout = useMemo(
+    () => buildGraphLayout(commits, refs, defaultBranch),
+    [commits, refs, defaultBranch]
+  );
 
   if (commits.length === 0) {
     return null;
