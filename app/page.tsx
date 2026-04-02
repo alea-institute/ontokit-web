@@ -1,63 +1,40 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Plus, Search, Globe, Lock, FolderOpen, LogIn } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
-import { projectApi, type Project, type ProjectListResponse } from "@/lib/api/projects";
+import { projectApi } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
 
 type FilterType = "public" | "private" | "all";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("public");
   const [searchQuery, setSearchQuery] = useState("");
 
   const isAuthenticated = status === "authenticated";
 
-  useEffect(() => {
-    // Don't fetch for the private tab when not authenticated
-    if (filter === "private" && !isAuthenticated) {
-      setProjects([]);
-      setTotal(0);
-      setIsLoading(false);
-      return;
-    }
+  const {
+    data,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ["projects", filter, session?.accessToken],
+    queryFn: async () => {
+      const filterParam = filter === "all" ? undefined : filter === "private" ? "mine" : "public";
+      return projectApi.list(0, 50, filterParam, session?.accessToken);
+    },
+    enabled: status !== "loading" && !(filter === "private" && !isAuthenticated),
+  });
 
-    const fetchProjects = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const filterParam = filter === "all" ? undefined : filter === "private" ? "mine" : "public";
-        const response: ProjectListResponse = await projectApi.list(
-          0,
-          50,
-          filterParam,
-          session?.accessToken
-        );
-        setProjects(response.items);
-        setTotal(response.total);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load projects");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    // Only fetch when auth status is determined (not loading)
-    if (status !== "loading") {
-      fetchProjects();
-    }
-  }, [filter, session?.accessToken, status, isAuthenticated]);
+  const projects = data?.items ?? [];
+  const total = data?.total ?? 0;
 
   // Filter projects by search query (client-side)
   const filteredProjects = searchQuery
@@ -183,7 +160,7 @@ export default function HomePage() {
               </div>
             ) : error ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/50 dark:bg-red-900/20">
-                <p className="text-red-700 dark:text-red-400">{error}</p>
+                <p className="text-red-700 dark:text-red-400">{error instanceof Error ? error.message : "Failed to load projects"}</p>
                 <Button
                   variant="outline"
                   className="mt-4"
