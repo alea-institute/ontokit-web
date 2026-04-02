@@ -8,7 +8,8 @@ import { ThemeToggle } from "@/components/editor/ThemeToggle";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
-  { href: "/projects", label: "Projects" },
+  { href: "/", label: "Projects" },
+  { href: "/info", label: "Info" },
   { href: "/docs", label: "Documentation" },
   { href: "/api-docs", label: "API Reference" },
 ];
@@ -27,7 +28,9 @@ export function Header() {
           </Link>
           <nav className="hidden md:flex items-center gap-6">
             {navLinks.map(({ href, label }) => {
-              const isActive = pathname === href || pathname.startsWith(`${href}/`);
+              const isActive = href === "/"
+                ? pathname === "/"
+                : pathname === href || pathname.startsWith(`${href}/`);
               return (
                 <Link
                   key={href}
