@@ -198,7 +198,7 @@ export default function HomePage() {
             ) : (
               <>
                 <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-                  {filteredProjects.length !== total
+                  {searchQuery
                     ? `Showing ${filteredProjects.length} projects (filtered from ${total})`
                     : `Showing ${filteredProjects.length} of ${total} projects`}
                 </div>
