@@ -221,7 +221,9 @@ export default function HomePage() {
             ) : (
               <>
                 <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-                  Showing {filteredProjects.length} of {total} projects
+                  {filteredProjects.length !== total
+                    ? `Showing ${filteredProjects.length} projects (filtered from ${total})`
+                    : `Showing ${filteredProjects.length} of ${total} projects`}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredProjects.map((project) => (
