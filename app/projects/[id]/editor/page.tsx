@@ -874,8 +874,8 @@ export default function EditorPage() {
         values: a.values,
       })),
       deprecated: detail.deprecated,
-      equivalent_iris: detail.equivalent_iris,
-      disjoint_iris: detail.disjoint_iris,
+      equivalent_iris: detail.equivalent_iris ?? undefined,
+      disjoint_iris: detail.disjoint_iris ?? undefined,
     };
 
     // Route through the appropriate save handler
