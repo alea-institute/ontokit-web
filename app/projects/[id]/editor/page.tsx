@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard } from "lucide-react";
+import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -68,6 +68,7 @@ export default function EditorPage() {
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"private-403" | "no-access" | "not-found" | "generic" | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const [openPRCount, setOpenPRCount] = useState(0);
@@ -187,6 +188,7 @@ export default function EditorPage() {
     const fetchProject = async () => {
       setIsLoading(true);
       setError(null);
+      setErrorKind(null);
 
       try {
         const data = await projectApi.get(projectId, session?.accessToken);
@@ -210,11 +212,19 @@ export default function EditorPage() {
         }
       } catch (err) {
         if (err instanceof Error && err.message.includes("403")) {
-          setError("You don't have access to this project");
+          if (!session?.accessToken) {
+            setError("This is a private project. Sign in to request access.");
+            setErrorKind("private-403");
+          } else {
+            setError("You don't have access to this project");
+            setErrorKind("no-access");
+          }
         } else if (err instanceof Error && err.message.includes("404")) {
           setError("Project not found");
+          setErrorKind("not-found");
         } else {
           setError(err instanceof Error ? err.message : "Failed to load project");
+          setErrorKind("generic");
         }
       } finally {
         setIsLoading(false);
@@ -232,6 +242,7 @@ export default function EditorPage() {
   const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
   const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!session?.accessToken);
   const canSuggest = canEdit || isSuggester;
+  const hasValidAccess = status === "authenticated" && !!session?.accessToken;
   const hasOntology = project?.source_file_path;
 
   // Fetch pending suggestion count for editors/admins
@@ -272,7 +283,7 @@ export default function EditorPage() {
 
   // Load source content
   const loadSourceContent = useCallback(async (isPreload = false) => {
-    if (!projectId || !session?.accessToken || !activeBranch) return;
+    if (!projectId || !activeBranch) return;
     if (sourceContent) return;
 
     if (isPreload) {
@@ -286,7 +297,7 @@ export default function EditorPage() {
       const response = await revisionsApi.getFileAtVersion(
         projectId,
         activeBranch,
-        session.accessToken,
+        session?.accessToken,
         project?.git_ontology_path
       );
       setSourceContent(response.content);
@@ -517,6 +528,7 @@ export default function EditorPage() {
 
   const handleEntityConfirm = useCallback(
     async (entity: NewEntityInfo) => {
+      if (!canSuggest) return;
       const snippet = generateTurtleSnippet({
         iri: entity.iri,
         label: entity.label,
@@ -552,7 +564,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session?.accessToken, activeBranch, project?.git_ontology_path, toast],
+    [canSuggest, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session?.accessToken, activeBranch, project?.git_ontology_path, toast],
   );
 
   // Handle copy IRI
@@ -874,8 +886,8 @@ export default function EditorPage() {
         values: a.values,
       })),
       deprecated: detail.deprecated,
-      equivalent_iris: detail.equivalent_iris,
-      disjoint_iris: detail.disjoint_iris,
+      equivalent_iris: detail.equivalent_iris ?? undefined,
+      disjoint_iris: detail.disjoint_iris ?? undefined,
     };
 
     // Route through the appropriate save handler
@@ -914,7 +926,7 @@ export default function EditorPage() {
       global: true,
       ignoreWhenEditorFocused: true,
     },
-    {
+    ...(canSuggest ? [{
       id: "add-entity",
       key: "n",
       modifiers: { ctrl: true },
@@ -922,7 +934,7 @@ export default function EditorPage() {
       category: "Editing",
       action: () => handleAddEntity(),
       global: true,
-    },
+    }] : []),
     {
       id: "help",
       key: "?",
@@ -945,7 +957,7 @@ export default function EditorPage() {
       global: true,
       ignoreWhenEditorFocused: false,
     },
-  ], [handleAddEntity, shortcutDialogOpen, showHistory]);
+  ], [handleAddEntity, shortcutDialogOpen, showHistory, canSuggest]);
 
   useKeyboardShortcuts(keyboardShortcuts);
 
@@ -981,9 +993,17 @@ export default function EditorPage() {
               <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">
                 {error || "Project not found"}
               </h2>
-              <Link href="/projects" className="mt-4 inline-block">
-                <Button variant="outline">Back to Projects</Button>
-              </Link>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                {errorKind === "private-403" && (
+                  <Button onClick={() => signIn("zitadel")} className="gap-2">
+                    <LogIn className="h-4 w-4" />
+                    Sign In
+                  </Button>
+                )}
+                <Link href="/projects">
+                  <Button variant="outline">Back to Projects</Button>
+                </Link>
+              </div>
             </div>
           </div>
         </main>
@@ -1069,6 +1089,19 @@ export default function EditorPage() {
                   Suggesting
                 </span>
               )}
+
+              {/* Sign-in CTA for unauthenticated users */}
+              {!hasValidAccess && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => signIn("zitadel")}
+                  className="gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                >
+                  <LogIn className="h-3 w-3" />
+                  Sign in to suggest edits
+                </Button>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {/* Submit Suggestions button */}
@@ -1130,14 +1163,16 @@ export default function EditorPage() {
               {/* History Button */}
               <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
 
-              {/* Upstream Sync Status */}
-              <UpstreamSyncIndicator
-                projectId={projectId}
-                accessToken={session?.accessToken}
-              />
+              {/* Upstream Sync Status (auth-only) */}
+              {hasValidAccess && (
+                <UpstreamSyncIndicator
+                  projectId={projectId}
+                  accessToken={session?.accessToken}
+                />
+              )}
 
-              {/* Normalization Status */}
-              {normalizationStatus?.needs_normalization && (
+              {/* Normalization Status (auth-only) */}
+              {hasValidAccess && normalizationStatus?.needs_normalization && (
                 <Link href={`/projects/${projectId}/settings#normalization`}>
                   <Button
                     variant="ghost"
@@ -1317,17 +1352,19 @@ export default function EditorPage() {
         defaultMessage="Update ontology"
       />
 
-      {/* Add Entity Dialog */}
-      <AddEntityDialog
-        open={addEntityDialogOpen}
-        onOpenChange={setAddEntityDialogOpen}
-        onConfirm={handleEntityConfirm}
-        iriPattern={iriPattern}
-        nextNumeric={nextNumeric}
-        ontologyNamespace={ontologyNamespace}
-        parentIri={addEntityParentIri}
-        parentLabel={addEntityParentLabel}
-      />
+      {/* Add Entity Dialog (only for users with edit/suggest permissions) */}
+      {canSuggest && (
+        <AddEntityDialog
+          open={addEntityDialogOpen}
+          onOpenChange={setAddEntityDialogOpen}
+          onConfirm={handleEntityConfirm}
+          iriPattern={iriPattern}
+          nextNumeric={nextNumeric}
+          ontologyNamespace={ontologyNamespace}
+          parentIri={addEntityParentIri}
+          parentLabel={addEntityParentLabel}
+        />
+      )}
 
       {/* Delete Class Confirmation Dialog */}
       <ConfirmDialog

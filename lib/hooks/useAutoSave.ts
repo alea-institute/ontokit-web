@@ -195,8 +195,8 @@ export function useAutoSave({
         parent_iris: draft.parentIris,
         annotations: [...cleanAnnotations, ...relationshipAnnotations],
         deprecated: detail?.deprecated,
-        equivalent_iris: detail?.equivalent_iris,
-        disjoint_iris: detail?.disjoint_iris,
+        equivalent_iris: detail?.equivalent_iris ?? undefined,
+        disjoint_iris: detail?.disjoint_iris ?? undefined,
       };
 
       if (saveMode === "suggest" && onSuggestSave) {
