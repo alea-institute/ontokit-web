@@ -16,7 +16,7 @@ import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
 import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingToggle";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
-import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
+import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
 import { useQueryClient } from "@tanstack/react-query";
 import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
@@ -1076,8 +1076,6 @@ export default function EditorPage() {
               <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
               <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
-              <BranchBadge />
-
               {/* Mode Switcher */}
               <ModeSwitcher />
               {canSuggest && <ContinuousEditingToggle />}
