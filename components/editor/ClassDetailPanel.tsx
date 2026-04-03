@@ -27,6 +27,7 @@ import {
   Hash,
   Link2,
   LogIn,
+  Pencil,
 } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail, type ClassUpdatePayload, type AnnotationUpdate } from "@/lib/api/client";
 import type { LocalizedString } from "@/lib/api/client";
@@ -80,6 +81,12 @@ interface ClassDetailPanelProps {
   showSignInToEdit?: boolean;
   /** Called when anonymous user clicks "Sign in to edit" */
   onSignInToEdit?: () => void;
+  /** Show "Propose Edit" button for anonymous users (AUTH_MODE != required) */
+  canPropose?: boolean;
+  /** Called when anonymous user clicks "Propose Edit" */
+  onProposeEdit?: () => void;
+  /** True when anonymous proposal mode is active (editing is allowed) */
+  isAnonymousProposalMode?: boolean;
 }
 
 export function ClassDetailPanel({
@@ -97,6 +104,9 @@ export function ClassDetailPanel({
   headerActions,
   showSignInToEdit,
   onSignInToEdit,
+  canPropose,
+  onProposeEdit,
+  isAnonymousProposalMode: _isAnonymousProposalMode,
 }: ClassDetailPanelProps) {
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
   const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
@@ -597,7 +607,29 @@ export function ClassDetailPanel({
               </h2>
               <div className="flex shrink-0 items-center gap-1">
                 {headerActions}
-                {!canEdit && !isEditing && showSignInToEdit && onSignInToEdit && (
+                {!canEdit && canPropose && !isEditing && onProposeEdit && (
+                  <>
+                    <button
+                      onClick={onProposeEdit}
+                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                      title="Propose an edit to this class"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      Propose Edit
+                    </button>
+                    {showSignInToEdit && onSignInToEdit && (
+                      <button
+                        onClick={onSignInToEdit}
+                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
+                        title="Sign in for full editing"
+                      >
+                        <LogIn className="h-3 w-3" />
+                        Sign in for full editing
+                      </button>
+                    )}
+                  </>
+                )}
+                {!canEdit && !canPropose && !isEditing && showSignInToEdit && onSignInToEdit && (
                   <button
                     onClick={onSignInToEdit}
                     className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"

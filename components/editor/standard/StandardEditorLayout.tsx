@@ -93,6 +93,11 @@ export interface StandardEditorLayoutProps {
   // Sign-in-to-edit affordance for anonymous users
   showSignInToEdit?: boolean;
   onSignInToEdit?: () => void;
+
+  // Anonymous proposal mode
+  canPropose?: boolean;
+  onProposeEdit?: () => void;
+  isAnonymousProposalMode?: boolean;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -132,6 +137,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     rollbackReparent,
     showSignInToEdit,
     onSignInToEdit,
+    canPropose,
+    onProposeEdit,
+    isAnonymousProposalMode,
   } = props;
 
   const toast = useToast();
@@ -467,6 +475,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             refreshKey={detailRefreshKey}
             showSignInToEdit={showSignInToEdit}
             onSignInToEdit={onSignInToEdit}
+            canPropose={canPropose}
+            onProposeEdit={onProposeEdit}
+            isAnonymousProposalMode={isAnonymousProposalMode}
             headerActions={selectedIri ? (
               <button
                 onClick={() => setShowGraph(true)}
