@@ -85,6 +85,10 @@ export interface StandardEditorLayoutProps {
   onReparentClass?: (classIri: string, oldParentIris: string[], newParentIris: string[], mode: DragMode) => Promise<void>;
   reparentOptimistic?: (iri: string, oldParentIri: string | null, newParentIri: string | null) => { previousNodes: ClassTreeNode[] };
   rollbackReparent?: (snapshot: { previousNodes: ClassTreeNode[] }) => void;
+
+  // Sign-in-to-edit affordance for anonymous users
+  showSignInToEdit?: boolean;
+  onSignInToEdit?: () => void;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -123,6 +127,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     onReparentClass,
     reparentOptimistic,
     rollbackReparent,
+    showSignInToEdit,
+    onSignInToEdit,
   } = props;
 
   const toast = useToast();
@@ -401,6 +407,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             isSuggestionMode={isSuggestionMode}
             onUpdateClass={onUpdateClass}
             refreshKey={detailRefreshKey}
+            showSignInToEdit={showSignInToEdit}
+            onSignInToEdit={onSignInToEdit}
             headerActions={selectedIri ? (
               <button
                 onClick={() => setShowGraph(true)}
