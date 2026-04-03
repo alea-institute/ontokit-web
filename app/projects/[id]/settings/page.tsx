@@ -13,14 +13,14 @@ import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff, ExternalLink } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Tag, Check, Github, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff, Database, ExternalLink } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/components/projects/project-form";
 import { MemberList } from "@/components/projects/member-list";
 import { UserSearchInput } from "@/components/projects/user-search-input";
 import { LabelPreferences } from "@/components/projects/label-preferences";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, projectOntologyApi, type IndexStatusResponse, type IndexStatus } from "@/lib/api/client";
 import {
   projectApi,
   type Project,
@@ -129,6 +129,20 @@ export default function ProjectSettingsPage() {
   const [normalizationJobId, setNormalizationJobId] = useState<string | null>(null);
   const [normalizationJobStatus, setNormalizationJobStatus] = useState<string | null>(null);
 
+  // Ontology index state
+  const [indexStatus, setIndexStatus] = useState<IndexStatusResponse | null>(null);
+  const [isReindexing, setIsReindexing] = useState(false);
+  const reindexPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Clean up reindex polling on unmount
+  useEffect(() => {
+    return () => {
+      if (reindexPollRef.current) {
+        clearInterval(reindexPollRef.current);
+      }
+    };
+  }, []);
+
   // Join requests state
   const [joinRequests, setJoinRequests] = useState<JoinRequestType[]>([]);
   const [joinRequestCount, setJoinRequestCount] = useState(0);
@@ -176,6 +190,14 @@ export default function ProjectSettingsPage() {
             setNormalizationStatus(normStatus);
           } catch {
             // Normalization status may not be available, ignore
+          }
+
+          // Fetch ontology index status
+          try {
+            const idxStatus = await projectOntologyApi.getIndexStatus(projectId, session.accessToken);
+            setIndexStatus(idxStatus);
+          } catch {
+            // Index status endpoint may not be available, ignore
           }
         }
 
@@ -588,6 +610,50 @@ export default function ProjectSettingsPage() {
       setError(err instanceof Error ? err.message : "Failed to decline request");
     } finally {
       setProcessingJoinRequest(null);
+    }
+  };
+
+  const handleReindex = async () => {
+    if (!session?.accessToken || !project) return;
+
+    setIsReindexing(true);
+    setError(null);
+
+    try {
+      await projectOntologyApi.reindex(project.id, session.accessToken);
+      setIndexStatus((prev) =>
+        prev ? { ...prev, status: "indexing" as IndexStatus } : prev
+      );
+      setSuccessMessage("Reindex job queued. The index will update in the background.");
+      setTimeout(() => setSuccessMessage(null), 5000);
+
+      // Clear any existing poll before starting a new one
+      if (reindexPollRef.current) {
+        clearInterval(reindexPollRef.current);
+      }
+
+      // Poll for completion
+      reindexPollRef.current = setInterval(async () => {
+        try {
+          const status = await projectOntologyApi.getIndexStatus(
+            project.id,
+            session.accessToken
+          );
+          setIndexStatus(status);
+          if (status.status === "ready" || status.status === "failed") {
+            clearInterval(reindexPollRef.current!);
+            reindexPollRef.current = null;
+            setIsReindexing(false);
+          }
+        } catch {
+          clearInterval(reindexPollRef.current!);
+          reindexPollRef.current = null;
+          setIsReindexing(false);
+        }
+      }, 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to trigger reindex");
+      setIsReindexing(false);
     }
   };
 
@@ -1240,6 +1306,97 @@ export default function ProjectSettingsPage() {
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* Ontology Index Section - only for admins/owners with an ontology */}
+          {canManage && project.source_file_path && (
+            <section
+              id="ontology-index"
+              className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Database className="h-5 w-5 text-slate-500" />
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                    Ontology Search Index
+                  </h2>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleReindex}
+                  disabled={isReindexing}
+                >
+                  {isReindexing ? (
+                    <>
+                      <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+                      Reindexing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-1 h-4 w-4" />
+                      Rebuild Index
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                The search index accelerates class tree navigation, entity search, and detail
+                lookups by caching ontology structure in PostgreSQL. It is rebuilt automatically
+                after imports and edits, but you can trigger a manual rebuild if results seem stale.
+              </p>
+
+              {/* Status indicator */}
+              {indexStatus ? (
+                <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {indexStatus.status === "ready" && (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      )}
+                      {indexStatus.status === "indexing" && (
+                        <RefreshCw className="h-4 w-4 animate-spin text-blue-500" />
+                      )}
+                      {indexStatus.status === "pending" && (
+                        <RefreshCw className="h-4 w-4 text-slate-400" />
+                      )}
+                      {indexStatus.status === "failed" && (
+                        <XCircle className="h-4 w-4 text-red-500" />
+                      )}
+                      <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                        {indexStatus.status === "ready" && "Index up to date"}
+                        {indexStatus.status === "indexing" && "Indexing in progress..."}
+                        {indexStatus.status === "pending" && "Index pending"}
+                        {indexStatus.status === "failed" && "Index failed"}
+                      </span>
+                    </div>
+                    <div className="text-right text-xs text-slate-500 dark:text-slate-400">
+                      {indexStatus.entity_count != null && (
+                        <p>{indexStatus.entity_count.toLocaleString()} entities indexed</p>
+                      )}
+                      {indexStatus.indexed_at && (
+                        <p>Last indexed: {new Date(indexStatus.indexed_at).toLocaleString()}</p>
+                      )}
+                      {indexStatus.commit_hash && (
+                        <p className="font-mono">{indexStatus.commit_hash.substring(0, 7)}</p>
+                      )}
+                    </div>
+                  </div>
+                  {indexStatus.status === "failed" && indexStatus.error_message && (
+                    <p className="mt-2 text-xs text-red-600 dark:text-red-400">
+                      {indexStatus.error_message}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    No index status available. Click &quot;Rebuild Index&quot; to create the search index.
+                  </p>
                 </div>
               )}
             </section>
