@@ -412,8 +412,13 @@ export default function SuggestionReviewPage() {
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
                               <span className="text-sm font-medium text-slate-900 dark:text-white">
-                                {s.submitter?.name || s.submitter?.email || "Unknown user"}
+                                {s.submitter?.name || s.submitter?.email || (s.is_anonymous ? "Anonymous" : "Unknown user")}
                               </span>
+                              {s.is_anonymous && (
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                                  Anonymous
+                                </span>
+                              )}
                               {(s.revision ?? 1) > 1 && (
                                 <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                                   v{s.revision}
@@ -515,9 +520,16 @@ export default function SuggestionReviewPage() {
                                 <h4 className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
                                   Submitted by
                                 </h4>
-                                <p className="mt-1 text-sm text-slate-900 dark:text-white">
-                                  {s.submitter?.name || s.submitter?.email || "Unknown user"}
-                                </p>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <p className="text-sm text-slate-900 dark:text-white">
+                                    {s.submitter?.name || s.submitter?.email || (s.is_anonymous ? "Anonymous" : "Unknown user")}
+                                  </p>
+                                  {s.is_anonymous && (
+                                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                                      Anonymous
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">
                                   <Clock className="mr-1 inline h-3 w-3" />
                                   {lastActivity.toLocaleString()}
