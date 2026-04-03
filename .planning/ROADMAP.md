@@ -68,5 +68,5 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 7. Sync ALEA Forks | v0.3.0 | 0/TBD | Not started | - |
-| 8. Optional Auth | v0.3.0 | 0/2 | Planning complete | - |
+| 8. Optional Auth | 1/2 | In Progress|  | - |
 | 9. Production Deployment | v0.3.0 | 0/TBD | Not started | - |
