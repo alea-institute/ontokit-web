@@ -117,6 +117,10 @@ export interface DeveloperEditorLayoutProps {
 
   /** Ref populated with a function to navigate to any entity type */
   entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
+
+  // Sign-in-to-edit affordance for anonymous users
+  showSignInToEdit?: boolean;
+  onSignInToEdit?: () => void;
 }
 
 export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
@@ -165,6 +169,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     onReparentClass,
     reparentOptimistic,
     rollbackReparent,
+    showSignInToEdit,
+    onSignInToEdit,
   } = props;
 
   const toast = useToast();
@@ -563,6 +569,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   canEdit={canEdit || isSuggestionMode}
                   onUpdateClass={onUpdateClass}
                   refreshKey={detailRefreshKey}
+                  showSignInToEdit={showSignInToEdit}
+                  onSignInToEdit={onSignInToEdit}
                 />
               ) : activeTab === "properties" ? (
                 <PropertyDetailPanel

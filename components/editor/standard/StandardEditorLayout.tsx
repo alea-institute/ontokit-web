@@ -89,6 +89,10 @@ export interface StandardEditorLayoutProps {
 
   /** Ref populated with a function to navigate to any entity type */
   entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
+
+  // Sign-in-to-edit affordance for anonymous users
+  showSignInToEdit?: boolean;
+  onSignInToEdit?: () => void;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -126,6 +130,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     onReparentClass,
     reparentOptimistic,
     rollbackReparent,
+    showSignInToEdit,
+    onSignInToEdit,
   } = props;
 
   const toast = useToast();
@@ -459,6 +465,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             canEdit={canEdit || isSuggestionMode}
             onUpdateClass={onUpdateClass}
             refreshKey={detailRefreshKey}
+            showSignInToEdit={showSignInToEdit}
+            onSignInToEdit={onSignInToEdit}
             headerActions={selectedIri ? (
               <button
                 onClick={() => setShowGraph(true)}

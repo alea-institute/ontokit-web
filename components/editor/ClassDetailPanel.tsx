@@ -26,6 +26,7 @@ import {
   StickyNote,
   Hash,
   Link2,
+  LogIn,
 } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail, type ClassUpdatePayload, type AnnotationUpdate } from "@/lib/api/client";
 import type { LocalizedString } from "@/lib/api/client";
@@ -75,6 +76,10 @@ interface ClassDetailPanelProps {
   refreshKey?: number;
   /** Extra actions rendered in the header row (e.g. Graph button) */
   headerActions?: ReactNode;
+  /** Show "Sign in to edit" button for anonymous users when Zitadel is configured */
+  showSignInToEdit?: boolean;
+  /** Called when anonymous user clicks "Sign in to edit" */
+  onSignInToEdit?: () => void;
 }
 
 export function ClassDetailPanel({
@@ -90,6 +95,8 @@ export function ClassDetailPanel({
   onUpdateClass,
   refreshKey,
   headerActions,
+  showSignInToEdit,
+  onSignInToEdit,
 }: ClassDetailPanelProps) {
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
   const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
@@ -590,6 +597,16 @@ export function ClassDetailPanel({
               </h2>
               <div className="flex shrink-0 items-center gap-1">
                 {headerActions}
+                {!canEdit && !isEditing && showSignInToEdit && onSignInToEdit && (
+                  <button
+                    onClick={onSignInToEdit}
+                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                    title="Sign in to edit this class"
+                  >
+                    <LogIn className="h-3.5 w-3.5" />
+                    Sign in to edit
+                  </button>
+                )}
               </div>
             </div>
             <div className="mt-1 flex items-center gap-2">
