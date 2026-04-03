@@ -31,8 +31,8 @@
 - [ ] **ANON-01**: Anonymous visitor sees "Suggest Changes" button on ClassDetailPanel for public projects when AUTH_MODE != required
 - [ ] **ANON-02**: Anonymous visitor can enter suggestion edit mode, modify class data, and submit without signing in
 - [ ] **ANON-03**: After submitting, user is prompted "Want credit for your suggestions?" with optional name and email fields
-- [ ] **ANON-04**: Suggestion API accepts anonymous suggestion sessions (no Bearer token required when AUTH_MODE != required)
-- [ ] **ANON-05**: Suggestion review page shows submitter name/email if provided, or "Anonymous" if not
+- [x] **ANON-04**: Suggestion API accepts anonymous suggestion sessions (no Bearer token required when AUTH_MODE != required)
+- [x] **ANON-05**: Suggestion review page shows submitter name/email if provided, or "Anonymous" if not
 - [ ] **ANON-06**: Signed-in users with editor+ role bypass suggestion flow (existing "Edit Item" behavior unchanged)
 - [ ] **ANON-07**: When Zitadel/OAuth is configured, "Sign in for full editing" link appears alongside the Suggest button
 
@@ -72,8 +72,8 @@
 | ANON-01 | Phase 10 | Pending |
 | ANON-02 | Phase 10 | Pending |
 | ANON-03 | Phase 10 | Pending |
-| ANON-04 | Phase 10 | Pending |
-| ANON-05 | Phase 10 | Pending |
+| ANON-04 | Phase 10 | Complete |
+| ANON-05 | Phase 10 | Complete |
 | ANON-06 | Phase 10 | Pending |
 | ANON-07 | Phase 10 | Pending |
 

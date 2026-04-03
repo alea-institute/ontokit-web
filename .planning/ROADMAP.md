@@ -76,7 +76,7 @@ Plans:
   7. When Zitadel/OAuth is configured in optional mode, "Sign in for full editing" link appears alongside the suggestion button
 **Plans**: 3 plans
 Plans:
-- [ ] 10-01-PLAN.md — Backend: Anonymous token + session endpoints + rate limiting (ontokit-api)
+- [x] 10-01-PLAN.md — Backend: Anonymous token + session endpoints + rate limiting (ontokit-api)
 - [ ] 10-02-PLAN.md — Frontend: Anonymous API client + session hook + credit modal (ontokit-web)
 - [ ] 10-03-PLAN.md — Frontend: UI integration (Propose Edit button + editor wiring + review display)
 
@@ -89,4 +89,4 @@ Plans:
 | 7. Sync ALEA Forks | v0.3.0 | 0/TBD | Not started | - |
 | 8. Optional Auth | 2/2 | Complete   | 2026-04-03 | - |
 | 9. Production Deployment | v0.3.0 | 0/TBD | Not started | - |
-| 10. Anonymous Suggestions | v0.3.0 | 0/3 | Planned | - |
+| 10. Anonymous Suggestions | v0.3.0 | 1/3 | In Progress|  |
