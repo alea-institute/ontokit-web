@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isAuthRequired } from "./auth-mode";
 
 const serverSchema = z.object({
   ZITADEL_ISSUER: z.url("ZITADEL_ISSUER must be a valid URL"),
@@ -19,7 +20,21 @@ export type ServerEnv = z.infer<typeof serverSchema>;
 export type ClientEnv = z.infer<typeof clientSchema>;
 
 function validateServerEnv(): ServerEnv {
-  const result = serverSchema.safeParse(process.env);
+  // When auth is not required, Zitadel vars are optional
+  const schema = isAuthRequired()
+    ? serverSchema
+    : z.object({
+        ZITADEL_ISSUER: z.url().optional(),
+        ZITADEL_CLIENT_ID: z.string().optional(),
+        ZITADEL_CLIENT_SECRET: z.string().optional(),
+        NEXTAUTH_URL: z.url().optional(),
+        NEXTAUTH_SECRET: z
+          .string()
+          .min(1, "NEXTAUTH_SECRET is required")
+          .default("ontokit-dev-secret"),
+      });
+
+  const result = schema.safeParse(process.env);
   if (!result.success) {
     const tree = z.treeifyError(result.error);
     const messages = Object.entries(tree.properties ?? {})
@@ -33,7 +48,7 @@ function validateServerEnv(): ServerEnv {
         `Set the required variables before starting the server.`
     );
   }
-  return result.data;
+  return result.data as ServerEnv;
 }
 
 function validateClientEnv(): ClientEnv {
