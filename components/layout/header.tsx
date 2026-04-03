@@ -7,6 +7,11 @@ import { NotificationBell } from "@/components/layout/notification-bell";
 import { ThemeToggle } from "@/components/editor/ThemeToggle";
 import { cn } from "@/lib/utils";
 
+// Auth mode flags — set at build time by next.config.ts
+const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
+const showAuthUI = authMode === "required" || (authMode === "optional" && zitadelConfigured);
+
 const navLinks = [
   { href: "/", label: "Projects" },
   { href: "/info", label: "Info" },
@@ -50,8 +55,8 @@ export function Header() {
         </div>
         <div className="flex items-center gap-4">
           <ThemeToggle />
-          <NotificationBell />
-          <UserMenu />
+          {showAuthUI && <NotificationBell />}
+          {showAuthUI && <UserMenu />}
         </div>
       </div>
     </header>
