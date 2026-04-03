@@ -124,6 +124,11 @@ export interface DeveloperEditorLayoutProps {
   // Sign-in-to-edit affordance for anonymous users
   showSignInToEdit?: boolean;
   onSignInToEdit?: () => void;
+
+  // Anonymous proposal mode
+  canPropose?: boolean;
+  onProposeEdit?: () => void;
+  isAnonymousProposalMode?: boolean;
 }
 
 export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
@@ -177,6 +182,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     rollbackReparent,
     showSignInToEdit,
     onSignInToEdit,
+    canPropose,
+    onProposeEdit,
+    isAnonymousProposalMode,
   } = props;
 
   const toast = useToast();
@@ -524,6 +532,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   refreshKey={detailRefreshKey}
                   showSignInToEdit={showSignInToEdit}
                   onSignInToEdit={onSignInToEdit}
+                  canPropose={canPropose}
+                  onProposeEdit={onProposeEdit}
+                  isAnonymousProposalMode={isAnonymousProposalMode}
                 />
               ) : activeTab === "properties" ? (
                 <PropertyDetailPanel
