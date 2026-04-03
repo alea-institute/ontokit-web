@@ -13,7 +13,8 @@ interface ProjectCardProps {
 export function ProjectCard({ project, className }: ProjectCardProps) {
   return (
     <Link
-      href={`/projects/${project.id}`}
+      href={`/projects/${project.id}/editor`}
+      aria-label={`Open project ${project.name} editor`}
       className={cn(
         "block rounded-lg border border-slate-200 bg-white p-5 shadow-sm transition-all",
         "hover:border-primary-300 hover:shadow-md",
