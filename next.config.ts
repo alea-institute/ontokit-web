@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
+    NEXT_PUBLIC_AUTH_MODE: process.env.AUTH_MODE || "required",
+    NEXT_PUBLIC_ZITADEL_CONFIGURED: process.env.ZITADEL_ISSUER ? "true" : "false",
   },
 
   // WSL2: use polling for file watching since inotify doesn't work across the VM boundary
