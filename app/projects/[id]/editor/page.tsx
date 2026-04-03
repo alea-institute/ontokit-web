@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn } from "lucide-react";
+import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn, Pencil } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -38,6 +38,8 @@ import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
 import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
 import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
+import { useAnonymousSuggestion } from "@/lib/hooks/useAnonymousSuggestion";
+import { CreditModal } from "@/components/suggestions/CreditModal";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
@@ -58,6 +60,7 @@ export default function EditorPage() {
 
   // Auth mode — set at build time by next.config.ts
   const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
+  const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
 
   // Branch state
   const queryClient = useQueryClient();
@@ -130,6 +133,20 @@ export default function EditorPage() {
 
   // Suggestion session (only active for suggesters who can't directly edit)
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+
+  // Anonymous proposal mode: available when AUTH_MODE != required and user is NOT signed in as editor/suggester
+  const canPropose = authMode !== "required" && !canEdit && !isSuggester;
+  const [creditModalOpen, setCreditModalOpen] = useState(false);
+
+  const anonymousSuggestion = useAnonymousSuggestion({
+    projectId,
+    onSubmitted: (prNumber) => {
+      toast.success(`Proposal submitted as PR #${prNumber}`);
+    },
+    onError: (msg) => toast.error("Proposal error", msg),
+  });
+
+  const isAnonymousProposalMode = canPropose && anonymousSuggestion.isActive;
 
   const suggestionSession = useSuggestionSession({
     projectId,
@@ -576,6 +593,59 @@ export default function EditorPage() {
     iriPatternDetectedRef.current = false;
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
+  // Handle anonymous proposal mode class update
+  // Routes through anonymousSuggestion.saveToSession() instead of the normal commit path
+  const handleAnonymousClassUpdate = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
+    if (!activeBranch && !anonymousSuggestion.branch) {
+      throw new Error("No branch selected");
+    }
+
+    // Ensure session exists before saving
+    if (!anonymousSuggestion.sessionId) {
+      await anonymousSuggestion.startSession();
+    }
+
+    // Load source from the anonymous suggestion branch (or current active branch as fallback)
+    const branchToLoad = anonymousSuggestion.branch || activeBranch;
+    let source = sourceContent;
+    if (!source) {
+      const response = await revisionsApi.getFileAtVersion(
+        projectId,
+        branchToLoad!,
+        undefined, // no Bearer token needed for anonymous
+        project?.git_ontology_path,
+      );
+      source = response.content;
+    }
+
+    const modifiedSource = updateClassInTurtle(source, classIri, data);
+    const label = data.labels[0]?.value || getLocalName(classIri);
+
+    await anonymousSuggestion.saveToSession(modifiedSource, classIri, label);
+
+    setSourceContent(modifiedSource);
+    toast.success(`Proposed update to "${label}"`);
+    updateNodeLabel(classIri, label);
+    setDetailRefreshKey((k) => k + 1);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+  }, [activeBranch, anonymousSuggestion, projectId, project?.git_ontology_path, sourceContent, toast, updateNodeLabel]);
+
+  // Handle anonymous proposal "Propose Edit" button click
+  const handleProposeEdit = useCallback(async () => {
+    if (!anonymousSuggestion.isActive) {
+      await anonymousSuggestion.startSession();
+    }
+    // After session starts, isAnonymousProposalMode becomes true (canPropose && isActive),
+    // which re-renders ClassDetailPanel with canEdit=true allowing form editing
+  }, [anonymousSuggestion]);
+
+  // Handle "Submit Proposal" — called by CreditModal onSubmitCredit after user fills in name/email (or skips)
+  const handleAnonymousSubmit = useCallback(async (name: string | null, email: string | null) => {
+    setCreditModalOpen(false);
+    await anonymousSuggestion.submitSession(undefined, name ?? undefined, email ?? undefined);
+  }, [anonymousSuggestion]);
+
   // Handle drag-and-drop reparent class
   // Fetches full class detail, modifies parent_iris, then routes through the appropriate save handler
   const handleReparentClass = useCallback(async (
@@ -629,9 +699,13 @@ export default function EditorPage() {
     };
 
     // Route through the appropriate save handler
-    const saveHandler = isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass;
+    const saveHandler = isAnonymousProposalMode
+      ? handleAnonymousClassUpdate
+      : isSuggestionMode
+      ? handleSuggestClassUpdate
+      : handleUpdateClass;
     await saveHandler(classIri, payload);
-  }, [session, projectId, activeBranch, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate]);
+  }, [session?.accessToken, projectId, activeBranch, isAnonymousProposalMode, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate, handleAnonymousClassUpdate]);
 
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
@@ -838,6 +912,14 @@ export default function EditorPage() {
                 </span>
               )}
 
+              {/* Anonymous proposal mode indicator */}
+              {isAnonymousProposalMode && (
+                <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <Pencil className="h-3 w-3" />
+                  Proposing
+                </span>
+              )}
+
               {/* Sign-in CTA for unauthenticated users (only when Zitadel is configured) */}
               {!hasValidAccess && zitadelConfigured && (
                 <Button
@@ -865,6 +947,34 @@ export default function EditorPage() {
                   <span className="rounded-full bg-amber-500/30 px-1.5 py-0.5 text-xs">
                     {suggestionSession.changesCount}
                   </span>
+                </Button>
+              )}
+
+              {/* Submit Proposal button (anonymous mode) */}
+              {isAnonymousProposalMode && anonymousSuggestion.changesCount > 0 && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setCreditModalOpen(true)}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Submit Proposal
+                  <span className="rounded-full bg-emerald-500/30 px-1.5 py-0.5 text-xs">
+                    {anonymousSuggestion.changesCount}
+                  </span>
+                </Button>
+              )}
+
+              {/* Discard Proposal button (anonymous mode) */}
+              {isAnonymousProposalMode && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  onClick={() => anonymousSuggestion.discardSession()}
+                >
+                  Discard
                 </Button>
               )}
 
@@ -997,10 +1107,10 @@ export default function EditorPage() {
                 <DeveloperEditorLayout
                   projectId={projectId}
                   accessToken={session?.accessToken}
-                  activeBranch={activeBranch}
-                  canEdit={!!canEdit}
+                  activeBranch={isAnonymousProposalMode && anonymousSuggestion.branch ? anonymousSuggestion.branch : activeBranch}
+                  canEdit={isAnonymousProposalMode ? true : !!canEdit}
                   canSuggest={!!canSuggest}
-                  isSuggestionMode={isSuggestionMode}
+                  isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
                   canManage={!!canManage}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
@@ -1032,7 +1142,13 @@ export default function EditorPage() {
                   onDeleteClass={handleDeleteClass}
                   onCopyIri={handleCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
-                  onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
+                  onUpdateClass={
+                    isAnonymousProposalMode
+                      ? handleAnonymousClassUpdate
+                      : isSuggestionMode
+                      ? handleSuggestClassUpdate
+                      : handleUpdateClass
+                  }
                   detailRefreshKey={detailRefreshKey}
                   showHealthCheck={showHealthCheck}
                   onCloseHealthCheck={() => setShowHealthCheck(false)}
@@ -1041,18 +1157,21 @@ export default function EditorPage() {
                   onReparentClass={handleReparentClass}
                   reparentOptimistic={reparentOptimistic}
                   rollbackReparent={rollbackReparent}
-                  showSignInToEdit={!hasValidAccess && zitadelConfigured}
+                  showSignInToEdit={!hasValidAccess && zitadelConfigured && !canPropose}
                   onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
+                  canPropose={canPropose && !isAnonymousProposalMode}
+                  onProposeEdit={handleProposeEdit}
+                  isAnonymousProposalMode={isAnonymousProposalMode}
                 />
               </div>
             ) : (
               <StandardEditorLayout
                 projectId={projectId}
                 accessToken={session?.accessToken}
-                activeBranch={activeBranch}
-                canEdit={!!canEdit}
+                activeBranch={isAnonymousProposalMode && anonymousSuggestion.branch ? anonymousSuggestion.branch : activeBranch}
+                canEdit={isAnonymousProposalMode ? true : !!canEdit}
                 canSuggest={!!canSuggest}
-                isSuggestionMode={isSuggestionMode}
+                isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
                 nodes={nodes}
                 isTreeLoading={isTreeLoading}
                 treeError={treeError}
@@ -1072,7 +1191,13 @@ export default function EditorPage() {
                 onDeleteClass={handleDeleteClass}
                 onCopyIri={handleCopyIri}
                 selectedNodeFallback={selectedNodeFallback}
-                onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
+                onUpdateClass={
+                  isAnonymousProposalMode
+                    ? handleAnonymousClassUpdate
+                    : isSuggestionMode
+                    ? handleSuggestClassUpdate
+                    : handleUpdateClass
+                }
                 detailRefreshKey={detailRefreshKey}
                 sourceContent={sourceContent}
                 onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
@@ -1080,8 +1205,11 @@ export default function EditorPage() {
                 onReparentClass={handleReparentClass}
                 reparentOptimistic={reparentOptimistic}
                 rollbackReparent={rollbackReparent}
-                showSignInToEdit={!hasValidAccess && zitadelConfigured}
+                showSignInToEdit={!hasValidAccess && zitadelConfigured && !canPropose}
                 onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
+                canPropose={canPropose && !isAnonymousProposalMode}
+                onProposeEdit={handleProposeEdit}
+                isAnonymousProposalMode={isAnonymousProposalMode}
               />
             )}
           </div>
@@ -1157,6 +1285,13 @@ export default function EditorPage() {
         open={shortcutDialogOpen}
         onOpenChange={setShortcutDialogOpen}
         shortcuts={keyboardShortcuts}
+      />
+
+      {/* Credit Modal for anonymous proposal submissions — opens before submit to collect optional credit info */}
+      <CreditModal
+        open={creditModalOpen}
+        onClose={() => handleAnonymousSubmit(null, null)}
+        onSubmitCredit={handleAnonymousSubmit}
       />
     </BranchProvider>
   );

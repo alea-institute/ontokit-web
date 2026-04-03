@@ -64,6 +64,7 @@ export interface SuggestionSessionSummary {
   reviewed_at?: string;
   revision?: number;
   summary?: string;
+  is_anonymous?: boolean;
 }
 
 export interface SuggestionSessionListResponse {
