@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v0.2.0 Core Editor** - Phases 1-6 (shipped)
-- 🚧 **v0.3.0 Deployment** - Phases 7-9 (in progress)
+- 🚧 **v0.3.0 Deployment** - Phases 7-10 (in progress)
 
 ## Phases
 
@@ -21,6 +21,7 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 - [ ] **Phase 7: Sync ALEA Forks** - Fast-forward both ALEA repos to CatholicOS main
 - [x] **Phase 8: Optional Auth** - Make authentication optional via AUTH_DISABLED env var across both repos (completed 2026-04-03)
 - [ ] **Phase 9: Production Deployment** - Install Postgres, switch branches, configure env, rebuild, restart on production server
+- [ ] **Phase 10: Anonymous Suggestions** - Allow anonymous users to suggest changes on public projects with optional name/email collection
 
 ## Phase Details
 
@@ -61,12 +62,27 @@ Plans:
   5. Caddy, systemd unit files, and `.env` files on the server reflect the full-stack configuration (Postgres DSN, AUTH_DISABLED, etc.)
 **Plans**: TBD
 
+### Phase 10: Anonymous Suggestions
+**Goal**: Anonymous users can suggest changes on public projects without signing in, with optional name/email collection after submission for admin follow-up
+**Depends on**: Phase 8 (AUTH_MODE support), Phase 9 (production deployment)
+**Requirements**: ANON-01, ANON-02, ANON-03, ANON-04, ANON-05, ANON-06, ANON-07
+**Success Criteria** (what must be TRUE):
+  1. Anonymous visitor sees "Suggest Changes" button on ClassDetailPanel for public projects when `AUTH_MODE != required`
+  2. Anonymous visitor can enter edit mode, modify labels/comments/annotations, and submit a suggestion without signing in
+  3. After clicking "Submit", a modal asks "Want credit for your suggestions?" with optional name and email fields
+  4. Suggestion appears in admin review queue with submitter name/email if provided, or marked "Anonymous" if not
+  5. Signed-in users with editor+ role see "Edit Item" (existing flow, unchanged)
+  6. Signed-in users with suggester role see "Suggest Changes" (existing flow, unchanged)
+  7. When Zitadel/OAuth is configured in optional mode, "Sign in for full editing" link appears alongside the suggestion button
+**Plans**: TBD
+
 ## Progress
 
-**Execution Order:** 7 → 8 → 9
+**Execution Order:** 7 → 8 → 9 → 10
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 7. Sync ALEA Forks | v0.3.0 | 0/TBD | Not started | - |
 | 8. Optional Auth | 2/2 | Complete   | 2026-04-03 | - |
 | 9. Production Deployment | v0.3.0 | 0/TBD | Not started | - |
+| 10. Anonymous Suggestions | v0.3.0 | 0/TBD | Not started | - |
