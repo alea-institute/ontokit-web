@@ -12,11 +12,11 @@
 
 ### Auth
 
-- [ ] **AUTH-01**: App runs without Zitadel when `AUTH_DISABLED=true` env var is set
+- [x] **AUTH-01**: App runs without Zitadel when `AUTH_DISABLED=true` env var is set
 - [ ] **AUTH-02**: Unauthenticated users can browse projects, classes, and ontology tree in read-only mode
 - [ ] **AUTH-03**: Edit/commit/PR features are hidden when auth is disabled
-- [ ] **AUTH-04**: Existing Zitadel-based auth continues working when `AUTH_DISABLED` is unset or false
-- [ ] **AUTH-05**: API accepts requests without Bearer tokens when auth is disabled
+- [x] **AUTH-04**: Existing Zitadel-based auth continues working when `AUTH_DISABLED` is unset or false
+- [x] **AUTH-05**: API accepts requests without Bearer tokens when auth is disabled
 
 ### Deploy
 
@@ -49,11 +49,11 @@
 |-------------|-------|--------|
 | SYNC-01 | Phase 7 | Pending |
 | SYNC-02 | Phase 7 | Pending |
-| AUTH-01 | Phase 8 | Pending |
+| AUTH-01 | Phase 8 | Complete |
 | AUTH-02 | Phase 8 | Pending |
 | AUTH-03 | Phase 8 | Pending |
-| AUTH-04 | Phase 8 | Pending |
-| AUTH-05 | Phase 8 | Pending |
+| AUTH-04 | Phase 8 | Complete |
+| AUTH-05 | Phase 8 | Complete |
 | DEPL-01 | Phase 9 | Pending |
 | DEPL-02 | Phase 9 | Pending |
 | DEPL-03 | Phase 9 | Pending |

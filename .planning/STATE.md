@@ -1,3 +1,19 @@
+---
+gsd_state_version: 1.0
+milestone: v0.2
+milestone_name: milestone
+status: planning
+stopped_at: Completed 08-01-PLAN.md
+last_updated: "2026-04-03T16:21:21.412Z"
+last_activity: "2026-04-03 — Completed quick task 260403-dth: Phase 7 Sync ALEA Forks"
+progress:
+  total_phases: 3
+  completed_phases: 0
+  total_plans: 2
+  completed_plans: 1
+  percent: 50
+---
+
 # Project State
 
 ## Project Reference
@@ -14,7 +30,7 @@ Plan: — of — in current phase
 Status: Ready to plan
 Last activity: 2026-04-03 — Completed quick task 260403-dth: Phase 7 Sync ALEA Forks
 
-Progress: [███░░░░░░░] 33%
+Progress: [█████░░░░░] 50%
 
 ## Performance Metrics
 
@@ -30,6 +46,7 @@ Progress: [███░░░░░░░] 33%
 | - | - | - | - |
 
 *Updated after each plan completion*
+| Phase 08-optional-auth P01 | 4min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -38,6 +55,8 @@ Progress: [███░░░░░░░] 33%
 - [v0.3.0]: CatholicOS main is long-term truth — Mike's folio-adapter was a deadline hack
 - [v0.3.0]: Auth optional via `AUTH_DISABLED` env var — avoids maintaining two codebases
 - [v0.3.0]: Bare metal deploy (no Docker) — server already set up this way, working fine
+- [Phase 08-optional-auth]: AUTH_MODE=optional leaves RequiredUser 401ing — no code change needed for write protection
+- [Phase 08-optional-auth]: ANONYMOUS_USER has roles=['viewer'] for least-privilege unauthenticated access
 
 ### Key Facts
 
@@ -63,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03
-Stopped at: Roadmap created, ready to plan Phase 7
+Last session: 2026-04-03T16:21:21.411Z
+Stopped at: Completed 08-01-PLAN.md
 Resume file: None
