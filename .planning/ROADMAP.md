@@ -19,7 +19,7 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 **Milestone Goal:** Sync ALEA forks with CatholicOS upstream and deploy the full stack to production with optional authentication for public read-only browsing.
 
 - [ ] **Phase 7: Sync ALEA Forks** - Fast-forward both ALEA repos to CatholicOS main
-- [ ] **Phase 8: Optional Auth** - Make authentication optional via AUTH_DISABLED env var across both repos
+- [x] **Phase 8: Optional Auth** - Make authentication optional via AUTH_DISABLED env var across both repos (completed 2026-04-03)
 - [ ] **Phase 9: Production Deployment** - Install Postgres, switch branches, configure env, rebuild, restart on production server
 
 ## Phase Details
@@ -68,5 +68,5 @@ Plans:
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 7. Sync ALEA Forks | v0.3.0 | 0/TBD | Not started | - |
-| 8. Optional Auth | 1/2 | In Progress|  | - |
+| 8. Optional Auth | 2/2 | Complete   | 2026-04-03 | - |
 | 9. Production Deployment | v0.3.0 | 0/TBD | Not started | - |
