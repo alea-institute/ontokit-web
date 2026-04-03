@@ -77,7 +77,7 @@ Plans:
 **Plans**: 3 plans
 Plans:
 - [x] 10-01-PLAN.md — Backend: Anonymous token + session endpoints + rate limiting (ontokit-api)
-- [ ] 10-02-PLAN.md — Frontend: Anonymous API client + session hook + credit modal (ontokit-web)
+- [x] 10-02-PLAN.md — Frontend: Anonymous API client + session hook + credit modal (ontokit-web)
 - [ ] 10-03-PLAN.md — Frontend: UI integration (Propose Edit button + editor wiring + review display)
 
 ## Progress
@@ -89,4 +89,4 @@ Plans:
 | 7. Sync ALEA Forks | v0.3.0 | 0/TBD | Not started | - |
 | 8. Optional Auth | 2/2 | Complete   | 2026-04-03 | - |
 | 9. Production Deployment | v0.3.0 | 0/TBD | Not started | - |
-| 10. Anonymous Suggestions | v0.3.0 | 1/3 | In Progress|  |
+| 10. Anonymous Suggestions | v0.3.0 | 2/3 | In Progress|  |
