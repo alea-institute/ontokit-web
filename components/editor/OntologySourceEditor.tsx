@@ -233,7 +233,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
       try {
         const response = await lintApi.getIssues(projectId, accessToken, {
           include_resolved: false,
-          limit: 100, // Limit to avoid performance issues
+          limit: 200, // Fetch a larger pool so navigated-to issues are more likely included
         });
         setLintIssues(response.items);
       } catch (error) {
@@ -538,7 +538,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                 if (posA && posB) return posA.line - posB.line;
                 return 0;
               })
-              .slice(0, 20)
+              .slice(0, 50)
               .map((issue) => (
               <button
                 key={issue.id}
@@ -578,9 +578,9 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                 </span>
               </button>
             ))}
-            {lintIssues.length > 20 && (
+            {lintIssues.length > 50 && (
               <div className="px-4 py-2 text-center text-xs text-slate-500">
-                And {lintIssues.length - 20} more issues...
+                And {lintIssues.length - 50} more issues...
               </div>
             )}
           </div>
