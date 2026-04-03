@@ -44,7 +44,10 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
   3. Edit, commit, and pull request UI elements are not visible when auth is disabled
   4. Visiting the app with `AUTH_DISABLED` unset (or `false`) shows the normal login page and full editor functionality after sign-in
   5. API endpoints return data (not 401) for GET requests when auth is disabled, while write endpoints remain protected
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 08-01-PLAN.md — Backend auth bypass: AUTH_DISABLED config + anonymous user in ontokit-api
+- [ ] 08-02-PLAN.md — Frontend auth bypass: anonymous session + hidden auth UI in ontokit-web
 
 ### Phase 9: Production Deployment
 **Goal**: ontokit.openlegalstandard.org serves the FOLIO ontology browser running CatholicOS main on the production server
@@ -65,5 +68,5 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 7. Sync ALEA Forks | v0.3.0 | 0/TBD | Not started | - |
-| 8. Optional Auth | v0.3.0 | 0/TBD | Not started | - |
+| 8. Optional Auth | v0.3.0 | 0/2 | Planning complete | - |
 | 9. Production Deployment | v0.3.0 | 0/TBD | Not started | - |
