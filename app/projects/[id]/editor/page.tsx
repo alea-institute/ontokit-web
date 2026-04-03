@@ -64,6 +64,9 @@ export default function EditorPage() {
 
   const editorMode = useEditorModeStore((s) => s.editorMode);
 
+  // Auth mode — set at build time by next.config.ts
+  const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
+
   // Project state
   const [project, setProject] = useState<Project | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -994,8 +997,8 @@ export default function EditorPage() {
                 {error || "Project not found"}
               </h2>
               <div className="mt-4 flex items-center justify-center gap-3">
-                {errorKind === "private-403" && (
-                  <Button onClick={() => signIn("zitadel")} className="gap-2">
+                {errorKind === "private-403" && zitadelConfigured && (
+                  <Button onClick={() => signIn("zitadel", { callbackUrl: window.location.href })} className="gap-2">
                     <LogIn className="h-4 w-4" />
                     Sign In
                   </Button>
@@ -1088,16 +1091,16 @@ export default function EditorPage() {
                 </span>
               )}
 
-              {/* Sign-in CTA for unauthenticated users */}
-              {!hasValidAccess && (
+              {/* Sign-in CTA for unauthenticated users (only when Zitadel is configured) */}
+              {!hasValidAccess && zitadelConfigured && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => signIn("zitadel")}
+                  onClick={() => signIn("zitadel", { callbackUrl: window.location.href })}
                   className="gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 >
                   <LogIn className="h-3 w-3" />
-                  Sign in to suggest edits
+                  Sign in to edit
                 </Button>
               )}
             </div>
@@ -1291,6 +1294,8 @@ export default function EditorPage() {
                   onReparentClass={handleReparentClass}
                   reparentOptimistic={reparentOptimistic}
                   rollbackReparent={rollbackReparent}
+                  showSignInToEdit={!hasValidAccess && zitadelConfigured}
+                  onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
                 />
               </div>
             ) : (
@@ -1328,6 +1333,8 @@ export default function EditorPage() {
                 onReparentClass={handleReparentClass}
                 reparentOptimistic={reparentOptimistic}
                 rollbackReparent={rollbackReparent}
+                showSignInToEdit={!hasValidAccess && zitadelConfigured}
+                onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
               />
             )}
           </div>
