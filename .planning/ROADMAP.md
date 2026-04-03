@@ -21,7 +21,7 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 - [ ] **Phase 7: Sync ALEA Forks** - Fast-forward both ALEA repos to CatholicOS main
 - [x] **Phase 8: Optional Auth** - Make authentication optional via AUTH_DISABLED env var across both repos (completed 2026-04-03)
 - [ ] **Phase 9: Production Deployment** - Install Postgres, switch branches, configure env, rebuild, restart on production server
-- [ ] **Phase 10: Anonymous Suggestions** - Allow anonymous users to suggest changes on public projects with optional name/email collection
+- [x] **Phase 10: Anonymous Suggestions** - Allow anonymous users to suggest changes on public projects with optional name/email collection (completed 2026-04-03)
 
 ## Phase Details
 
@@ -78,7 +78,7 @@ Plans:
 Plans:
 - [x] 10-01-PLAN.md — Backend: Anonymous token + session endpoints + rate limiting (ontokit-api)
 - [x] 10-02-PLAN.md — Frontend: Anonymous API client + session hook + credit modal (ontokit-web)
-- [ ] 10-03-PLAN.md — Frontend: UI integration (Propose Edit button + editor wiring + review display)
+- [x] 10-03-PLAN.md — Frontend: UI integration (Propose Edit button + editor wiring + review display)
 
 ## Progress
 
@@ -89,4 +89,4 @@ Plans:
 | 7. Sync ALEA Forks | v0.3.0 | 0/TBD | Not started | - |
 | 8. Optional Auth | 2/2 | Complete   | 2026-04-03 | - |
 | 9. Production Deployment | v0.3.0 | 0/TBD | Not started | - |
-| 10. Anonymous Suggestions | v0.3.0 | 2/3 | In Progress|  |
+| 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete   | 2026-04-03 |
