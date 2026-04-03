@@ -149,13 +149,13 @@ export function buildGraphFromClassDetail(
     }
 
     // equivalentClass edges
-    for (const eqIri of detail.equivalent_iris) {
+    for (const eqIri of detail.equivalent_iris ?? []) {
       ensureNode(eqIri);
       addEdge(iri, eqIri, "equivalentClass");
     }
 
     // disjointWith edges
-    for (const djIri of detail.disjoint_iris) {
+    for (const djIri of detail.disjoint_iris ?? []) {
       ensureNode(djIri);
       addEdge(iri, djIri, "disjointWith");
     }

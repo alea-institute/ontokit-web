@@ -331,7 +331,7 @@ export interface OWLClass {
   deprecated: boolean;
   parent_iris: string[];
   child_count: number;
-  instance_count: number;
+  instance_count: number | null;
 }
 
 export interface OWLClassListResponse {
@@ -390,10 +390,10 @@ export interface OWLClassDetail {
   deprecated: boolean;
   parent_iris: string[];
   parent_labels: Record<string, string>;  // Map of IRI to resolved label
-  equivalent_iris: string[];
-  disjoint_iris: string[];
+  equivalent_iris: string[] | null;
+  disjoint_iris: string[] | null;
   child_count: number;
-  instance_count: number;
+  instance_count: number | null;
   is_defined: boolean;
   source_ontology?: string;
   annotations: AnnotationProperty[];  // DC, SKOS, and other annotation properties
