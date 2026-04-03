@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, Github, Trash2, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Pencil, Save } from "lucide-react";
+import { ArrowLeft, Trash2, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Pencil, Save } from "lucide-react";
+import { GithubIcon as Github } from "@/components/icons/github";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
