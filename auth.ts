@@ -1,6 +1,12 @@
 import NextAuth from "next-auth";
 import type { NextAuthConfig, User } from "next-auth";
 import "next-auth/jwt";
+import { getAuthMode, isZitadelConfigured } from "@/lib/auth-mode";
+
+// When auth is not required, provide a default secret so NextAuth doesn't crash
+if (getAuthMode() !== "required" && !process.env.NEXTAUTH_SECRET) {
+  process.env.NEXTAUTH_SECRET = "ontokit-optional-auth-secret";
+}
 
 // Zitadel provider configuration
 const zitadelProvider = {
@@ -26,7 +32,9 @@ const zitadelProvider = {
 };
 
 export const authConfig: NextAuthConfig = {
-  providers: [zitadelProvider],
+  providers: getAuthMode() === "disabled" || !isZitadelConfigured()
+    ? []
+    : [zitadelProvider],
   events: {
     async signOut(_message) {
       // This event fires after local session is cleared
@@ -44,6 +52,11 @@ export const authConfig: NextAuthConfig = {
           expiresAt: account.expires_at,
           user,
         };
+      }
+
+      // Skip token refresh when Zitadel is not configured
+      if (!isZitadelConfigured()) {
+        return token;
       }
 
       // Return previous token if the access token has not expired yet
@@ -95,10 +108,9 @@ export const authConfig: NextAuthConfig = {
       return session;
     },
   },
-  pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error",
-  },
+  pages: getAuthMode() === "required"
+    ? { signIn: "/auth/signin", error: "/auth/error" }
+    : {},
   debug: process.env.NODE_ENV === "development",
 };
 
