@@ -1010,7 +1010,7 @@ export function ClassDetailPanel({
             <div className="flex items-center gap-4">
               <StatItem label="subclasses" value={classDetail.child_count} />
               <span className="text-slate-300 dark:text-slate-600">&middot;</span>
-              <StatItem label="instances" value={classDetail.instance_count} />
+              <StatItem label="instances" value={classDetail.instance_count ?? "—"} />
             </div>
           </Section>
 
@@ -1041,7 +1041,7 @@ export function ClassDetailPanel({
           />
 
           {/* Equivalent Classes (read-only) */}
-          {classDetail.equivalent_iris.length > 0 && (
+          {classDetail.equivalent_iris && classDetail.equivalent_iris.length > 0 && (
             <Section title="Equivalent Classes" tooltip="owl:equivalentClass" icon={<Equal className="h-4 w-4" />}>
               <div className="space-y-1">
                 {classDetail.equivalent_iris.map((iri) => (
@@ -1052,7 +1052,7 @@ export function ClassDetailPanel({
           )}
 
           {/* Disjoint Classes (read-only) */}
-          {classDetail.disjoint_iris.length > 0 && (
+          {classDetail.disjoint_iris && classDetail.disjoint_iris.length > 0 && (
             <Section title="Disjoint With" tooltip="owl:disjointWith" icon={<Ban className="h-4 w-4" />}>
               <div className="space-y-1">
                 {classDetail.disjoint_iris.map((iri) => (
@@ -1144,7 +1144,7 @@ function IriLink({ iri, label, onClick }: IriLinkProps) {
 
 interface StatItemProps {
   label: string;
-  value: number;
+  value: number | string | null;
 }
 
 function StatItem({ label, value }: StatItemProps) {

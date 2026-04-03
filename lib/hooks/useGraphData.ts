@@ -89,12 +89,12 @@ export function useGraphData({
               newNeighborIris.push(parentIri);
             }
           }
-          for (const eqIri of detail.equivalent_iris) {
+          for (const eqIri of detail.equivalent_iris ?? []) {
             if (!resolvedNodesRef.current.has(eqIri)) {
               newNeighborIris.push(eqIri);
             }
           }
-          for (const djIri of detail.disjoint_iris) {
+          for (const djIri of detail.disjoint_iris ?? []) {
             if (!resolvedNodesRef.current.has(djIri)) {
               newNeighborIris.push(djIri);
             }
@@ -158,8 +158,8 @@ export function useGraphData({
     const referenced = new Set<string>();
     for (const detail of resolvedNodesRef.current.values()) {
       for (const iri of detail.parent_iris) referenced.add(iri);
-      for (const iri of detail.equivalent_iris) referenced.add(iri);
-      for (const iri of detail.disjoint_iris) referenced.add(iri);
+      for (const iri of detail.equivalent_iris ?? []) referenced.add(iri);
+      for (const iri of detail.disjoint_iris ?? []) referenced.add(iri);
       for (const iri of getSeeAlsoIris(detail)) referenced.add(iri);
     }
     return [...referenced].filter(
@@ -250,8 +250,8 @@ export function useGraphData({
         // Depth 1: immediate neighbors (including seeAlso/isDefinedBy targets)
         const depth1Iris = [
           ...focusDetail.parent_iris,
-          ...focusDetail.equivalent_iris,
-          ...focusDetail.disjoint_iris,
+          ...(focusDetail.equivalent_iris ?? []),
+          ...(focusDetail.disjoint_iris ?? []),
           ...getSeeAlsoIris(focusDetail),
         ];
         const depth2Candidates = await fetchNeighbors(depth1Iris);
@@ -303,8 +303,8 @@ export function useGraphData({
         if (detail) {
           const neighborIris = [
             ...detail.parent_iris,
-            ...detail.equivalent_iris,
-            ...detail.disjoint_iris,
+            ...(detail.equivalent_iris ?? []),
+            ...(detail.disjoint_iris ?? []),
             ...getSeeAlsoIris(detail),
           ];
           await fetchNeighbors(neighborIris);
