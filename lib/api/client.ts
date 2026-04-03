@@ -149,6 +149,9 @@ function uploadFileWithProgress<T>(
     const xhr = new XMLHttpRequest();
     const url = `${API_BASE}${endpoint}`;
 
+    // 5-minute timeout for large file uploads + server-side processing
+    xhr.timeout = 300000;
+
     // Track upload progress
     xhr.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable && options.onProgress) {
@@ -186,8 +189,37 @@ function uploadFileWithProgress<T>(
       }
     });
 
-    xhr.addEventListener("error", () => {
-      reject(new ApiError(0, "Network Error", "Failed to upload file"));
+    xhr.addEventListener("error", async () => {
+      // XHR "error" fires for both true network failures and CORS-blocked
+      // server errors (e.g. a 500 without CORS headers). Probe the API root
+      // to distinguish the two cases so the user gets an actionable message.
+      let serverReachable = false;
+      try {
+        await fetch(`${API_BASE}/`, { method: "HEAD", mode: "cors" });
+        serverReachable = true;
+      } catch {
+        // probe failed — server truly unreachable
+      }
+
+      reject(
+        new ApiError(
+          0,
+          "Network Error",
+          serverReachable
+            ? "The server encountered an error processing your upload. Please try again or check the server logs."
+            : "Could not reach the server. Please check that the API server is running and accessible."
+        )
+      );
+    });
+
+    xhr.addEventListener("timeout", () => {
+      reject(
+        new ApiError(
+          0,
+          "Timeout",
+          "The upload timed out. The file may be too large for the server to process, or the server is not responding."
+        )
+      );
     });
 
     xhr.addEventListener("abort", () => {

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Upload } from "lucide-react";
+import { ArrowLeft, Plus, Upload, AlertCircle } from "lucide-react";
 import { GithubIcon as Github } from "@/components/icons/github";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -128,7 +128,6 @@ export default function NewProjectPage() {
       } else {
         setImportError("An error occurred while importing the file");
       }
-      throw err;
     } finally {
       setIsSubmitting(false);
       setUploadProgress(null);
@@ -312,11 +311,22 @@ export default function NewProjectPage() {
                     Ontology File <span className="text-red-500">*</span>
                   </label>
                   <FileUpload
-                    onFileSelect={setSelectedFile}
+                    onFileSelect={(file) => {
+                      setSelectedFile(file);
+                      setImportError(null);
+                    }}
                     selectedFile={selectedFile}
                     disabled={isSubmitting}
-                    error={importError}
                   />
+                  {importError && (
+                    <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                      <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium">Import failed</p>
+                        <p className="mt-0.5">{importError}</p>
+                      </div>
+                    </div>
+                  )}
                   <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                     The project name and description will be extracted from the ontology metadata.
                     You can override them below.
