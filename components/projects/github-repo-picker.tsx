@@ -145,7 +145,7 @@ export function GitHubRepoPicker({ onSelect }: GitHubRepoPickerProps) {
                   <p className="text-sm font-medium text-slate-900 dark:text-white">
                     {repo.full_name}
                     {repo.private && (
-                      <span className="ml-2 rounded-xs bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                      <span className="ml-2 rounded-sm bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
                         Private
                       </span>
                     )}
