@@ -7,11 +7,6 @@ import { NotificationBell } from "@/components/layout/notification-bell";
 import { ThemeToggle } from "@/components/editor/ThemeToggle";
 import { cn } from "@/lib/utils";
 
-// Auth mode flags — set at build time by next.config.ts
-const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
-const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
-const showAuthUI = authMode === "required" || (authMode === "optional" && zitadelConfigured);
-
 const navLinks = [
   { href: "/", label: "Projects" },
   { href: "/info", label: "Info" },
@@ -21,6 +16,11 @@ const navLinks = [
 
 export function Header() {
   const pathname = usePathname();
+
+  // Auth mode flags — must be inside component for correct client-side hydration
+  const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+  const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
+  const showAuthUI = authMode === "required" || (authMode === "optional" && zitadelConfigured);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
