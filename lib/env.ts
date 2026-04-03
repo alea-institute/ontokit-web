@@ -1,19 +1,18 @@
 import { z } from "zod";
 
 const serverSchema = z.object({
-  ZITADEL_ISSUER: z.string().url("ZITADEL_ISSUER must be a valid URL"),
+  ZITADEL_ISSUER: z.url("ZITADEL_ISSUER must be a valid URL"),
   ZITADEL_CLIENT_ID: z.string().min(1, "ZITADEL_CLIENT_ID is required"),
   ZITADEL_CLIENT_SECRET: z.string().min(1, "ZITADEL_CLIENT_SECRET is required"),
-  NEXTAUTH_URL: z.string().url().optional(),
+  NEXTAUTH_URL: z.url().optional(),
   NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required"),
 });
 
 const clientSchema = z.object({
   NEXT_PUBLIC_API_URL: z
-    .string()
     .url("NEXT_PUBLIC_API_URL must be a valid URL")
     .default("http://localhost:8000"),
-  NEXT_PUBLIC_WS_URL: z.string().url().optional(),
+  NEXT_PUBLIC_WS_URL: z.url().optional(),
 });
 
 export type ServerEnv = z.infer<typeof serverSchema>;
@@ -22,11 +21,10 @@ export type ClientEnv = z.infer<typeof clientSchema>;
 function validateServerEnv(): ServerEnv {
   const result = serverSchema.safeParse(process.env);
   if (!result.success) {
-    const formatted = result.error.format();
-    const messages = Object.entries(formatted)
-      .filter(([key]) => key !== "_errors")
+    const tree = z.treeifyError(result.error);
+    const messages = Object.entries(tree.properties ?? {})
       .map(([key, val]) => {
-        const errors = (val as { _errors?: string[] })?._errors ?? [];
+        const errors = val?.errors ?? [];
         return `  ${key}: ${errors.join(", ")}`;
       })
       .join("\n");
@@ -45,10 +43,15 @@ function validateClientEnv(): ClientEnv {
   };
   const result = clientSchema.safeParse(raw);
   if (!result.success) {
+    const tree = z.treeifyError(result.error);
+    const fieldErrors: Record<string, string[]> = {};
+    for (const [key, val] of Object.entries(tree.properties ?? {})) {
+      if (val?.errors?.length) {
+        fieldErrors[key] = val.errors;
+      }
+    }
     throw new Error(
-      `Invalid client environment variables: ${JSON.stringify(
-        result.error.flatten().fieldErrors
-      )}`
+      `Invalid client environment variables: ${JSON.stringify(fieldErrors)}`
     );
   }
   return result.data;
