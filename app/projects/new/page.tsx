@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Upload, Github } from "lucide-react";
+import { ArrowLeft, Plus, Upload } from "lucide-react";
+import { GithubIcon as Github } from "@/components/icons/github";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/file-upload";
@@ -182,7 +183,7 @@ export default function NewProjectPage() {
   };
 
   const handleCancel = () => {
-    router.push("/projects");
+    router.push("/");
   };
 
   // Show loading state while checking auth
@@ -232,7 +233,7 @@ export default function NewProjectPage() {
         <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
           {/* Back link */}
           <Link
-            href="/projects"
+            href="/"
             className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
           >
             <ArrowLeft className="h-4 w-4" />

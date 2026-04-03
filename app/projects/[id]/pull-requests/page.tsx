@@ -74,7 +74,7 @@ export default function PullRequestsPage() {
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
             <Link
-              href="/projects"
+              href="/"
               className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -85,7 +85,7 @@ export default function PullRequestsPage() {
               <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">
                 {error || "Project not found"}
               </h2>
-              <Link href="/projects" className="mt-4 inline-block">
+              <Link href="/" className="mt-4 inline-block">
                 <Button variant="outline">Back to Projects</Button>
               </Link>
             </div>
