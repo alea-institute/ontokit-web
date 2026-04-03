@@ -37,7 +37,7 @@ export function AnnotationRow({
     <div className="flex items-start gap-2">
       {showPropertyLabel && (
         <span
-          className="mt-1.5 shrink-0 rounded-xs bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+          className="mt-1.5 shrink-0 rounded-sm bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
           title={curie}
         >
           {displayLabel}
@@ -79,13 +79,13 @@ export function AnnotationRow({
       {onRemove ? (
         <button
           onClick={onRemove}
-          className="mt-1 shrink-0 rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+          className="mt-1 shrink-0 rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
           aria-label={`Remove ${displayLabel} annotation`}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       ) : (
-        <div className="mt-1 shrink-0 rounded-xs p-1">
+        <div className="mt-1 shrink-0 rounded-sm p-1">
           <div className="h-3.5 w-3.5" />
         </div>
       )}

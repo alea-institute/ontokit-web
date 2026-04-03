@@ -275,7 +275,7 @@ export function OntologyGraph({
         <button
           onClick={toggleDirection}
           className={cn(
-            "flex items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium transition-colors",
+            "flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
             "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700",
           )}
           aria-label={`Switch to ${direction === "TB" ? "left-to-right" : "top-to-bottom"} layout`}
@@ -289,7 +289,7 @@ export function OntologyGraph({
         </button>
         <button
           onClick={resetGraph}
-          className="flex items-center gap-1 rounded-xs px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+          className="flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
           aria-label="Reset graph"
         >
           <RotateCcw className="h-3.5 w-3.5" />

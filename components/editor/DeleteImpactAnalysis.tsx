@@ -119,7 +119,7 @@ export function DeleteImpactAnalysis({
             setAcknowledged(e.target.checked);
             onAcknowledge(e.target.checked);
           }}
-          className="mt-0.5 h-4 w-4 rounded-xs border-slate-300 text-red-600 focus:ring-red-500"
+          className="mt-0.5 h-4 w-4 rounded-sm border-slate-300 text-red-600 focus:ring-red-500"
         />
         <span className="text-sm text-slate-600 dark:text-slate-400">
           I understand this will create dangling references

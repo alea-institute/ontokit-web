@@ -613,7 +613,7 @@ export function ClassDetailPanel({
               {onCopyIri && (
                 <button
                   onClick={() => onCopyIri(classDetail.iri)}
-                  className="flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                  className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300"
                   title="Copy IRI"
                 >
                   <Copy className="h-3 w-3" />
@@ -622,7 +622,7 @@ export function ClassDetailPanel({
               {onNavigateToSource && (
                 <button
                   onClick={() => onNavigateToSource(classDetail.iri)}
-                  className="flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-xs text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                  className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                   title="View in Source"
                 >
                   <Code className="h-3 w-3" />
@@ -691,13 +691,13 @@ export function ClassDetailPanel({
                     {editLabels.length > 1 ? (
                       <button
                         onClick={() => removeLabel(index)}
-                        className="rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                        className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                         title="Remove label"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     ) : (
-                      <div className="rounded-xs p-1">
+                      <div className="rounded-sm p-1">
                         <div className="h-3.5 w-3.5" />
                       </div>
                     )}
@@ -798,13 +798,13 @@ export function ClassDetailPanel({
                       {!isGhost ? (
                         <button
                           onClick={() => removeComment(index)}
-                          className="mt-1 shrink-0 rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          className="mt-1 shrink-0 rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                           title="Remove comment"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       ) : (
-                        <div className="mt-1 shrink-0 rounded-xs p-1">
+                        <div className="mt-1 shrink-0 rounded-sm p-1">
                           <div className="h-3.5 w-3.5" />
                         </div>
                       )}
@@ -921,7 +921,7 @@ export function ClassDetailPanel({
                     </span>
                     <button
                       onClick={() => removeParent(parentIri)}
-                      className="rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                      className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                       title="Remove parent"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

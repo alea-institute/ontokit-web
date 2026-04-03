@@ -137,7 +137,7 @@ export function RelationshipSection({
                 </button>
                 <button
                   onClick={() => { onRemoveTarget?.(gIdx, tIdx); onSaveNeeded?.(); }}
-                  className="shrink-0 rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                  className="shrink-0 rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                   title="Remove"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -441,7 +441,7 @@ function RelationshipEntitySearch({
         className="flex-1 rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500"
       />
       {/* Placeholder to align with the delete button column */}
-      <div className="shrink-0 rounded-xs p-1">
+      <div className="shrink-0 rounded-sm p-1">
         <div className="h-3.5 w-3.5" />
       </div>
 

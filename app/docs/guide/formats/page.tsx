@@ -114,7 +114,7 @@ ex:Dog a owl:Class ;
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
               JSON-LD embeds RDF data in standard JSON using
-              a <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">@context</code> block.
+              a <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">@context</code> block.
               Popular with web developers because it integrates directly with JavaScript and REST
               APIs. Used by Schema.org for structured data in web pages.
             </p>

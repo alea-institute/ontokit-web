@@ -481,7 +481,7 @@ export function PropertyDetailPanel({
               </span>
               <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={propertyIri}>{propertyIri}</p>
               {onCopyIri && (
-                <button onClick={() => onCopyIri(propertyIri)} className="flex items-center gap-1 rounded-xs px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700" title="Copy IRI">
+                <button onClick={() => onCopyIri(propertyIri)} className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700" title="Copy IRI">
                   <Copy className="h-3 w-3" />
                 </button>
               )}
@@ -515,9 +515,9 @@ export function PropertyDetailPanel({
                     <LanguageFlag lang={label.lang} />
                     <input type="text" value={label.lang} onChange={(e) => updateLabel(index, "lang", e.target.value)} onBlur={() => triggerSave()} className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" title="Language tag" />
                     {editLabels.length > 1 ? (
-                      <button onClick={() => removeLabel(index)} className="rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400" title="Remove"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <button onClick={() => removeLabel(index)} className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400" title="Remove"><Trash2 className="h-3.5 w-3.5" /></button>
                     ) : (
-                      <div className="rounded-xs p-1"><div className="h-3.5 w-3.5" /></div>
+                      <div className="rounded-sm p-1"><div className="h-3.5 w-3.5" /></div>
                     )}
                   </div>
                 ))}
@@ -701,7 +701,7 @@ export function PropertyDetailPanel({
                         type="checkbox"
                         checked={editCharacteristics.includes(ch.iri)}
                         onChange={() => toggleCharacteristic(ch.iri)}
-                        className="h-3.5 w-3.5 rounded-xs border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600"
+                        className="h-3.5 w-3.5 rounded-sm border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600"
                       />
                       <span className="text-xs text-slate-700 dark:text-slate-300">{ch.label}</span>
                     </label>
@@ -776,7 +776,7 @@ export function PropertyDetailPanel({
                   return (
                     <div key={`${ann.property_iri}-${vi}`} className="flex gap-4">
                       <div className="w-40 shrink-0 flex items-center">
-                        <span className="rounded-xs bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={curie}>{effectiveLabel}</span>
+                        <span className="rounded-sm bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={curie}>{effectiveLabel}</span>
                       </div>
                       <div className="min-w-0 flex-1 flex items-center gap-2">
                         {v.lang && <LanguageFlag lang={v.lang} />}
@@ -933,7 +933,7 @@ function IriList({
           <button onClick={() => onNavigate?.(iri)} className="flex-1 truncate text-sm text-primary-600 hover:underline dark:text-primary-400" title={iri}>
             {resolvedLabels?.[iri] || getLocalName(iri)}
           </button>
-          <button onClick={() => onRemove(iri)} className="shrink-0 rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400" title="Remove">
+          <button onClick={() => onRemove(iri)} className="shrink-0 rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400" title="Remove">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>

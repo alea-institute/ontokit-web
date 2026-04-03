@@ -21,12 +21,12 @@ export default function VocabulariesPage() {
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-3">
               The foundational vocabulary for defining classes and properties in RDF.
-              Provides <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">rdfs:Class</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">rdfs:subClassOf</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">rdfs:label</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">rdfs:comment</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">rdfs:domain</code>, and
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">rdfs:range</code>.
+              Provides <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">rdfs:Class</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">rdfs:subClassOf</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">rdfs:label</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">rdfs:comment</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">rdfs:domain</code>, and
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">rdfs:range</code>.
               Almost every ontology uses RDFS terms.
             </p>
             <p className="text-sm">
@@ -46,7 +46,7 @@ export default function VocabulariesPage() {
             <p className="text-slate-600 dark:text-slate-400 mb-3">
               A set of 15 core metadata elements (title, creator, date, subject, etc.) widely used
               in libraries, digital repositories, and ontology metadata.
-              The <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">dcterms:</code> namespace
+              The <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">dcterms:</code> namespace
               provides refined versions with formal ranges and domains.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
@@ -74,11 +74,11 @@ export default function VocabulariesPage() {
             <p className="text-slate-600 dark:text-slate-400 mb-3">
               Designed for thesauri, classification schemes, and controlled vocabularies. Key
               terms include
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">skos:Concept</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">skos:broader</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">skos:narrower</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">skos:prefLabel</code>, and
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">skos:altLabel</code>.
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">skos:Concept</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">skos:broader</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">skos:narrower</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">skos:prefLabel</code>, and
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">skos:altLabel</code>.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
               <pre>{`@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
@@ -108,10 +108,10 @@ ex:Mammals a skos:Concept ;
             <p className="text-slate-600 dark:text-slate-400 mb-3">
               Describes people, their activities, and their relationships. Commonly used terms
               include
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">foaf:Person</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">foaf:name</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">foaf:knows</code>, and
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">foaf:homepage</code>.
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">foaf:Person</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">foaf:name</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">foaf:knows</code>, and
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">foaf:homepage</code>.
             </p>
             <p className="text-sm">
               <a href="http://xmlns.com/foaf/spec/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">
@@ -148,12 +148,12 @@ ex:Mammals a skos:Concept ;
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-3">
               OWL itself provides vocabulary terms for formal ontology
-              modeling: <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">owl:Class</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">owl:ObjectProperty</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">owl:DatatypeProperty</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">owl:Restriction</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">owl:equivalentClass</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">owl:disjointWith</code>, and
+              modeling: <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">owl:Class</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">owl:ObjectProperty</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">owl:DatatypeProperty</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">owl:Restriction</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">owl:equivalentClass</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">owl:disjointWith</code>, and
               many more.
             </p>
             <p className="text-sm">
@@ -173,9 +173,9 @@ ex:Mammals a skos:Concept ;
             <p className="text-slate-600 dark:text-slate-400 mb-3">
               Captures the provenance of data &mdash; who created it, when, from what sources, and
               through which processes. Key
-              types: <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">prov:Entity</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">prov:Activity</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-xs text-xs">prov:Agent</code>.
+              types: <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">prov:Entity</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">prov:Activity</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">prov:Agent</code>.
             </p>
             <p className="text-sm">
               <a href="https://www.w3.org/TR/prov-o/" target="_blank" rel="noopener noreferrer" className="text-blue-600 dark:text-blue-400 hover:underline">

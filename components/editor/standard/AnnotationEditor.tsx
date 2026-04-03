@@ -210,7 +210,7 @@ export function AnnotationPropertyPicker({ onSelect, onClose, excludeIris }: Ann
           placeholder="Search annotation properties..."
           className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-hidden dark:text-white dark:placeholder:text-slate-500"
         />
-        <button onClick={onClose} className="rounded-xs p-0.5 hover:bg-slate-100 dark:hover:bg-slate-600">
+        <button onClick={onClose} className="rounded-sm p-0.5 hover:bg-slate-100 dark:hover:bg-slate-600">
           <X className="h-3.5 w-3.5 text-slate-400" />
         </button>
       </div>

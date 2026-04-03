@@ -392,7 +392,7 @@ export function PRActions({
             type="checkbox"
             checked={deleteSourceBranch}
             onChange={(e) => setDeleteSourceBranch(e.target.checked)}
-            className="h-4 w-4 rounded-xs border-slate-300 text-primary-600 focus:ring-primary-500"
+            className="h-4 w-4 rounded-sm border-slate-300 text-primary-600 focus:ring-primary-500"
           />
           <span className="text-sm text-slate-700 dark:text-slate-300">
             Delete source branch &ldquo;{pr.source_branch}&rdquo; after merging

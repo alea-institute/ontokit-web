@@ -81,7 +81,7 @@ function ToastItem({ toast }: { toast: Toast }) {
       <button
         onClick={handleDismiss}
         aria-label="Dismiss notification"
-        className="shrink-0 rounded-xs p-0.5 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+        className="shrink-0 rounded-sm p-0.5 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
       >
         <X className="h-3.5 w-3.5" />
       </button>

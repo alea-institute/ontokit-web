@@ -454,7 +454,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
           </div>
 
           {hasChanges && (
-            <span className="rounded-xs bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+            <span className="rounded-sm bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
               Unsaved changes
             </span>
           )}
@@ -573,7 +573,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                     )}
                   </div>
                 </div>
-                <span className="flex-shrink-0 rounded-xs bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                <span className="flex-shrink-0 rounded-sm bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                   {issue.rule_id}
                 </span>
               </button>

@@ -90,7 +90,7 @@ export function PRCreateModal({
           <h2 className="text-lg font-semibold">Create Pull Request</h2>
           <button
             onClick={onClose}
-            className="rounded-xs p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
+            className="rounded-sm p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
           >
             <X className="h-5 w-5" />
           </button>
@@ -115,7 +115,7 @@ export function PRCreateModal({
                 <select
                   value={sourceBranch}
                   onChange={(e) => setSourceBranch(e.target.value)}
-                  className="flex-1 rounded-xs border-0 bg-transparent py-1 text-sm focus:outline-hidden focus:ring-0"
+                  className="flex-1 rounded-sm border-0 bg-transparent py-1 text-sm focus:outline-hidden focus:ring-0"
                 >
                   {branches.map((branch) => (
                     <option key={branch.name} value={branch.name}>
@@ -137,7 +137,7 @@ export function PRCreateModal({
                 <select
                   value={targetBranch}
                   onChange={(e) => setTargetBranch(e.target.value)}
-                  className="flex-1 rounded-xs border-0 bg-transparent py-1 text-sm focus:outline-hidden focus:ring-0"
+                  className="flex-1 rounded-sm border-0 bg-transparent py-1 text-sm focus:outline-hidden focus:ring-0"
                 >
                   {branches.map((branch) => (
                     <option key={branch.name} value={branch.name}>

@@ -142,14 +142,14 @@ export function PRCommentThread({
                     setEditingId(comment.id);
                     setEditBody(comment.body);
                   }}
-                  className="rounded-xs p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+                  className="rounded-sm p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
                   title="Edit"
                 >
                   <Edit className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(comment.id)}
-                  className="rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                  className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
                   title="Delete"
                 >
                   <Trash2 className="h-4 w-4" />

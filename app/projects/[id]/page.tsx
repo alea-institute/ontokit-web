@@ -410,7 +410,7 @@ export default function ProjectPage() {
                 Tell the project owners why you&apos;d like to join this project.
               </p>
               {joinError && (
-                <div className="mb-3 rounded-xs bg-red-50 p-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                <div className="mb-3 rounded-sm bg-red-50 p-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
                   {joinError}
                 </div>
               )}

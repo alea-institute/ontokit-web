@@ -92,7 +92,7 @@ export function EntityTreeToolbar({
         {canAdd && onAdd && (
           <button
             onClick={onAdd}
-            className="rounded-xs p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
+            className="rounded-sm p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
             aria-label="Add entity"
           >
             <Plus className="h-4 w-4 text-slate-500" />
@@ -152,7 +152,7 @@ export function EntityTreeToolbar({
         <button
           onClick={handleToggle}
           className={cn(
-            "flex items-center gap-0.5 rounded-xs p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
+            "flex items-center gap-0.5 rounded-sm p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
             showSearch && "bg-slate-100 dark:bg-slate-700",
           )}
           title={showSearch ? "Close search" : "Search (Ctrl+K)"}
@@ -175,7 +175,7 @@ export function EntityTreeToolbar({
           <span>Tip: click Expand to expand one level at a time</span>
           <button
             onClick={dismissTip}
-            className="ml-auto rounded-xs p-0.5 hover:bg-blue-100 dark:hover:bg-blue-800/50"
+            className="ml-auto rounded-sm p-0.5 hover:bg-blue-100 dark:hover:bg-blue-800/50"
             aria-label="Dismiss tip"
           >
             <X className="h-3 w-3" />

@@ -43,7 +43,7 @@ export function PropertyAssertionSection({
         return (
           <div key={idx} className="contents">
             <span
-              className="self-center rounded-xs bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+              className="self-center rounded-sm bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
               title={a.propertyIri}
             >
               {propLabel}
@@ -62,7 +62,7 @@ export function PropertyAssertionSection({
                   {a.lang && <LanguageFlag lang={a.lang} />}
                   <span className="text-sm text-slate-700 dark:text-slate-300">{a.value}</span>
                   {a.datatype && (
-                    <span className="shrink-0 rounded-xs bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>
+                    <span className="shrink-0 rounded-sm bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>
                       {getLocalName(a.datatype)}
                     </span>
                   )}
@@ -71,7 +71,7 @@ export function PropertyAssertionSection({
               {isEditing && onRemove && (
                 <button
                   onClick={() => { onRemove(idx); onSaveNeeded?.(); }}
-                  className="shrink-0 rounded-xs p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                  className="shrink-0 rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                   title="Remove"
                 >
                   <Trash2 className="h-3.5 w-3.5" />

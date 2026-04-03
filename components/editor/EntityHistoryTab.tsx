@@ -101,7 +101,7 @@ export function EntityHistoryTab({
       <div className="min-w-0 flex-1">
         {isLoading && (
           <div className="py-1">
-            <div className="h-4 w-24 animate-pulse rounded-xs bg-slate-200 dark:bg-slate-700" />
+            <div className="h-4 w-24 animate-pulse rounded-sm bg-slate-200 dark:bg-slate-700" />
           </div>
         )}
         {error && !isLoading && (

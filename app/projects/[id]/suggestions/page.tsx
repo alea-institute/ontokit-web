@@ -226,7 +226,7 @@ export default function SuggestionsPage() {
                             {config.label}
                           </span>
                           {(s.revision ?? 1) > 1 && (
-                            <span className="rounded-xs bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                            <span className="rounded-sm bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                               v{s.revision}
                             </span>
                           )}
@@ -241,7 +241,7 @@ export default function SuggestionsPage() {
                             {s.entities_modified.map((label) => (
                               <span
                                 key={label}
-                                className="rounded-xs bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-300"
+                                className="rounded-sm bg-slate-100 px-1.5 py-0.5 text-xs text-slate-700 dark:bg-slate-700 dark:text-slate-300"
                               >
                                 {label}
                               </span>

@@ -263,10 +263,10 @@ export default function UserSettingsPage() {
                   >
                     GitHub Personal Access Token
                   </a>{" "}
-                  with the <code className="rounded-xs bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">repo</code> scope.
+                  with the <code className="rounded-sm bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">repo</code> scope.
                 </p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Optional: add the <code className="rounded-xs bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">admin:repo_hook</code> scope
+                  Optional: add the <code className="rounded-sm bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">admin:repo_hook</code> scope
                   to allow OntoKit to auto-configure GitHub webhooks for instant upstream sync.
                 </p>
 

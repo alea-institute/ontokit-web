@@ -136,7 +136,7 @@ export function ParentClassPicker({
         />
         <button
           onClick={onClose}
-          className="rounded-xs p-0.5 hover:bg-slate-100 dark:hover:bg-slate-600"
+          className="rounded-sm p-0.5 hover:bg-slate-100 dark:hover:bg-slate-600"
         >
           <X className="h-3.5 w-3.5 text-slate-400" />
         </button>

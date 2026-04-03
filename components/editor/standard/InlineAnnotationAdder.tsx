@@ -210,7 +210,7 @@ export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: Inli
             disabled={!selectedProperty}
           />
           {/* Invisible placeholder to align with delete buttons above */}
-          <div className="shrink-0 rounded-xs p-1">
+          <div className="shrink-0 rounded-sm p-1">
             <div className="h-3.5 w-3.5" />
           </div>
         </div>
