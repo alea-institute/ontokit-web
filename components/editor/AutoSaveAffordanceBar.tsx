@@ -106,30 +106,32 @@ export function AutoSaveAffordanceBar({
         {/* Right side — save + cancel buttons */}
         <div className="flex shrink-0 items-center gap-2">
           {!hideSaveButton && (
-            <button
-              onClick={saveEnabled ? onManualSave : undefined}
-              disabled={!saveEnabled}
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                saveEnabled
-                  ? "bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
-                  : "cursor-not-allowed bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500",
-              )}
-            >
-              {saveSpinning ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Save className="h-3.5 w-3.5" />
-              )}
-              Save
-            </button>
-            <Link
-              href="/settings#save-button"
-              title="You can hide this button in Settings. Auto-save still works when navigating away."
-              className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
-            >
-              <Info className="h-3.5 w-3.5" />
-            </Link>
+            <>
+              <button
+                onClick={saveEnabled ? onManualSave : undefined}
+                disabled={!saveEnabled}
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                  saveEnabled
+                    ? "bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
+                    : "cursor-not-allowed bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500",
+                )}
+              >
+                {saveSpinning ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Save
+              </button>
+              <Link
+                href="/settings#save-button"
+                title="You can hide this button in Settings. Auto-save still works when navigating away."
+                className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+              >
+                <Info className="h-3.5 w-3.5" />
+              </Link>
+            </>
           )}
           {onCancel && (
             <button
