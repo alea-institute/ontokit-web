@@ -3,7 +3,7 @@
 ## Milestones
 
 - ✅ **v0.2.0 Core Editor** - Phases 1-6 (shipped)
-- 🚧 **v0.3.0 Deployment** - Phases 7-10 (in progress)
+- ✅ **v0.3.0 Deployment** - Phases 7-10 (shipped)
 
 ## Phases
 
@@ -14,14 +14,14 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 
 </details>
 
-### 🚧 v0.3.0 Deployment (In Progress)
+### ✅ v0.3.0 Deployment (Shipped 2026-04-03)
 
-**Milestone Goal:** Sync ALEA forks with CatholicOS upstream and deploy the full stack to production with optional authentication for public read-only browsing.
+**Milestone Goal:** Sync ALEA forks with CatholicOS upstream and deploy the full stack to production with optional authentication and anonymous suggestions.
 
-- [ ] **Phase 7: Sync ALEA Forks** - Fast-forward both ALEA repos to CatholicOS main
-- [x] **Phase 8: Optional Auth** - Make authentication optional via AUTH_DISABLED env var across both repos (completed 2026-04-03)
-- [ ] **Phase 9: Production Deployment** - Install Postgres, switch branches, configure env, rebuild, restart on production server
-- [x] **Phase 10: Anonymous Suggestions** - Allow anonymous users to suggest changes on public projects with optional name/email collection (completed 2026-04-03)
+- [x] **Phase 7: Sync ALEA Forks** - Fast-forward both ALEA repos to CatholicOS main (completed 2026-04-03)
+- [x] **Phase 8: Optional Auth** - AUTH_MODE=required|optional|disabled across both repos (completed 2026-04-03)
+- [x] **Phase 9: Production Deployment** - Postgres, Redis, Caddy, systemd on 54.224.195.12 (completed 2026-04-03)
+- [x] **Phase 10: Anonymous Suggestions** - "Propose Edit" for anonymous users with credit modal (completed 2026-04-03)
 
 ## Phase Details
 
@@ -86,7 +86,7 @@ Plans:
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 7. Sync ALEA Forks | v0.3.0 | 0/TBD | Not started | - |
-| 8. Optional Auth | 2/2 | Complete   | 2026-04-03 | - |
-| 9. Production Deployment | v0.3.0 | 0/TBD | Not started | - |
-| 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete   | 2026-04-03 |
+| 7. Sync ALEA Forks | v0.3.0 | ✓ | Complete | 2026-04-03 |
+| 8. Optional Auth | v0.3.0 | 2/2 | Complete | 2026-04-03 |
+| 9. Production Deployment | v0.3.0 | 1/1 | Complete | 2026-04-03 |
+| 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete | 2026-04-03 |
