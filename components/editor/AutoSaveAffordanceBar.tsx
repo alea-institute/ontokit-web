@@ -3,6 +3,7 @@
 import { Cloud, Loader2, Check, AlertTriangle, Save, X, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { Tooltip } from "@/components/ui/tooltip";
 import Link from "next/link";
 import type { SaveStatus } from "@/lib/hooks/useAutoSave";
 
@@ -124,13 +125,24 @@ export function AutoSaveAffordanceBar({
                 )}
                 Save
               </button>
-              <Link
-                href="/settings#save-button"
-                title="You can hide this button in Settings. Auto-save still works when navigating away."
-                className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+              <Tooltip
+                side="bottom"
+                content={
+                  <span>
+                    Auto-save works when navigating away.{" "}
+                    <Link href="/settings#save-button" className="underline hover:text-slate-300 dark:hover:text-slate-600">
+                      Click here to change this setting.
+                    </Link>
+                  </span>
+                }
               >
-                <Info className="h-3.5 w-3.5" />
-              </Link>
+                <button
+                  type="button"
+                  className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </Tooltip>
             </>
           )}
           {onCancel && (
