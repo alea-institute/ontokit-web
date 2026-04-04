@@ -191,7 +191,7 @@ export function AddEntityDialog({
                 onChange={(e) => setLabel(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="e.g., Privileged Altar"
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
                 autoComplete="off"
               />
             </div>
@@ -209,7 +209,7 @@ export function AddEntityDialog({
                 value={entityType}
                 onChange={(e) => setEntityType(e.target.value as EntityType)}
                 disabled={!!parentIri}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
               >
                 {ENTITY_TYPE_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -254,7 +254,7 @@ export function AddEntityDialog({
                       iriManuallyEdited.current = true;
                       setIri(e.target.value);
                     }}
-                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs placeholder:text-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {iriPattern === "uuid" && "Auto-generated UUID-based IRI"}

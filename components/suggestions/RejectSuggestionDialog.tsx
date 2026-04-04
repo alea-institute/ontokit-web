@@ -88,7 +88,7 @@ export function RejectSuggestionDialog({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="E.g., These changes conflict with the current naming conventions..."
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-red-500 focus:outline-hidden focus:ring-1 focus:ring-red-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
                 rows={3}
                 disabled={isSubmitting}
                 maxLength={1000}

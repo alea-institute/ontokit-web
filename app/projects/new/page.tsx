@@ -257,7 +257,7 @@ export default function NewProjectPage() {
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
                 activeTab === "create"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                  ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               )}
             >
@@ -270,7 +270,7 @@ export default function NewProjectPage() {
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
                 activeTab === "import"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                  ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               )}
             >
@@ -283,7 +283,7 @@ export default function NewProjectPage() {
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
                 activeTab === "github"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                  ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               )}
             >

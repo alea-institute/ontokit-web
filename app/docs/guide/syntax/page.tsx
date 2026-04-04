@@ -36,13 +36,13 @@ export default function SyntaxPage() {
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
               Designed for readability by ontology authors. Uses English-like keywords
-              (<code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">some</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">only</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">and</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">or</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">min</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">max</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">exactly</code>)
+              (<code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">some</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">only</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">and</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">or</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">min</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">max</code>,
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">exactly</code>)
               and is widely used in tools like Prot&eacute;g&eacute;.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">

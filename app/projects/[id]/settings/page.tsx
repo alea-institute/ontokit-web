@@ -1287,7 +1287,7 @@ export default function ProjectSettingsPage() {
                               <p className="text-sm font-medium text-slate-900 dark:text-white">
                                 {run.trigger_type === "import" ? "Import" : run.trigger_type === "manual" ? "Manual" : "Automatic"}
                                 {run.is_dry_run && (
-                                  <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                                  <span className="ml-2 rounded-sm bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                                     Preview
                                   </span>
                                 )}
@@ -1416,7 +1416,7 @@ export default function ProjectSettingsPage() {
                     Join Requests
                   </h2>
                   {joinRequestCount > 0 && (
-                    <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                       {joinRequestCount}
                     </span>
                   )}
@@ -1509,7 +1509,7 @@ export default function ProjectSettingsPage() {
                   Add a new member
                 </h3>
                 {addMemberError && (
-                  <div className="mb-3 rounded bg-red-50 p-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                  <div className="mb-3 rounded-sm bg-red-50 p-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
                     {addMemberError}
                   </div>
                 )}
@@ -1641,7 +1641,7 @@ export default function ProjectSettingsPage() {
                         <p className="text-sm text-slate-500 dark:text-slate-400">
                           {githubIntegration.sync_enabled ? "Sync enabled" : "Sync disabled"}
                           {!githubIntegration.connected_by_user_id && (
-                            <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                            <span className="ml-2 rounded-sm bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                               Legacy — reconnect to enable sync
                             </span>
                           )}
@@ -1829,7 +1829,7 @@ export default function ProjectSettingsPage() {
                                   <p className="text-sm font-medium text-slate-900 dark:text-white">
                                     {repo.full_name}
                                     {repo.private && (
-                                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+                                      <span className="ml-2 rounded-sm bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
                                         Private
                                       </span>
                                     )}
@@ -2205,7 +2205,7 @@ function WebhookConfigPanel({
                       Payload URL
                     </label>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 truncate rounded bg-slate-100 px-2 py-1.5 text-xs text-slate-800 dark:bg-slate-700 dark:text-slate-200">
+                      <code className="flex-1 truncate rounded-sm bg-slate-100 px-2 py-1.5 text-xs text-slate-800 dark:bg-slate-700 dark:text-slate-200">
                         {fullWebhookUrl}
                       </code>
                       <Button
@@ -2229,7 +2229,7 @@ function WebhookConfigPanel({
                       Secret
                     </label>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 truncate rounded bg-slate-100 px-2 py-1.5 text-xs text-slate-800 dark:bg-slate-700 dark:text-slate-200">
+                      <code className="flex-1 truncate rounded-sm bg-slate-100 px-2 py-1.5 text-xs text-slate-800 dark:bg-slate-700 dark:text-slate-200">
                         {showSecret ? webhookSecret : "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022"}
                       </code>
                       <Button
@@ -2702,7 +2702,7 @@ function UpstreamSyncSection({
                   type="checkbox"
                   checked={enabled}
                   onChange={(e) => setEnabled(e.target.checked)}
-                  className="rounded border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700"
+                  className="rounded-sm border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                   Enable upstream tracking
@@ -3141,7 +3141,7 @@ function EmbeddingSettingsSection({
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder={config?.api_key_set ? "Enter new key to replace" : "Enter API key"}
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
               />
             </div>
           )}
@@ -3152,7 +3152,7 @@ function EmbeddingSettingsSection({
               type="checkbox"
               checked={autoEmbed}
               onChange={(e) => setAutoEmbed(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+              className="h-4 w-4 rounded-sm border-slate-300 text-primary-600 focus:ring-primary-500"
             />
             <span className="text-sm text-slate-700 dark:text-slate-300">
               Auto-embed on save (~50ms for local model)

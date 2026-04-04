@@ -124,7 +124,7 @@ export default function HomePage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={cn(
                   "w-full rounded-lg border border-slate-200 bg-white py-2 pl-10 pr-4 text-sm",
-                  "placeholder:text-slate-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500",
+                  "placeholder:text-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500",
                   "dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100",
                   "sm:w-64"
                 )}

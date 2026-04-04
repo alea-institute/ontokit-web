@@ -448,7 +448,7 @@ export function PRDetail({
                     onChange={(e) => setNewComment(e.target.value)}
                     placeholder="Leave a comment..."
                     rows={3}
-                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700"
+                    className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-hidden dark:border-slate-600 dark:bg-slate-700"
                   />
                   <div className="mt-2 flex justify-end">
                     <Button
@@ -497,7 +497,7 @@ export function PRDetail({
                         <Clock className="h-3 w-3" />
                         {formatDate(commit.timestamp)}
                       </span>
-                      <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-700">
+                      <code className="rounded-sm bg-slate-100 px-1.5 py-0.5 font-mono text-xs dark:bg-slate-700">
                         {commit.short_hash}
                       </code>
                     </div>
@@ -589,7 +589,7 @@ export function PRDetail({
                               )}
                             </div>
                             <span className={cn(
-                              "flex-shrink-0 rounded px-1.5 py-0.5 text-xs font-medium",
+                              "flex-shrink-0 rounded-sm px-1.5 py-0.5 text-xs font-medium",
                               file.change_type === "added" && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
                               file.change_type === "deleted" && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
                               file.change_type === "modified" && "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",

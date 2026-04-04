@@ -248,7 +248,7 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
       {onAddChild && (
         <button
           onClick={handleAddChild}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700"
+          className="opacity-0 group-hover:opacity-100 p-1 rounded-sm hover:bg-slate-200 dark:hover:bg-slate-700"
           aria-label="Add subclass"
           tabIndex={-1}
         >

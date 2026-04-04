@@ -20,7 +20,7 @@ export default function InfoPage() {
         <div className="mt-10 flex items-center justify-center gap-4">
           <Link
             href="/"
-            className="rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors"
+            className="rounded-lg bg-primary-600 px-6 py-3 text-sm font-semibold text-white shadow-xs hover:bg-primary-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 transition-colors"
           >
             Browse Projects
           </Link>

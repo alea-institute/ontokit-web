@@ -20,7 +20,7 @@ const changelog: ChangelogEntry[] = [
           "Form-based entity editing for classes, properties, and individuals replacing raw Turtle source editing.",
           "Standard/Developer mode toggle with persistent preference for simplified or advanced editing views.",
           "Suggestion workflow: new 'suggester' role allows non-editors to propose changes with mandatory editor review.",
-          "Two-tier auto-save system: blur saves drafts to localStorage, navigation commits to git.",
+          "Two-tier auto-save system: on blur saves drafts to localStorage, navigation commits to git.",
           "Interactive graph visualization using React Flow with ELK layout for exploring ontology relationships.",
           "Drag-and-drop class reparenting with cycle detection and undo support.",
           "Context menus (right-click) for Add Subclass, Copy IRI, View in Source, and Delete operations.",

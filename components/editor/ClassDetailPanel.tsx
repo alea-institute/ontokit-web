@@ -613,7 +613,7 @@ export function ClassDetailPanel({
               {onCopyIri && (
                 <button
                   onClick={() => onCopyIri(classDetail.iri)}
-                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                  className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-300"
                   title="Copy IRI"
                 >
                   <Copy className="h-3 w-3" />
@@ -622,7 +622,7 @@ export function ClassDetailPanel({
               {onNavigateToSource && (
                 <button
                   onClick={() => onNavigateToSource(classDetail.iri)}
-                  className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                  className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                   title="View in Source"
                 >
                   <Code className="h-3 w-3" />
@@ -677,7 +677,7 @@ export function ClassDetailPanel({
                       onChange={(e) => updateLabel(index, "value", e.target.value)}
                       onBlur={() => triggerSave()}
                       placeholder="Label text"
-                      className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                      className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                     />
                     <LanguageFlag lang={label.lang} />
                     <input
@@ -685,19 +685,19 @@ export function ClassDetailPanel({
                       value={label.lang}
                       onChange={(e) => updateLabel(index, "lang", e.target.value)}
                       onBlur={() => triggerSave()}
-                      className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                      className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                       title="Language tag (e.g. en, de, fr)"
                     />
                     {editLabels.length > 1 ? (
                       <button
                         onClick={() => removeLabel(index)}
-                        className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                        className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                         title="Remove label"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     ) : (
-                      <div className="rounded p-1">
+                      <div className="rounded-sm p-1">
                         <div className="h-3.5 w-3.5" />
                       </div>
                     )}
@@ -782,7 +782,7 @@ export function ClassDetailPanel({
                         onBlur={() => triggerSave()}
                         placeholder={isGhost ? "Add another Comment \u2014 or translation." : ""}
                         rows={isGhost ? 1 : 2}
-                        className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                        className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                       />
                       <div className="mt-1 shrink-0">
                         <LanguageFlag lang={comment.lang} />
@@ -792,19 +792,19 @@ export function ClassDetailPanel({
                         value={comment.lang}
                         onChange={(e) => updateComment(index, "lang", e.target.value)}
                         onBlur={() => triggerSave()}
-                        className="w-14 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                        className="w-14 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                         title="Language tag"
                       />
                       {!isGhost ? (
                         <button
                           onClick={() => removeComment(index)}
-                          className="mt-1 shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          className="mt-1 shrink-0 rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                           title="Remove comment"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       ) : (
-                        <div className="mt-1 shrink-0 rounded p-1">
+                        <div className="mt-1 shrink-0 rounded-sm p-1">
                           <div className="h-3.5 w-3.5" />
                         </div>
                       )}
@@ -921,7 +921,7 @@ export function ClassDetailPanel({
                     </span>
                     <button
                       onClick={() => removeParent(parentIri)}
-                      className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                      className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
                       title="Remove parent"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

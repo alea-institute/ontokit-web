@@ -89,7 +89,7 @@ export default function ProjectAnalyticsPage() {
                       minHeight: day.count > 0 ? 4 : 1,
                     }}
                   />
-                  <div className="pointer-events-none absolute -top-8 hidden rounded bg-slate-800 px-2 py-1 text-xs text-white group-hover:block dark:bg-slate-600">
+                  <div className="pointer-events-none absolute -top-8 hidden rounded-sm bg-slate-800 px-2 py-1 text-xs text-white group-hover:block dark:bg-slate-600">
                     {day.date}: {day.count}
                   </div>
                 </div>

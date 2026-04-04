@@ -373,9 +373,9 @@ export default function DocsPage() {
                     <ul className="list-disc list-inside text-amber-700 dark:text-amber-300 text-sm space-y-1">
                       <li>All formats (RDF/XML, OWL/XML, N3, JSON-LD) are converted to Turtle (.ttl)</li>
                       <li>Triples are reordered into a consistent, deterministic sequence</li>
-                      <li>Unused namespace prefixes may be removed (e.g., <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">rdf:</code>, <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">xml:</code>, <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">xsd:</code> if not explicitly used)</li>
+                      <li>Unused namespace prefixes may be removed (e.g., <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded-sm">rdf:</code>, <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded-sm">xml:</code>, <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded-sm">xsd:</code> if not explicitly used)</li>
                       <li>Whitespace and formatting are standardized</li>
-                      <li>The shorthand <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">a</code> is used for <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded">rdf:type</code></li>
+                      <li>The shorthand <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded-sm">a</code> is used for <code className="bg-amber-100 dark:bg-amber-800 px-1 rounded-sm">rdf:type</code></li>
                     </ul>
                   </div>
                 </div>
@@ -394,12 +394,12 @@ export default function DocsPage() {
                     </h4>
                     <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
                       <li>
-                        <strong>Title:</strong> Updates <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dc:title</code>, <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dcterms:title</code>, or <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">rdfs:label</code> (whichever exists)
+                        <strong>Title:</strong> Updates <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">dc:title</code>, <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">dcterms:title</code>, or <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">rdfs:label</code> (whichever exists)
                       </li>
                       <li>
-                        <strong>Description:</strong> Updates <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dc:description</code>, <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dcterms:description</code>, or <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">rdfs:comment</code>
+                        <strong>Description:</strong> Updates <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">dc:description</code>, <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">dcterms:description</code>, or <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">rdfs:comment</code>
                       </li>
-                      <li>If no metadata property exists, <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dc:title</code> / <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">dc:description</code> is added</li>
+                      <li>If no metadata property exists, <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">dc:title</code> / <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">dc:description</code> is added</li>
                       <li>Changes are committed to git with a descriptive message</li>
                     </ul>
                   </div>
