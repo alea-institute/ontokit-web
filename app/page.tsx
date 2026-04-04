@@ -44,7 +44,7 @@ export default function HomePage() {
   });
 
   const projects = data?.pages.flatMap((page) => page.items) ?? [];
-  const total = data?.pages[0]?.total ?? 0;
+  const total = data?.pages.at(-1)?.total ?? 0;
 
   const handleLoadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -215,7 +215,7 @@ export default function HomePage() {
               <>
                 <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
                   {searchQuery
-                    ? `Showing ${filteredProjects.length} projects (filtered from ${total})`
+                    ? `Showing ${filteredProjects.length} projects (filtered from ${projects.length} loaded)`
                     : `${total} ${total === 1 ? "project" : "projects"}`}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -223,7 +223,7 @@ export default function HomePage() {
                     <ProjectCard key={project.id} project={project} />
                   ))}
                 </div>
-                {!searchQuery && hasNextPage && (
+                {hasNextPage && (
                   <div className="mt-6 flex justify-center">
                     <Button
                       variant="outline"
