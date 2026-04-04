@@ -35,19 +35,6 @@ export default function UserSettingsPage() {
   const [isDeletingToken, setIsDeletingToken] = useState(false);
 
   const isAuthenticated = status === "authenticated";
-  const [highlightedSetting, setHighlightedSetting] = useState<string | null>(null);
-
-  // Highlight and scroll to the setting referenced by the URL hash
-  useEffect(() => {
-    const hash = window.location.hash.slice(1);
-    if (!hash) return;
-    const el = document.getElementById(hash);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    setHighlightedSetting(hash);
-    const timer = setTimeout(() => setHighlightedSetting(null), 2000);
-    return () => clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     const fetchTokenStatus = async () => {
@@ -343,6 +330,20 @@ function EditorPreferencesSection() {
   const setTheme = useEditorModeStore((s) => s.setTheme);
   const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
   const setContinuousEditing = useEditorModeStore((s) => s.setContinuousEditing);
+
+  const [highlightedSetting, setHighlightedSetting] = useState<string | null>(null);
+
+  // Highlight and scroll to the setting referenced by the URL hash
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedSetting(hash);
+    const timer = setTimeout(() => setHighlightedSetting(null), 2000);
+    return () => clearTimeout(timer);
+  }, []);
   const hideSaveButton = useEditorModeStore((s) => s.hideSaveButton);
   const setHideSaveButton = useEditorModeStore((s) => s.setHideSaveButton);
 
