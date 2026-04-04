@@ -35,6 +35,19 @@ export default function UserSettingsPage() {
   const [isDeletingToken, setIsDeletingToken] = useState(false);
 
   const isAuthenticated = status === "authenticated";
+  const [highlightedSetting, setHighlightedSetting] = useState<string | null>(null);
+
+  // Highlight and scroll to the setting referenced by the URL hash
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedSetting(hash);
+    const timer = setTimeout(() => setHighlightedSetting(null), 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const fetchTokenStatus = async () => {
@@ -454,7 +467,13 @@ function EditorPreferencesSection() {
       </div>
 
       {/* Hide Save Button */}
-      <div id="save-button" className="mt-6 scroll-mt-8">
+      <div
+        id="save-button"
+        className={cn(
+          "mt-6 scroll-mt-8 rounded-lg p-2 -mx-2 transition-colors duration-1000",
+          highlightedSetting === "save-button" && "bg-amber-100 dark:bg-amber-900/30",
+        )}
+      >
         <span id="hide-save-button-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
           Hide Save Button
         </span>
