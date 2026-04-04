@@ -131,7 +131,7 @@ export function AutoSaveAffordanceBar({
                   <span>
                     You can hide this button in{" "}
                     <Link href="/settings#save-button" className="underline hover:text-slate-300 dark:hover:text-slate-600">
-                      Settings
+                      User Settings
                     </Link>
                     . Changes still auto-save when you navigate away.
                   </span>
