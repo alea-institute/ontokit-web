@@ -29,12 +29,15 @@ interface BranchSelectorProps {
   onBranchChange?: (branchName: string) => void;
   /** Whether the current user can create new branches (requires editor+ role) */
   canCreateBranch?: boolean;
+  /** Whether the selector is read-only (e.g. unauthenticated users) */
+  readOnly?: boolean;
 }
 
 export function BranchSelector({
   className,
   onBranchChange,
   canCreateBranch = false,
+  readOnly = false,
 }: BranchSelectorProps) {
   const {
     branches,
@@ -123,8 +126,8 @@ export function BranchSelector({
           "gap-2",
           isFeatureBranch && "border-amber-500 text-amber-600 dark:text-amber-400"
         )}
-        onClick={() => setIsOpen(!isOpen)}
-        disabled={isLoading}
+        onClick={() => !readOnly && setIsOpen(!isOpen)}
+        disabled={isLoading || readOnly}
       >
         <GitBranch className="h-4 w-4" />
         <span className="max-w-32 truncate">{currentBranch}</span>
@@ -151,7 +154,7 @@ export function BranchSelector({
             {currentBranchInfo.remote_commits_behind! > 0 && `\u2193${currentBranchInfo.remote_commits_behind}`}
           </span>
         )}
-        <ChevronDown className="h-4 w-4" />
+        {!readOnly && <ChevronDown className="h-4 w-4" />}
       </Button>
 
       {/* Dropdown */}
