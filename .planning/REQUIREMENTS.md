@@ -7,8 +7,8 @@
 
 ### Sync
 
-- [ ] **SYNC-01**: ALEA ontokit-web main is fast-forwarded to CatholicOS main
-- [ ] **SYNC-02**: ALEA ontokit-api main is fast-forwarded to CatholicOS main
+- [x] **SYNC-01**: ALEA ontokit-web main is fast-forwarded to CatholicOS main
+- [x] **SYNC-02**: ALEA ontokit-api main is fast-forwarded to CatholicOS main
 
 ### Auth
 
@@ -20,11 +20,11 @@
 
 ### Deploy
 
-- [ ] **DEPL-01**: PostgreSQL installed and running on production server
-- [ ] **DEPL-02**: Production server runs CatholicOS main (not folio-adapter) for both repos
-- [ ] **DEPL-03**: Ontology index is built and serving queries on production
-- [ ] **DEPL-04**: ontokit.openlegalstandard.org serves the FOLIO ontology browser from CatholicOS main
-- [ ] **DEPL-05**: Caddy, systemd services, and env vars are configured for the full stack
+- [x] **DEPL-01**: PostgreSQL installed and running on production server
+- [x] **DEPL-02**: Production server runs CatholicOS main (not folio-adapter) for both repos
+- [x] **DEPL-03**: Ontology index is built and serving queries on production
+- [x] **DEPL-04**: ontokit.openlegalstandard.org serves the FOLIO ontology browser from CatholicOS main
+- [x] **DEPL-05**: Caddy, systemd services, and env vars are configured for the full stack
 
 ### Anonymous Suggestions
 
@@ -57,18 +57,18 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SYNC-01 | Phase 7 | Pending |
-| SYNC-02 | Phase 7 | Pending |
+| SYNC-01 | Phase 7 | Complete |
+| SYNC-02 | Phase 7 | Complete |
 | AUTH-01 | Phase 8 | Complete |
 | AUTH-02 | Phase 8 | Complete |
 | AUTH-03 | Phase 8 | Complete |
 | AUTH-04 | Phase 8 | Complete |
 | AUTH-05 | Phase 8 | Complete |
-| DEPL-01 | Phase 9 | Pending |
-| DEPL-02 | Phase 9 | Pending |
-| DEPL-03 | Phase 9 | Pending |
-| DEPL-04 | Phase 9 | Pending |
-| DEPL-05 | Phase 9 | Pending |
+| DEPL-01 | Phase 9 | Complete |
+| DEPL-02 | Phase 9 | Complete |
+| DEPL-03 | Phase 9 | Complete |
+| DEPL-04 | Phase 9 | Complete |
+| DEPL-05 | Phase 9 | Complete |
 | ANON-01 | Phase 10 | Complete |
 | ANON-02 | Phase 10 | Complete |
 | ANON-03 | Phase 10 | Complete |
