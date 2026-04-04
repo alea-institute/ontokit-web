@@ -454,7 +454,7 @@ function EditorPreferencesSection() {
       </div>
 
       {/* Hide Save Button */}
-      <div className="mt-6">
+      <div id="save-button" className="mt-6 scroll-mt-8">
         <span id="hide-save-button-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
           Hide Save Button
         </span>

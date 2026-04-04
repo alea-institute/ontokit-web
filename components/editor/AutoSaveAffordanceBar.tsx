@@ -1,8 +1,9 @@
 "use client";
 
-import { Cloud, Loader2, Check, AlertTriangle, Save, X } from "lucide-react";
+import { Cloud, Loader2, Check, AlertTriangle, Save, X, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import Link from "next/link";
 import type { SaveStatus } from "@/lib/hooks/useAutoSave";
 
 interface AutoSaveAffordanceBarProps {
@@ -122,6 +123,13 @@ export function AutoSaveAffordanceBar({
               )}
               Save
             </button>
+            <Link
+              href="/settings#save-button"
+              title="You can hide this button in Settings. Auto-save still works when navigating away."
+              className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+            >
+              <Info className="h-3.5 w-3.5" />
+            </Link>
           )}
           {onCancel && (
             <button
