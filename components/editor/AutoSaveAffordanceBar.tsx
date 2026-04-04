@@ -129,10 +129,11 @@ export function AutoSaveAffordanceBar({
                 side="bottom"
                 content={
                   <span>
-                    Auto-save works when navigating away.{" "}
+                    You can hide this button in{" "}
                     <Link href="/settings#save-button" className="underline hover:text-slate-300 dark:hover:text-slate-600">
-                      Click here to change this setting.
+                      Settings
                     </Link>
+                    . Changes still auto-save when you navigate away.
                   </span>
                 }
               >
