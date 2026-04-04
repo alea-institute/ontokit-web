@@ -205,9 +205,7 @@ export function BranchProvider({
       setStoredBranch(projectId, name);
 
       // Fire-and-forget: persist to DB for cross-session restore
-      if (accessToken) {
-        branchesApi.savePreference(projectId, name, accessToken).catch(() => {});
-      }
+      branchesApi.savePreference(projectId, name, accessToken).catch(() => {});
     },
     [branches, pendingChanges, projectId, accessToken]
   );
