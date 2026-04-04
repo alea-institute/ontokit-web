@@ -150,13 +150,13 @@ export const projectApi = {
    * @param filter - Filter type: 'public', 'mine', or undefined for all accessible
    * @param token - Access token for authentication
    */
-  list: (skip = 0, limit = 20, filter?: "public" | "mine", token?: string) => {
+  list: (skip = 0, limit = 20, filter?: "public" | "mine", token?: string, search?: string) => {
     const headers: HeadersInit = {};
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
     return api.get<ProjectListResponse>("/api/v1/projects", {
-      params: { skip, limit, filter },
+      params: { skip, limit, filter, search: search || undefined },
       headers,
     });
   },

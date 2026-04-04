@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
@@ -19,6 +19,14 @@ export default function HomePage() {
   const { data: session, status } = useSession();
   const [filter, setFilter] = useState<FilterType>("public");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search input
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    debounceRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [searchQuery]);
 
   const isAuthenticated = status === "authenticated";
 
@@ -30,10 +38,10 @@ export default function HomePage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["projects", filter, session?.accessToken],
+    queryKey: ["projects", filter, session?.accessToken, debouncedSearch],
     queryFn: async ({ pageParam = 0 }) => {
       const filterParam = filter === "all" ? undefined : filter === "private" ? "mine" : "public";
-      return projectApi.list(pageParam, PAGE_SIZE, filterParam, session?.accessToken);
+      return projectApi.list(pageParam, PAGE_SIZE, filterParam, session?.accessToken, debouncedSearch || undefined);
     },
     initialPageParam: 0,
     getNextPageParam: (lastPage) => {
@@ -52,14 +60,8 @@ export default function HomePage() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Filter projects by search query (client-side)
-  const filteredProjects = searchQuery
-    ? projects.filter(
-        (p) =>
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : projects;
+  // Search is handled server-side; no client-side filtering needed
+  const filteredProjects = projects;
 
   return (
     <>
@@ -214,9 +216,7 @@ export default function HomePage() {
             ) : (
               <>
                 <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-                  {searchQuery
-                    ? `Showing ${filteredProjects.length} projects (filtered from ${projects.length} loaded)`
-                    : `${total} ${total === 1 ? "project" : "projects"}`}
+                  {`${total} ${total === 1 ? "project" : "projects"}`}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredProjects.map((project) => (
