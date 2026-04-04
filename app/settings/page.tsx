@@ -330,8 +330,8 @@ function EditorPreferencesSection() {
   const setTheme = useEditorModeStore((s) => s.setTheme);
   const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
   const setContinuousEditing = useEditorModeStore((s) => s.setContinuousEditing);
-  const manualSave = useEditorModeStore((s) => s.manualSave);
-  const setManualSave = useEditorModeStore((s) => s.setManualSave);
+  const hideSaveButton = useEditorModeStore((s) => s.hideSaveButton);
+  const setHideSaveButton = useEditorModeStore((s) => s.setHideSaveButton);
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
@@ -453,41 +453,41 @@ function EditorPreferencesSection() {
         </button>
       </div>
 
-      {/* Manual Save Button */}
+      {/* Hide Save Button */}
       <div className="mt-6">
-        <span id="manual-save-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Manual Save Button
+        <span id="hide-save-button-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Hide Save Button
         </span>
         <button
           type="button"
           role="switch"
-          aria-checked={manualSave}
-          aria-labelledby="manual-save-label"
-          onClick={() => setManualSave(!manualSave)}
+          aria-checked={hideSaveButton}
+          aria-labelledby="hide-save-button-label"
+          onClick={() => setHideSaveButton(!hideSaveButton)}
           className={cn(
             "flex items-center gap-3 rounded-lg border p-4 text-left transition-colors w-full",
-            manualSave
+            hideSaveButton
               ? "border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/20"
               : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
           )}
         >
           <Save className={cn(
             "h-5 w-5 flex-shrink-0",
-            manualSave
+            hideSaveButton
               ? "text-primary-600 dark:text-primary-400"
               : "text-slate-400",
           )} />
           <div>
             <p className={cn(
               "font-medium",
-              manualSave
+              hideSaveButton
                 ? "text-primary-700 dark:text-primary-300"
                 : "text-slate-900 dark:text-white",
             )}>
-              {manualSave ? "On" : "Off"}
+              {hideSaveButton ? "On" : "Off"}
             </p>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Show a Save button in the editor. Auto-save still works in the background &mdash; the button provides an explicit way to save and exit editing.
+              Hide the Save button in the editor. Auto-save still works when navigating away.
             </p>
           </div>
         </button>

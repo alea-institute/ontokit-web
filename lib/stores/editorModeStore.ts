@@ -8,11 +8,11 @@ interface EditorModeState {
   editorMode: EditorMode;
   theme: ThemePreference;
   continuousEditing: boolean;
-  manualSave: boolean;
+  hideSaveButton: boolean;
   setEditorMode: (mode: EditorMode) => void;
   setTheme: (theme: ThemePreference) => void;
   setContinuousEditing: (on: boolean) => void;
-  setManualSave: (on: boolean) => void;
+  setHideSaveButton: (on: boolean) => void;
 }
 
 /**
@@ -40,7 +40,7 @@ export const useEditorModeStore = create<EditorModeState>()(
       editorMode: "standard",
       theme: "system",
       continuousEditing: false,
-      manualSave: false,
+      hideSaveButton: false,
 
       setEditorMode: (mode) => set({ editorMode: mode }),
 
@@ -50,7 +50,7 @@ export const useEditorModeStore = create<EditorModeState>()(
       },
 
       setContinuousEditing: (on) => set({ continuousEditing: on }),
-      setManualSave: (on) => set({ manualSave: on }),
+      setHideSaveButton: (on) => set({ hideSaveButton: on }),
     }),
     {
       name: "ontokit-editor-preferences",

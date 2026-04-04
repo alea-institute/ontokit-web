@@ -22,12 +22,12 @@ export function AutoSaveAffordanceBar({
   onManualSave,
   onCancel,
 }: AutoSaveAffordanceBarProps) {
-  const manualSave = useEditorModeStore((s) => s.manualSave);
+  const hideSaveButton = useEditorModeStore((s) => s.hideSaveButton);
 
   const effectiveStatus = validationError ? "validationError" : status;
 
-  const saveEnabled = manualSave && effectiveStatus === "draft" && !!onManualSave;
-  const saveSpinning = manualSave && effectiveStatus === "saving";
+  const saveEnabled = !hideSaveButton && effectiveStatus === "draft" && !!onManualSave;
+  const saveSpinning = !hideSaveButton && effectiveStatus === "saving";
 
   return (
     <div
@@ -104,7 +104,7 @@ export function AutoSaveAffordanceBar({
 
         {/* Right side — save + cancel buttons */}
         <div className="flex shrink-0 items-center gap-2">
-          {manualSave && (
+          {!hideSaveButton && (
             <button
               onClick={saveEnabled ? onManualSave : undefined}
               disabled={!saveEnabled}
