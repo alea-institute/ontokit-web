@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useSession, signIn } from "next-auth/react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Plus, Search, Globe, Lock, FolderOpen, LogIn } from "lucide-react";
 import { Header } from "@/components/layout/header";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
 import { projectApi } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
+
+const PAGE_SIZE = 50;
 
 type FilterType = "public" | "private" | "all";
 
@@ -24,17 +26,31 @@ export default function HomePage() {
     data,
     isLoading,
     error,
-  } = useQuery({
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ["projects", filter, session?.accessToken],
-    queryFn: async () => {
+    queryFn: async ({ pageParam = 0 }) => {
       const filterParam = filter === "all" ? undefined : filter === "private" ? "mine" : "public";
-      return projectApi.list(0, 50, filterParam, session?.accessToken);
+      return projectApi.list(pageParam, PAGE_SIZE, filterParam, session?.accessToken);
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const nextSkip = lastPage.skip + lastPage.limit;
+      return nextSkip < lastPage.total ? nextSkip : undefined;
     },
     enabled: status !== "loading" && !(filter === "private" && !isAuthenticated),
   });
 
-  const projects = data?.items ?? [];
-  const total = data?.total ?? 0;
+  const projects = data?.pages.flatMap((page) => page.items) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
+
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // Filter projects by search query (client-side)
   const filteredProjects = searchQuery
@@ -200,13 +216,24 @@ export default function HomePage() {
                 <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
                   {searchQuery
                     ? `Showing ${filteredProjects.length} projects (filtered from ${total})`
-                    : `Showing ${filteredProjects.length} of ${total} projects`}
+                    : `${total} ${total === 1 ? "project" : "projects"}`}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredProjects.map((project) => (
                     <ProjectCard key={project.id} project={project} />
                   ))}
                 </div>
+                {!searchQuery && hasNextPage && (
+                  <div className="mt-6 flex justify-center">
+                    <Button
+                      variant="outline"
+                      onClick={handleLoadMore}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? "Loading..." : "Load More"}
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>
