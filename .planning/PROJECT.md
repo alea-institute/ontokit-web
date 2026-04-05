@@ -6,13 +6,27 @@ A Next.js frontend for collaborative OWL ontology editing. Connects to a FastAPI
 
 ## Core Value
 
-Enable grassroots-level collaborative ontology editing in a modern, accessible web interface.
+Enable grassroots-level collaborative ontology editing in a modern, accessible web interface — where subject-matter experts can rapidly improve their ontology with LLM assistance while preserving integrity through human curation.
+
+## Current Milestone: v0.4.0 LLM-Assisted Ontology Improvements
+
+**Goal:** Enable SMEs to rapidly improve their ontology (new classes, new properties, annotations) with LLM assistance, while guaranteeing integrity (no duplicates, no AI slop) through whole-ontology duplicate detection, validation guardrails, and human-curated review.
+
+**Target features:**
+- LLM suggestion pipeline (cloud + local via ALEA LLM Client; backend proxy for project keys, BYO-key browser-side)
+- Dual UX: inline "✨ Suggest improvements" affordance + flashcard iterator mode
+- Whole-ontology duplicate detection (exact + semantic + structural composite scoring)
+- Generative FOLIO + folio-python + OpenGloss + OWL reasoner integration
+- Hybrid clustering: auto-cluster session suggestions into reviewable PR shards with user review
+- Property support (ObjectProperty, DataProperty, AnnotationProperty) alongside classes
+- Per-role UX + cost controls (project budget, per-user daily caps, usage dashboard)
+- Success: 50+ annotations/hour SME throughput, ≥70% admin acceptance rate, zero duplicates in first month
 
 ## Requirements
 
 ### Validated
 
-<!-- Shipped and confirmed valuable. Phases 1-6 from prior work. -->
+<!-- Shipped and confirmed valuable. -->
 
 - ✓ Two-mode editor (standard + developer) — v0.2.0
 - ✓ Auto-save with draft system — v0.2.0
@@ -23,45 +37,82 @@ Enable grassroots-level collaborative ontology editing in a modern, accessible w
 - ✓ PostgreSQL ontology index frontend — v0.3.0-dev
 - ✓ Upstream source tracking with loop prevention — v0.3.0-dev
 - ✓ Projects landing page with tabs — v0.3.0-dev
+- ✓ Synced ALEA forks with CatholicOS upstream — v0.3.0
+- ✓ Optional auth (AUTH_MODE=required|optional|disabled) — v0.3.0
+- ✓ Production deployment (ontokit.openlegalstandard.org) — v0.3.0
+- ✓ Anonymous suggestions with credit modal — v0.3.0
 
 ### Active
 
-<!-- Current scope — Milestone v0.3.0 deployment. -->
+<!-- Current scope — Milestone v0.4.0 LLM-Assisted Ontology Improvements. -->
 
-- [ ] Sync ALEA forks with CatholicOS upstream
-- [ ] Make authentication optional for public read-only browsing
-- [ ] Deploy CatholicOS main to production (ontokit.openlegalstandard.org)
+- [ ] LLM abstraction layer (ALEA LLM Client integration, cloud + local, key routing)
+- [ ] Duplicate detection (whole-ontology embeddings index + composite scoring)
+- [ ] Suggestion generation (Generative FOLIO integration, prompts, validation)
+- [ ] Dual UX modes (inline button + flashcard iterator)
+- [ ] Session clustering into reviewable PR shards
+- [ ] Property support (ObjectProperty, DataProperty, AnnotationProperty)
+- [ ] Pre-submit validation guardrails (parent, label, cycle, namespace)
+- [ ] Per-role access model (admin/editor/suggester/anonymous)
+- [ ] Cost controls (project budget, per-user caps, usage dashboard)
 
 ### Out of Scope
 
-- Full Zitadel deployment on FOLIO server — FOLIO needs read-only public access, not multi-user auth (yet)
-- Docker-based deployment — production server runs bare metal with systemd, working well
-- Mike's folio-adapter branches — temporary hack, CatholicOS main is the long-term path
+- Full Zitadel deployment on FOLIO server — FOLIO needs read-only public access
+- Docker-based deployment — bare metal working fine
+- Anonymous LLM access — cost control, not enough abuse signal
+- Custom LLM provider abstraction — use ALEA LLM Client (existing)
+- Cross-branch suggestion appearance — each suggestion lands in exactly one PR shard
+- Real-time collaborative editing — not the bottleneck for ontology quality
 
 ## Context
 
-- Production server: AWS Ubuntu 24.04 ARM64 at 54.224.195.12
-- Currently running Mike's `feature/folio-adapter` branches (stripped auth, lightweight FOLIO adapter)
-- CatholicOS upstream has ~30 commits ahead of ALEA (all v0.3.0 PRs we just merged)
-- Server has Caddy + systemd, no Docker, no Postgres/Redis/Zitadel
-- CatholicOS main requires Postgres (ontology index) and optionally Redis/Zitadel
-- Two repos to sync: ontokit-web (alea-institute → CatholicOS) and ontokit-api (same)
+- Production server: AWS Ubuntu 24.04 ARM64 at 54.224.195.12 (ontokit.openlegalstandard.org)
+- FOLIO ontology seeded with 18,326 classes in Postgres index
+- Running CatholicOS main with AUTH_MODE=optional + anonymous suggestions active
+- Two repos (ontokit-web + ontokit-api) synced with CatholicOS upstream
+- v0.4.0 feature branch: tested on FOLIO first, then proposed upstream to CatholicOS
+- Existing infra to reuse: suggestion sessions, drafts, embeddings API, analytics API, quality API, anonymous tokens
 
 ## Constraints
 
-- **Infrastructure**: Server is bare metal, no Docker — install services directly
-- **Auth**: FOLIO needs public read-only access without Zitadel — auth must be optional
-- **Backwards compat**: CatholicOS deployments with Zitadel must continue working
-- **Downtime**: Minimize production downtime during switchover
-- **Two repos**: Both ontokit-web and ontokit-api must be synced and deployed together
+- **LLM cost discipline**: project-owner budget caps, per-user daily limits, BYO-key off project bill
+- **Integrity over speed**: must block duplicates (>0.95), warn on similar (>0.80), enforce validation
+- **No AI slop**: LLM assists the human; human curates; admin accepts/rejects per-entity
+- **Dual deployment**: feature must work on both FOLIO (no auth) and CatholicOS (with Zitadel)
+- **Backwards compat**: existing suggestion/editor flows must continue to work
+- **Existing tools first**: ALEA LLM Client, Generative FOLIO, folio-python, OpenGloss — don't rebuild
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| CatholicOS main is long-term truth | Mike's folio-adapter was a deadline hack | — Pending |
-| Make auth optional via env var | Avoids maintaining two codebases | — Pending |
-| Bare metal deploy (no Docker) | Server already set up this way, working fine | — Pending |
+| CatholicOS main is long-term truth | Mike's folio-adapter was a deadline hack | ✓ v0.3.0 |
+| Make auth optional via env var | Avoids maintaining two codebases | ✓ v0.3.0 |
+| Bare metal deploy (no Docker) | Server already set up this way, working fine | ✓ v0.3.0 |
+| ALEA LLM Client as LLM abstraction | Already handles multi-provider dispatch, no rebuild | — Pending |
+| Project keys via backend proxy, BYO via browser | Protects project owner's bill, simpler client for BYO users | — Pending |
+| Whole-ontology duplicate check (not local) | Cross-branch duplicates fragment the ontology | — Pending |
+| Hybrid clustering (D+E) with max-50/min-3 shards | Balance reviewer load vs PR churn | — Pending |
+| Anonymous users get no LLM access | Cost control, insufficient abuse signal | — Pending |
+| Property support in v0.4.0 (not deferred) | Pipeline is uniform at generation; validation diverges cheaply | — Pending |
+
+## Evolution
+
+This document evolves at phase transitions and milestone boundaries.
+
+**After each phase transition** (via `/gsd:transition`):
+1. Requirements invalidated? → Move to Out of Scope with reason
+2. Requirements validated? → Move to Validated with phase reference
+3. New requirements emerged? → Add to Active
+4. Decisions to log? → Add to Key Decisions
+5. "What This Is" still accurate? → Update if drifted
+
+**After each milestone** (via `/gsd:complete-milestone`):
+1. Full review of all sections
+2. Core Value check — still the right priority?
+3. Audit Out of Scope — reasons still valid?
+4. Update Context with current state
 
 ---
-*Last updated: 2026-04-03 after milestone v0.3.0 deployment start*
+*Last updated: 2026-04-05 after milestone v0.4.0 LLM-Assisted Ontology Improvements start*
