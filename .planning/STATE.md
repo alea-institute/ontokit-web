@@ -1,36 +1,36 @@
 ---
 gsd_state_version: 1.0
-milestone: v0.3.0
-milestone_name: Deployment
-status: complete
-stopped_at: "Milestone v0.3.0 complete — all 4 phases shipped"
-last_updated: "2026-04-03T23:02:53.173Z"
-last_activity: "2026-04-03 — Completed quick task 260403-dth: Phase 7 Sync ALEA Forks"
+milestone: v0.4.0
+milestone_name: LLM-Assisted Ontology Improvements
+status: defining_requirements
+stopped_at: null
+last_updated: "2026-04-05T00:00:00.000Z"
+last_activity: "2026-04-05 — Milestone v0.4.0 started"
 progress:
-  total_phases: 4
-  completed_phases: 4
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-04-03)
+See: .planning/PROJECT.md (updated 2026-04-05)
 
-**Core value:** Enable grassroots-level collaborative ontology editing in a modern, accessible web interface.
-**Current focus:** Milestone v0.3.0 complete
+**Core value:** Enable grassroots-level collaborative ontology editing in a modern, accessible web interface — where SMEs rapidly improve their ontology with LLM assistance while preserving integrity through human curation.
+**Current focus:** Milestone v0.4.0 LLM-Assisted Ontology Improvements — defining requirements
 
 ## Current Position
 
-Phase: All complete (4/4)
+Phase: Not started (defining requirements)
 Plan: —
-Status: Milestone v0.3.0 shipped
-Last activity: 2026-04-03 — Milestone v0.3.0 complete
+Status: Defining requirements
+Last activity: 2026-04-05 — Milestone v0.4.0 started
 
-Progress: [██████████] 100%
+Progress: [ ] 0%
 
 ## Performance Metrics
 
@@ -57,6 +57,14 @@ Progress: [██████████] 100%
 
 ### Decisions
 
+- [v0.4.0]: ALEA LLM Client serves as LLM abstraction layer — no need to rebuild multi-provider dispatch
+- [v0.4.0]: Project keys route through backend proxy; BYO-keys stay in browser — protects project owner's bill
+- [v0.4.0]: Whole-ontology duplicate detection (not local neighborhood) — cross-branch duplicates fragment the ontology
+- [v0.4.0]: Hybrid clustering D+E with max-50/min-3 shards — balance reviewer load against PR churn
+- [v0.4.0]: Anonymous users get no LLM access — cost control + insufficient abuse signal
+- [v0.4.0]: Property support included in v0.4.0 (not deferred) — generation pipeline is uniform, validation diverges cheaply
+- [v0.4.0]: Generative FOLIO + folio-python + OpenGloss + OWL reasoner = toolchain — use existing tools, don't rebuild
+- [v0.4.0]: Per-role access: admin self-merge all, editor annotations-only, suggester routes to session flow
 - [v0.3.0]: CatholicOS main is long-term truth — Mike's folio-adapter was a deadline hack
 - [v0.3.0]: Auth optional via `AUTH_DISABLED` env var — avoids maintaining two codebases
 - [v0.3.0]: Bare metal deploy (no Docker) — server already set up this way, working fine
@@ -75,6 +83,12 @@ Progress: [██████████] 100%
 
 ### Key Facts
 
+- v0.4.0 feature branch: tested on FOLIO first, then proposed upstream to CatholicOS
+- Existing infra to reuse: suggestion sessions, drafts, embeddings API, analytics API, quality API, anonymous tokens
+- Success metrics (all required): 50+ annotations/hour, ≥70% admin acceptance, zero duplicates in first month
+- Rate limits: editors 500/day LLM calls, suggesters 100/day, anonymous 0
+- Duplicate thresholds: block >0.95, warn >0.80, pass below 0.80 (composite score)
+- Shard bounds: max 50 items, min 3 (small orphans roll into "Miscellaneous improvements")
 - ALEA forks have zero unique commits on main — clean fast-forward, no conflicts expected
 - Production server: 54.224.195.12, Ubuntu 24.04 ARM64, Caddy + systemd, 8GB RAM, 53GB disk
 - Currently running Mike's folio-adapter branches (stripped auth) — must switch to CatholicOS main
@@ -97,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-03T23:02:53.172Z
-Stopped at: Completed 10-anonymous-suggestions/10-03-PLAN.md (checkpoint: awaiting human verify)
+Last session: 2026-04-05T00:00:00.000Z
+Stopped at: Milestone v0.4.0 started — defining requirements
 Resume file: None
