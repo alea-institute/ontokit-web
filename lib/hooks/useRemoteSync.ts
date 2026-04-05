@@ -1,5 +1,5 @@
 /**
- * React hook for upstream sync management.
+ * React hook for remote sync management.
  *
  * Handles config CRUD, manual check triggering with job polling,
  * and sync event history.
@@ -7,41 +7,41 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  upstreamSyncApi,
-  type UpstreamSyncConfig,
-  type UpstreamSyncConfigCreate,
-  type UpstreamSyncConfigUpdate,
+  remoteSyncApi,
+  type RemoteSyncConfig,
+  type RemoteSyncConfigCreate,
+  type RemoteSyncConfigUpdate,
   type SyncEvent,
-} from "@/lib/api/upstreamSync";
+} from "@/lib/api/remoteSync";
 
 
 const JOB_POLL_INTERVAL = 2000; // 2 seconds
 
-interface UseUpstreamSyncOptions {
+interface UseRemoteSyncOptions {
   projectId: string;
   accessToken?: string;
   /** Disable initial fetch (e.g. when user doesn't have permission) */
   enabled?: boolean;
 }
 
-interface UseUpstreamSyncReturn {
-  config: UpstreamSyncConfig | null;
+interface UseRemoteSyncReturn {
+  config: RemoteSyncConfig | null;
   history: SyncEvent[];
   isLoading: boolean;
   isChecking: boolean;
   error: string | null;
   triggerCheck: () => Promise<void>;
-  saveConfig: (data: UpstreamSyncConfigCreate | UpstreamSyncConfigUpdate) => Promise<void>;
+  saveConfig: (data: RemoteSyncConfigCreate | RemoteSyncConfigUpdate) => Promise<void>;
   deleteConfig: () => Promise<void>;
   refetch: () => Promise<void>;
 }
 
-export function useUpstreamSync({
+export function useRemoteSync({
   projectId,
   accessToken,
   enabled = true,
-}: UseUpstreamSyncOptions): UseUpstreamSyncReturn {
-  const [config, setConfig] = useState<UpstreamSyncConfig | null>(null);
+}: UseRemoteSyncOptions): UseRemoteSyncReturn {
+  const [config, setConfig] = useState<RemoteSyncConfig | null>(null);
   const [history, setHistory] = useState<SyncEvent[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
@@ -67,13 +67,13 @@ export function useUpstreamSync({
     setError(null);
 
     try {
-      const configData = await upstreamSyncApi.getConfig(projectId, accessToken);
+      const configData = await remoteSyncApi.getConfig(projectId, accessToken);
       setConfig(configData);
 
       // Fetch history if config exists
       if (configData) {
         try {
-          const historyData = await upstreamSyncApi.getHistory(projectId, 20, accessToken);
+          const historyData = await remoteSyncApi.getHistory(projectId, 20, accessToken);
           setHistory(historyData.items);
         } catch {
           // History may be empty, ignore
@@ -82,7 +82,7 @@ export function useUpstreamSync({
         setHistory([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load upstream sync config");
+      setError(err instanceof Error ? err.message : "Failed to load remote sync config");
     } finally {
       setIsLoading(false);
     }
@@ -106,7 +106,7 @@ export function useUpstreamSync({
         if (!jobIdRef.current) return;
 
         try {
-          const status = await upstreamSyncApi.getJobStatus(
+          const status = await remoteSyncApi.getJobStatus(
             projectId,
             jobIdRef.current,
             accessToken
@@ -143,7 +143,7 @@ export function useUpstreamSync({
     setIsChecking(true);
 
     try {
-      const response = await upstreamSyncApi.triggerCheck(projectId, accessToken);
+      const response = await remoteSyncApi.triggerCheck(projectId, accessToken);
       startPolling(response.job_id);
     } catch (err) {
       setIsChecking(false);
@@ -153,13 +153,13 @@ export function useUpstreamSync({
 
   // Save config
   const saveConfig = useCallback(
-    async (data: UpstreamSyncConfigCreate | UpstreamSyncConfigUpdate) => {
+    async (data: RemoteSyncConfigCreate | RemoteSyncConfigUpdate) => {
       if (!accessToken) return;
 
       setError(null);
 
       try {
-        const updated = await upstreamSyncApi.saveConfig(projectId, data, accessToken);
+        const updated = await remoteSyncApi.saveConfig(projectId, data, accessToken);
         setConfig(updated);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to save config";
@@ -177,7 +177,7 @@ export function useUpstreamSync({
     setError(null);
 
     try {
-      await upstreamSyncApi.deleteConfig(projectId, accessToken);
+      await remoteSyncApi.deleteConfig(projectId, accessToken);
       setConfig(null);
       setHistory([]);
     } catch (err) {

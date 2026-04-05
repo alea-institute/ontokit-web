@@ -578,11 +578,11 @@ export const projectOntologyApi = {
     ),
 };
 
-// Re-export semantic search / quality / analytics / upstream sync APIs for convenience
+// Re-export semantic search / quality / analytics / remote sync APIs for convenience
 export { embeddingsApi } from "./embeddings";
 export { qualityApi } from "./quality";
 export { analyticsApi } from "./analytics";
-export { upstreamSyncApi } from "./upstreamSync";
+export { remoteSyncApi } from "./remoteSync";
 
 // Annotation update — a single annotation property with its values
 export interface AnnotationUpdate {

@@ -37,7 +37,7 @@ import { SuggestionSubmitDialog } from "@/components/editor/SuggestionSubmitDial
 import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
 import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
-import { UpstreamSyncIndicator } from "@/components/editor/UpstreamSyncIndicator";
+import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
@@ -908,9 +908,9 @@ export default function EditorPage() {
               {/* History Button */}
               <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
 
-              {/* Upstream Sync Status (auth-only) */}
+              {/* Remote Sync Status (auth-only) */}
               {hasValidAccess && (
-                <UpstreamSyncIndicator
+                <RemoteSyncIndicator
                   projectId={projectId}
                   accessToken={session?.accessToken}
                 />

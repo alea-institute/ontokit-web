@@ -1,7 +1,7 @@
 /**
- * Upstream Sync API client
+ * Remote Sync API client
  *
- * Manages configuration and triggering of upstream source tracking
+ * Manages configuration and triggering of remote source tracking
  * for external GitHub repositories (e.g., FOLIO).
  */
 
@@ -11,14 +11,14 @@ import { api } from "./client";
 
 export type SyncFrequency = "6h" | "12h" | "24h" | "48h" | "weekly" | "manual" | "webhook";
 export type SyncUpdateMode = "auto_apply" | "review_required";
-export type UpstreamSyncStatus =
+export type RemoteSyncStatus =
   | "idle"
   | "checking"
   | "update_available"
   | "up_to_date"
   | "error";
 
-export interface UpstreamSyncConfig {
+export interface RemoteSyncConfig {
   id: string;
   project_id: string;
   repo_owner: string;
@@ -28,16 +28,16 @@ export interface UpstreamSyncConfig {
   frequency: SyncFrequency;
   enabled: boolean;
   update_mode: SyncUpdateMode;
-  status: UpstreamSyncStatus;
+  status: RemoteSyncStatus;
   last_check_at: string | null;
   last_update_at: string | null;
   next_check_at: string | null;
-  upstream_commit_sha: string | null;
+  remote_commit_sha: string | null;
   pending_pr_id: string | null;
   error_message: string | null;
 }
 
-export interface UpstreamSyncConfigCreate {
+export interface RemoteSyncConfigCreate {
   repo_owner: string;
   repo_name: string;
   branch?: string;
@@ -47,7 +47,7 @@ export interface UpstreamSyncConfigCreate {
   update_mode?: SyncUpdateMode;
 }
 
-export interface UpstreamSyncConfigUpdate {
+export interface RemoteSyncConfigUpdate {
   repo_owner?: string;
   repo_name?: string;
   branch?: string;
@@ -67,7 +67,7 @@ export interface SyncEvent {
     | "auto_applied"
     | "pr_created"
     | "error";
-  upstream_commit_sha: string | null;
+  remote_commit_sha: string | null;
   pr_id: string | null;
   changes_summary: string | null;
   error_message: string | null;
@@ -94,9 +94,9 @@ export interface SyncJobStatusResponse {
 
 // --- API ---
 
-export const upstreamSyncApi = {
+export const remoteSyncApi = {
   /**
-   * Get upstream sync configuration for a project.
+   * Get remote sync configuration for a project.
    * Returns the config or throws 404 if not configured.
    */
   getConfig: (projectId: string, token?: string) => {
@@ -104,40 +104,40 @@ export const upstreamSyncApi = {
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
-    return api.get<UpstreamSyncConfig | null>(
-      `/api/v1/projects/${projectId}/upstream-sync`,
+    return api.get<RemoteSyncConfig | null>(
+      `/api/v1/projects/${projectId}/remote-sync`,
       { headers }
     );
   },
 
   /**
-   * Create or update upstream sync configuration.
+   * Create or update remote sync configuration.
    */
   saveConfig: (
     projectId: string,
-    data: UpstreamSyncConfigCreate | UpstreamSyncConfigUpdate,
+    data: RemoteSyncConfigCreate | RemoteSyncConfigUpdate,
     token: string
   ) =>
-    api.put<UpstreamSyncConfig>(
-      `/api/v1/projects/${projectId}/upstream-sync`,
+    api.put<RemoteSyncConfig>(
+      `/api/v1/projects/${projectId}/remote-sync`,
       data,
       { headers: { Authorization: `Bearer ${token}` } }
     ),
 
   /**
-   * Remove upstream sync configuration.
+   * Remove remote sync configuration.
    */
   deleteConfig: (projectId: string, token: string) =>
-    api.delete(`/api/v1/projects/${projectId}/upstream-sync`, {
+    api.delete(`/api/v1/projects/${projectId}/remote-sync`, {
       headers: { Authorization: `Bearer ${token}` },
     }),
 
   /**
-   * Trigger a manual upstream check. Returns a job ID for polling.
+   * Trigger a manual remote check. Returns a job ID for polling.
    */
   triggerCheck: (projectId: string, token: string) =>
     api.post<SyncCheckResponse>(
-      `/api/v1/projects/${projectId}/upstream-sync/check`,
+      `/api/v1/projects/${projectId}/remote-sync/check`,
       {},
       { headers: { Authorization: `Bearer ${token}` } }
     ),
@@ -151,7 +151,7 @@ export const upstreamSyncApi = {
       headers.Authorization = `Bearer ${token}`;
     }
     return api.get<SyncJobStatusResponse>(
-      `/api/v1/projects/${projectId}/upstream-sync/jobs/${jobId}`,
+      `/api/v1/projects/${projectId}/remote-sync/jobs/${jobId}`,
       { headers }
     );
   },
@@ -165,7 +165,7 @@ export const upstreamSyncApi = {
       headers.Authorization = `Bearer ${token}`;
     }
     return api.get<SyncHistoryResponse>(
-      `/api/v1/projects/${projectId}/upstream-sync/history`,
+      `/api/v1/projects/${projectId}/remote-sync/history`,
       { params: { limit }, headers }
     );
   },
