@@ -904,7 +904,7 @@ export default function ProjectSettingsPage() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 hover:underline"
                     >
-                      View remote source
+                      View remote source file
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   ) : (
@@ -1896,7 +1896,7 @@ export default function ProjectSettingsPage() {
             </section>
           )}
 
-          {/* Remote Source Tracking - only for owners/admins */}
+          {/* Sync from Remote - only for owners/admins */}
           {canManage && (
             <RemoteSyncSection
               projectId={projectId}
@@ -2132,7 +2132,7 @@ function WebhookConfigPanel({
             Webhooks
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Receive push events from GitHub for instant remote sync
+            Receive push events from GitHub for instant sync from remote
           </p>
         </div>
         <label className="relative inline-flex cursor-pointer items-center">
@@ -2458,7 +2458,7 @@ function RemoteSyncSection({
       <div className="mb-4 flex items-center gap-2">
         <Download className="h-5 w-5 text-slate-500" />
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-          Remote Source Tracking
+          Sync from Remote
         </h2>
       </div>
 
@@ -2565,7 +2565,7 @@ function RemoteSyncSection({
             <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/50 dark:bg-indigo-900/20">
               <Download className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
               <p className="text-sm text-indigo-700 dark:text-indigo-300">
-                Remote update available
+                Update available from remote
                 {config.pending_pr_id && (
                   <span className="ml-1">
                     &mdash;{" "}
@@ -2687,13 +2687,13 @@ function RemoteSyncSection({
               </p>
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 <Download className="mr-2 h-4 w-4" />
-                Configure Remote Source
+                Configure Remote Source File
               </Button>
             </div>
           ) : (
             <>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                {config ? "Edit remote source configuration." : "Configure which external repository to track."}
+                {config ? "Edit remote source file configuration." : "Configure which external repository to track."}
               </p>
 
               {/* Enable toggle */}

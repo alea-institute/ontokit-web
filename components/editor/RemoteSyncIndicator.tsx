@@ -46,7 +46,7 @@ export function RemoteSyncIndicator({
           variant="ghost"
           size="sm"
           className="gap-1.5 text-green-600 dark:text-green-400"
-          aria-label="Remote source in sync"
+          aria-label="In sync with remote"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           <span className="hidden sm:inline text-xs">Synced</span>
@@ -61,7 +61,7 @@ export function RemoteSyncIndicator({
         variant="ghost"
         size="sm"
         className="gap-1.5 text-blue-600 dark:text-blue-400 cursor-default"
-        aria-label="Checking remote source"
+        aria-label="Checking for updates from remote"
         disabled
       >
         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -81,7 +81,7 @@ export function RemoteSyncIndicator({
           variant="ghost"
           size="sm"
           className="gap-1.5 text-indigo-600 dark:text-indigo-400"
-          aria-label="Remote update available"
+          aria-label="Update available from remote"
         >
           <Download className="h-3.5 w-3.5" />
           <span className="hidden sm:inline text-xs">Update</span>
@@ -98,7 +98,7 @@ export function RemoteSyncIndicator({
           variant="ghost"
           size="sm"
           className="gap-1.5 text-red-600 dark:text-red-400"
-          aria-label="Remote sync error"
+          aria-label="Sync from remote error"
         >
           <AlertCircle className="h-3.5 w-3.5" />
           <span className="hidden sm:inline text-xs">Sync Error</span>
