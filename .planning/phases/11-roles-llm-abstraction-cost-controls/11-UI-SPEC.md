@@ -43,8 +43,9 @@ Declared values (multiples of 4):
 | xl | 32px | Layout gaps between settings section cards (`mb-8` = 32px) |
 | 2xl | 48px | Major section breaks on the settings page |
 | 3xl | 64px | Page-level spacing (not used in this phase) |
+| touch | 44px | Minimum touch target (WCAG 2.5.5) |
 
-Exceptions: 44px minimum touch target for the BYO key toggle and the "Can self-merge structural PRs" toggle (accessibility requirement, WCAG 2.5.5).
+Exceptions: The 44px touch row applies to the BYO key toggle and the "Can self-merge structural PRs" toggle. Implemented via wrapper `<label>` with `min-h-[44px]`.
 
 Source: Spacing inferred from `mb-8 rounded-lg border border-slate-200 bg-white p-6` pattern repeated across 10+ settings sections. 8-point scale confirmed.
 
@@ -54,12 +55,13 @@ Source: Spacing inferred from `mb-8 rounded-lg border border-slate-200 bg-white 
 
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
-| Body | 14px (`text-sm`) | 400 (regular) | 1.5 |
-| Label | 14px (`text-sm`) | 500 (`font-medium`) | 1.4 |
+| Body | 14px (`text-sm`) | 400 (`font-normal`) | 1.5 |
+| Label / Metadata | 14px (`text-sm`) or 12px (`text-xs`) | 600 (`font-semibold`) | 1.4 |
 | Heading (section) | 18px (`text-lg`) | 600 (`font-semibold`) | 1.2 |
-| Metadata / caption | 12px (`text-xs`) | 500 (`font-medium`) | 1.4 |
 
-Source: Settings page uses `text-lg font-semibold` for section headings, `text-sm font-medium` for field labels, `text-sm` for body copy, `text-xs font-medium` for stat labels. Pattern confirmed in lines 891–995 of `settings/page.tsx`.
+Two weights declared: **400** (body copy, table cells, helper text) and **600** (labels, metadata captions, section headings, badge text, sub-headings). No `font-medium` (500) is used anywhere in this phase.
+
+Source: Settings page uses `text-lg font-semibold` for section headings and `text-sm font-semibold` for field labels. Pattern confirmed in lines 891–995 of `settings/page.tsx`.
 
 No display-size type (20px+) is used in this phase — this is a settings-and-dashboard phase, not a marketing page.
 
@@ -71,17 +73,16 @@ No display-size type (20px+) is used in this phase — this is a settings-and-da
 |------|-------|-------|
 | Dominant (60%) | `white` / `slate-950` (dark) | Page background, section card surfaces |
 | Secondary (30%) | `slate-50` / `slate-800` (dark) | Card interiors, form fields, table rows |
-| Accent (10%) | `primary-500` (#0ea5e9) | Primary CTA buttons, active provider card border, progress bar fill, coverage bar fill, active toggle |
+| Accent (10%) | `primary-500` (#0ea5e9) | Primary CTA buttons, active toggle fill, progress bar fill, coverage bar fill, BYO key validation spinner |
 | Destructive | `red-600` | Danger button variant only — used for budget exhaustion hard-stop actions |
 
 Accent reserved for:
 - "Save AI Settings" button (primary CTA)
-- Active LLM provider card border + ring (`border-primary-500 ring-1 ring-primary-500`)
 - Budget consumption progress bar fill
 - BYO key validation spinner
 - Active "Can self-merge structural PRs" toggle fill (`peer-checked:bg-primary-600`)
 
-Accent is NOT used for: table rows, stat labels, budget warning states, section headings, or the budget exhaustion banner.
+Accent is NOT used for: table rows, stat labels, budget warning states, section headings, the budget exhaustion banner, or the provider dropdown trigger/options.
 
 Semantic state colors (informational — not in the 60/30/10 split):
 - Budget warning (>80% consumed): `amber-600` text, `amber-50` background, `amber-200` border
@@ -104,11 +105,11 @@ All new components must follow existing codebase patterns. No new component prim
 
 | Component | Path | Pattern Source |
 |-----------|------|----------------|
-| `LLMSettingsSection` | `components/projects/LLMSettingsSection.tsx` | Mirror `EmbeddingSettingsSection` exactly — provider card grid, API key field, save button |
+| `LLMSettingsSection` | `components/projects/LLMSettingsSection.tsx` | Mirror `EmbeddingSettingsSection` — provider dropdown (Listbox), API key field, save button |
 | `LLMUsageSection` | `components/projects/LLMUsageSection.tsx` | Summary bar (budget used/remaining/burn rate) + sortable per-user table; no charts |
 | `BYOKeyPopover` | `components/projects/BYOKeyPopover.tsx` | Inline popover anchored to the triggering LLM action button; 280px max-width |
 | `LLMBudgetBanner` | `components/editor/LLMBudgetBanner.tsx` | Slim horizontal bar in editor header; `text-sm`, amber/red tinted; dismissible |
-| `LLMRoleBadge` | `components/editor/LLMRoleBadge.tsx` | Inline `<span>` badge; `rounded-full px-2 py-0.5 text-xs font-medium`; shown near LLM affordances |
+| `LLMRoleBadge` | `components/editor/LLMRoleBadge.tsx` | Inline `<span>` badge; `rounded-full px-2 py-1 text-xs font-semibold`; shown near LLM affordances |
 
 ### Modified Components (this phase)
 
@@ -127,16 +128,21 @@ All new components must follow existing codebase patterns. No new component prim
 
 The new section is placed directly below the "Intelligence Features (Embeddings)" section and above the Danger Zone. It uses the identical container: `mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800`.
 
-Section heading: "AI / LLM" (`text-lg font-semibold`) with a badge `rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700` reading "AI".
+Section heading: "AI / LLM" (`text-lg font-semibold`) with a badge `rounded-full bg-primary-100 px-2 py-1 text-xs font-semibold text-primary-700` reading "AI".
 
 Visible to: owner and admin roles only (gate with `isOwner || canManage`).
 
 #### LLMSettingsSection layout (vertical stack, `space-y-4`):
 
 1. Section description paragraph (`text-sm text-slate-500`) — "Configure the LLM provider for AI-assisted suggestions on this project."
-2. Provider grid: `grid gap-2 sm:grid-cols-2` — one card per provider. Each card: `rounded-lg border p-3 text-left transition-all`. Selected state: `border-primary-500 bg-primary-50 ring-1 ring-primary-500`. Unselected: `border-slate-200 hover:border-slate-300`.
-   - Card content: provider logo (16x16px SVG or lucide icon) + provider name (`text-sm font-medium`) + model tier label (`text-xs text-slate-500`).
-3. API key input (hidden when provider is Ollama/local): `<label>` (`text-sm font-medium`) + `<input type="password">` + show/hide toggle (Eye/EyeOff icon from lucide-react).
+2. Provider dropdown (locked decision D-11 — dropdown, not card grid):
+   - `<label className="text-sm font-semibold">LLM Provider</label>`
+   - `<Listbox>` (hand-rolled — no Headless UI dependency): a `<button>` trigger showing the selected provider name + small inline logo icon (16x16px); a `<ul>` dropdown panel (`rounded-md border border-slate-200 bg-white shadow-md dark:border-slate-700 dark:bg-slate-800`) anchored below the trigger with each `<li>` option showing provider logo + provider name + model tier label.
+   - Trigger layout: `flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100` (full width).
+   - Each option: `flex items-center gap-2 px-3 py-2 text-sm text-slate-800 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-700`.
+   - Selected option gets a `Check` icon (lucide-react, 14x14px) at right edge.
+   - Provider logo placeholder: lucide-react icon — `Cpu` for Ollama, `Sparkles` for OpenAI, `Bot` for Anthropic, `Star` for Google, `Zap` for Cohere, `Globe` for generic.
+3. API key input (hidden when provider is Ollama/local): `<label>` (`text-sm font-semibold`) + `<input type="password">` + show/hide toggle (Eye/EyeOff icon from lucide-react).
 4. Local endpoint URL input (shown only when provider is Ollama): `<label>` + `<input type="url" placeholder="http://localhost:11434">`.
 5. Default model tier radio group: "Quality" | "Cheap" — two `<label>` + `<input type="radio">` pairs in a horizontal flex row.
 6. BYO key inline toggle: labeled "Use my own API key (BYO)" — checkbox or toggle. When enabled, shows inline explanatory text: "Your key is stored in your browser only and billed directly to you."
@@ -157,7 +163,7 @@ Placed as a second sub-section within the AI / LLM card, separated by a `<hr cla
 5. Budget progress bar: `h-2 rounded-full bg-slate-200` container; `h-full rounded-full bg-primary-500` fill (amber when >80%, red when >100%).
 6. Per-user call count table:
    - Columns: User, Calls today, Calls this month, Est. cost (USD), BYO key
-   - `text-xs font-medium text-slate-500` column headers
+   - `text-xs font-semibold text-slate-500` column headers
    - `text-sm` cell text
    - Pagination: "Showing N of M users" + Previous / Next buttons if >20 rows
    - Default sort: calls this month descending
@@ -168,14 +174,14 @@ Placed as a second sub-section within the AI / LLM card, separated by a `<hr cla
 
 - Warning state (80-99%): `bg-amber-50 border-b border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400` — text: "AI budget {X}% used this month. You have ${Y} remaining."
 - Exhausted state (100%): `bg-red-50 border-b border-red-200 text-red-700 dark:bg-red-900/20 dark:text-red-400` — text: "AI budget exhausted for this month. LLM features are disabled. Manual suggestions continue to work."
-- Layout: `flex items-center justify-between px-4 py-1.5 text-sm`. Dismiss button (X icon, `ghost` variant, `size="sm"`) at right edge.
+- Layout: `flex items-center justify-between px-4 py-2 text-sm`. Dismiss button (X icon, `ghost` variant, `size="sm"`) at right edge.
 
 `LLMRoleBadge`: Inline `<span>` placed in the editor toolbar, near the future LLM action buttons. Not rendered if user has no LLM access.
 
 - Admin: `bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400` — "Admin — unlimited"
 - Editor: `bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400` — "Editor — 500/day"
 - Suggester: `bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400` — "Suggester — 100/day"
-- Layout: `rounded-full px-2 py-0.5 text-xs font-medium`
+- Layout: `rounded-full px-2 py-1 text-xs font-semibold`
 
 ### BYO Key Popover
 
@@ -224,11 +230,12 @@ This phase establishes the disabled state that future LLM buttons must respect:
 
 Tooltip: `title` attribute only for this phase (full tooltip component in Phase 14).
 
-### Provider Card Selection
+### Provider Dropdown Selection
 
-- Click selects provider: immediate visual update (no debounce).
+- Open on click; close on selection, outside click, or Escape.
 - Selection does not auto-save — user must click "Save AI Settings".
-- Only one card selected at a time.
+- Only one option selected at a time; selected option shows `Check` icon.
+- Keyboard navigable: Arrow keys move focus within list, Enter selects, Escape closes.
 
 ### Key Validation Flow
 
@@ -279,7 +286,7 @@ Destructive actions in this phase:
 ## Accessibility Contract
 
 - All form inputs have explicit `<label>` elements — no `placeholder` as sole label.
-- Provider cards are `<button>` elements (not `<div>`) — keyboard navigable.
+- Provider dropdown trigger is a `<button>` element; list options are `<li>` with `role="option"`; container has `role="listbox"`.
 - Toggle for "Can self-merge structural PRs" uses `<input type="checkbox">` with visible `<label>`.
 - BYO key popover traps focus while open; Escape closes it.
 - Budget banner has `role="alert"` when state transitions from no-banner to exhausted (assertive announcement via `useAnnounce()`).
@@ -303,13 +310,15 @@ No third-party component registries are used in this phase. All components are c
 ## Implementation Notes for Executor
 
 1. **Settings section container:** `<section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">` — copy verbatim from `EmbeddingSettingsSection`.
-2. **Provider logo assets:** Use lucide-react icons as placeholders — `Cpu` for local/Ollama, `Sparkles` for OpenAI, `Bot` for Anthropic, `Star` for Google, `Zap` for Cohere, `Globe` for generic. Do not fetch external SVG assets.
-3. **localStorage key for BYO store:** `ontokit-byo-key` (Zustand persist key). Structure: `{ provider: string; key: string; validatedAt: string | null }`.
-4. **Budget progress bar thresholds:** `consumedPct < 0.8` → `bg-primary-500`; `0.8 ≤ consumedPct < 1.0` → `bg-amber-500`; `consumedPct >= 1.0` → `bg-red-500`.
-5. **Usage table date range default:** Current calendar month. No date picker in this phase.
-6. **BYO popover placement:** Use CSS `position: absolute` with `top: 100%; left: 0; mt-2` relative to the triggering button's container. No Radix Popover — keep it simple.
-7. **Price-per-token table update:** Backend-managed config file (no admin UI for prices in this phase — deferred to Claude's discretion).
-8. **`canSelfMergeStructural` toggle placement:** Right edge of each editor-role member row, after the existing role dropdown.
+2. **Provider dropdown:** Hand-rolled `<Listbox>`-style component — no Headless UI or Radix Select dependency. `<button>` trigger + absolute-positioned `<ul>`. See provider logo instructions in Screen Areas section.
+3. **Provider logo assets:** Use lucide-react icons as placeholders — `Cpu` for local/Ollama, `Sparkles` for OpenAI, `Bot` for Anthropic, `Star` for Google, `Zap` for Cohere, `Globe` for generic. Do not fetch external SVG assets.
+4. **localStorage key for BYO store:** `ontokit-byo-key` (Zustand persist key). Structure: `{ provider: string; key: string; validatedAt: string | null }`.
+5. **Budget progress bar thresholds:** `consumedPct < 0.8` → `bg-primary-500`; `0.8 ≤ consumedPct < 1.0` → `bg-amber-500`; `consumedPct >= 1.0` → `bg-red-500`.
+6. **Usage table date range default:** Current calendar month. No date picker in this phase.
+7. **BYO popover placement:** Use CSS `position: absolute` with `top: 100%; left: 0; mt-2` relative to the triggering button's container. No Radix Popover — keep it simple.
+8. **Price-per-token table update:** Backend-managed config file (no admin UI for prices in this phase — deferred to Claude's discretion).
+9. **`canSelfMergeStructural` toggle placement:** Right edge of each editor-role member row, after the existing role dropdown.
+10. **Font weights:** Use only `font-normal` (400) and `font-semibold` (600). Do not use `font-medium` (500) anywhere in this phase.
 
 ---
 
