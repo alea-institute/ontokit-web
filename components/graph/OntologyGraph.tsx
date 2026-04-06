@@ -12,26 +12,25 @@ import {
   type Node,
   type Edge,
   type ColorMode,
+  type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowDown, ArrowRight, ChevronDown, ChevronUp, Maximize2, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowRight, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGraphData } from "@/lib/hooks/useGraphData";
-import { computeLayout } from "@/lib/graph/elkLayout";
-import { OntologyNode, type OntologyNodeData } from "./OntologyNode";
-import { OntologyEdge, type OntologyEdgeData } from "./OntologyEdge";
+import { useELKLayout, type LayoutDirection } from "@/lib/graph/useELKLayout";
+import { OntologyNode } from "./OntologyNode";
+import { OntologyEdge } from "./OntologyEdge";
 
 interface OntologyGraphProps {
   focusIri: string | null;
   projectId: string;
-  accessToken?: string;
   branch?: string;
   onNavigateToClass?: (iri: string) => void;
-  labelHints?: Map<string, string>;
 }
 
-const nodeTypes = { ontology: OntologyNode };
-const edgeTypes = { ontology: OntologyEdge };
+const nodeTypes = { ontologyNode: OntologyNode };
+const edgeTypes = { ontologyEdge: OntologyEdge };
 
 function GraphLegend() {
   const [expanded, setExpanded] = useState(false);
@@ -49,20 +48,18 @@ function GraphLegend() {
         </button>
         {expanded && (
           <div className="border-t border-slate-200 px-2.5 pb-2 pt-1.5 dark:border-slate-700">
-            {/* Node types */}
             <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Nodes
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               <LegendNodeItem color="border-2 border-primary-500 bg-primary-50 dark:bg-primary-950/40" label="Focus" />
               <LegendNodeItem color="border border-slate-300 bg-white dark:bg-slate-800" label="Class" />
-              <LegendNodeItem color="border-2 border-amber-400 bg-amber-50 dark:bg-amber-950/30" label="Root" />
+              <LegendNodeItem color="border-[3px] border-red-500 bg-red-50 dark:bg-red-950/30" label="Root ancestor" />
               <LegendNodeItem color="border border-pink-300 bg-pink-50 dark:bg-pink-950/30" label="Individual" badge="I" badgeColor="bg-pink-200 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300" />
               <LegendNodeItem color="border border-blue-300 bg-blue-50 dark:bg-blue-950/30" label="Property" badge="P" badgeColor="bg-blue-200 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300" />
               <LegendNodeItem color="border border-slate-200 bg-slate-50 dark:bg-slate-900" label="External" />
               <LegendNodeItem color="border border-dashed border-slate-300 bg-white dark:bg-slate-800" label="Unexplored" />
             </div>
-            {/* Edge types */}
             <div className="mb-1 mt-2 text-[9px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Edges
             </div>
@@ -70,7 +67,7 @@ function GraphLegend() {
               <LegendEdgeItem stroke="#94a3b8" label="subClassOf" />
               <LegendEdgeItem stroke="#3b82f6" dasharray="5 3" label="equivalentTo" />
               <LegendEdgeItem stroke="#ef4444" dasharray="5 3" label="disjointWith" />
-              <LegendEdgeItem stroke="#9ca3af" dasharray="2 4" label="seeAlso" />
+              <LegendEdgeItem stroke="#8b5cf6" dasharray="6 3" label="rdfs:seeAlso" />
             </div>
           </div>
         )}
@@ -133,21 +130,21 @@ function LegendEdgeItem({
 export function OntologyGraph({
   focusIri,
   projectId,
-  accessToken,
   branch,
   onNavigateToClass,
-  labelHints,
 }: OntologyGraphProps) {
-  const { graphData, isLoading, expandNode, resetGraph, resolvedCount } =
-    useGraphData({
-      focusIri,
-      projectId,
-      accessToken,
-      branch,
-      labelHints,
-    });
+  const {
+    graphData,
+    isLoading,
+    showDescendants,
+    setShowDescendants,
+    expandNode,
+    resetGraph,
+    resolvedCount,
+  } = useGraphData({ focusIri, projectId, branch });
 
-  const [direction, setDirection] = useState<"TB" | "LR">("TB");
+  const [direction, setDirection] = useState<LayoutDirection>("TB");
+  const { nodes: layoutNodes, edges: layoutEdges, isLayouting, runLayout } = useELKLayout();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [colorMode, setColorMode] = useState<ColorMode>("light");
@@ -167,21 +164,45 @@ export function OntologyGraph({
     return () => observer.disconnect();
   }, []);
 
-  const handleNavigate = useCallback(
-    (iri: string) => {
-      onNavigateToClass?.(iri);
+  // Run ELK layout when data or direction changes
+  useEffect(() => {
+    if (!graphData || graphData.nodes.length === 0) return;
+    runLayout(graphData, direction).catch(() => {
+      // Layout failed — nodes stay empty
+    });
+  }, [graphData, direction, runLayout]);
+
+  // Sync layout results to React Flow state
+  useEffect(() => {
+    if (layoutNodes.length > 0) {
+      setNodes(layoutNodes);
+      setEdges(layoutEdges);
+    }
+  }, [layoutNodes, layoutEdges, setNodes, setEdges]);
+
+  // Progressive expansion: click to expand or navigate
+  const expandedNodes = useMemo(() => new Set<string>(focusIri ? [focusIri] : []), [focusIri]);
+
+  const handleNodeClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      if (expandedNodes.has(node.id)) {
+        onNavigateToClass?.(node.id);
+        return;
+      }
+      expandedNodes.add(node.id);
+      expandNode(node.id);
+    },
+    [expandedNodes, expandNode, onNavigateToClass],
+  );
+
+  const handleNodeDoubleClick: NodeMouseHandler = useCallback(
+    (_event, node) => {
+      onNavigateToClass?.(node.id);
     },
     [onNavigateToClass],
   );
 
-  const handleExpandNode = useCallback(
-    (iri: string) => {
-      expandNode(iri);
-    },
-    [expandNode],
-  );
-
-  // SVG marker definitions for arrows
+  // SVG marker definitions
   const arrowMarker = useMemo(
     () => (
       <svg style={{ position: "absolute", width: 0, height: 0 }}>
@@ -203,61 +224,6 @@ export function OntologyGraph({
     [],
   );
 
-  // Apply layout when graph data changes
-  useEffect(() => {
-    if (!graphData || graphData.nodes.length === 0) {
-      setNodes([]);
-      setEdges([]);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function applyLayout() {
-      const positions = await computeLayout(
-        graphData!.nodes,
-        graphData!.edges,
-        direction,
-      );
-      if (cancelled) return;
-
-      const flowNodes: Node[] = graphData!.nodes.map((n) => ({
-        id: n.id,
-        type: "ontology",
-        position: positions.get(n.id) || { x: 0, y: 0 },
-        data: {
-          label: n.label,
-          nodeType: n.nodeType,
-          deprecated: n.deprecated,
-          childCount: n.childCount,
-          isExpanded: n.isExpanded,
-          onNavigate: handleNavigate,
-          onExpandNode: handleExpandNode,
-        } as OntologyNodeData,
-      }));
-
-      const flowEdges: Edge[] = graphData!.edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        type: "ontology",
-        data: { edgeType: e.edgeType } as OntologyEdgeData,
-      }));
-
-      setNodes(flowNodes);
-      setEdges(flowEdges);
-    }
-
-    applyLayout();
-    return () => {
-      cancelled = true;
-    };
-  }, [graphData, direction, handleNavigate, handleExpandNode, setNodes, setEdges]);
-
-  const toggleDirection = useCallback(() => {
-    setDirection((prev) => (prev === "TB" ? "LR" : "TB"));
-  }, []);
-
   if (!focusIri) {
     return (
       <div className="flex h-full items-center justify-center bg-slate-50 dark:bg-slate-900">
@@ -273,11 +239,8 @@ export function OntologyGraph({
       {/* Toolbar */}
       <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-1.5 dark:border-slate-700 dark:bg-slate-800">
         <button
-          onClick={toggleDirection}
-          className={cn(
-            "flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
-            "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700",
-          )}
+          onClick={() => setDirection((d) => (d === "TB" ? "LR" : "TB"))}
+          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
           aria-label={`Switch to ${direction === "TB" ? "left-to-right" : "top-to-bottom"} layout`}
         >
           {direction === "TB" ? (
@@ -288,6 +251,18 @@ export function OntologyGraph({
           {direction === "TB" ? "Top-Down" : "Left-Right"}
         </button>
         <button
+          onClick={() => setShowDescendants(!showDescendants)}
+          className={cn(
+            "rounded border px-2 py-0.5 text-xs",
+            showDescendants
+              ? "border-blue-300 bg-blue-50 font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
+              : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700",
+          )}
+          aria-label={showDescendants ? "Hide descendants" : "Show descendants"}
+        >
+          {showDescendants ? "Descendants: On" : "Show Descendants"}
+        </button>
+        <button
           onClick={resetGraph}
           className="flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
           aria-label="Reset graph"
@@ -295,11 +270,21 @@ export function OntologyGraph({
           <RotateCcw className="h-3.5 w-3.5" />
           Reset
         </button>
+        {isLayouting && (
+          <span className="flex items-center gap-1 text-xs text-slate-400">
+            <span className="inline-block h-3 w-3 animate-spin rounded-full border border-slate-300 border-t-blue-600" />
+            Computing layout...
+          </span>
+        )}
         <div className="flex-1" />
         <span className="text-[10px] text-slate-400 dark:text-slate-500">
-          {graphData?.nodes.length ?? 0} nodes, {graphData?.edges.length ?? 0} edges
-          {resolvedCount > 0 && ` (${resolvedCount} resolved)`}
+          {resolvedCount} nodes, {graphData?.edges.length ?? 0} edges
         </span>
+        {graphData?.truncated && (
+          <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+            Truncated ({graphData.total_concept_count} discovered)
+          </span>
+        )}
       </div>
 
       {/* Graph */}
@@ -307,14 +292,15 @@ export function OntologyGraph({
         {arrowMarker}
         {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-slate-900/60">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+            <div className="flex items-center gap-2">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-blue-600" />
+              <span className="text-sm text-slate-500">Loading entity graph...</span>
+            </div>
           </div>
         )}
-        {graphData && graphData.nodes.length === 1 && graphData.edges.length === 0 && !isLoading && (
+        {graphData && graphData.nodes.length === 0 && !isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
-            <p className="rounded-lg bg-white/80 px-4 py-2 text-sm text-slate-500 shadow-xs dark:bg-slate-800/80 dark:text-slate-400">
-              No relationships found for this class
-            </p>
+            <p className="text-sm text-slate-400 dark:text-slate-500">No graph data available</p>
           </div>
         )}
         <ReactFlow
@@ -322,31 +308,34 @@ export function OntologyGraph({
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onNodeClick={handleNodeClick}
+          onNodeDoubleClick={handleNodeDoubleClick}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           colorMode={colorMode}
           fitView
-          fitViewOptions={{ padding: 0.2 }}
+          fitViewOptions={{ padding: 0.2, duration: 400 }}
           minZoom={0.1}
           maxZoom={2}
           proOptions={{ hideAttribution: true }}
+          defaultEdgeOptions={{ type: "ontologyEdge" }}
         >
           <Background variant={BackgroundVariant.Dots} gap={16} size={1} />
-          <Controls showInteractive={false}>
-            <button
-              onClick={() => {
-                // Fit view is handled by Controls built-in, but add a toolbar one too
-              }}
-              className="react-flow__controls-button"
-              aria-label="Fit view"
-            >
-              <Maximize2 className="h-3 w-3" />
-            </button>
-          </Controls>
+          <Controls showInteractive={false} />
           <MiniMap
             pannable
             zoomable
-            className="bg-slate-100! dark:bg-slate-800!"
+            nodeColor={(node) => {
+              const nodeType = node.data?.nodeType;
+              if (nodeType === "focus") return "#3b82f6";
+              if (nodeType === "root") return "#ef4444";
+              if (nodeType === "property") return "#93c5fd";
+              if (nodeType === "individual") return "#f9a8d4";
+              if (nodeType === "external") return "#e2e8f0";
+              return "#d1d5db";
+            }}
+            maskColor="rgba(0,0,0,0.1)"
+            className="!bg-slate-100 dark:!bg-slate-800"
           />
         </ReactFlow>
         <GraphLegend />
