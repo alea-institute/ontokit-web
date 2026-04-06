@@ -29,7 +29,7 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 **Milestone Goal:** Enable SMEs to rapidly improve their ontology with LLM assistance while guaranteeing integrity through duplicate detection, validation guardrails, and human-curated review.
 
 - [x] **Phase 11: Roles, LLM Abstraction & Cost Controls** - Per-role gating, multi-provider LLM dispatch, project budget caps, and per-user rate limits (completed 2026-04-06)
-- [ ] **Phase 12: Toolchain Integration & Duplicate Detection** - folio-python, OpenGloss, OWL reasoner, plus whole-ontology embeddings index and ANN-based duplicate scoring
+- [x] **Phase 12: Toolchain Integration & Duplicate Detection** - folio-python, OpenGloss, OWL reasoner, plus whole-ontology embeddings index and ANN-based duplicate scoring (completed 2026-04-06)
 - [ ] **Phase 13: Validation Guardrails & Suggestion Generation** - Pre-submit validation rules, Generative FOLIO prompt pipeline, and LLM suggestion endpoints for classes/annotations/edges
 - [ ] **Phase 14: Inline Suggestion UX & Property Support** - "Suggest improvements" button on class detail panel, flashcard iterator mode, one-click suggestion actions, and property tree browsing with LLM suggestions
 - [ ] **Phase 15: Session Clustering & Batch Submit** - Auto-clustering of session suggestions by ancestor, shard preview tree, per-shard PR creation, and batch traceability
@@ -128,7 +128,7 @@ Plans:
 - [x] 12-01-PLAN.md — Backend: DuplicateRejection model, Pydantic schemas, HNSW + duplicate_rejections Alembic migration
 - [x] 12-02-PLAN.md — Backend: StructuralSimilarityService (folio-python), GlossExtractionService (stub), ReasonerService (owlready2), validation endpoint
 - [x] 12-03-PLAN.md — Backend: All-branch semantic search, webhook rebuild trigger, startup freshness check, branch cleanup
-- [ ] 12-04-PLAN.md — Backend: DuplicateCheckService (composite 40/40/20 scoring), duplicate-check API endpoint, suggestion rejection extension
+- [x] 12-04-PLAN.md — Backend: DuplicateCheckService (composite 40/40/20 scoring), duplicate-check API endpoint, suggestion rejection extension
 
 ### Phase 13: Validation Guardrails & Suggestion Generation
 **Goal**: LLM suggestions for child classes, sibling classes, annotations, parents, and relationship edges are available via API, filtered through duplicate detection, and blocked by pre-submit validation before they can enter a user's draft
@@ -191,7 +191,7 @@ Plans:
 | 9. Production Deployment | v0.3.0 | 1/1 | Complete | 2026-04-03 |
 | 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete | 2026-04-03 |
 | 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete    | 2026-04-06 |
-| 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 4/5 | In Progress|  |
+| 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete   | 2026-04-06 |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 0/TBD | Not started | - |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/TBD | Not started | - |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |
