@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Plus, Search, Globe, Lock, FolderOpen, LogIn } from "lucide-react";
+import { Plus, Search, Globe, Lock, FolderOpen, LogIn, User } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
@@ -13,13 +13,24 @@ import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
 
-type FilterType = "public" | "private" | "all";
+type FilterType = "public" | "private" | "mine" | "all";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
   const [filter, setFilter] = useState<FilterType>("public");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  const isAuthenticated = status === "authenticated";
+
+  // Default authenticated users to "mine" tab
+  const authDefaultApplied = useRef(false);
+  useEffect(() => {
+    if (!authDefaultApplied.current && status !== "loading") {
+      authDefaultApplied.current = true;
+      if (isAuthenticated) setFilter("mine");
+    }
+  }, [status, isAuthenticated]);
 
   // Debounce search input
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -29,8 +40,6 @@ export default function HomePage() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [searchQuery]);
-
-  const isAuthenticated = status === "authenticated";
 
   const {
     data,
@@ -44,7 +53,7 @@ export default function HomePage() {
   } = useInfiniteQuery({
     queryKey: ["projects", filter, isAuthenticated, debouncedSearch],
     queryFn: async ({ pageParam = 0 }) => {
-      const filterParam = filter === "all" ? undefined : filter === "private" ? "mine" : "public";
+      const filterParam = filter === "all" ? undefined : filter;
       return projectApi.list(pageParam, PAGE_SIZE, filterParam, session?.accessToken, debouncedSearch || undefined);
     },
     initialPageParam: 0,
@@ -52,7 +61,7 @@ export default function HomePage() {
       const nextSkip = lastPage.skip + lastPage.limit;
       return nextSkip < lastPage.total ? nextSkip : undefined;
     },
-    enabled: status !== "loading" && !(filter === "private" && !isAuthenticated),
+    enabled: status !== "loading" && !((filter === "mine" || filter === "private") && !isAuthenticated),
   });
 
   const projects = data?.pages.flatMap((page) => page.items) ?? [];
@@ -104,42 +113,26 @@ export default function HomePage() {
           <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             {/* Filter Tabs */}
             <div className="flex rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
-              <button
-                onClick={() => setFilter("public")}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  filter === "public"
-                    ? "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-              >
-                <Globe className="h-4 w-4" />
-                Public
-              </button>
-              <button
-                onClick={() => setFilter("private")}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  filter === "private"
-                    ? "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-              >
-                <Lock className="h-4 w-4" />
-                Private
-              </button>
-              <button
-                onClick={() => setFilter("all")}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  filter === "all"
-                    ? "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300"
-                    : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-                )}
-              >
-                <FolderOpen className="h-4 w-4" />
-                All
-              </button>
+              {([
+                { value: "mine" as const, label: "My Projects", icon: User },
+                { value: "public" as const, label: "Public", icon: Globe },
+                { value: "private" as const, label: "Private", icon: Lock },
+                { value: "all" as const, label: "All", icon: FolderOpen },
+              ] as const).map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setFilter(value)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    filter === value
+                      ? "bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300"
+                      : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </button>
+              ))}
             </div>
 
             {/* Search */}
@@ -163,14 +156,14 @@ export default function HomePage() {
           {/* Content */}
           <div className="mt-8">
             {/* Private tab login prompt for unauthenticated users */}
-            {filter === "private" && !isAuthenticated ? (
+            {(filter === "mine" || filter === "private") && !isAuthenticated ? (
               <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
-                <Lock className="mx-auto h-12 w-12 text-slate-400" />
+                <User className="mx-auto h-12 w-12 text-slate-400" />
                 <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
-                  Sign in to see your private projects
+                  Sign in to see your projects
                 </h3>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  Private projects are only visible to members with an assigned role
+                  View all projects you own or are a member of
                 </p>
                 <Button className="mt-6" onClick={() => signIn()}>
                   <LogIn className="mr-2 h-4 w-4" />
@@ -204,18 +197,18 @@ export default function HomePage() {
                 <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
                   {debouncedSearch
                     ? "No projects found"
-                    : filter === "private"
+                    : (filter === "mine" || filter === "private")
                     ? "No projects yet"
                     : "No projects available"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                   {debouncedSearch
                     ? "Try a different search term"
-                    : filter === "private" && isAuthenticated
+                    : (filter === "mine" || filter === "private") && isAuthenticated
                     ? "Create your first project to get started"
                     : "Check back later for public projects"}
                 </p>
-                {filter === "private" && isAuthenticated && !debouncedSearch && (
+                {(filter === "mine" || filter === "private") && isAuthenticated && !debouncedSearch && (
                   <Link href="/projects/new" className="mt-4 inline-block">
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
