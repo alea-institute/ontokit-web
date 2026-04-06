@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Completed 12-01-PLAN.md (DuplicateRejection model, HNSW migration, Pydantic schemas)
-last_updated: "2026-04-06T21:33:20.613Z"
+stopped_at: Completed 12-02-PLAN.md (StructuralSimilarityService, GlossExtractionService stub, ReasonerService, validation endpoint)
+last_updated: "2026-04-06T21:41:19.181Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 15
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 12 (toolchain-integration-duplicate-detection) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-04-06
 
@@ -60,6 +60,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 11-roles-llm-abstraction-cost-controls P05 | 4 | 3 tasks | 8 files |
 | Phase 12-toolchain-integration-duplicate-detection P00 | 2 | 1 tasks | 6 files |
 | Phase 12 P01 | 2 | 2 tasks | 4 files |
+| Phase 12-toolchain-integration-duplicate-detection P02 | 7 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -101,6 +102,8 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase Phase 12-00]: Wave 0 stubs created before implementation so downstream plans can run pytest --co without discovery failures (Nyquist compliance pattern)
 - [Phase 12-01]: HNSW index wrapped in PL/pgSQL EXCEPTION WHEN others block — graceful fallback for pgvector < 0.5.0 so migration succeeds on older dev environments
 - [Phase 12-01]: DuplicateVerdict and CandidateSource defined as Literal aliases (not Enum) — consistent with existing schema patterns in embeddings.py and quality.py
+- [Phase 12-toolchain-integration-duplicate-detection]: RDFLib used for cycle detection instead of owlready2 is_a traversal — owlready2/HermiT normalizes cycles into class equivalences before Python can observe them
+- [Phase 12-toolchain-integration-duplicate-detection]: Validation endpoint fallback uses load_project_graph() + graph.serialize() not storage.get_source() — StorageService has no get_source() method
 
 ### Key Facts
 
@@ -142,6 +145,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T21:33:20.611Z
-Stopped at: Completed 12-01-PLAN.md (DuplicateRejection model, HNSW migration, Pydantic schemas)
+Last session: 2026-04-06T21:41:19.179Z
+Stopped at: Completed 12-02-PLAN.md (StructuralSimilarityService, GlossExtractionService stub, ReasonerService, validation endpoint)
 Resume file: None
