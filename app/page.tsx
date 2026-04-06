@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Plus, Search, Globe, Lock, FolderOpen, LogIn } from "lucide-react";
 import { Header } from "@/components/layout/header";
@@ -11,12 +11,24 @@ import { ProjectCard } from "@/components/projects/project-card";
 import { projectApi } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
 
+const PAGE_SIZE = 50;
+
 type FilterType = "public" | "private" | "all";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
   const [filter, setFilter] = useState<FilterType>("public");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search input
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    debounceRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchQuery]);
 
   const isAuthenticated = status === "authenticated";
 
@@ -24,26 +36,40 @@ export default function HomePage() {
     data,
     isLoading,
     error,
-  } = useQuery({
-    queryKey: ["projects", filter, session?.accessToken],
-    queryFn: async () => {
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["projects", filter, isAuthenticated, debouncedSearch],
+    queryFn: async ({ pageParam = 0 }) => {
       const filterParam = filter === "all" ? undefined : filter === "private" ? "mine" : "public";
-      return projectApi.list(0, 50, filterParam, session?.accessToken);
+      return projectApi.list(pageParam, PAGE_SIZE, filterParam, session?.accessToken, debouncedSearch || undefined);
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => {
+      const nextSkip = lastPage.skip + lastPage.limit;
+      return nextSkip < lastPage.total ? nextSkip : undefined;
     },
     enabled: status !== "loading" && !(filter === "private" && !isAuthenticated),
   });
 
-  const projects = data?.items ?? [];
-  const total = data?.total ?? 0;
+  const projects = data?.pages.flatMap((page) => page.items) ?? [];
+  const total = data?.pages.at(-1)?.total ?? 0;
 
-  // Filter projects by search query (client-side)
-  const filteredProjects = searchQuery
-    ? projects.filter(
-        (p) =>
-          p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.description?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : projects;
+  const [nextPageError, setNextPageError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setNextPageError(null);
+  }, [filter, debouncedSearch]);
+
+  const handleLoadMore = useCallback(() => {
+    if (hasNextPage && !isFetchingNextPage) {
+      setNextPageError(null);
+      fetchNextPage().catch((err) => {
+        setNextPageError(err instanceof Error ? err.message : "Failed to load more projects");
+      });
+    }
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   return (
     <>
@@ -158,7 +184,7 @@ export default function HomePage() {
                   />
                 ))}
               </div>
-            ) : error ? (
+            ) : error && !data ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/50 dark:bg-red-900/20">
                 <p className="text-red-700 dark:text-red-400">{error instanceof Error ? error.message : "Failed to load projects"}</p>
                 <Button
@@ -169,24 +195,24 @@ export default function HomePage() {
                   Try Again
                 </Button>
               </div>
-            ) : filteredProjects.length === 0 ? (
+            ) : projects.length === 0 ? (
               <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
                 <FolderOpen className="mx-auto h-12 w-12 text-slate-400" />
                 <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
-                  {searchQuery
+                  {debouncedSearch
                     ? "No projects found"
                     : filter === "private"
                     ? "No projects yet"
                     : "No projects available"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  {searchQuery
+                  {debouncedSearch
                     ? "Try a different search term"
                     : filter === "private" && isAuthenticated
                     ? "Create your first project to get started"
                     : "Check back later for public projects"}
                 </p>
-                {filter === "private" && isAuthenticated && !searchQuery && (
+                {filter === "private" && isAuthenticated && !debouncedSearch && (
                   <Link href="/projects/new" className="mt-4 inline-block">
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
@@ -198,15 +224,29 @@ export default function HomePage() {
             ) : (
               <>
                 <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-                  {searchQuery
-                    ? `Showing ${filteredProjects.length} projects (filtered from ${total})`
-                    : `Showing ${filteredProjects.length} of ${total} projects`}
+                  {debouncedSearch
+                    ? `${total} ${total === 1 ? "result" : "results"} for "${debouncedSearch}"`
+                    : `${total} ${total === 1 ? "project" : "projects"}`}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredProjects.map((project) => (
+                  {projects.map((project) => (
                     <ProjectCard key={project.id} project={project} />
                   ))}
                 </div>
+                {hasNextPage && (
+                  <div className="mt-6 flex flex-col items-center gap-2">
+                    {nextPageError && (
+                      <p className="text-sm text-red-600 dark:text-red-400">{nextPageError}</p>
+                    )}
+                    <Button
+                      variant="outline"
+                      onClick={handleLoadMore}
+                      disabled={isFetchingNextPage}
+                    >
+                      {isFetchingNextPage ? "Loading..." : nextPageError ? "Retry" : "Load More"}
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>
