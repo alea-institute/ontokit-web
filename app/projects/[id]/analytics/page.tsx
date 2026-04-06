@@ -127,7 +127,7 @@ export default function ProjectAnalyticsPage() {
                     key={entity.entity_iri}
                     onClick={() =>
                       router.push(
-                        `/projects/${projectId}/editor?classIri=${encodeURIComponent(entity.entity_iri)}`
+                        `/projects/${projectId}?classIri=${encodeURIComponent(entity.entity_iri)}`
                       )
                     }
                     className="flex w-full items-center gap-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
