@@ -5,12 +5,13 @@ import { ApiError } from "@/lib/api/client";
 export type ProjectErrorKind = "private-403" | "no-access" | "not-found" | "generic";
 
 export const projectQueryKeys = {
-  detail: (projectId: string) => ["project", projectId] as const,
+  detail: (projectId: string, isAuthenticated: boolean) =>
+    ["project", projectId, isAuthenticated] as const,
 };
 
 export function useProject(projectId: string, accessToken?: string) {
   const query = useQuery({
-    queryKey: projectQueryKeys.detail(projectId),
+    queryKey: projectQueryKeys.detail(projectId, !!accessToken),
     queryFn: () => projectApi.get(projectId, accessToken),
     enabled: !!projectId,
   });

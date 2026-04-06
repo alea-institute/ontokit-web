@@ -229,6 +229,7 @@ export default function SuggestionReviewPage() {
 
   const handleApprove = async () => {
     if (!selectedSession || !session?.accessToken) return;
+    setSessionsError(null);
     setActionInProgress(true);
     try {
       await suggestionsApi.approve(projectId, selectedSession.session_id, session.accessToken);
@@ -245,6 +246,7 @@ export default function SuggestionReviewPage() {
 
   const handleReject = async (reason: string) => {
     if (!selectedSession || !session?.accessToken) return;
+    setSessionsError(null);
     setActionInProgress(true);
     try {
       await suggestionsApi.reject(projectId, selectedSession.session_id, { reason }, session.accessToken);
@@ -261,6 +263,7 @@ export default function SuggestionReviewPage() {
 
   const handleRequestChanges = async (feedback: string) => {
     if (!selectedSession || !session?.accessToken) return;
+    setSessionsError(null);
     setActionInProgress(true);
     try {
       await suggestionsApi.requestChanges(projectId, selectedSession.session_id, { feedback }, session.accessToken);
