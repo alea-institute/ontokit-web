@@ -456,7 +456,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
       {showGraphModal && selectedIri && (
         <EntityGraphModal
           focusIri={selectedIri}
-          label={getLocalName(selectedIri)}
+          label={treeLabelHints.get(selectedIri) || getLocalName(selectedIri)}
           projectId={projectId}
           branch={activeBranch}
           onNavigateToClass={(iri) => {

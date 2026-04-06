@@ -90,7 +90,7 @@ export const OntologyNode = memo(function OntologyNode({
       onKeyDown={handleKeyDown}
       aria-label={`${label}${nodeType === "unexplored" ? " (click to expand)" : ""}`}
     >
-      <Handle type="target" position={Position.Bottom} className="bg-slate-400! w-2! h-2! border-0!" />
+      <Handle type="target" position={Position.Top} className="bg-slate-400! w-2! h-2! border-0!" />
 
       <div className="flex items-center gap-1.5">
         {typeBadge[nodeType] && (
@@ -128,7 +128,7 @@ export const OntologyNode = memo(function OntologyNode({
         </span>
       )}
 
-      <Handle type="source" position={Position.Top} className="bg-slate-400! w-2! h-2! border-0!" />
+      <Handle type="source" position={Position.Bottom} className="bg-slate-400! w-2! h-2! border-0!" />
     </div>
   );
 });
