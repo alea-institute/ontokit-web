@@ -16,6 +16,7 @@ import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 import { projectApi, type Project } from "@/lib/api/projects";
+import { ApiError } from "@/lib/api/client";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
 export default function ProjectViewerPage() {
@@ -38,7 +39,7 @@ export default function ProjectViewerPage() {
         const data = await projectApi.get(projectId, session?.accessToken);
         setProject(data);
       } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
+        if (err instanceof ApiError && err.status === 403) {
           if (!session?.accessToken) {
             setError("This is a private project. Sign in to request access.");
             setErrorKind("private-403");
@@ -46,7 +47,7 @@ export default function ProjectViewerPage() {
             setError("You don't have access to this project");
             setErrorKind("no-access");
           }
-        } else if (err instanceof Error && err.message.includes("404")) {
+        } else if (err instanceof ApiError && err.status === 404) {
           setError("Project not found");
           setErrorKind("not-found");
         } else {
@@ -198,13 +199,13 @@ function ViewerContent({
   const editorMode = useEditorModeStore((s) => s.editorMode);
 
   // Use the default branch from the BranchProvider context
-  const { defaultBranch } = useBranch();
+  const { defaultBranch, isLoading: isBranchLoading } = useBranch();
 
   const viewer = useProjectViewer({
     projectId,
     accessToken,
     sessionStatus,
-    activeBranch: defaultBranch,
+    activeBranch: isBranchLoading ? undefined : defaultBranch,
   });
 
   const {
