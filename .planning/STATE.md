@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: verifying
-stopped_at: Paused at 11-05-PLAN.md Task 4 (human-verify checkpoint)
-last_updated: "2026-04-06T16:04:50.656Z"
+status: planning
+stopped_at: Entity graph port code-complete; needs visual verification + PR
+last_updated: "2026-04-06T16:17:41.578Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 
 ## Current Position
 
-Phase: 11 (roles-llm-abstraction-cost-controls) — EXECUTING
-Plan: 6 of 6
+Phase: 12
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-04-06
 
@@ -129,8 +129,9 @@ None yet.
 ## Active Feature Branches
 
 ### Entity Graph Port (`entity-graph-migration`)
+
 - **Issue:** CatholicOS/ontokit-web#81
-- **Status:** Code-complete, awaiting visual verification
+- **Status:** Ready to plan
 - **Handoff:** `.planning/features/entity-graph-port/HANDOFF.md`
 - **Next:** Visual verify with MCP chrome-devtools (headless), then create PR
 
