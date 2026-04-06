@@ -583,6 +583,7 @@ export { embeddingsApi } from "./embeddings";
 export { qualityApi } from "./quality";
 export { analyticsApi } from "./analytics";
 export { remoteSyncApi } from "./remoteSync";
+export { llmApi } from "./llm";
 
 // Annotation update — a single annotation property with its values
 export interface AnnotationUpdate {
