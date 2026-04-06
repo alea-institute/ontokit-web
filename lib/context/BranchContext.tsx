@@ -114,6 +114,9 @@ export function BranchProvider({
   useEffect(() => {
     if (!response) return;
     setCurrentBranch((prev) => {
+      // Unauthenticated users are locked to the default branch
+      if (!accessToken) return response.default_branch ?? response.current_branch;
+
       const prevExists = response.items.some((b) => b.name === prev);
       if (prevExists) return prev;
       // Stored/initial branch was deleted — clear stale sessionStorage
@@ -129,12 +132,13 @@ export function BranchProvider({
         ? response.preferred_branch!
         : response.current_branch;
     });
-  }, [response, projectId]);
+  }, [response, projectId, accessToken]);
 
-  // Set initial branch if specified and different from current
+  // Set initial branch if specified and different from current (authenticated only)
   const [initialBranchHandled, setInitialBranchHandled] = useState(false);
   useEffect(() => {
     if (
+      accessToken &&
       initialBranch &&
       !initialBranchHandled &&
       !isLoading &&
@@ -146,7 +150,7 @@ export function BranchProvider({
       }
       setInitialBranchHandled(true);
     }
-  }, [initialBranch, initialBranchHandled, isLoading, branches, currentBranch]);
+  }, [accessToken, initialBranch, initialBranchHandled, isLoading, branches, currentBranch]);
 
   const refreshBranches = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -181,6 +185,10 @@ export function BranchProvider({
 
   const switchBranch = useCallback(
     async (name: string) => {
+      if (!accessToken) {
+        throw new Error("Authentication required to switch branches");
+      }
+
       if (pendingChanges) {
         throw new Error(
           "You have pending changes. Please commit or discard them before switching branches."
@@ -197,9 +205,7 @@ export function BranchProvider({
       setStoredBranch(projectId, name);
 
       // Fire-and-forget: persist to DB for cross-session restore
-      if (accessToken) {
-        branchesApi.savePreference(projectId, name, accessToken).catch(() => {});
-      }
+      branchesApi.savePreference(projectId, name, accessToken).catch(() => {});
     },
     [branches, pendingChanges, projectId, accessToken]
   );
