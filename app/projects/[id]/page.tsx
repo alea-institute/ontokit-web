@@ -10,59 +10,57 @@ import { Button } from "@/components/ui/button";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
-import { BranchProvider } from "@/lib/context/BranchContext";
+import { BranchProvider, useBranch } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { projectApi, type Project } from "@/lib/api/projects";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
 export default function ProjectViewerPage() {
   const { data: session, status } = useSession();
   const params = useParams();
-  const searchParams = useSearchParams();
   const projectId = params.id as string;
-  const classIriParam = searchParams.get("classIri");
 
-  const editorMode = useEditorModeStore((s) => s.editorMode);
+  // Lightweight project fetch for loading/error/no-ontology gates
+  const [project, setProject] = useState<Project | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<"private-403" | "no-access" | "not-found" | "generic" | null>(null);
 
-  // No branch selection in viewer — locked to default
-  const [activeBranch] = useState<string | undefined>(undefined);
-
-  const viewer = useProjectViewer({
-    projectId,
-    accessToken: session?.accessToken,
-    sessionStatus: status,
-    activeBranch,
-  });
-
-  const {
-    project, isLoading, error, errorKind,
-    canManage, canSuggest, hasValidAccess, hasOntology,
-    nodes, totalClasses, isTreeLoading, treeError,
-    selectedIri, expandNode, collapseNode, selectNode,
-    navigateToNode, collapseAll, collapseOneLevel, expandOneLevel, expandAllFully,
-    hasExpandableNodes, hasExpandedNodes, isExpandingAll,
-    selectedNodeFallback,
-    sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
-    loadSourceContent, sourceIriIndex,
-    connectionStatus, wsEndpoint, wsPurpose,
-  } = viewer;
-
-  // Source editor ref (read-only, but required by DeveloperEditorLayout)
-  const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
-  const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
-
-  // Navigate to classIri from URL query param once tree is ready
   useEffect(() => {
-    if (!classIriParam || isTreeLoading || !nodes.length) return;
-    if (selectedIri === classIriParam) return;
-    navigateToNode(classIriParam);
-  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
+    const fetchProject = async () => {
+      setIsLoading(true);
+      setError(null);
+      setErrorKind(null);
+      try {
+        const data = await projectApi.get(projectId, session?.accessToken);
+        setProject(data);
+      } catch (err) {
+        if (err instanceof Error && err.message.includes("403")) {
+          if (!session?.accessToken) {
+            setError("This is a private project. Sign in to request access.");
+            setErrorKind("private-403");
+          } else {
+            setError("You don't have access to this project");
+            setErrorKind("no-access");
+          }
+        } else if (err instanceof Error && err.message.includes("404")) {
+          setError("Project not found");
+          setErrorKind("not-found");
+        } else {
+          setError(err instanceof Error ? err.message : "Failed to load project");
+          setErrorKind("generic");
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    if (status !== "loading" && projectId) fetchProject();
+  }, [projectId, session?.accessToken, status]);
 
-  // No-op handlers for required props (viewer is read-only)
-  const noop = () => {};
-
-  // --- Render ---
+  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
+  const hasOntology = !!project?.source_file_path;
 
   if (isLoading || status === "loading") {
     return (
@@ -172,6 +170,68 @@ export default function ProjectViewerPage() {
 
   return (
     <BranchProvider projectId={projectId} accessToken={session?.accessToken}>
+      <ViewerContent
+        projectId={projectId}
+        accessToken={session?.accessToken}
+        sessionStatus={status}
+      />
+    </BranchProvider>
+  );
+}
+
+/**
+ * Inner viewer component that lives inside BranchProvider
+ * so it can access the default branch via useBranch().
+ */
+function ViewerContent({
+  projectId,
+  accessToken,
+  sessionStatus,
+}: {
+  projectId: string;
+  accessToken?: string;
+  sessionStatus: "loading" | "authenticated" | "unauthenticated";
+}) {
+  const searchParams = useSearchParams();
+  const classIriParam = searchParams.get("classIri");
+  const editorMode = useEditorModeStore((s) => s.editorMode);
+
+  // Use the default branch from the BranchProvider context
+  const { defaultBranch } = useBranch();
+
+  const viewer = useProjectViewer({
+    projectId,
+    accessToken,
+    sessionStatus,
+    activeBranch: defaultBranch,
+  });
+
+  const {
+    project, canManage, canSuggest, hasValidAccess,
+    nodes, totalClasses, isTreeLoading, treeError,
+    selectedIri, expandNode, collapseNode, selectNode,
+    navigateToNode, collapseAll, collapseOneLevel, expandOneLevel, expandAllFully,
+    hasExpandableNodes, hasExpandedNodes, isExpandingAll,
+    selectedNodeFallback,
+    sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
+    loadSourceContent, sourceIriIndex,
+    connectionStatus, wsEndpoint, wsPurpose,
+  } = viewer;
+
+  const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
+  const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
+
+  // Navigate to classIri from URL query param once tree is ready
+  useEffect(() => {
+    if (!classIriParam || isTreeLoading || !nodes.length) return;
+    if (selectedIri === classIriParam) return;
+    navigateToNode(classIriParam);
+  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
+
+  const noop = () => {};
+
+  return (
+    <>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {/* Viewer Header */}
@@ -186,7 +246,7 @@ export default function ProjectViewerPage() {
                 Back
               </Link>
               <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
-              <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
+              <h1 className="font-semibold text-slate-900 dark:text-white">{project?.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
               <ModeSwitcher />
             </div>
@@ -250,8 +310,8 @@ export default function ProjectViewerPage() {
               <div className="flex-1 flex flex-col">
                 <DeveloperEditorLayout
                   projectId={projectId}
-                  accessToken={session?.accessToken}
-                  activeBranch={activeBranch}
+                  accessToken={accessToken}
+                  activeBranch={defaultBranch}
                   canEdit={false}
                   canSuggest={false}
                   isSuggestionMode={false}
@@ -293,8 +353,8 @@ export default function ProjectViewerPage() {
             ) : (
               <StandardEditorLayout
                 projectId={projectId}
-                accessToken={session?.accessToken}
-                activeBranch={activeBranch}
+                accessToken={accessToken}
+                activeBranch={defaultBranch}
                 canEdit={false}
                 canSuggest={false}
                 isSuggestionMode={false}
@@ -321,6 +381,6 @@ export default function ProjectViewerPage() {
           </div>
         </div>
       </main>
-    </BranchProvider>
+    </>
   );
 }
