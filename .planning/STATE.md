@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: planning
-stopped_at: Entity graph port code-complete; needs visual verification + PR
-last_updated: "2026-04-06T16:17:41.578Z"
+status: executing
+stopped_at: Completed 12-00-PLAN.md — folio-python installed, Wave 0 stubs created
+last_updated: "2026-04-06T21:32:29.504Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 17
+  completed_plans: 13
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Enable grassroots-level collaborative ontology editing in a modern, accessible web interface — where SMEs rapidly improve their ontology with LLM assistance while preserving integrity through human curation.
-**Current focus:** Phase 11 — roles-llm-abstraction-cost-controls
+**Current focus:** Phase 12 — toolchain-integration-duplicate-detection
 
 ## Current Position
 
-Phase: 12
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 12 (toolchain-integration-duplicate-detection) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
 Last activity: 2026-04-06
 
 Progress: [ ] 0% (v0.4.0 phases)
@@ -58,6 +58,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 11-roles-llm-abstraction-cost-controls P04 | 7 | 2 tasks | 3 files |
 | Phase 11-roles-llm-abstraction-cost-controls P02 | 7 | 2 tasks | 7 files |
 | Phase 11-roles-llm-abstraction-cost-controls P05 | 4 | 3 tasks | 8 files |
+| Phase 12-toolchain-integration-duplicate-detection P00 | 2 | 1 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 11-roles-llm-abstraction-cost-controls]: Two-router pattern in llm.py: project-scoped router + public public_router to avoid prefix collision between /projects/... and /llm/providers
 - [Phase 11-roles-llm-abstraction-cost-controls]: check_rate_limit fails open (returns True) when Redis unavailable to avoid blocking legitimate users during Redis downtime
 - [Phase Phase 11-roles-llm-abstraction-cost-controls]: AdminSelfMergeDialog uses custom dialog (not ConfirmDialog) to satisfy role=dialog + aria-modal requirements; UI-SPEC copy takes precedence over plan task spec where they differ
+- [Phase Phase 12-00]: Wave 0 stubs created before implementation so downstream plans can run pytest --co without discovery failures (Nyquist compliance pattern)
 
 ### Key Facts
 
@@ -131,12 +133,12 @@ None yet.
 ### Entity Graph Port (`entity-graph-migration`)
 
 - **Issue:** CatholicOS/ontokit-web#81
-- **Status:** Ready to plan
+- **Status:** Ready to execute
 - **Handoff:** `.planning/features/entity-graph-port/HANDOFF.md`
 - **Next:** Visual verify with MCP chrome-devtools (headless), then create PR
 
 ## Session Continuity
 
-Last session: 2026-04-06
-Stopped at: Entity graph port code-complete; needs visual verification + PR
-Resume file: .planning/features/entity-graph-port/HANDOFF.md
+Last session: 2026-04-06T21:32:29.502Z
+Stopped at: Completed 12-00-PLAN.md — folio-python installed, Wave 0 stubs created
+Resume file: None

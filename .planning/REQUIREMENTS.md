@@ -29,14 +29,14 @@
 
 ### Duplicate Detection
 
-- [ ] **DEDUP-01**: System pre-computes embeddings for all existing classes and properties in the ontology
-- [ ] **DEDUP-02**: Embeddings are stored in an approximate-nearest-neighbor index for O(log n) similarity search
-- [ ] **DEDUP-03**: ANN index is rebuilt automatically after each merge to the main branch
-- [ ] **DEDUP-04**: Every LLM suggestion is scored against the ontology for exact label match, semantic similarity, and structural similarity
-- [ ] **DEDUP-05**: Composite duplicate score >0.95 blocks submission and forces the user to link to the existing entity instead
-- [ ] **DEDUP-06**: Composite duplicate score >0.80 shows a warning with candidate existing entities and lets the user decide
-- [ ] **DEDUP-07**: Composite score ≤0.80 passes duplicate check silently
-- [ ] **DEDUP-08**: Duplicate check runs across the whole ontology, not just the local neighborhood
+- [x] **DEDUP-01**: System pre-computes embeddings for all existing classes and properties in the ontology
+- [x] **DEDUP-02**: Embeddings are stored in an approximate-nearest-neighbor index for O(log n) similarity search
+- [x] **DEDUP-03**: ANN index is rebuilt automatically after each merge to the main branch
+- [x] **DEDUP-04**: Every LLM suggestion is scored against the ontology for exact label match, semantic similarity, and structural similarity
+- [x] **DEDUP-05**: Composite duplicate score >0.95 blocks submission and forces the user to link to the existing entity instead
+- [x] **DEDUP-06**: Composite duplicate score >0.80 shows a warning with candidate existing entities and lets the user decide
+- [x] **DEDUP-07**: Composite score ≤0.80 passes duplicate check silently
+- [x] **DEDUP-08**: Duplicate check runs across the whole ontology, not just the local neighborhood
 
 ### Pre-Submit Validation
 
@@ -106,11 +106,11 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 
 ### Toolchain Integration
 
-- [ ] **TOOL-01**: Backend calls folio-python for graph queries (structural similarity, parent/sibling lookups)
-- [ ] **TOOL-02**: Backend integrates OpenGloss for definition/gloss extraction from reference texts
-- [ ] **TOOL-03**: Backend loads the FOLIO OWL file into a reasoner for logical consistency checks (cycles, domain/range)
-- [ ] **TOOL-04**: Reasoner validation runs after user accepts suggestions but before commit
-- [ ] **TOOL-05**: Generative FOLIO is installable as a Python dependency in the ontokit-api virtual environment
+- [x] **TOOL-01**: Backend calls folio-python for graph queries (structural similarity, parent/sibling lookups)
+- [x] **TOOL-02**: Backend integrates OpenGloss for definition/gloss extraction from reference texts
+- [x] **TOOL-03**: Backend loads the FOLIO OWL file into a reasoner for logical consistency checks (cycles, domain/range)
+- [x] **TOOL-04**: Reasoner validation runs after user accepts suggestions but before commit
+- [x] **TOOL-05**: Generative FOLIO is installable as a Python dependency in the ontokit-api virtual environment
 
 ## Future Requirements
 
@@ -163,14 +163,14 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | GEN-07 | Phase 13 | Pending |
 | GEN-08 | Phase 13 | Pending |
 | GEN-09 | Phase 13 | Pending |
-| DEDUP-01 | Phase 12 | Pending |
-| DEDUP-02 | Phase 12 | Pending |
-| DEDUP-03 | Phase 12 | Pending |
-| DEDUP-04 | Phase 12 | Pending |
-| DEDUP-05 | Phase 12 | Pending |
-| DEDUP-06 | Phase 12 | Pending |
-| DEDUP-07 | Phase 12 | Pending |
-| DEDUP-08 | Phase 12 | Pending |
+| DEDUP-01 | Phase 12 | Complete |
+| DEDUP-02 | Phase 12 | Complete |
+| DEDUP-03 | Phase 12 | Complete |
+| DEDUP-04 | Phase 12 | Complete |
+| DEDUP-05 | Phase 12 | Complete |
+| DEDUP-06 | Phase 12 | Complete |
+| DEDUP-07 | Phase 12 | Complete |
+| DEDUP-08 | Phase 12 | Complete |
 | VALID-01 | Phase 13 | Pending |
 | VALID-02 | Phase 13 | Pending |
 | VALID-03 | Phase 13 | Pending |
@@ -214,11 +214,11 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | REVIEW-03 | Phase 16 | Pending |
 | REVIEW-04 | Phase 16 | Pending |
 | REVIEW-05 | Phase 16 | Pending |
-| TOOL-01 | Phase 12 | Pending |
-| TOOL-02 | Phase 12 | Pending |
-| TOOL-03 | Phase 12 | Pending |
-| TOOL-04 | Phase 12 | Pending |
-| TOOL-05 | Phase 12 | Pending |
+| TOOL-01 | Phase 12 | Complete |
+| TOOL-02 | Phase 12 | Complete |
+| TOOL-03 | Phase 12 | Complete |
+| TOOL-04 | Phase 12 | Complete |
+| TOOL-05 | Phase 12 | Complete |
 
 **Coverage:**
 - v0.4.0 requirements: 72 total (7 LLM + 9 GEN + 8 DEDUP + 6 VALID + 9 CLUSTER + 6 UX + 5 PROP + 5 ROLE + 7 COST + 5 REVIEW + 5 TOOL)

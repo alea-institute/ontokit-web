@@ -124,7 +124,7 @@ Plans:
   5. Submitting a class with a semantically similar label (score 0.80-0.95) shows a warning with candidate matches, letting the user decide whether to proceed or link to the existing entity
 **Plans**: 5 plans
 Plans:
-- [ ] 12-00-PLAN.md — Wave 0: Install folio-python + create test stubs for all Phase 12 services
+- [x] 12-00-PLAN.md — Wave 0: Install folio-python + create test stubs for all Phase 12 services
 - [ ] 12-01-PLAN.md — Backend: DuplicateRejection model, Pydantic schemas, HNSW + duplicate_rejections Alembic migration
 - [ ] 12-02-PLAN.md — Backend: StructuralSimilarityService (folio-python), GlossExtractionService (stub), ReasonerService (owlready2), validation endpoint
 - [ ] 12-03-PLAN.md — Backend: All-branch semantic search, webhook rebuild trigger, startup freshness check, branch cleanup
@@ -191,7 +191,7 @@ Plans:
 | 9. Production Deployment | v0.3.0 | 1/1 | Complete | 2026-04-03 |
 | 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete | 2026-04-03 |
 | 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete    | 2026-04-06 |
-| 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 0/5 | Not started | - |
+| 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 1/5 | In Progress|  |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 0/TBD | Not started | - |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/TBD | Not started | - |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |
