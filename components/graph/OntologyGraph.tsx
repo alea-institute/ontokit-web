@@ -144,6 +144,7 @@ export function OntologyGraph({
   } = useGraphData({ focusIri, projectId, branch });
 
   const [direction, setDirection] = useState<LayoutDirection>("TB");
+  const toggleDirection = useCallback(() => setDirection((d) => (d === "TB" ? "LR" : "TB")), []);
   const { nodes: layoutNodes, edges: layoutEdges, isLayouting, runLayout } = useELKLayout();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);

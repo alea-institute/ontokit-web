@@ -135,7 +135,7 @@ export default function EditorPage() {
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
   // Anonymous proposal mode: available when AUTH_MODE != required and user is NOT signed in as editor/suggester
-  const canPropose = authMode !== "required" && !canEdit && !isSuggester;
+  const canPropose = authMode !== "required" && !canEdit && !canSuggest;
   const [creditModalOpen, setCreditModalOpen] = useState(false);
 
   const anonymousSuggestion = useAnonymousSuggestion({
