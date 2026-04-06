@@ -191,7 +191,7 @@ Plans:
 | 9. Production Deployment | v0.3.0 | 1/1 | Complete | 2026-04-03 |
 | 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete | 2026-04-03 |
 | 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete    | 2026-04-06 |
-| 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete   | 2026-04-06 |
+| 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete    | 2026-04-06 |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 0/TBD | Not started | - |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/TBD | Not started | - |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |

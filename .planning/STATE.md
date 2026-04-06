@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: verifying
+status: planning
 stopped_at: Completed 12-04-PLAN.md (DuplicateCheckService, POST /duplicate-check endpoint, 7 tests)
-last_updated: "2026-04-06T21:47:44.267Z"
+last_updated: "2026-04-06T21:51:50.621Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 
 ## Current Position
 
-Phase: 12 (toolchain-integration-duplicate-detection) — EXECUTING
-Plan: 5 of 5
+Phase: 13
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-04-06
 
@@ -145,7 +145,7 @@ None yet.
 ### Entity Graph Port (`entity-graph-migration`)
 
 - **Issue:** CatholicOS/ontokit-web#81
-- **Status:** Phase complete — ready for verification
+- **Status:** Ready to plan
 - **Handoff:** `.planning/features/entity-graph-port/HANDOFF.md`
 - **Next:** Visual verify with MCP chrome-devtools (headless), then create PR
 
