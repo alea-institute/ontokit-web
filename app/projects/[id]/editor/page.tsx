@@ -38,6 +38,7 @@ import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
 import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
 import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
+import { ShareButton } from "@/components/editor/ShareButton";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
@@ -50,6 +51,7 @@ export default function EditorPage() {
   const projectId = params.id as string;
   const resumeSessionParam = searchParams.get("resumeSession") || undefined;
   const resumeBranchParam = searchParams.get("branch") || undefined;
+  const classIriParam = searchParams.get("classIri");
   const initialBranch = resumeBranchParam
     || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
@@ -85,6 +87,13 @@ export default function EditorPage() {
     connectionStatus, wsEndpoint, wsPurpose,
     resetSourceState,
   } = viewer;
+
+  // Restore selected class from URL query param once tree is ready
+  useEffect(() => {
+    if (!classIriParam || isTreeLoading || !nodes.length) return;
+    if (selectedIri === classIriParam) return;
+    navigateToNode(classIriParam);
+  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
 
   // UI state (editor-only)
   const [showHistory, setShowHistory] = useState(false);
@@ -778,7 +787,7 @@ export default function EditorPage() {
               </div>
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -905,6 +914,13 @@ export default function EditorPage() {
               {/* Branch Selector */}
               <BranchSelector onBranchChange={handleBranchChange} canCreateBranch={canEdit} readOnly={!hasValidAccess} />
 
+              {/* Share */}
+              <ShareButton
+                projectId={projectId}
+                selectedIri={selectedIri}
+                selectedLabel={selectedNodeFallback?.label}
+              />
+
               {/* History Button */}
               <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
 
@@ -977,7 +993,7 @@ export default function EditorPage() {
 
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>
