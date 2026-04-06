@@ -187,7 +187,7 @@ export default function EditorPage() {
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session?.accessToken, pendingSaveContent, activeBranch, loadRootClasses, queryClient, setSourceContent, setSourceIriIndex]);
+  }, [projectId, session, pendingSaveContent, activeBranch, loadRootClasses, queryClient, setSourceContent, setSourceIriIndex]);
 
   const handleCommitDialogClose = useCallback((open: boolean) => {
     setCommitDialogOpen(open);
@@ -299,7 +299,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [canSuggest, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session?.accessToken, activeBranch, project?.git_ontology_path, toast],
+    [canSuggest, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
   );
 
   // Handle copy IRI
@@ -347,7 +347,7 @@ export default function EditorPage() {
       // Reload tree to restore state
       loadRootClasses();
     }
-  }, [deleteTargetIri, deleteTargetLabel, session?.accessToken, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient]);
+  }, [deleteTargetIri, deleteTargetLabel, session, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, setSourceContent]);
 
   // Handle update class (form-based editing)
   // Routes through source save: modifies the Turtle text and commits via PUT /source
@@ -398,7 +398,7 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, queryClient]);
+  }, [session, projectId, activeBranch, project, sourceContent, toast, updateNodeLabel, queryClient, setSourceContent, setSourceIriIndex]);
 
   // Handle update property (form-based editing)
   const handleUpdateProperty = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
@@ -438,7 +438,7 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, queryClient]);
+  }, [session, projectId, activeBranch, project, sourceContent, toast, queryClient, setSourceContent, setSourceIriIndex]);
 
   // Handle update individual (form-based editing)
   const handleUpdateIndividual = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
@@ -478,7 +478,7 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, queryClient]);
+  }, [session, projectId, activeBranch, project, sourceContent, toast, queryClient, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode class update
   // Instead of directly committing, sends modified source to the suggestion branch
@@ -513,7 +513,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, suggestionSession]);
+  }, [session, projectId, activeBranch, project, sourceContent, toast, updateNodeLabel, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode property update
   const handleSuggestPropertyUpdate = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
@@ -542,7 +542,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, suggestionSession]);
+  }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode individual update
   const handleSuggestIndividualUpdate = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
@@ -571,7 +571,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, suggestionSession]);
+  }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle drag-and-drop reparent class
   // Fetches full class detail, modifies parent_iris, then routes through the appropriate save handler
@@ -628,7 +628,7 @@ export default function EditorPage() {
     // Route through the appropriate save handler
     const saveHandler = isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass;
     await saveHandler(classIri, payload);
-  }, [session?.accessToken, projectId, activeBranch, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate]);
+  }, [session, projectId, activeBranch, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate]);
 
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
