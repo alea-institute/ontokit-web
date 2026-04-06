@@ -40,7 +40,7 @@ export default function HomePage() {
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ["projects", filter, session?.accessToken, debouncedSearch],
+    queryKey: ["projects", filter, isAuthenticated, debouncedSearch],
     queryFn: async ({ pageParam = 0 }) => {
       const filterParam = filter === "all" ? undefined : filter === "private" ? "mine" : "public";
       return projectApi.list(pageParam, PAGE_SIZE, filterParam, session?.accessToken, debouncedSearch || undefined);
@@ -56,9 +56,14 @@ export default function HomePage() {
   const projects = data?.pages.flatMap((page) => page.items) ?? [];
   const total = data?.pages.at(-1)?.total ?? 0;
 
+  const [nextPageError, setNextPageError] = useState<string | null>(null);
+
   const handleLoadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
-      fetchNextPage();
+      setNextPageError(null);
+      fetchNextPage().catch((err) => {
+        setNextPageError(err instanceof Error ? err.message : "Failed to load more projects");
+      });
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
@@ -178,7 +183,7 @@ export default function HomePage() {
                   />
                 ))}
               </div>
-            ) : error ? (
+            ) : error && !data ? (
               <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/50 dark:bg-red-900/20">
                 <p className="text-red-700 dark:text-red-400">{error instanceof Error ? error.message : "Failed to load projects"}</p>
                 <Button
@@ -228,13 +233,16 @@ export default function HomePage() {
                   ))}
                 </div>
                 {hasNextPage && (
-                  <div className="mt-6 flex justify-center">
+                  <div className="mt-6 flex flex-col items-center gap-2">
+                    {nextPageError && (
+                      <p className="text-sm text-red-600 dark:text-red-400">{nextPageError}</p>
+                    )}
                     <Button
                       variant="outline"
                       onClick={handleLoadMore}
                       disabled={isFetchingNextPage}
                     >
-                      {isFetchingNextPage ? "Loading..." : "Load More"}
+                      {isFetchingNextPage ? "Loading..." : nextPageError ? "Retry" : "Load More"}
                     </Button>
                   </div>
                 )}
