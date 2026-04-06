@@ -187,7 +187,7 @@ export default function EditorPage() {
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session?.accessToken, pendingSaveContent, activeBranch, loadRootClasses, queryClient]);
+  }, [projectId, session?.accessToken, pendingSaveContent, activeBranch, loadRootClasses, queryClient, setSourceContent, setSourceIriIndex]);
 
   const handleCommitDialogClose = useCallback((open: boolean) => {
     setCommitDialogOpen(open);
