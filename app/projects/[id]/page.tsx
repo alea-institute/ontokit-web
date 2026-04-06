@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Settings, FileCode, Pencil, LogIn, LayoutDashboard } from "lucide-react";
 import { Header } from "@/components/layout/header";
@@ -19,7 +19,9 @@ import type { OntologySourceEditorRef } from "@/components/editor/OntologySource
 export default function ProjectViewerPage() {
   const { data: session, status } = useSession();
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params.id as string;
+  const classIriParam = searchParams.get("classIri");
 
   const editorMode = useEditorModeStore((s) => s.editorMode);
 
@@ -49,6 +51,13 @@ export default function ProjectViewerPage() {
   // Source editor ref (read-only, but required by DeveloperEditorLayout)
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
+
+  // Navigate to classIri from URL query param once tree is ready
+  useEffect(() => {
+    if (!classIriParam || isTreeLoading || !nodes.length) return;
+    if (selectedIri === classIriParam) return;
+    navigateToNode(classIriParam);
+  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
 
   // No-op handlers for required props (viewer is read-only)
   const noop = () => {};
