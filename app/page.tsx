@@ -22,10 +22,12 @@ export default function HomePage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   // Debounce search input
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     debounceRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 300);
-    return () => clearTimeout(debounceRef.current);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, [searchQuery]);
 
   const isAuthenticated = status === "authenticated";
@@ -216,7 +218,9 @@ export default function HomePage() {
             ) : (
               <>
                 <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-                  {`${total} ${total === 1 ? "project" : "projects"}`}
+                  {debouncedSearch
+                    ? `${total} ${total === 1 ? "result" : "results"} for "${debouncedSearch}"`
+                    : `${total} ${total === 1 ? "project" : "projects"}`}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {filteredProjects.map((project) => (
