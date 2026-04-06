@@ -18,7 +18,7 @@ import {
 // --- Query key factory ---
 
 export const branchQueryKeys = {
-  list: (projectId: string, accessToken?: string) => ["branches", projectId, accessToken] as const,
+  list: (projectId: string, accessToken?: string) => ["branches", projectId, !!accessToken] as const,
 };
 
 // --- sessionStorage helpers ---

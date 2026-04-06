@@ -8,7 +8,7 @@ export function useCrossReferences(
   branch?: string
 ) {
   return useQuery({
-    queryKey: ["crossReferences", projectId, entityIri, accessToken, branch],
+    queryKey: ["crossReferences", projectId, entityIri, !!accessToken, branch],
     queryFn: () =>
       qualityApi.getCrossReferences(projectId, entityIri!, accessToken, branch),
     enabled: !!entityIri && !!projectId,

@@ -7,7 +7,7 @@ export function useProjectActivity(
   days = 30
 ) {
   return useQuery({
-    queryKey: ["projectActivity", projectId, accessToken, days],
+    queryKey: ["projectActivity", projectId, !!accessToken, days],
     queryFn: () => analyticsApi.getActivity(projectId, accessToken, days),
     enabled: !!projectId,
     staleTime: 60_000,
@@ -20,7 +20,7 @@ export function useHotEntities(
   limit = 20
 ) {
   return useQuery({
-    queryKey: ["hotEntities", projectId, accessToken, limit],
+    queryKey: ["hotEntities", projectId, !!accessToken, limit],
     queryFn: () => analyticsApi.getHotEntities(projectId, accessToken, limit),
     enabled: !!projectId,
     staleTime: 60_000,
@@ -33,7 +33,7 @@ export function useContributors(
   days = 30
 ) {
   return useQuery({
-    queryKey: ["contributors", projectId, accessToken, days],
+    queryKey: ["contributors", projectId, !!accessToken, days],
     queryFn: () => analyticsApi.getContributors(projectId, accessToken, days),
     enabled: !!projectId,
     staleTime: 60_000,
