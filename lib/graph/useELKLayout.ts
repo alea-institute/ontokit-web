@@ -36,6 +36,10 @@ export function useELKLayout(): LayoutResult {
           id: n.id,
           width: Math.max(NODE_WIDTH, n.label.length * 7.5 + 32),
           height: NODE_HEIGHT,
+          // Pin root nodes to the first layer so they align at the top
+          ...(n.node_type === "root" || n.node_type === "secondary_root"
+            ? { layoutOptions: { "elk.layered.layering.layerConstraint": "FIRST" } }
+            : {}),
         }));
 
         const elkEdges = data.edges.map((e) => ({
