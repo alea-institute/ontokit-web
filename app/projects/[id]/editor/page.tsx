@@ -51,6 +51,7 @@ export default function EditorPage() {
   const projectId = params.id as string;
   const resumeSessionParam = searchParams.get("resumeSession") || undefined;
   const resumeBranchParam = searchParams.get("branch") || undefined;
+  const classIriParam = searchParams.get("classIri");
   const initialBranch = resumeBranchParam
     || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
@@ -86,6 +87,13 @@ export default function EditorPage() {
     connectionStatus, wsEndpoint, wsPurpose,
     resetSourceState,
   } = viewer;
+
+  // Restore selected class from URL query param once tree is ready
+  useEffect(() => {
+    if (!classIriParam || isTreeLoading || !nodes.length) return;
+    if (selectedIri === classIriParam) return;
+    navigateToNode(classIriParam);
+  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
 
   // UI state (editor-only)
   const [showHistory, setShowHistory] = useState(false);
