@@ -58,6 +58,10 @@ export default function HomePage() {
 
   const [nextPageError, setNextPageError] = useState<string | null>(null);
 
+  useEffect(() => {
+    setNextPageError(null);
+  }, [filter, debouncedSearch]);
+
   const handleLoadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       setNextPageError(null);
@@ -66,9 +70,6 @@ export default function HomePage() {
       });
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  // Search is handled server-side; no client-side filtering needed
-  const filteredProjects = projects;
 
   return (
     <>
@@ -194,7 +195,7 @@ export default function HomePage() {
                   Try Again
                 </Button>
               </div>
-            ) : filteredProjects.length === 0 ? (
+            ) : projects.length === 0 ? (
               <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
                 <FolderOpen className="mx-auto h-12 w-12 text-slate-400" />
                 <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
@@ -228,7 +229,7 @@ export default function HomePage() {
                     : `${total} ${total === 1 ? "project" : "projects"}`}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {filteredProjects.map((project) => (
+                  {projects.map((project) => (
                     <ProjectCard key={project.id} project={project} />
                   ))}
                 </div>
