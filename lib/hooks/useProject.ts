@@ -51,9 +51,9 @@ export function useProject(projectId: string, accessToken?: string) {
  * Derive common permission flags from a Project object.
  */
 export function derivePermissions(project: Project | null, accessToken?: string) {
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
+  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || !!project?.is_superadmin;
   const hasExplicitRole = !!project?.user_role;
-  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
+  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || !!project?.is_superadmin;
   const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!accessToken);
   const canSuggest = canEdit || isSuggester;
   const hasValidAccess = !!accessToken;
