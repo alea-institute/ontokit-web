@@ -91,15 +91,16 @@ export function useProjectViewer({
   }, [canEdit, projectId, accessToken]);
 
   // Derive fallback data for the selected node from the tree
+  const { selectedIri, nodes } = tree;
   const selectedNodeFallback = useMemo((): TreeNodeFallback | null => {
-    if (!tree.selectedIri) return null;
+    if (!selectedIri) return null;
     const findInTree = (
-      items: typeof tree.nodes,
+      items: typeof nodes,
       parentIri?: string,
       parentLabel?: string,
     ): TreeNodeFallback | null => {
       for (const node of items) {
-        if (node.iri === tree.selectedIri) {
+        if (node.iri === selectedIri) {
           return { iri: node.iri, label: node.label || "", parentIri, parentLabel };
         }
         const found = findInTree(node.children, node.iri, node.label);
@@ -107,9 +108,8 @@ export function useProjectViewer({
       }
       return null;
     };
-    return findInTree(tree.nodes);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tree.selectedIri, tree.nodes]);
+    return findInTree(nodes);
+  }, [selectedIri, nodes]);
 
   // Load source content
   const loadSourceContent = useCallback(async (isPreload = false) => {
