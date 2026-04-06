@@ -11,7 +11,6 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
 import { useToast } from "@/lib/context/ToastContext";
-import type { TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
 import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingToggle";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
@@ -19,17 +18,12 @@ import { StandardEditorLayout } from "@/components/editor/standard/StandardEdito
 import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
 import { useQueryClient } from "@tanstack/react-query";
 import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
-import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
-import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
+import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
-import { projectApi, type Project } from "@/lib/api/projects";
-import { pullRequestsApi } from "@/lib/api/pullRequests";
-import { lintApi, type LintSummary } from "@/lib/api/lint";
 import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
-import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
 import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
 import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
@@ -42,12 +36,10 @@ import { KeyboardShortcutDialog } from "@/components/editor/KeyboardShortcutDial
 import { SuggestionSubmitDialog } from "@/components/editor/SuggestionSubmitDialog";
 import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
-import { suggestionsApi } from "@/lib/api/suggestions";
 import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
 import { UpstreamSyncIndicator } from "@/components/editor/UpstreamSyncIndicator";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
-import type { IriPosition } from "@/lib/editor/indexWorker";
 
 export default function EditorPage() {
   const { data: session, status } = useSession();
@@ -64,33 +56,40 @@ export default function EditorPage() {
 
   const editorMode = useEditorModeStore((s) => s.editorMode);
 
-  // Project state
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [errorKind, setErrorKind] = useState<"private-403" | "no-access" | "not-found" | "generic" | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
-  const [showHealthCheck, setShowHealthCheck] = useState(false);
-  const [openPRCount, setOpenPRCount] = useState(0);
-  const [pendingSuggestionCount, setPendingSuggestionCount] = useState(0);
-  const [lintSummary, setLintSummary] = useState<LintSummary | null>(null);
-  const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
-
   // Branch state
   const queryClient = useQueryClient();
   const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
 
-  // Source state (shared across modes)
-  const [sourceContent, setSourceContent] = useState<string>("");
-  const [isLoadingSource, setIsLoadingSource] = useState(false);
-  const [sourceError, setSourceError] = useState<string | null>(null);
-  const [isPreloading, setIsPreloading] = useState(false);
-  const preloadStartedRef = useRef(false);
-  const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
+  // Shared project/tree/source state from hook
+  const viewer = useProjectViewer({
+    projectId,
+    accessToken: session?.accessToken,
+    sessionStatus: status,
+    activeBranch,
+  });
 
-  // IRI indexing
-  const [sourceIriIndex, setSourceIriIndex] = useState<Map<string, IriPosition>>(new Map());
-  const [isIndexing, setIsIndexing] = useState(false);
+  const {
+    project, isLoading, error, errorKind,
+    openPRCount, pendingSuggestionCount, lintSummary, normalizationStatus,
+    canManage, canEdit, canSuggest, isSuggestionMode,
+    hasValidAccess, hasOntology,
+    nodes, totalClasses, isTreeLoading, treeError,
+    selectedIri, loadRootClasses, expandNode, collapseNode, selectNode,
+    navigateToNode, addOptimisticNode, removeOptimisticNode, updateNodeLabel,
+    collapseAll, collapseOneLevel, expandOneLevel, expandAllFully,
+    hasExpandableNodes, hasExpandedNodes, isExpandingAll,
+    reparentOptimistic, rollbackReparent,
+    selectedNodeFallback,
+    sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
+    loadSourceContent, sourceIriIndex, setSourceIriIndex,
+    connectionStatus, wsEndpoint, wsPurpose,
+    resetSourceState,
+  } = viewer;
+
+  // UI state (editor-only)
+  const [showHistory, setShowHistory] = useState(false);
+  const [showHealthCheck, setShowHealthCheck] = useState(false);
+  const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
 
   // Commit dialog
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
@@ -123,142 +122,10 @@ export default function EditorPage() {
   // Pending scroll IRI for source navigation
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
 
-  // Ontology tree
-  const {
-    nodes,
-    totalClasses,
-    isLoading: isTreeLoading,
-    error: treeError,
-    selectedIri,
-    loadRootClasses,
-    expandNode,
-    collapseNode,
-    selectNode,
-    navigateToNode,
-    addOptimisticNode,
-    removeOptimisticNode,
-    updateNodeLabel,
-    collapseAll,
-    collapseOneLevel,
-    expandOneLevel,
-    expandAllFully,
-    hasExpandableNodes,
-    hasExpandedNodes,
-    isExpandingAll,
-    reparentOptimistic,
-    rollbackReparent,
-  } = useOntologyTree({
-    projectId,
-    accessToken: session?.accessToken,
-    branchKey: activeBranch,
-  });
-
-  // Derive fallback data for the selected node from the tree
-  const selectedNodeFallback = useMemo((): TreeNodeFallback | null => {
-    if (!selectedIri) return null;
-    const findInTree = (
-      items: typeof nodes,
-      parentIri?: string,
-      parentLabel?: string,
-    ): TreeNodeFallback | null => {
-      for (const node of items) {
-        if (node.iri === selectedIri) {
-          return { iri: node.iri, label: node.label || "", parentIri, parentLabel };
-        }
-        const found = findInTree(node.children, node.iri, node.label);
-        if (found) return found;
-      }
-      return null;
-    };
-    return findInTree(nodes);
-  }, [selectedIri, nodes]);
-
-  // WebSocket connection status
-  const {
-    status: connectionStatus,
-    endpoint: wsEndpoint,
-    purpose: wsPurpose,
-  } = useCollaborationStatus({
-    projectId,
-    enabled: !!projectId && status !== "loading",
-  });
-
-  // Load project data
-  useEffect(() => {
-    const fetchProject = async () => {
-      setIsLoading(true);
-      setError(null);
-      setErrorKind(null);
-
-      try {
-        const data = await projectApi.get(projectId, session?.accessToken);
-        setProject(data);
-
-        try {
-          const prResponse = await pullRequestsApi.list(projectId, session?.accessToken, "open", undefined, 0, 1);
-          setOpenPRCount(prResponse.total);
-        } catch { /* ignore */ }
-
-        try {
-          const summary = await lintApi.getStatus(projectId, session?.accessToken);
-          setLintSummary(summary);
-        } catch { /* ignore */ }
-
-        if (data.source_file_path) {
-          try {
-            const normStatus = await normalizationApi.getStatus(projectId, session?.accessToken);
-            setNormalizationStatus(normStatus);
-          } catch { /* ignore */ }
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
-          if (!session?.accessToken) {
-            setError("This is a private project. Sign in to request access.");
-            setErrorKind("private-403");
-          } else {
-            setError("You don't have access to this project");
-            setErrorKind("no-access");
-          }
-        } else if (err instanceof Error && err.message.includes("404")) {
-          setError("Project not found");
-          setErrorKind("not-found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load project");
-          setErrorKind("generic");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (status !== "loading" && projectId) {
-      fetchProject();
-    }
-  }, [projectId, session?.accessToken, status]);
-
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
-  // If user_role is null but user has access to the project, default to edit (backend enforces actual perms)
-  const hasExplicitRole = !!project?.user_role;
-  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
-  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!session?.accessToken);
-  const canSuggest = canEdit || isSuggester;
-  const hasValidAccess = status === "authenticated" && !!session?.accessToken;
-  const hasOntology = project?.source_file_path;
-
-  // Fetch pending suggestion count for editors/admins
-  useEffect(() => {
-    if (!canEdit || !session?.accessToken) return;
-    suggestionsApi
-      .listPending(projectId, session.accessToken)
-      .then((res) => setPendingSuggestionCount(res.items.length))
-      .catch(() => { /* ignore — endpoint may not exist yet */ });
-  }, [canEdit, projectId, session?.accessToken]);
-
   // Keyboard shortcut help dialog
   const [shortcutDialogOpen, setShortcutDialogOpen] = useState(false);
 
   // Suggestion session (only active for suggesters who can't directly edit)
-  const isSuggestionMode = isSuggester && !canEdit;
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
   const suggestionSession = useSuggestionSession({
@@ -280,40 +147,6 @@ export default function EditorPage() {
     getCurrentContent: () => sourceContent || null,
     enabled: isSuggestionMode && suggestionSession.isActive,
   });
-
-  // Load source content
-  const loadSourceContent = useCallback(async (isPreload = false) => {
-    if (!projectId || !activeBranch) return;
-    if (sourceContent) return;
-
-    if (isPreload) {
-      setIsPreloading(true);
-    } else {
-      setIsLoadingSource(true);
-    }
-    setSourceError(null);
-
-    try {
-      const response = await revisionsApi.getFileAtVersion(
-        projectId,
-        activeBranch,
-        session?.accessToken,
-        project?.git_ontology_path
-      );
-      setSourceContent(response.content);
-    } catch (err) {
-      console.error("Failed to load source:", err);
-      if (!isPreload) {
-        setSourceError(err instanceof Error ? err.message : "Failed to load source content");
-      }
-    } finally {
-      if (isPreload) {
-        setIsPreloading(false);
-      } else {
-        setIsLoadingSource(false);
-      }
-    }
-  }, [projectId, session?.accessToken, sourceContent, activeBranch, project?.git_ontology_path]);
 
   // Save refs for commit promise
   const pendingSaveResolveRef = useRef<(() => void) | null>(null);
@@ -365,104 +198,6 @@ export default function EditorPage() {
       setPendingSaveContent(null);
     }
   }, [pendingSaveContent]);
-
-  // Background preload source content after initial page load
-  useEffect(() => {
-    if (!sourceContent && !isLoadingSource && !isPreloading && !preloadStartedRef.current && hasOntology) {
-      const timer = setTimeout(() => {
-        if (!preloadStartedRef.current) {
-          preloadStartedRef.current = true;
-          loadSourceContent(true);
-        }
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [sourceContent, isLoadingSource, isPreloading, loadSourceContent, hasOntology]);
-
-  // Build IRI index in background
-  useEffect(() => {
-    if (!sourceContent || sourceIriIndex.size > 0 || isIndexing) return;
-
-    setIsIndexing(true);
-
-    const buildIriIndexAsync = async (content: string): Promise<Map<string, IriPosition>> => {
-      const index = new Map<string, IriPosition>();
-      const lines = content.split("\n");
-
-      const prefixes = new Map<string, string>();
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const prefixMatch = line.match(/@?prefix\s+(\w*):\s*<([^>]+)>/i);
-        if (prefixMatch) {
-          prefixes.set(prefixMatch[1], prefixMatch[2]);
-        }
-      }
-
-      const chunkSize = 5000;
-      for (let start = 0; start < lines.length; start += chunkSize) {
-        const end = Math.min(start + chunkSize, lines.length);
-
-        for (let i = start; i < end; i++) {
-          const line = lines[i];
-          const trimmed = line.trim();
-
-          if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("@") || trimmed.toUpperCase().startsWith("PREFIX")) continue;
-
-          let isContinuation = false;
-          for (let j = i - 1; j >= 0; j--) {
-            const prevTrimmed = lines[j].trim();
-            if (!prevTrimmed || prevTrimmed.startsWith("#")) continue;
-            if (prevTrimmed.endsWith(",") || prevTrimmed.endsWith(";")) {
-              isContinuation = true;
-            }
-            break;
-          }
-
-          if (isContinuation) continue;
-
-          const fullIriMatch = trimmed.match(/^<([^>\s]+)>/);
-          if (fullIriMatch) {
-            const iri = fullIriMatch[1];
-            if (!index.has(iri)) {
-              const col = line.indexOf('<') + 1;
-              index.set(iri, { line: i + 1, col, len: fullIriMatch[0].length });
-            }
-          }
-
-          const prefixedMatch = trimmed.match(/^(\w*):([A-Za-z_][A-Za-z0-9_\-]*)/);
-          if (prefixedMatch) {
-            const prefix = prefixedMatch[1];
-            const localName = prefixedMatch[2];
-            const namespace = prefixes.get(prefix);
-            if (namespace) {
-              const fullIri = namespace + localName;
-              if (!index.has(fullIri)) {
-                const prefixedName = `${prefix}:${localName}`;
-                const col = line.indexOf(prefixedName) + 1;
-                index.set(fullIri, { line: i + 1, col, len: prefixedName.length });
-              }
-            }
-          }
-        }
-
-        if (end < lines.length) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-      }
-
-      return index;
-    };
-
-    buildIriIndexAsync(sourceContent)
-      .then((newIndex) => {
-        setSourceIriIndex(newIndex);
-        setIsIndexing(false);
-      })
-      .catch((error) => {
-        console.error("[ViewInSource] Indexing error:", error);
-        setIsIndexing(false);
-      });
-  }, [sourceContent, sourceIriIndex.size, isIndexing]);
 
   // Detect IRI pattern
   useEffect(() => {
@@ -902,12 +637,9 @@ export default function EditorPage() {
       suggestionSession.discardSession();
     }
     setActiveBranch(branchName);
-    setSourceContent("");
-    setSourceError(null);
-    setSourceIriIndex(new Map());
-    preloadStartedRef.current = false;
+    resetSourceState();
     router.replace(`${pathname}?branch=${encodeURIComponent(branchName)}`);
-  }, [pathname, router, suggestionSession]);
+  }, [pathname, router, suggestionSession, resetSourceState]);
 
   // --- Keyboard shortcuts ---
   const keyboardShortcuts = useMemo((): ShortcutDefinition[] => [
@@ -1005,6 +737,21 @@ export default function EditorPage() {
                 </Link>
               </div>
             </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // Auth guard: redirect unauthenticated or unauthorized users to the viewer
+  if (status === "unauthenticated" || (project && !canSuggest)) {
+    router.replace(`/projects/${projectId}`);
+    return (
+      <>
+        <Header />
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+          <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
           </div>
         </main>
       </>
