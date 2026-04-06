@@ -49,7 +49,7 @@ Enable grassroots-level collaborative ontology editing in a modern, accessible w
 - [x] LLM abstraction layer (13-provider registry, encryption, SSRF protection, key routing) — Phase 11
 - [x] Per-role access model (admin/editor/suggester/anonymous LLM gates) — Phase 11
 - [x] Cost controls (project budget, per-user daily caps, usage dashboard, BYO key) — Phase 11
-- [ ] Duplicate detection (whole-ontology embeddings index + composite scoring)
+- [x] Duplicate detection (whole-ontology embeddings index + composite scoring) — Phase 12
 - [ ] Suggestion generation (Generative FOLIO integration, prompts, validation)
 - [ ] Dual UX modes (inline button + flashcard iterator)
 - [ ] Session clustering into reviewable PR shards
@@ -92,7 +92,7 @@ Enable grassroots-level collaborative ontology editing in a modern, accessible w
 | Bare metal deploy (no Docker) | Server already set up this way, working fine | ✓ v0.3.0 |
 | 13-provider LLM registry (not ALEA LLM Client) | ALEA LLM Client is Python-only; built OpenAI-compat dispatch in ontokit-api directly | ✓ Phase 11 |
 | Project keys via backend proxy, BYO via browser | Protects project owner's bill, simpler client for BYO users | ✓ Phase 11 |
-| Whole-ontology duplicate check (not local) | Cross-branch duplicates fragment the ontology | — Pending |
+| Whole-ontology duplicate check (not local) | Cross-branch duplicates fragment the ontology | ✓ Phase 12 |
 | Hybrid clustering (D+E) with max-50/min-3 shards | Balance reviewer load vs PR churn | — Pending |
 | Anonymous users get no LLM access | Cost control, insufficient abuse signal | ✓ Phase 11 |
 | Property support in v0.4.0 (not deferred) | Pipeline is uniform at generation; validation diverges cheaply | — Pending |
@@ -115,4 +115,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-05 after milestone v0.4.0 LLM-Assisted Ontology Improvements start*
+*Last updated: 2026-04-06 after Phase 12 (Toolchain Integration & Duplicate Detection) complete*
