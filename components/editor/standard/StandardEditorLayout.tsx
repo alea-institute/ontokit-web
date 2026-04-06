@@ -36,7 +36,7 @@ import type { TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividual
 import type { ClassTreeNode } from "@/lib/ontology/types";
 import { useDraftStore } from "@/lib/stores/draftStore";
 import { getLocalName } from "@/lib/utils";
-import { extractTreeLabelMap } from "@/lib/graph/buildGraphData";
+import { extractTreeLabelMap } from "@/lib/graph/utils";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
 
 export interface StandardEditorLayoutProps {

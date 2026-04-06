@@ -147,83 +147,85 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LLM-01 | TBD | Pending |
-| LLM-02 | TBD | Pending |
-| LLM-03 | TBD | Pending |
-| LLM-04 | TBD | Pending |
-| LLM-05 | TBD | Pending |
-| LLM-06 | TBD | Pending |
-| LLM-07 | TBD | Pending |
-| GEN-01 | TBD | Pending |
-| GEN-02 | TBD | Pending |
-| GEN-03 | TBD | Pending |
-| GEN-04 | TBD | Pending |
-| GEN-05 | TBD | Pending |
-| GEN-06 | TBD | Pending |
-| GEN-07 | TBD | Pending |
-| GEN-08 | TBD | Pending |
-| GEN-09 | TBD | Pending |
-| DEDUP-01 | TBD | Pending |
-| DEDUP-02 | TBD | Pending |
-| DEDUP-03 | TBD | Pending |
-| DEDUP-04 | TBD | Pending |
-| DEDUP-05 | TBD | Pending |
-| DEDUP-06 | TBD | Pending |
-| DEDUP-07 | TBD | Pending |
-| DEDUP-08 | TBD | Pending |
-| VALID-01 | TBD | Pending |
-| VALID-02 | TBD | Pending |
-| VALID-03 | TBD | Pending |
-| VALID-04 | TBD | Pending |
-| VALID-05 | TBD | Pending |
-| VALID-06 | TBD | Pending |
-| CLUSTER-01 | TBD | Pending |
-| CLUSTER-02 | TBD | Pending |
-| CLUSTER-03 | TBD | Pending |
-| CLUSTER-04 | TBD | Pending |
-| CLUSTER-05 | TBD | Pending |
-| CLUSTER-06 | TBD | Pending |
-| CLUSTER-07 | TBD | Pending |
-| CLUSTER-08 | TBD | Pending |
-| CLUSTER-09 | TBD | Pending |
-| UX-01 | TBD | Pending |
-| UX-02 | TBD | Pending |
-| UX-03 | TBD | Pending |
-| UX-04 | TBD | Pending |
-| UX-05 | TBD | Pending |
-| UX-06 | TBD | Pending |
-| PROP-01 | TBD | Pending |
-| PROP-02 | TBD | Pending |
-| PROP-03 | TBD | Pending |
-| PROP-04 | TBD | Pending |
-| PROP-05 | TBD | Pending |
-| ROLE-01 | TBD | Pending |
-| ROLE-02 | TBD | Pending |
-| ROLE-03 | TBD | Pending |
-| ROLE-04 | TBD | Pending |
-| ROLE-05 | TBD | Pending |
-| COST-01 | TBD | Pending |
-| COST-02 | TBD | Pending |
-| COST-03 | TBD | Pending |
-| COST-04 | TBD | Pending |
-| COST-05 | TBD | Pending |
-| COST-06 | TBD | Pending |
-| COST-07 | TBD | Pending |
-| REVIEW-01 | TBD | Pending |
-| REVIEW-02 | TBD | Pending |
-| REVIEW-03 | TBD | Pending |
-| REVIEW-04 | TBD | Pending |
-| REVIEW-05 | TBD | Pending |
-| TOOL-01 | TBD | Pending |
-| TOOL-02 | TBD | Pending |
-| TOOL-03 | TBD | Pending |
-| TOOL-04 | TBD | Pending |
-| TOOL-05 | TBD | Pending |
+| LLM-01 | Phase 11 | Pending |
+| LLM-02 | Phase 11 | Pending |
+| LLM-03 | Phase 11 | Pending |
+| LLM-04 | Phase 11 | Pending |
+| LLM-05 | Phase 11 | Pending |
+| LLM-06 | Phase 11 | Pending |
+| LLM-07 | Phase 11 | Pending |
+| GEN-01 | Phase 13 | Pending |
+| GEN-02 | Phase 13 | Pending |
+| GEN-03 | Phase 13 | Pending |
+| GEN-04 | Phase 13 | Pending |
+| GEN-05 | Phase 13 | Pending |
+| GEN-06 | Phase 13 | Pending |
+| GEN-07 | Phase 13 | Pending |
+| GEN-08 | Phase 13 | Pending |
+| GEN-09 | Phase 13 | Pending |
+| DEDUP-01 | Phase 12 | Pending |
+| DEDUP-02 | Phase 12 | Pending |
+| DEDUP-03 | Phase 12 | Pending |
+| DEDUP-04 | Phase 12 | Pending |
+| DEDUP-05 | Phase 12 | Pending |
+| DEDUP-06 | Phase 12 | Pending |
+| DEDUP-07 | Phase 12 | Pending |
+| DEDUP-08 | Phase 12 | Pending |
+| VALID-01 | Phase 13 | Pending |
+| VALID-02 | Phase 13 | Pending |
+| VALID-03 | Phase 13 | Pending |
+| VALID-04 | Phase 13 | Pending |
+| VALID-05 | Phase 13 | Pending |
+| VALID-06 | Phase 13 | Pending |
+| CLUSTER-01 | Phase 15 | Pending |
+| CLUSTER-02 | Phase 15 | Pending |
+| CLUSTER-03 | Phase 15 | Pending |
+| CLUSTER-04 | Phase 15 | Pending |
+| CLUSTER-05 | Phase 15 | Pending |
+| CLUSTER-06 | Phase 15 | Pending |
+| CLUSTER-07 | Phase 15 | Pending |
+| CLUSTER-08 | Phase 15 | Pending |
+| CLUSTER-09 | Phase 15 | Pending |
+| UX-01 | Phase 14 | Pending |
+| UX-02 | Phase 14 | Pending |
+| UX-03 | Phase 14 | Pending |
+| UX-04 | Phase 14 | Pending |
+| UX-05 | Phase 14 | Pending |
+| UX-06 | Phase 14 | Pending |
+| PROP-01 | Phase 14 | Pending |
+| PROP-02 | Phase 14 | Pending |
+| PROP-03 | Phase 14 | Pending |
+| PROP-04 | Phase 14 | Pending |
+| PROP-05 | Phase 14 | Pending |
+| ROLE-01 | Phase 11 | Pending |
+| ROLE-02 | Phase 11 | Pending |
+| ROLE-03 | Phase 11 | Pending |
+| ROLE-04 | Phase 11 | Pending |
+| ROLE-05 | Phase 11 | Pending |
+| COST-01 | Phase 11 | Pending |
+| COST-02 | Phase 11 | Pending |
+| COST-03 | Phase 11 | Pending |
+| COST-04 | Phase 11 | Pending |
+| COST-05 | Phase 11 | Pending |
+| COST-06 | Phase 11 | Pending |
+| COST-07 | Phase 11 | Pending |
+| REVIEW-01 | Phase 16 | Pending |
+| REVIEW-02 | Phase 16 | Pending |
+| REVIEW-03 | Phase 16 | Pending |
+| REVIEW-04 | Phase 16 | Pending |
+| REVIEW-05 | Phase 16 | Pending |
+| TOOL-01 | Phase 12 | Pending |
+| TOOL-02 | Phase 12 | Pending |
+| TOOL-03 | Phase 12 | Pending |
+| TOOL-04 | Phase 12 | Pending |
+| TOOL-05 | Phase 12 | Pending |
 
 **Coverage:**
-- v0.4.0 requirements: 65 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 65 ⚠️ (will be populated by gsd-roadmapper)
+- v0.4.0 requirements: 72 total (7 LLM + 9 GEN + 8 DEDUP + 6 VALID + 9 CLUSTER + 6 UX + 5 PROP + 5 ROLE + 7 COST + 5 REVIEW + 5 TOOL)
+- Mapped to phases: 72 ✓
+- Unmapped: 0 ✓
+
+Note: The requirements header stated 65, but counting all defined requirement IDs yields 72. All 72 are mapped.
 
 ---
 
@@ -233,4 +235,4 @@ v0.3.0 requirements (SYNC-01/02, AUTH-01/05, DEPL-01/05, ANON-01/07) are all com
 
 ---
 *Requirements defined: 2026-04-05*
-*Last updated: 2026-04-05 — milestone v0.4.0 initialized*
+*Last updated: 2026-04-05 — milestone v0.4.0 roadmap created (phases 11-16)*
