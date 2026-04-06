@@ -17,10 +17,9 @@ import {
   PenLine,
   MessageCircle,
 } from "lucide-react";
-import { ApiError } from "@/lib/api/client";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
-import { projectApi, type Project } from "@/lib/api/projects";
+import { useProject } from "@/lib/hooks/useProject";
 import {
   suggestionsApi,
   type SuggestionSessionSummary,
@@ -74,42 +73,23 @@ export default function SuggestionsPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  const [project, setProject] = useState<Project | null>(null);
+  const { project, isLoading: isProjectLoading, error } = useProject(projectId, session?.accessToken);
   const [sessions, setSessions] = useState<SuggestionSessionSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const [proj, sessionList] = await Promise.all([
-          projectApi.get(projectId, session?.accessToken),
-          session?.accessToken
-            ? suggestionsApi.listSessions(projectId, session.accessToken)
-            : Promise.resolve({ items: [] }),
-        ]);
-        setProject(proj);
-        setSessions(sessionList.items);
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 403) {
-          setError("You don't have access to this project");
-        } else if (err instanceof ApiError && err.status === 404) {
-          setError("Project not found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load suggestions");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (status !== "loading" && projectId) {
-      fetchData();
+    if (!session?.accessToken || !projectId) {
+      setIsLoadingSessions(false);
+      return;
     }
-  }, [projectId, session?.accessToken, status]);
+    setIsLoadingSessions(true);
+    suggestionsApi.listSessions(projectId, session.accessToken)
+      .then((res) => setSessions(res.items))
+      .catch(() => { /* ignore */ })
+      .finally(() => setIsLoadingSessions(false));
+  }, [projectId, session?.accessToken]);
+
+  const isLoading = isProjectLoading || isLoadingSessions;
 
   if (isLoading || status === "loading") {
     return (

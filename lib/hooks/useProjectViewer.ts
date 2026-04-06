@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
-import { projectApi, type Project } from "@/lib/api/projects";
+import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import { pullRequestsApi } from "@/lib/api/pullRequests";
 import { lintApi, type LintSummary } from "@/lib/api/lint";
 import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
@@ -23,11 +23,19 @@ export function useProjectViewer({
   sessionStatus,
   activeBranch,
 }: UseProjectViewerOptions) {
-  // Project state
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [errorKind, setErrorKind] = useState<"private-403" | "no-access" | "not-found" | "generic" | null>(null);
+  // Project data from shared React Query cache
+  const {
+    project, isLoading, error, errorKind,
+  } = useProject(projectId, accessToken);
+  const permissions = derivePermissions(project, accessToken);
+  const {
+    canManage, canEdit, canSuggest, isSuggester, isSuggestionMode,
+    hasValidAccess: _hasValidAccess, hasOntology, hasExplicitRole,
+  } = permissions;
+  // Override hasValidAccess to check session status (not just token presence)
+  const hasValidAccess = sessionStatus === "authenticated" && !!accessToken;
+
+  // Secondary data state
   const [openPRCount, setOpenPRCount] = useState(0);
   const [pendingSuggestionCount, setPendingSuggestionCount] = useState(0);
   const [lintSummary, setLintSummary] = useState<LintSummary | null>(null);
@@ -57,68 +65,21 @@ export function useProjectViewer({
     enabled: !!projectId && sessionStatus !== "loading",
   });
 
-  // Load project data
+  // Fetch secondary data once project is loaded
   useEffect(() => {
-    const fetchProject = async () => {
-      setIsLoading(true);
-      setError(null);
-      setErrorKind(null);
-
-      try {
-        const data = await projectApi.get(projectId, accessToken);
-        setProject(data);
-
-        try {
-          const prResponse = await pullRequestsApi.list(projectId, accessToken, "open", undefined, 0, 1);
-          setOpenPRCount(prResponse.total);
-        } catch { /* ignore */ }
-
-        try {
-          const summary = await lintApi.getStatus(projectId, accessToken);
-          setLintSummary(summary);
-        } catch { /* ignore */ }
-
-        if (data.source_file_path) {
-          try {
-            const normStatus = await normalizationApi.getStatus(projectId, accessToken);
-            setNormalizationStatus(normStatus);
-          } catch { /* ignore */ }
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
-          if (!accessToken) {
-            setError("This is a private project. Sign in to request access.");
-            setErrorKind("private-403");
-          } else {
-            setError("You don't have access to this project");
-            setErrorKind("no-access");
-          }
-        } else if (err instanceof Error && err.message.includes("404")) {
-          setError("Project not found");
-          setErrorKind("not-found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load project");
-          setErrorKind("generic");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (sessionStatus !== "loading" && projectId) {
-      fetchProject();
+    if (!project) return;
+    pullRequestsApi.list(projectId, accessToken, "open", undefined, 0, 1)
+      .then((res) => setOpenPRCount(res.total))
+      .catch(() => { /* ignore */ });
+    lintApi.getStatus(projectId, accessToken)
+      .then((summary) => setLintSummary(summary))
+      .catch(() => { /* ignore */ });
+    if (project.source_file_path) {
+      normalizationApi.getStatus(projectId, accessToken)
+        .then((status) => setNormalizationStatus(status))
+        .catch(() => { /* ignore */ });
     }
-  }, [projectId, accessToken, sessionStatus]);
-
-  // Permission derivation
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
-  const hasExplicitRole = !!project?.user_role;
-  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
-  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!accessToken);
-  const canSuggest = canEdit || isSuggester;
-  const hasValidAccess = sessionStatus === "authenticated" && !!accessToken;
-  const hasOntology = !!project?.source_file_path;
-  const isSuggestionMode = isSuggester && !canEdit;
+  }, [project, projectId, accessToken]);
 
   // Fetch pending suggestion count for editors/admins
   useEffect(() => {

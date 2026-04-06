@@ -15,8 +15,7 @@ import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
-import { projectApi, type Project } from "@/lib/api/projects";
-import { ApiError } from "@/lib/api/client";
+import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
 export default function ProjectViewerPage() {
@@ -24,45 +23,9 @@ export default function ProjectViewerPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  // Lightweight project fetch for loading/error/no-ontology gates
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [errorKind, setErrorKind] = useState<"private-403" | "no-access" | "not-found" | "generic" | null>(null);
-
-  useEffect(() => {
-    const fetchProject = async () => {
-      setIsLoading(true);
-      setError(null);
-      setErrorKind(null);
-      try {
-        const data = await projectApi.get(projectId, session?.accessToken);
-        setProject(data);
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 403) {
-          if (!session?.accessToken) {
-            setError("This is a private project. Sign in to request access.");
-            setErrorKind("private-403");
-          } else {
-            setError("You don't have access to this project");
-            setErrorKind("no-access");
-          }
-        } else if (err instanceof ApiError && err.status === 404) {
-          setError("Project not found");
-          setErrorKind("not-found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load project");
-          setErrorKind("generic");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    if (status !== "loading" && projectId) fetchProject();
-  }, [projectId, session?.accessToken, status]);
-
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
-  const hasOntology = !!project?.source_file_path;
+  // Project data from shared React Query cache
+  const { project, isLoading, error, errorKind } = useProject(projectId, session?.accessToken);
+  const { canManage, hasOntology } = derivePermissions(project, session?.accessToken);
 
   if (isLoading || status === "loading") {
     return (
