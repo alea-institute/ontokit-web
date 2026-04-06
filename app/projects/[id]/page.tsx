@@ -95,6 +95,7 @@ export default function ProjectViewerPage() {
                 <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               </div>
               <div className="flex items-center gap-2">
+                <ShareButton projectId={projectId} />
                 <Link href={`/projects/${projectId}/dashboard`}>
                   <Button variant="ghost" size="sm">
                     <LayoutDashboard className="h-4 w-4" />
