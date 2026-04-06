@@ -1,10 +1,11 @@
 ---
 phase: 11
 slug: roles-llm-abstraction-cost-controls
-status: draft
+status: approved
+reviewed_at: 2026-04-05
 shadcn_initialized: false
 preset: none
-created: 2026-04-06
+created: 2026-04-05
 ---
 
 # Phase 11 — UI Design Contract
