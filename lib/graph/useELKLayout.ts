@@ -42,6 +42,10 @@ export function useELKLayout(): LayoutResult {
           id: e.id,
           sources: [e.source],
           targets: [e.target],
+          // seeAlso edges should not influence layering — mark as non-hierarchical
+          ...(e.edge_type === "seeAlso"
+            ? { layoutOptions: { "elk.layered.priority.direction": "0" } }
+            : {}),
         }));
 
         const elkGraph = await elk.layout({
@@ -53,7 +57,9 @@ export function useELKLayout(): LayoutResult {
             "elk.layered.spacing.nodeNodeBetweenLayers": "70",
             "elk.layered.crossingMinimization.strategy": "LAYER_SWEEP",
             "elk.edgeRouting": "SPLINES",
-            "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+            "elk.layered.nodePlacement.strategy": "NETWORK_SIMPLEX",
+            "elk.layered.cycleBreaking.strategy": "DEPTH_FIRST",
+            "elk.separateConnectedComponents": "false",
           },
           children: elkNodes,
           edges: elkEdges,
