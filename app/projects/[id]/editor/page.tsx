@@ -787,7 +787,7 @@ export default function EditorPage() {
               </div>
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -993,7 +993,7 @@ export default function EditorPage() {
 
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>

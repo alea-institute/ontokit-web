@@ -97,13 +97,13 @@ export default function ProjectViewerPage() {
               <div className="flex items-center gap-2">
                 <ShareButton projectId={projectId} />
                 <Link href={`/projects/${projectId}/dashboard`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project dashboard" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <LayoutDashboard className="h-4 w-4" />
                   </Button>
                 </Link>
                 {canManage && (
                   <Link href={`/projects/${projectId}/settings`}>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                       <Settings className="h-4 w-4" />
                     </Button>
                   </Link>
@@ -251,7 +251,7 @@ function ViewerContent({
 
               {/* Dashboard link */}
               <Link href={`/projects/${projectId}/dashboard`}>
-                <Button variant="ghost" size="sm" title="Project dashboard">
+                <Button variant="ghost" size="sm" title="Project dashboard" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                   <LayoutDashboard className="h-4 w-4" />
                 </Button>
               </Link>
@@ -278,7 +278,7 @@ function ViewerContent({
 
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>

@@ -69,8 +69,9 @@ export function ShareButton({ projectId, selectedIri, selectedLabel }: ShareButt
       <Button
         variant="ghost"
         size="sm"
-        className="gap-1.5"
+        className="gap-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         onClick={() => copyToClipboard(projectUrl)}
+        title="Share project permalink"
         aria-label="Copy project link"
       >
         <Share2 className="h-4 w-4" />
@@ -86,8 +87,9 @@ export function ShareButton({ projectId, selectedIri, selectedLabel }: ShareButt
       <Button
         variant="ghost"
         size="sm"
-        className="gap-1.5 rounded-r-none pr-1.5"
+        className="gap-1.5 rounded-r-none pr-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         onClick={() => copyToClipboard(classUrl, displayLabel || undefined)}
+        title={`Share link to "${displayLabel}"`}
         aria-label={`Copy link to ${displayLabel}`}
       >
         <Share2 className="h-4 w-4" />
@@ -100,8 +102,9 @@ export function ShareButton({ projectId, selectedIri, selectedLabel }: ShareButt
       <Button
         variant="ghost"
         size="sm"
-        className="rounded-l-none border-l border-slate-200 px-1 dark:border-slate-700"
+        className="rounded-l-none border-l border-slate-200 px-1 text-slate-500 hover:text-slate-900 dark:border-slate-700 dark:text-slate-400 dark:hover:text-white"
         onClick={() => setDropdownOpen(!dropdownOpen)}
+        title="More share options"
         aria-label="More share options"
         aria-expanded={dropdownOpen}
         aria-haspopup="menu"
