@@ -20,11 +20,10 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
-import { projectApi, type Project } from "@/lib/api/projects";
+import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import {
   joinRequestApi,
   type MyJoinRequestResponse,
-  type JoinRequestListResponse,
 } from "@/lib/api/joinRequests";
 import { cn, formatDate } from "@/lib/utils";
 
@@ -33,9 +32,9 @@ export default function ProjectDashboardPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Project data from shared React Query cache
+  const { project, isLoading, error } = useProject(projectId, session?.accessToken);
+  const { canEdit, canSuggest, canManage } = derivePermissions(project, session?.accessToken);
 
   // Join request state
   const [joinRequestStatus, setJoinRequestStatus] =
@@ -48,77 +47,20 @@ export default function ProjectDashboardPage() {
 
   const isAuthenticated = status === "authenticated";
 
+  // Fetch join request data once project is loaded
   useEffect(() => {
-    const fetchProject = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const data = await projectApi.get(projectId, session?.accessToken);
-        setProject(data);
-
-        // Fetch pending join request count for admins/owners of public projects
-        const userCanManage =
-          data.user_role === "owner" ||
-          data.user_role === "admin" ||
-          data.is_superadmin;
-        if (session?.accessToken && data.is_public && userCanManage) {
-          try {
-            const jrList: JoinRequestListResponse = await joinRequestApi.list(
-              projectId,
-              session.accessToken
-            );
-            setPendingJoinCount(jrList.total);
-          } catch {
-            // Ignore — join request listing may fail
-          }
-        }
-
-        // Fetch join request status for authenticated users on public projects
-        // who don't have a role
-        if (
-          session?.accessToken &&
-          data.is_public &&
-          !data.user_role
-        ) {
-          try {
-            const jrStatus = await joinRequestApi.getMine(
-              projectId,
-              session.accessToken
-            );
-            setJoinRequestStatus(jrStatus);
-          } catch {
-            // Ignore — user may not have a join request
-          }
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
-          setError("You don't have access to this project");
-        } else if (err instanceof Error && err.message.includes("404")) {
-          setError("Project not found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load project");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (status !== "loading" && projectId) {
-      fetchProject();
+    if (!project) return;
+    if (session?.accessToken && project.is_public && canManage) {
+      joinRequestApi.list(projectId, session.accessToken)
+        .then((jrList) => setPendingJoinCount(jrList.total))
+        .catch(() => { /* ignore */ });
     }
-  }, [projectId, session?.accessToken, status]);
-
-  const hasExplicitRole = !!project?.user_role;
-  const canEdit =
-    project?.user_role === "owner" ||
-    project?.user_role === "admin" ||
-    project?.user_role === "editor" ||
-    project?.is_superadmin;
-  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!session?.accessToken);
-  const canSuggest = canEdit || isSuggester;
-
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
+    if (session?.accessToken && project.is_public && !project.user_role) {
+      joinRequestApi.getMine(projectId, session.accessToken)
+        .then((jrStatus) => setJoinRequestStatus(jrStatus))
+        .catch(() => { /* ignore */ });
+    }
+  }, [project, projectId, session?.accessToken, canManage]);
 
   const showJoinRequestSection =
     isAuthenticated &&
