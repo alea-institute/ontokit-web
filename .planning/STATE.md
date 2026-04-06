@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Completed 11-04-PLAN.md (LLM Settings UI and Usage Dashboard)
-last_updated: "2026-04-06T15:57:47.665Z"
+stopped_at: Completed 11-02-PLAN.md (rate limiting, budget enforcement, role gates, LLM API routes)
+last_updated: "2026-04-06T15:57:57.269Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
@@ -56,6 +56,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 11-roles-llm-abstraction-cost-controls P03 | 2 | 2 tasks | 6 files |
 | Phase 11-roles-llm-abstraction-cost-controls P01 | 6 | 2 tasks | 18 files |
 | Phase 11-roles-llm-abstraction-cost-controls P04 | 7 | 2 tasks | 3 files |
+| Phase 11-roles-llm-abstraction-cost-controls P02 | 7 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,8 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 11-roles-llm-abstraction-cost-controls]: chat() returns (text, input_tokens, output_tokens) tuple — audit log requires token counts without separate API call
 - [Phase 11-roles-llm-abstraction-cost-controls]: Budget inputs live in LLMSettingsSection (single save CTA); LLMUsageSection receives monthlyBudgetUsd prop for display only
 - [Phase 11-roles-llm-abstraction-cost-controls]: testConnection called before updateConfig when new API key provided — invalid key blocks save
+- [Phase 11-roles-llm-abstraction-cost-controls]: Two-router pattern in llm.py: project-scoped router + public public_router to avoid prefix collision between /projects/... and /llm/providers
+- [Phase 11-roles-llm-abstraction-cost-controls]: check_rate_limit fails open (returns True) when Redis unavailable to avoid blocking legitimate users during Redis downtime
 
 ### Key Facts
 
@@ -123,6 +126,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T15:57:35.980Z
-Stopped at: Completed 11-04-PLAN.md (LLM Settings UI and Usage Dashboard)
+Last session: 2026-04-06T15:57:57.267Z
+Stopped at: Completed 11-02-PLAN.md (rate limiting, budget enforcement, role gates, LLM API routes)
 Resume file: None
