@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Completed 12-02-PLAN.md (StructuralSimilarityService, GlossExtractionService stub, ReasonerService, validation endpoint)
-last_updated: "2026-04-06T21:41:19.181Z"
+stopped_at: Completed 12-03-PLAN.md (cross-branch embedding search, startup freshness check, webhook rebuild)
+last_updated: "2026-04-06T21:41:59.128Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 12 (toolchain-integration-duplicate-detection) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-04-06
 
@@ -61,6 +61,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 12-toolchain-integration-duplicate-detection P00 | 2 | 1 tasks | 6 files |
 | Phase 12 P01 | 2 | 2 tasks | 4 files |
 | Phase 12-toolchain-integration-duplicate-detection P02 | 7 | 2 tasks | 7 files |
+| Phase 12 P03 | 30 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 12-01]: DuplicateVerdict and CandidateSource defined as Literal aliases (not Enum) — consistent with existing schema patterns in embeddings.py and quality.py
 - [Phase 12-toolchain-integration-duplicate-detection]: RDFLib used for cycle detection instead of owlready2 is_a traversal — owlready2/HermiT normalizes cycles into class equivalences before Python can observe them
 - [Phase 12-toolchain-integration-duplicate-detection]: Validation endpoint fallback uses load_project_graph() + graph.serialize() not storage.get_source() — StorageService has no get_source() method
+- [Phase 12]: EmbeddingService lazy imports require patching at source module (ontokit.services.embedding_service.EmbeddingService) not call site
+- [Phase 12]: async def side_effect functions in tests avoid coroutine-awaiting ambiguity vs AsyncMock.side_effect with nested coroutines
 
 ### Key Facts
 
@@ -145,6 +148,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T21:41:19.179Z
-Stopped at: Completed 12-02-PLAN.md (StructuralSimilarityService, GlossExtractionService stub, ReasonerService, validation endpoint)
+Last session: 2026-04-06T21:41:59.126Z
+Stopped at: Completed 12-03-PLAN.md (cross-branch embedding search, startup freshness check, webhook rebuild)
 Resume file: None
