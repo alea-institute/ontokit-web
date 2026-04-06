@@ -28,7 +28,7 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 
 **Milestone Goal:** Enable SMEs to rapidly improve their ontology with LLM assistance while guaranteeing integrity through duplicate detection, validation guardrails, and human-curated review.
 
-- [ ] **Phase 11: Roles, LLM Abstraction & Cost Controls** - Per-role gating, multi-provider LLM dispatch, project budget caps, and per-user rate limits
+- [x] **Phase 11: Roles, LLM Abstraction & Cost Controls** - Per-role gating, multi-provider LLM dispatch, project budget caps, and per-user rate limits (completed 2026-04-06)
 - [ ] **Phase 12: Toolchain Integration & Duplicate Detection** - folio-python, OpenGloss, OWL reasoner, plus whole-ontology embeddings index and ANN-based duplicate scoring
 - [ ] **Phase 13: Validation Guardrails & Suggestion Generation** - Pre-submit validation rules, Generative FOLIO prompt pipeline, and LLM suggestion endpoints for classes/annotations/edges
 - [ ] **Phase 14: Inline Suggestion UX & Property Support** - "Suggest improvements" button on class detail panel, flashcard iterator mode, one-click suggestion actions, and property tree browsing with LLM suggestions
@@ -109,7 +109,7 @@ Plans:
 - [x] 11-02-PLAN.md — Backend: Rate limiter, budget enforcer, role gates, audit logger, FastAPI routes
 - [x] 11-03-PLAN.md — Frontend: TypeScript types, API client, BYO key store, LLM hooks
 - [x] 11-04-PLAN.md — Frontend: LLMSettingsSection + LLMUsageSection in project settings page
-- [ ] 11-05-PLAN.md — Frontend: BYOKeyPopover, LLMBudgetBanner, LLMRoleBadge, member list toggle, editor layout wiring
+- [x] 11-05-PLAN.md — Frontend: BYOKeyPopover, LLMBudgetBanner, LLMRoleBadge, member list toggle, editor layout wiring
 **UI hint**: yes
 
 ### Phase 12: Toolchain Integration & Duplicate Detection
@@ -184,7 +184,7 @@ Plans:
 | 8. Optional Auth | v0.3.0 | 2/2 | Complete | 2026-04-03 |
 | 9. Production Deployment | v0.3.0 | 1/1 | Complete | 2026-04-03 |
 | 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete | 2026-04-03 |
-| 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 5/6 | In Progress|  |
+| 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete   | 2026-04-06 |
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 0/TBD | Not started | - |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 0/TBD | Not started | - |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/TBD | Not started | - |

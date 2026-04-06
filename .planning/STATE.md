@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: executing
-stopped_at: Completed 11-02-PLAN.md (rate limiting, budget enforcement, role gates, LLM API routes)
-last_updated: "2026-04-06T15:57:57.269Z"
+status: verifying
+stopped_at: Paused at 11-05-PLAN.md Task 4 (human-verify checkpoint)
+last_updated: "2026-04-06T16:04:50.656Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 
 Phase: 11 (roles-llm-abstraction-cost-controls) — EXECUTING
 Plan: 6 of 6
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-06
 
 Progress: [ ] 0% (v0.4.0 phases)
@@ -57,6 +57,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 11-roles-llm-abstraction-cost-controls P01 | 6 | 2 tasks | 18 files |
 | Phase 11-roles-llm-abstraction-cost-controls P04 | 7 | 2 tasks | 3 files |
 | Phase 11-roles-llm-abstraction-cost-controls P02 | 7 | 2 tasks | 7 files |
+| Phase 11-roles-llm-abstraction-cost-controls P05 | 4 | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 11-roles-llm-abstraction-cost-controls]: testConnection called before updateConfig when new API key provided — invalid key blocks save
 - [Phase 11-roles-llm-abstraction-cost-controls]: Two-router pattern in llm.py: project-scoped router + public public_router to avoid prefix collision between /projects/... and /llm/providers
 - [Phase 11-roles-llm-abstraction-cost-controls]: check_rate_limit fails open (returns True) when Redis unavailable to avoid blocking legitimate users during Redis downtime
+- [Phase Phase 11-roles-llm-abstraction-cost-controls]: AdminSelfMergeDialog uses custom dialog (not ConfirmDialog) to satisfy role=dialog + aria-modal requirements; UI-SPEC copy takes precedence over plan task spec where they differ
 
 ### Key Facts
 
@@ -126,6 +128,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T15:57:57.267Z
-Stopped at: Completed 11-02-PLAN.md (rate limiting, budget enforcement, role gates, LLM API routes)
+Last session: 2026-04-06T16:04:50.654Z
+Stopped at: Paused at 11-05-PLAN.md Task 4 (human-verify checkpoint)
 Resume file: None
