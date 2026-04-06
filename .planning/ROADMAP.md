@@ -102,8 +102,9 @@ Plans:
   3. LLM features show a "Budget exhausted" state and degrade gracefully to manual suggestion mode when the project monthly cap is reached; manual suggestions continue to work uninterrupted
   4. Project owner sees a usage dashboard showing per-user call counts, estimated cost, current budget consumption, and burn rate
   5. An anonymous visitor sees no LLM affordances anywhere in the editor; a suggester sees LLM access up to 100 calls/day; an editor sees LLM access up to 500 calls/day; an admin sees LLM access with self-merge permissions
-**Plans**: 5 plans
+**Plans**: 6 plans
 Plans:
+- [ ] 11-00-PLAN.md — Wave 0: Test stubs for backend pytest and frontend Vitest (Nyquist compliance)
 - [ ] 11-01-PLAN.md — Backend: DB models, Alembic migration, LLM provider registry (13 providers), crypto, pricing
 - [ ] 11-02-PLAN.md — Backend: Rate limiter, budget enforcer, role gates, audit logger, FastAPI routes
 - [ ] 11-03-PLAN.md — Frontend: TypeScript types, API client, BYO key store, LLM hooks
