@@ -11,4 +11,4 @@ export { CrossReferencesPanel } from "./CrossReferencesPanel";
 export { SimilarConceptsPanel } from "./SimilarConceptsPanel";
 export { EntityHistoryTab } from "./EntityHistoryTab";
 export { DeleteImpactAnalysis } from "./DeleteImpactAnalysis";
-export { UpstreamSyncIndicator } from "./UpstreamSyncIndicator";
+export { RemoteSyncIndicator } from "./RemoteSyncIndicator";

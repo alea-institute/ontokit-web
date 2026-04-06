@@ -5,26 +5,26 @@ import Link from "next/link";
 import { RefreshCw, Download, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  upstreamSyncApi,
-  type UpstreamSyncConfig,
-} from "@/lib/api/upstreamSync";
+  remoteSyncApi,
+  type RemoteSyncConfig,
+} from "@/lib/api/remoteSync";
 import { ApiError } from "@/lib/api/client";
 
-interface UpstreamSyncIndicatorProps {
+interface RemoteSyncIndicatorProps {
   projectId: string;
   accessToken?: string;
 }
 
-export function UpstreamSyncIndicator({
+export function RemoteSyncIndicator({
   projectId,
   accessToken,
-}: UpstreamSyncIndicatorProps) {
-  const [config, setConfig] = useState<UpstreamSyncConfig | null>(null);
+}: RemoteSyncIndicatorProps) {
+  const [config, setConfig] = useState<RemoteSyncConfig | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
 
-    upstreamSyncApi
+    remoteSyncApi
       .getConfig(projectId, accessToken)
       .then(setConfig)
       .catch((err) => {
@@ -41,12 +41,12 @@ export function UpstreamSyncIndicator({
 
   if (status === "up_to_date" || status === "idle") {
     return (
-      <Link href={`/projects/${projectId}/settings#upstream-sync`}>
+      <Link href={`/projects/${projectId}/settings#remote-sync`}>
         <Button
           variant="ghost"
           size="sm"
           className="gap-1.5 text-green-600 dark:text-green-400"
-          aria-label="Upstream source in sync"
+          aria-label="In sync with remote"
         >
           <RefreshCw className="h-3.5 w-3.5" />
           <span className="hidden sm:inline text-xs">Synced</span>
@@ -61,7 +61,7 @@ export function UpstreamSyncIndicator({
         variant="ghost"
         size="sm"
         className="gap-1.5 text-blue-600 dark:text-blue-400 cursor-default"
-        aria-label="Checking upstream source"
+        aria-label="Checking for updates from remote"
         disabled
       >
         <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -73,7 +73,7 @@ export function UpstreamSyncIndicator({
   if (status === "update_available") {
     const target = config.pending_pr_id
       ? `/projects/${projectId}/pull-requests/${config.pending_pr_id}`
-      : `/projects/${projectId}/settings#upstream-sync`;
+      : `/projects/${projectId}/settings#remote-sync`;
 
     return (
       <Link href={target}>
@@ -81,7 +81,7 @@ export function UpstreamSyncIndicator({
           variant="ghost"
           size="sm"
           className="gap-1.5 text-indigo-600 dark:text-indigo-400"
-          aria-label="Upstream update available"
+          aria-label="Update available from remote"
         >
           <Download className="h-3.5 w-3.5" />
           <span className="hidden sm:inline text-xs">Update</span>
@@ -93,12 +93,12 @@ export function UpstreamSyncIndicator({
 
   if (status === "error") {
     return (
-      <Link href={`/projects/${projectId}/settings#upstream-sync`}>
+      <Link href={`/projects/${projectId}/settings#remote-sync`}>
         <Button
           variant="ghost"
           size="sm"
           className="gap-1.5 text-red-600 dark:text-red-400"
-          aria-label="Upstream sync error"
+          aria-label="Sync from remote error"
         >
           <AlertCircle className="h-3.5 w-3.5" />
           <span className="hidden sm:inline text-xs">Sync Error</span>

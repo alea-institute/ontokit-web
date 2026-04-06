@@ -52,11 +52,11 @@ import {
   joinRequestApi,
   type JoinRequest as JoinRequestType,
 } from "@/lib/api/joinRequests";
-import { useUpstreamSync } from "@/lib/hooks/useUpstreamSync";
+import { useRemoteSync } from "@/lib/hooks/useRemoteSync";
 import type {
   SyncFrequency,
   SyncUpdateMode,
-} from "@/lib/api/upstreamSync";
+} from "@/lib/api/remoteSync";
 import { NOTIFICATIONS_CHANGED_EVENT } from "@/components/layout/notification-bell";
 import { cn } from "@/lib/utils";
 import dynamic from "next/dynamic";
@@ -270,8 +270,8 @@ export default function ProjectSettingsPage() {
     project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
   const isOwner = project?.user_role === "owner";
 
-  // Upstream sync hook
-  const upstreamSync = useUpstreamSync({
+  // Remote sync hook
+  const remoteSync = useRemoteSync({
     projectId,
     accessToken: session?.accessToken,
     enabled: canManage ?? false,
@@ -904,7 +904,7 @@ export default function ProjectSettingsPage() {
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 hover:underline"
                     >
-                      View upstream source
+                      View remote source file
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   ) : (
@@ -1700,12 +1700,12 @@ export default function ProjectSettingsPage() {
                     onIntegrationUpdate={setGithubIntegration}
                   />
 
-                  {/* Upstream sync info (shown when webhooks enabled) */}
+                  {/* Remote sync info (shown when webhooks enabled) */}
                   {githubIntegration.webhooks_enabled && (
                     <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm dark:border-blue-900/50 dark:bg-blue-900/20">
                       <Download className="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" />
                       <p className="text-blue-700 dark:text-blue-300">
-                        Changes pushed to the upstream repository will be synced back to OntoKit.
+                        Changes pushed to the remote repository will be synced back to OntoKit.
                       </p>
                     </div>
                   )}
@@ -1896,11 +1896,11 @@ export default function ProjectSettingsPage() {
             </section>
           )}
 
-          {/* Upstream Source Tracking - only for owners/admins */}
+          {/* Sync from Remote - only for owners/admins */}
           {canManage && (
-            <UpstreamSyncSection
+            <RemoteSyncSection
               projectId={projectId}
-              upstreamSync={upstreamSync}
+              remoteSync={remoteSync}
               githubIntegration={githubIntegration}
             />
           )}
@@ -2132,7 +2132,7 @@ function WebhookConfigPanel({
             Webhooks
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Receive push events from GitHub for instant upstream sync
+            Receive push events from GitHub for instant sync from remote
           </p>
         </div>
         <label className="relative inline-flex cursor-pointer items-center">
@@ -2280,7 +2280,7 @@ function WebhookConfigPanel({
   );
 }
 
-// --- Upstream Sync Section ---
+// --- Remote Sync Section ---
 
 const FREQUENCY_OPTIONS: { value: SyncFrequency; label: string }[] = [
   { value: "6h", label: "Every 6 hours" },
@@ -2294,7 +2294,7 @@ const FREQUENCY_OPTIONS: { value: SyncFrequency; label: string }[] = [
 
 const UPDATE_MODE_OPTIONS: { value: SyncUpdateMode; label: string; description: string }[] = [
   { value: "auto_apply", label: "Auto-apply if clean", description: "Automatically apply updates when there are no conflicts" },
-  { value: "review_required", label: "Always create PR", description: "Create a pull request for every upstream change" },
+  { value: "review_required", label: "Always create PR", description: "Create a pull request for every remote change" },
 ];
 
 function formatTimeAgo(dateStr: string): string {
@@ -2324,13 +2324,13 @@ function formatTimeUntil(dateStr: string): string {
   return `${Math.floor(diffHrs / 24)}d`;
 }
 
-function UpstreamSyncSection({
+function RemoteSyncSection({
   projectId,
-  upstreamSync,
+  remoteSync,
   githubIntegration,
 }: {
   projectId: string;
-  upstreamSync: ReturnType<typeof useUpstreamSync>;
+  remoteSync: ReturnType<typeof useRemoteSync>;
   githubIntegration: GitHubIntegration | null;
 }) {
   const {
@@ -2342,7 +2342,7 @@ function UpstreamSyncSection({
     triggerCheck,
     saveConfig,
     deleteConfig,
-  } = upstreamSync;
+  } = remoteSync;
 
   const [isEditing, setIsEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -2360,7 +2360,7 @@ function UpstreamSyncSection({
 
   const isWebhookDriven = !!(githubIntegration?.webhooks_enabled && config?.frequency === "webhook");
 
-  // Detect when upstream sync points to the same repo as the GitHub integration
+  // Detect when remote sync points to the same repo as the GitHub integration
   const isLinkedToSameRepo = !!(
     githubIntegration &&
     ((config && config.repo_owner === githubIntegration.repo_owner && config.repo_name === githubIntegration.repo_name) ||
@@ -2452,13 +2452,13 @@ function UpstreamSyncSection({
 
   return (
     <section
-      id="upstream-sync"
+      id="remote-sync"
       className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
     >
       <div className="mb-4 flex items-center gap-2">
         <Download className="h-5 w-5 text-slate-500" />
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-          Upstream Source Tracking
+          Sync from Remote
         </h2>
       </div>
 
@@ -2557,7 +2557,7 @@ function UpstreamSyncSection({
             <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/50 dark:bg-blue-900/20">
               <RefreshCw className="h-4 w-4 animate-spin text-blue-600 dark:text-blue-400" />
               <p className="text-sm text-blue-700 dark:text-blue-300">
-                Checking for upstream changes...
+                Checking for remote changes...
               </p>
             </div>
           )}
@@ -2565,7 +2565,7 @@ function UpstreamSyncSection({
             <div className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900/50 dark:bg-indigo-900/20">
               <Download className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
               <p className="text-sm text-indigo-700 dark:text-indigo-300">
-                Upstream update available
+                Update available from remote
                 {config.pending_pr_id && (
                   <span className="ml-1">
                     &mdash;{" "}
@@ -2683,17 +2683,17 @@ function UpstreamSyncSection({
               <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
                 {githubIntegration
                   ? "Track the linked GitHub repository for changes made outside of OntoKit. When external updates are detected, they can be auto-applied or routed through a pull request. OntoKit's own commits are filtered out to prevent circular syncing."
-                  : "Track an external GitHub repository for upstream changes. When updates are detected, they can be auto-applied or routed through a pull request."}
+                  : "Track an external GitHub repository for remote changes. When updates are detected, they can be auto-applied or routed through a pull request."}
               </p>
               <Button variant="outline" onClick={() => setIsEditing(true)}>
                 <Download className="mr-2 h-4 w-4" />
-                Configure Upstream Source
+                Configure Remote Source File
               </Button>
             </div>
           ) : (
             <>
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                {config ? "Edit upstream source configuration." : "Configure which external repository to track."}
+                {config ? "Edit remote source file configuration." : "Configure which external repository to track."}
               </p>
 
               {/* Enable toggle */}
@@ -2705,7 +2705,7 @@ function UpstreamSyncSection({
                   className="rounded-sm border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700"
                 />
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Enable upstream tracking
+                  Enable remote tracking
                 </span>
               </label>
 
@@ -2760,7 +2760,7 @@ function UpstreamSyncSection({
                 repoOwner === githubIntegration.repo_owner &&
                 repoName === githubIntegration.repo_name && (
                 <p className="text-xs text-amber-600 dark:text-amber-400">
-                  This is the same repository as your GitHub integration. Upstream tracking will only
+                  This is the same repository as your GitHub integration. Remote tracking will only
                   detect changes made outside of OntoKit &mdash; OntoKit&apos;s own pushes are excluded.
                 </p>
               )}

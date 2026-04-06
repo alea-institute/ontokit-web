@@ -19,9 +19,9 @@ export type NotificationType =
   | "pr_opened"
   | "pr_merged"
   | "pr_review"
-  | "upstream_update_applied"
-  | "upstream_update_available"
-  | "upstream_sync_error";
+  | "remote_update_applied"
+  | "remote_update_available"
+  | "remote_sync_error";
 
 export interface Notification {
   id: string;
