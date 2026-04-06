@@ -90,8 +90,8 @@
 - [x] **COST-02**: LLM features disable gracefully when project budget is exhausted (manual suggestions still work)
 - [x] **COST-03**: Editors are rate-limited to 500 LLM calls per day per project
 - [x] **COST-04**: Suggesters are rate-limited to 100 LLM calls per day per project
-- [ ] **COST-05**: Project owner sees a usage dashboard with per-user, per-day call counts and estimated cost
-- [ ] **COST-06**: Dashboard shows current budget consumption and burn rate
+- [x] **COST-05**: Project owner sees a usage dashboard with per-user, per-day call counts and estimated cost
+- [x] **COST-06**: Dashboard shows current budget consumption and burn rate
 - [x] **COST-07**: BYO-key users' calls do not count against the project budget
 
 ### Reviewer Tooling
@@ -206,8 +206,8 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | COST-02 | Phase 11 | Complete |
 | COST-03 | Phase 11 | Complete |
 | COST-04 | Phase 11 | Complete |
-| COST-05 | Phase 11 | Pending |
-| COST-06 | Phase 11 | Pending |
+| COST-05 | Phase 11 | Complete |
+| COST-06 | Phase 11 | Complete |
 | COST-07 | Phase 11 | Complete |
 | REVIEW-01 | Phase 16 | Pending |
 | REVIEW-02 | Phase 16 | Pending |

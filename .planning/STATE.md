@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Completed 11-01-PLAN.md (LLM data layer and provider registry)
-last_updated: "2026-04-06T15:50:58.277Z"
+stopped_at: Completed 11-04-PLAN.md (LLM Settings UI and Usage Dashboard)
+last_updated: "2026-04-06T15:57:47.665Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 11
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 11 (roles-llm-abstraction-cost-controls) — EXECUTING
-Plan: 4 of 6
+Plan: 6 of 6
 Status: Ready to execute
 Last activity: 2026-04-06
 
@@ -55,6 +55,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 11-roles-llm-abstraction-cost-controls P00 | 5 | 2 tasks | 7 files |
 | Phase 11-roles-llm-abstraction-cost-controls P03 | 2 | 2 tasks | 6 files |
 | Phase 11-roles-llm-abstraction-cost-controls P01 | 6 | 2 tasks | 18 files |
+| Phase 11-roles-llm-abstraction-cost-controls P04 | 7 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 11-roles-llm-abstraction-cost-controls]: useLLMGate is advisory frontend-only; canUseLLM=false for anonymous users always; consumers call invalidateStatus() on 402 response
 - [Phase 11-roles-llm-abstraction-cost-controls]: GoogleProvider uses httpx REST not google-generativeai SDK — SDK deprecated July 2025, REST is more stable
 - [Phase 11-roles-llm-abstraction-cost-controls]: chat() returns (text, input_tokens, output_tokens) tuple — audit log requires token counts without separate API call
+- [Phase 11-roles-llm-abstraction-cost-controls]: Budget inputs live in LLMSettingsSection (single save CTA); LLMUsageSection receives monthlyBudgetUsd prop for display only
+- [Phase 11-roles-llm-abstraction-cost-controls]: testConnection called before updateConfig when new API key provided — invalid key blocks save
 
 ### Key Facts
 
@@ -120,6 +123,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T15:50:58.275Z
-Stopped at: Completed 11-01-PLAN.md (LLM data layer and provider registry)
+Last session: 2026-04-06T15:57:35.980Z
+Stopped at: Completed 11-04-PLAN.md (LLM Settings UI and Usage Dashboard)
 Resume file: None
