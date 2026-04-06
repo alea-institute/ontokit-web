@@ -5,6 +5,10 @@ import dynamic from "next/dynamic";
 import { FileCode, TreePine, Code, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
+import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
+import { useLLMGate } from "@/lib/hooks/useLLMGate";
+import type { ProjectRole } from "@/lib/api/projects";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
@@ -65,6 +69,7 @@ export interface DeveloperEditorLayoutProps {
   canSuggest?: boolean;
   isSuggestionMode?: boolean;
   canManage: boolean;
+  userRole?: ProjectRole | null;
 
   // Tree state (from useOntologyTree)
   nodes: ClassTreeNode[];
@@ -141,6 +146,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     canSuggest = false,
     isSuggestionMode = false,
     canManage,
+    userRole,
     nodes,
     isTreeLoading,
     treeError,
@@ -189,6 +195,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
   const toast = useToast();
   const { announce } = useAnnounce();
+  const llmGate = useLLMGate(projectId, userRole);
 
   // Draft badges
   const getDraftIris = useDraftStore((s) => s.getDraftIris);
@@ -339,6 +346,15 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
   return (
     <div className="flex h-full flex-col">
+      {/* LLM Budget Banner — spans full width, below toolbar, above content */}
+      {!llmGate.isAnonymous && (
+        <LLMBudgetBanner
+          budgetExhausted={llmGate.budgetExhausted}
+          monthlySpentUsd={llmGate.monthlySpentUsd}
+          monthlyBudgetUsd={llmGate.monthlyBudgetUsd}
+        />
+      )}
+
       {/* Developer Sub-Header: View Mode Tabs */}
       <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-800">
         <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-900">
@@ -383,6 +399,11 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             <span className="hidden sm:inline">Graph</span>
           </button>
         </div>
+        {/* LLM Role Badge — shown in toolbar when user has LLM access */}
+        <LLMRoleBadge
+          roleLimitLabel={llmGate.roleLimitLabel}
+          userRole={userRole ?? undefined}
+        />
       </div>
 
       {/* Content Area */}

@@ -84,6 +84,7 @@ export interface ProjectMember {
   project_id: string;
   user_id: string;
   role: ProjectRole;
+  can_self_merge_structural?: boolean;  // Only relevant for editor role
   user?: MemberUser;
   created_at: string;
 }
@@ -100,6 +101,7 @@ export interface MemberCreate {
 
 export interface MemberUpdate {
   role: ProjectRole;
+  can_self_merge_structural?: boolean;  // Only relevant for editor role
 }
 
 export interface TransferOwnership {

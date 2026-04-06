@@ -2,6 +2,10 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
+import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
+import { useLLMGate } from "@/lib/hooks/useLLMGate";
+import type { ProjectRole } from "@/lib/api/projects";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
@@ -46,6 +50,7 @@ export interface StandardEditorLayoutProps {
   canEdit: boolean;
   canSuggest?: boolean;
   isSuggestionMode?: boolean;
+  userRole?: ProjectRole | null;
 
   // Tree state (from useOntologyTree)
   nodes: ClassTreeNode[];
@@ -106,6 +111,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     canSuggest = false,
     isSuggestionMode = false,
+    userRole,
     nodes,
     isTreeLoading,
     treeError,
@@ -142,6 +148,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
 
   const toast = useToast();
   const { announce } = useAnnounce();
+  const llmGate = useLLMGate(projectId, userRole);
 
   // Draft badges
   const getDraftIris = useDraftStore((s) => s.getDraftIris);
@@ -265,7 +272,27 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   };
 
   return (
-    <div className="flex h-full min-w-0 flex-1">
+    <div className="flex h-full min-w-0 flex-1 flex-col">
+      {/* LLM Budget Banner — spans full width, above main content */}
+      {!llmGate.isAnonymous && (
+        <LLMBudgetBanner
+          budgetExhausted={llmGate.budgetExhausted}
+          monthlySpentUsd={llmGate.monthlySpentUsd}
+          monthlyBudgetUsd={llmGate.monthlyBudgetUsd}
+        />
+      )}
+
+      {/* LLM Role Badge — shown in a slim toolbar row when user has LLM access */}
+      {llmGate.roleLimitLabel && (
+        <div className="flex items-center justify-end border-b border-slate-200 bg-white px-4 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+          <LLMRoleBadge
+            roleLimitLabel={llmGate.roleLimitLabel}
+            userRole={userRole ?? undefined}
+          />
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1">
       {/* Left Panel - Entity Tree/List with tabs */}
       <div className="flex-shrink-0 bg-white dark:bg-slate-800" style={{ width: treePanelWidth }}>
         {/* Entity Type Tabs */}
@@ -470,6 +497,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           />
         )}
       </div>
+
+      </div>{/* end flex min-h-0 flex-1 */}
 
       {/* Full-screen graph modal */}
       {showGraphModal && selectedIri && (
