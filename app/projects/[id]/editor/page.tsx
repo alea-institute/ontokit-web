@@ -38,6 +38,7 @@ import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
 import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
 import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
+import { ShareButton } from "@/components/editor/ShareButton";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
@@ -904,6 +905,13 @@ export default function EditorPage() {
 
               {/* Branch Selector */}
               <BranchSelector onBranchChange={handleBranchChange} canCreateBranch={canEdit} readOnly={!hasValidAccess} />
+
+              {/* Share */}
+              <ShareButton
+                projectId={projectId}
+                selectedIri={selectedIri}
+                selectedLabel={selectedNodeFallback?.label}
+              />
 
               {/* History Button */}
               <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />

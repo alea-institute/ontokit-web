@@ -5,6 +5,7 @@ import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Settings, FileCode, Pencil, LogIn, LayoutDashboard } from "lucide-react";
+import { ShareButton } from "@/components/editor/ShareButton";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
@@ -239,6 +240,13 @@ function ViewerContent({
                   endpoint={wsEndpoint}
                 />
               </div>
+
+              {/* Share */}
+              <ShareButton
+                projectId={projectId}
+                selectedIri={selectedIri}
+                selectedLabel={selectedNodeFallback?.label}
+              />
 
               {/* Dashboard link */}
               <Link href={`/projects/${projectId}/dashboard`}>
