@@ -40,9 +40,9 @@ const edgeTypeConfig: Record<GraphEdgeType, {
     label: "disjointWith",
   },
   seeAlso: {
-    stroke: "#9ca3af",
-    strokeDasharray: "2 4",
-    label: "seeAlso",
+    stroke: "#8b5cf6",
+    strokeDasharray: "6 3",
+    label: "rdfs:seeAlso",
   },
 };
 
