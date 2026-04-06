@@ -73,9 +73,10 @@ export default function SuggestionsPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  const { project, isLoading: isProjectLoading, error } = useProject(projectId, session?.accessToken);
+  const { project, isLoading: isProjectLoading, error: projectError } = useProject(projectId, session?.accessToken);
   const [sessions, setSessions] = useState<SuggestionSessionSummary[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session?.accessToken || !projectId) {
@@ -83,13 +84,15 @@ export default function SuggestionsPage() {
       return;
     }
     setIsLoadingSessions(true);
+    setSessionsError(null);
     suggestionsApi.listSessions(projectId, session.accessToken)
       .then((res) => setSessions(res.items))
-      .catch(() => { /* ignore */ })
+      .catch((err) => { setSessionsError(err instanceof Error ? err.message : "Failed to load suggestions"); })
       .finally(() => setIsLoadingSessions(false));
   }, [projectId, session?.accessToken]);
 
   const isLoading = isProjectLoading || isLoadingSessions;
+  const error = projectError || sessionsError;
 
   if (isLoading || status === "loading") {
     return (
