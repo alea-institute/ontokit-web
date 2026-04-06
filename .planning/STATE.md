@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Completed 12-00-PLAN.md — folio-python installed, Wave 0 stubs created
-last_updated: "2026-04-06T21:32:29.504Z"
+stopped_at: Completed 12-01-PLAN.md (DuplicateRejection model, HNSW migration, Pydantic schemas)
+last_updated: "2026-04-06T21:33:20.613Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
   completed_phases: 4
   total_plans: 17
-  completed_plans: 13
+  completed_plans: 14
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 12 (toolchain-integration-duplicate-detection) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-04-06
 
@@ -59,6 +59,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 11-roles-llm-abstraction-cost-controls P02 | 7 | 2 tasks | 7 files |
 | Phase 11-roles-llm-abstraction-cost-controls P05 | 4 | 3 tasks | 8 files |
 | Phase 12-toolchain-integration-duplicate-detection P00 | 2 | 1 tasks | 6 files |
+| Phase 12 P01 | 2 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -98,6 +99,8 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 11-roles-llm-abstraction-cost-controls]: check_rate_limit fails open (returns True) when Redis unavailable to avoid blocking legitimate users during Redis downtime
 - [Phase Phase 11-roles-llm-abstraction-cost-controls]: AdminSelfMergeDialog uses custom dialog (not ConfirmDialog) to satisfy role=dialog + aria-modal requirements; UI-SPEC copy takes precedence over plan task spec where they differ
 - [Phase Phase 12-00]: Wave 0 stubs created before implementation so downstream plans can run pytest --co without discovery failures (Nyquist compliance pattern)
+- [Phase 12-01]: HNSW index wrapped in PL/pgSQL EXCEPTION WHEN others block — graceful fallback for pgvector < 0.5.0 so migration succeeds on older dev environments
+- [Phase 12-01]: DuplicateVerdict and CandidateSource defined as Literal aliases (not Enum) — consistent with existing schema patterns in embeddings.py and quality.py
 
 ### Key Facts
 
@@ -139,6 +142,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T21:32:29.502Z
-Stopped at: Completed 12-00-PLAN.md — folio-python installed, Wave 0 stubs created
+Last session: 2026-04-06T21:33:20.611Z
+Stopped at: Completed 12-01-PLAN.md (DuplicateRejection model, HNSW migration, Pydantic schemas)
 Resume file: None

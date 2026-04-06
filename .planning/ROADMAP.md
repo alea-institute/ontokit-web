@@ -125,7 +125,7 @@ Plans:
 **Plans**: 5 plans
 Plans:
 - [x] 12-00-PLAN.md — Wave 0: Install folio-python + create test stubs for all Phase 12 services
-- [ ] 12-01-PLAN.md — Backend: DuplicateRejection model, Pydantic schemas, HNSW + duplicate_rejections Alembic migration
+- [x] 12-01-PLAN.md — Backend: DuplicateRejection model, Pydantic schemas, HNSW + duplicate_rejections Alembic migration
 - [ ] 12-02-PLAN.md — Backend: StructuralSimilarityService (folio-python), GlossExtractionService (stub), ReasonerService (owlready2), validation endpoint
 - [ ] 12-03-PLAN.md — Backend: All-branch semantic search, webhook rebuild trigger, startup freshness check, branch cleanup
 - [ ] 12-04-PLAN.md — Backend: DuplicateCheckService (composite 40/40/20 scoring), duplicate-check API endpoint, suggestion rejection extension
@@ -191,7 +191,7 @@ Plans:
 | 9. Production Deployment | v0.3.0 | 1/1 | Complete | 2026-04-03 |
 | 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete | 2026-04-03 |
 | 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete    | 2026-04-06 |
-| 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 1/5 | In Progress|  |
+| 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 2/5 | In Progress|  |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 0/TBD | Not started | - |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/TBD | Not started | - |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |
