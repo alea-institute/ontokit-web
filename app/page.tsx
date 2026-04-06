@@ -199,20 +199,20 @@ export default function HomePage() {
               <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
                 <FolderOpen className="mx-auto h-12 w-12 text-slate-400" />
                 <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
-                  {searchQuery
+                  {debouncedSearch
                     ? "No projects found"
                     : filter === "private"
                     ? "No projects yet"
                     : "No projects available"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  {searchQuery
+                  {debouncedSearch
                     ? "Try a different search term"
                     : filter === "private" && isAuthenticated
                     ? "Create your first project to get started"
                     : "Check back later for public projects"}
                 </p>
-                {filter === "private" && isAuthenticated && !searchQuery && (
+                {filter === "private" && isAuthenticated && !debouncedSearch && (
                   <Link href="/projects/new" className="mt-4 inline-block">
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
