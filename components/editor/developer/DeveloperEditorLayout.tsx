@@ -423,9 +423,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             <OntologyGraph
               focusIri={selectedIri}
               projectId={projectId}
-              accessToken={accessToken}
               branch={activeBranch}
-              labelHints={treeLabelHints}
               onNavigateToClass={(iri) => {
                 handleViewModeChange("tree");
                 navigateToNode(iri);
