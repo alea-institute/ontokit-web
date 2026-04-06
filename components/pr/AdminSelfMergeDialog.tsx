@@ -93,7 +93,7 @@ export function AdminSelfMergeDialog({
               Merge directly to main?
             </h2>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              You are about to merge this structural change without peer review. This cannot be undone.
+              You are about to merge this directly. Continue?
             </p>
             {prTitle && (
               <p className="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-300">
