@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -14,6 +14,7 @@ import { BranchProvider, useBranch } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { useToast } from "@/lib/context/ToastContext";
 import { projectApi, type Project } from "@/lib/api/projects";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
@@ -228,6 +229,15 @@ function ViewerContent({
     navigateToNode(classIriParam);
   }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
 
+  const toast = useToast();
+  const handleCopyIri = useCallback(async (iri: string) => {
+    try {
+      await navigator.clipboard.writeText(iri);
+      toast.success("IRI copied to clipboard");
+    } catch {
+      toast.error("Failed to copy IRI");
+    }
+  }, [toast]);
   const noop = () => {};
 
   return (
@@ -343,7 +353,7 @@ function ViewerContent({
                   sourceEditorRef={sourceEditorRef}
                   onSaveSource={async () => {}}
                   onAddEntity={noop}
-                  onCopyIri={noop}
+                  onCopyIri={handleCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
                   detailRefreshKey={0}
                   showHealthCheck={false}
@@ -374,6 +384,7 @@ function ViewerContent({
                 isExpandingAll={isExpandingAll}
                 navigateToNode={navigateToNode}
                 onAddEntity={noop}
+                onCopyIri={handleCopyIri}
                 selectedNodeFallback={selectedNodeFallback}
                 sourceContent={sourceContent}
               />
