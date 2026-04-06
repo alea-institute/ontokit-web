@@ -28,7 +28,7 @@ export function ShareButton({ projectId, selectedIri, selectedLabel }: ShareButt
 
   const displayLabel = selectedLabel || (selectedIri ? getLocalName(selectedIri) : null);
   const truncatedLabel = displayLabel && displayLabel.length > 24
-    ? `${displayLabel.slice(0, 24)}…`
+    ? `${displayLabel.slice(0, 23)}…`
     : displayLabel;
 
   const copyToClipboard = useCallback(async (url: string, label?: string) => {
