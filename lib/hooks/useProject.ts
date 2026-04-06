@@ -14,6 +14,10 @@ export function useProject(projectId: string, accessToken?: string) {
     queryKey: projectQueryKeys.detail(projectId, !!accessToken),
     queryFn: () => projectApi.get(projectId, accessToken),
     enabled: !!projectId,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiError && (error.status === 403 || error.status === 404)) return false;
+      return failureCount < 3;
+    },
   });
 
   // Derive error kind from the query error
