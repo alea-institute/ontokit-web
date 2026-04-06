@@ -108,6 +108,7 @@ export function useProjectViewer({
       return null;
     };
     return findInTree(tree.nodes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tree.selectedIri, tree.nodes]);
 
   // Load source content
