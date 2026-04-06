@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Completed 11-00-PLAN.md (test stub scaffolding)
-last_updated: "2026-04-06T15:42:15.359Z"
+stopped_at: Completed 11-03-PLAN.md (LLM data layer)
+last_updated: "2026-04-06T15:46:33.323Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 12
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 11 (roles-llm-abstraction-cost-controls) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-04-06
 
@@ -53,6 +53,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 10-anonymous-suggestions P02 | 2 | 2 tasks | 4 files |
 | Phase 10-anonymous-suggestions P03 | 9 | 2 tasks | 6 files |
 | Phase 11-roles-llm-abstraction-cost-controls P00 | 5 | 2 tasks | 7 files |
+| Phase 11-roles-llm-abstraction-cost-controls P03 | 2 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -82,6 +83,8 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase Phase 10-anonymous-suggestions]: CreditModal opens pre-submit so credit info is passed directly to submitSession() in one API call
 - [Phase Phase 10-anonymous-suggestions]: isAnonymousProposalMode overrides canEdit/isSuggestionMode to reuse existing form-editing infrastructure
 - [Phase 11-roles-llm-abstraction-cost-controls]: Wave 0 stubs created before implementation so downstream plans can verify against real code without test-discovery failures
+- [Phase 11-roles-llm-abstraction-cost-controls]: BYO key never sent to backend for storage — forwarded as X-BYO-API-Key header per-request only (D-05)
+- [Phase 11-roles-llm-abstraction-cost-controls]: useLLMGate is advisory frontend-only; canUseLLM=false for anonymous users always; consumers call invalidateStatus() on 402 response
 
 ### Key Facts
 
@@ -114,6 +117,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T15:42:15.357Z
-Stopped at: Completed 11-00-PLAN.md (test stub scaffolding)
+Last session: 2026-04-06T15:46:33.320Z
+Stopped at: Completed 11-03-PLAN.md (LLM data layer)
 Resume file: None
