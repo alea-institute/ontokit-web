@@ -126,8 +126,16 @@ None yet.
 |---|-------------|------|--------|-----------|
 | 260403-dth | Phase 7: Sync ALEA forks with CatholicOS main | 2026-04-03 | fbec037 | [260403-dth-phase-7-sync-alea-forks-with-catholicos-](./quick/260403-dth-phase-7-sync-alea-forks-with-catholicos-/) |
 
+## Active Feature Branches
+
+### Entity Graph Port (`entity-graph-migration`)
+- **Issue:** CatholicOS/ontokit-web#81
+- **Status:** Code-complete, awaiting visual verification
+- **Handoff:** `.planning/features/entity-graph-port/HANDOFF.md`
+- **Next:** Visual verify with MCP chrome-devtools (headless), then create PR
+
 ## Session Continuity
 
-Last session: 2026-04-06T16:04:50.654Z
-Stopped at: Paused at 11-05-PLAN.md Task 4 (human-verify checkpoint)
-Resume file: None
+Last session: 2026-04-06
+Stopped at: Entity graph port code-complete; needs visual verification + PR
+Resume file: .planning/features/entity-graph-port/HANDOFF.md
