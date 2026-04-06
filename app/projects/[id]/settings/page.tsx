@@ -67,6 +67,8 @@ import {
   type EmbeddingProvider,
   type EmbeddingStatus,
 } from "@/lib/api/embeddings";
+import { LLMSettingsSection } from "@/components/projects/LLMSettingsSection";
+import { LLMUsageSection } from "@/components/projects/LLMUsageSection";
 
 // Dynamically import the diff viewer to avoid SSR issues with Monaco
 const NormalizationDiffViewer = dynamic(
@@ -1911,6 +1913,29 @@ export default function ProjectSettingsPage() {
               projectId={projectId}
               accessToken={session?.accessToken}
             />
+          )}
+
+          {/* AI / LLM Configuration */}
+          {canManage && (
+            <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+              <div className="mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+                  AI / LLM
+                </h2>
+                <span className="rounded-full bg-primary-100 px-2 py-1 text-xs font-semibold text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                  AI
+                </span>
+              </div>
+              <LLMSettingsSection
+                projectId={projectId}
+                accessToken={session?.accessToken}
+              />
+              <hr className="my-6 border-slate-200 dark:border-slate-700" />
+              <LLMUsageSection
+                projectId={projectId}
+                accessToken={session?.accessToken}
+              />
+            </section>
           )}
 
           {/* Danger Zone — hidden for exemplar projects unless superadmin */}
