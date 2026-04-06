@@ -1,8 +1,10 @@
 "use client";
 
-import { Cloud, Loader2, Check, AlertTriangle, Save, X } from "lucide-react";
+import { Cloud, Loader2, Check, AlertTriangle, Save, X, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { Tooltip } from "@/components/ui/tooltip";
+import Link from "next/link";
 import type { SaveStatus } from "@/lib/hooks/useAutoSave";
 
 interface AutoSaveAffordanceBarProps {
@@ -22,12 +24,12 @@ export function AutoSaveAffordanceBar({
   onManualSave,
   onCancel,
 }: AutoSaveAffordanceBarProps) {
-  const manualSave = useEditorModeStore((s) => s.manualSave);
+  const hideSaveButton = useEditorModeStore((s) => s.hideSaveButton);
 
   const effectiveStatus = validationError ? "validationError" : status;
 
-  const saveEnabled = manualSave && effectiveStatus === "draft" && !!onManualSave;
-  const saveSpinning = manualSave && effectiveStatus === "saving";
+  const saveEnabled = !hideSaveButton && effectiveStatus === "draft" && !!onManualSave;
+  const saveSpinning = !hideSaveButton && effectiveStatus === "saving";
 
   return (
     <div
@@ -104,24 +106,45 @@ export function AutoSaveAffordanceBar({
 
         {/* Right side — save + cancel buttons */}
         <div className="flex shrink-0 items-center gap-2">
-          {manualSave && (
-            <button
-              onClick={saveEnabled ? onManualSave : undefined}
-              disabled={!saveEnabled}
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                saveEnabled
-                  ? "bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
-                  : "cursor-not-allowed bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500",
-              )}
-            >
-              {saveSpinning ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Save className="h-3.5 w-3.5" />
-              )}
-              Save
-            </button>
+          {!hideSaveButton && (
+            <>
+              <button
+                onClick={saveEnabled ? onManualSave : undefined}
+                disabled={!saveEnabled}
+                className={cn(
+                  "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                  saveEnabled
+                    ? "bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
+                    : "cursor-not-allowed bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500",
+                )}
+              >
+                {saveSpinning ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Save className="h-3.5 w-3.5" />
+                )}
+                Save
+              </button>
+              <Tooltip
+                side="bottom"
+                content={
+                  <span>
+                    You can hide this button in{" "}
+                    <Link href="/settings#save-button" className="underline hover:text-slate-300 dark:hover:text-slate-600">
+                      User Settings
+                    </Link>
+                    . Changes still auto-save when you navigate away.
+                  </span>
+                }
+              >
+                <button
+                  type="button"
+                  className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
+                >
+                  <Info className="h-3.5 w-3.5" />
+                </button>
+              </Tooltip>
+            </>
           )}
           {onCancel && (
             <button
