@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: Not started
-stopped_at: Phase 11 UI-SPEC approved
-last_updated: "2026-04-06T02:57:34.823Z"
-last_activity: 2026-04-05 — Roadmap created (phases 11-16)
+status: executing
+stopped_at: Completed 11-00-PLAN.md (test stub scaffolding)
+last_updated: "2026-04-06T15:42:15.359Z"
+last_activity: 2026-04-06
 progress:
   total_phases: 10
   completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 12
+  completed_plans: 7
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Enable grassroots-level collaborative ontology editing in a modern, accessible web interface — where SMEs rapidly improve their ontology with LLM assistance while preserving integrity through human curation.
-**Current focus:** Milestone v0.4.0 LLM-Assisted Ontology Improvements — Phase 11 of 16 — not started
+**Current focus:** Phase 11 — roles-llm-abstraction-cost-controls
 
 ## Current Position
 
-Phase: 11 of 16 — Roles, LLM Abstraction & Cost Controls
-Plan: —
-Status: Not started
-Last activity: 2026-04-05 — Roadmap created (phases 11-16)
+Phase: 11 (roles-llm-abstraction-cost-controls) — EXECUTING
+Plan: 2 of 6
+Status: Ready to execute
+Last activity: 2026-04-06
 
 Progress: [ ] 0% (v0.4.0 phases)
 
@@ -52,6 +52,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 10-anonymous-suggestions P01 | 525602min | 3 tasks | 7 files |
 | Phase 10-anonymous-suggestions P02 | 2 | 2 tasks | 4 files |
 | Phase 10-anonymous-suggestions P03 | 9 | 2 tasks | 6 files |
+| Phase 11-roles-llm-abstraction-cost-controls P00 | 5 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase Phase 10-anonymous-suggestions]: CreditModal appears post-submit so it does not block suggestion submission — callers render it conditionally on a showCreditModal flag
 - [Phase Phase 10-anonymous-suggestions]: CreditModal opens pre-submit so credit info is passed directly to submitSession() in one API call
 - [Phase Phase 10-anonymous-suggestions]: isAnonymousProposalMode overrides canEdit/isSuggestionMode to reuse existing form-editing infrastructure
+- [Phase 11-roles-llm-abstraction-cost-controls]: Wave 0 stubs created before implementation so downstream plans can verify against real code without test-discovery failures
 
 ### Key Facts
 
@@ -112,6 +114,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T02:57:34.821Z
-Stopped at: Phase 11 UI-SPEC approved
-Resume file: .planning/phases/11-roles-llm-abstraction-cost-controls/11-UI-SPEC.md
+Last session: 2026-04-06T15:42:15.357Z
+Stopped at: Completed 11-00-PLAN.md (test stub scaffolding)
+Resume file: None

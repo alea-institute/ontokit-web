@@ -7,13 +7,13 @@
 
 ### LLM Abstraction & Provider Routing
 
-- [ ] **LLM-01**: User can configure an LLM provider (cloud or local) at the project level
-- [ ] **LLM-02**: Project-owner API keys are stored on the backend and never exposed to the browser
-- [ ] **LLM-03**: BYO-key users can enter their own API key which stays in the browser and calls the provider directly
+- [x] **LLM-01**: User can configure an LLM provider (cloud or local) at the project level
+- [x] **LLM-02**: Project-owner API keys are stored on the backend and never exposed to the browser
+- [x] **LLM-03**: BYO-key users can enter their own API key which stays in the browser and calls the provider directly
 - [ ] **LLM-04**: User can choose between "quality" and "cheap" model tiers per LLM call
 - [ ] **LLM-05**: LLM dispatch layer is pluggable — can use ALEA LLM Client, direct provider SDKs (OpenAI, Anthropic, etc.), or local endpoints, chosen per-project. Default dispatch strategy is decided during phase planning based on what gives us access to the most current models (aligning with folio-enrich / folio-mapper conventions).
 - [ ] **LLM-06**: Local model endpoint (Ollama or compatible) can be configured as a provider alongside cloud providers
-- [ ] **LLM-07**: Backend records every project-key LLM call (timestamp, user, model, token count) for audit
+- [x] **LLM-07**: Backend records every project-key LLM call (timestamp, user, model, token count) for audit
 
 ### Suggestion Generation
 
@@ -78,21 +78,21 @@
 
 ### Per-Role Access Model
 
-- [ ] **ROLE-01**: Admins have full access: LLM suggestions, self-merge annotation PRs, self-merge structural PRs
-- [ ] **ROLE-02**: Editors have LLM access and self-merge annotation PRs by default; structural PRs require peer review
-- [ ] **ROLE-03**: Admin can override default editor permissions per-project (e.g., promote trusted editor to self-merge structural)
-- [ ] **ROLE-04**: Suggesters have LLM access and submit through the existing suggestion-session flow (goes to admin review)
-- [ ] **ROLE-05**: Anonymous users have no LLM access (can still submit manual suggestions via existing anonymous flow)
+- [x] **ROLE-01**: Admins have full access: LLM suggestions, self-merge annotation PRs, self-merge structural PRs
+- [x] **ROLE-02**: Editors have LLM access and self-merge annotation PRs by default; structural PRs require peer review
+- [x] **ROLE-03**: Admin can override default editor permissions per-project (e.g., promote trusted editor to self-merge structural)
+- [x] **ROLE-04**: Suggesters have LLM access and submit through the existing suggestion-session flow (goes to admin review)
+- [x] **ROLE-05**: Anonymous users have no LLM access (can still submit manual suggestions via existing anonymous flow)
 
 ### Cost Controls
 
-- [ ] **COST-01**: Project owner sets a monthly LLM budget ceiling per project
-- [ ] **COST-02**: LLM features disable gracefully when project budget is exhausted (manual suggestions still work)
-- [ ] **COST-03**: Editors are rate-limited to 500 LLM calls per day per project
-- [ ] **COST-04**: Suggesters are rate-limited to 100 LLM calls per day per project
+- [x] **COST-01**: Project owner sets a monthly LLM budget ceiling per project
+- [x] **COST-02**: LLM features disable gracefully when project budget is exhausted (manual suggestions still work)
+- [x] **COST-03**: Editors are rate-limited to 500 LLM calls per day per project
+- [x] **COST-04**: Suggesters are rate-limited to 100 LLM calls per day per project
 - [ ] **COST-05**: Project owner sees a usage dashboard with per-user, per-day call counts and estimated cost
 - [ ] **COST-06**: Dashboard shows current budget consumption and burn rate
-- [ ] **COST-07**: BYO-key users' calls do not count against the project budget
+- [x] **COST-07**: BYO-key users' calls do not count against the project budget
 
 ### Reviewer Tooling
 
@@ -147,13 +147,13 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LLM-01 | Phase 11 | Pending |
-| LLM-02 | Phase 11 | Pending |
-| LLM-03 | Phase 11 | Pending |
+| LLM-01 | Phase 11 | Complete |
+| LLM-02 | Phase 11 | Complete |
+| LLM-03 | Phase 11 | Complete |
 | LLM-04 | Phase 11 | Pending |
 | LLM-05 | Phase 11 | Pending |
 | LLM-06 | Phase 11 | Pending |
-| LLM-07 | Phase 11 | Pending |
+| LLM-07 | Phase 11 | Complete |
 | GEN-01 | Phase 13 | Pending |
 | GEN-02 | Phase 13 | Pending |
 | GEN-03 | Phase 13 | Pending |
@@ -197,18 +197,18 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | PROP-03 | Phase 14 | Pending |
 | PROP-04 | Phase 14 | Pending |
 | PROP-05 | Phase 14 | Pending |
-| ROLE-01 | Phase 11 | Pending |
-| ROLE-02 | Phase 11 | Pending |
-| ROLE-03 | Phase 11 | Pending |
-| ROLE-04 | Phase 11 | Pending |
-| ROLE-05 | Phase 11 | Pending |
-| COST-01 | Phase 11 | Pending |
-| COST-02 | Phase 11 | Pending |
-| COST-03 | Phase 11 | Pending |
-| COST-04 | Phase 11 | Pending |
+| ROLE-01 | Phase 11 | Complete |
+| ROLE-02 | Phase 11 | Complete |
+| ROLE-03 | Phase 11 | Complete |
+| ROLE-04 | Phase 11 | Complete |
+| ROLE-05 | Phase 11 | Complete |
+| COST-01 | Phase 11 | Complete |
+| COST-02 | Phase 11 | Complete |
+| COST-03 | Phase 11 | Complete |
+| COST-04 | Phase 11 | Complete |
 | COST-05 | Phase 11 | Pending |
 | COST-06 | Phase 11 | Pending |
-| COST-07 | Phase 11 | Pending |
+| COST-07 | Phase 11 | Complete |
 | REVIEW-01 | Phase 16 | Pending |
 | REVIEW-02 | Phase 16 | Pending |
 | REVIEW-03 | Phase 16 | Pending |
