@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: defining_requirements
-stopped_at: null
-last_updated: "2026-04-05T00:00:00.000Z"
-last_activity: "2026-04-05 — Milestone v0.4.0 started"
+status: Not started
+stopped_at: Phase 11 context gathered
+last_updated: "2026-04-06T02:25:47.101Z"
+last_activity: 2026-04-05 — Roadmap created (phases 11-16)
 progress:
-  total_phases: 0
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 10
+  completed_phases: 3
+  total_plans: 6
+  completed_plans: 6
   percent: 0
 ---
 
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Enable grassroots-level collaborative ontology editing in a modern, accessible web interface — where SMEs rapidly improve their ontology with LLM assistance while preserving integrity through human curation.
-**Current focus:** Milestone v0.4.0 LLM-Assisted Ontology Improvements — defining requirements
+**Current focus:** Milestone v0.4.0 LLM-Assisted Ontology Improvements — Phase 11 of 16 — not started
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 11 of 16 — Roles, LLM Abstraction & Cost Controls
 Plan: —
-Status: Defining requirements
-Last activity: 2026-04-05 — Milestone v0.4.0 started
+Status: Not started
+Last activity: 2026-04-05 — Roadmap created (phases 11-16)
 
-Progress: [ ] 0%
+Progress: [ ] 0% (v0.4.0 phases)
 
 ## Performance Metrics
 
@@ -94,6 +94,7 @@ Progress: [ ] 0%
 - Currently running Mike's folio-adapter branches (stripped auth) — must switch to CatholicOS main
 - Auth changes needed in: ontokit-web (auth.ts, env.ts) AND ontokit-api (auth middleware)
 - Phase 7 is trivial (~2 min git ops); Phase 8 is code changes in two repos; Phase 9 is SSH ops work
+- Roadmap note: requirements count is 72 (not 65 as stated in header) — all 72 are mapped to phases 11-16
 
 ### Pending Todos
 
@@ -111,6 +112,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-05T00:00:00.000Z
-Stopped at: Milestone v0.4.0 started — defining requirements
-Resume file: None
+Last session: 2026-04-06T02:25:47.099Z
+Stopped at: Phase 11 context gathered
+Resume file: .planning/phases/11-roles-llm-abstraction-cost-controls/11-CONTEXT.md
