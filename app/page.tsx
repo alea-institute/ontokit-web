@@ -35,7 +35,9 @@ export default function HomePage() {
   const {
     data,
     isLoading,
+    isFetching,
     error,
+    refetch,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -190,9 +192,10 @@ export default function HomePage() {
                 <Button
                   variant="outline"
                   className="mt-4"
-                  onClick={() => window.location.reload()}
+                  onClick={() => refetch()}
+                  disabled={isFetching}
                 >
-                  Try Again
+                  {isFetching ? "Retrying..." : "Try Again"}
                 </Button>
               </div>
             ) : projects.length === 0 ? (
