@@ -147,10 +147,10 @@ export const projectApi = {
    * List accessible projects
    * @param skip - Pagination offset
    * @param limit - Maximum results
-   * @param filter - Filter type: 'public', 'mine', or undefined for all accessible
+   * @param filter - Filter type: 'public', 'private', 'mine', or undefined for all accessible
    * @param token - Access token for authentication
    */
-  list: (skip = 0, limit = 20, filter?: "public" | "mine", token?: string, search?: string) => {
+  list: (skip = 0, limit = 20, filter?: "public" | "private" | "mine", token?: string, search?: string) => {
     const headers: HeadersInit = {};
     if (token) {
       headers.Authorization = `Bearer ${token}`;
