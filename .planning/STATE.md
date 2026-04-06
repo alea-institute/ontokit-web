@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Completed 11-03-PLAN.md (LLM data layer)
-last_updated: "2026-04-06T15:46:33.323Z"
+stopped_at: Completed 11-01-PLAN.md (LLM data layer and provider registry)
+last_updated: "2026-04-06T15:50:58.277Z"
 last_activity: 2026-04-06
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 12
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 11 (roles-llm-abstraction-cost-controls) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
 Last activity: 2026-04-06
 
@@ -54,6 +54,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 10-anonymous-suggestions P03 | 9 | 2 tasks | 6 files |
 | Phase 11-roles-llm-abstraction-cost-controls P00 | 5 | 2 tasks | 7 files |
 | Phase 11-roles-llm-abstraction-cost-controls P03 | 2 | 2 tasks | 6 files |
+| Phase 11-roles-llm-abstraction-cost-controls P01 | 6 | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 11-roles-llm-abstraction-cost-controls]: Wave 0 stubs created before implementation so downstream plans can verify against real code without test-discovery failures
 - [Phase 11-roles-llm-abstraction-cost-controls]: BYO key never sent to backend for storage — forwarded as X-BYO-API-Key header per-request only (D-05)
 - [Phase 11-roles-llm-abstraction-cost-controls]: useLLMGate is advisory frontend-only; canUseLLM=false for anonymous users always; consumers call invalidateStatus() on 402 response
+- [Phase 11-roles-llm-abstraction-cost-controls]: GoogleProvider uses httpx REST not google-generativeai SDK — SDK deprecated July 2025, REST is more stable
+- [Phase 11-roles-llm-abstraction-cost-controls]: chat() returns (text, input_tokens, output_tokens) tuple — audit log requires token counts without separate API call
 
 ### Key Facts
 
@@ -117,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-06T15:46:33.320Z
-Stopped at: Completed 11-03-PLAN.md (LLM data layer)
+Last session: 2026-04-06T15:50:58.275Z
+Stopped at: Completed 11-01-PLAN.md (LLM data layer and provider registry)
 Resume file: None

@@ -105,7 +105,7 @@ Plans:
 **Plans**: 6 plans
 Plans:
 - [x] 11-00-PLAN.md — Wave 0: Test stubs for backend pytest and frontend Vitest (Nyquist compliance)
-- [ ] 11-01-PLAN.md — Backend: DB models, Alembic migration, LLM provider registry (13 providers), crypto, pricing
+- [x] 11-01-PLAN.md — Backend: DB models, Alembic migration, LLM provider registry (13 providers), crypto, pricing
 - [ ] 11-02-PLAN.md — Backend: Rate limiter, budget enforcer, role gates, audit logger, FastAPI routes
 - [x] 11-03-PLAN.md — Frontend: TypeScript types, API client, BYO key store, LLM hooks
 - [ ] 11-04-PLAN.md — Frontend: LLMSettingsSection + LLMUsageSection in project settings page
@@ -184,7 +184,7 @@ Plans:
 | 8. Optional Auth | v0.3.0 | 2/2 | Complete | 2026-04-03 |
 | 9. Production Deployment | v0.3.0 | 1/1 | Complete | 2026-04-03 |
 | 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete | 2026-04-03 |
-| 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 2/6 | In Progress|  |
+| 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 3/6 | In Progress|  |
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 0/TBD | Not started | - |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 0/TBD | Not started | - |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/TBD | Not started | - |

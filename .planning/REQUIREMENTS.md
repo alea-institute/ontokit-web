@@ -11,8 +11,8 @@
 - [x] **LLM-02**: Project-owner API keys are stored on the backend and never exposed to the browser
 - [x] **LLM-03**: BYO-key users can enter their own API key which stays in the browser and calls the provider directly
 - [x] **LLM-04**: User can choose between "quality" and "cheap" model tiers per LLM call
-- [ ] **LLM-05**: LLM dispatch layer is pluggable — can use ALEA LLM Client, direct provider SDKs (OpenAI, Anthropic, etc.), or local endpoints, chosen per-project. Default dispatch strategy is decided during phase planning based on what gives us access to the most current models (aligning with folio-enrich / folio-mapper conventions).
-- [ ] **LLM-06**: Local model endpoint (Ollama or compatible) can be configured as a provider alongside cloud providers
+- [x] **LLM-05**: LLM dispatch layer is pluggable — can use ALEA LLM Client, direct provider SDKs (OpenAI, Anthropic, etc.), or local endpoints, chosen per-project. Default dispatch strategy is decided during phase planning based on what gives us access to the most current models (aligning with folio-enrich / folio-mapper conventions).
+- [x] **LLM-06**: Local model endpoint (Ollama or compatible) can be configured as a provider alongside cloud providers
 - [x] **LLM-07**: Backend records every project-key LLM call (timestamp, user, model, token count) for audit
 
 ### Suggestion Generation
@@ -151,8 +151,8 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | LLM-02 | Phase 11 | Complete |
 | LLM-03 | Phase 11 | Complete |
 | LLM-04 | Phase 11 | Complete |
-| LLM-05 | Phase 11 | Pending |
-| LLM-06 | Phase 11 | Pending |
+| LLM-05 | Phase 11 | Complete |
+| LLM-06 | Phase 11 | Complete |
 | LLM-07 | Phase 11 | Complete |
 | GEN-01 | Phase 13 | Pending |
 | GEN-02 | Phase 13 | Pending |
