@@ -200,12 +200,13 @@ function ViewerContent({
 
   // Use the default branch from the BranchProvider context
   const { defaultBranch, isLoading: isBranchLoading } = useBranch();
+  const resolvedBranch = isBranchLoading ? undefined : defaultBranch;
 
   const viewer = useProjectViewer({
     projectId,
     accessToken,
     sessionStatus,
-    activeBranch: isBranchLoading ? undefined : defaultBranch,
+    activeBranch: resolvedBranch,
   });
 
   const {
@@ -322,7 +323,7 @@ function ViewerContent({
                 <DeveloperEditorLayout
                   projectId={projectId}
                   accessToken={accessToken}
-                  activeBranch={defaultBranch}
+                  activeBranch={resolvedBranch}
                   canEdit={false}
                   canSuggest={false}
                   isSuggestionMode={false}
@@ -365,7 +366,7 @@ function ViewerContent({
               <StandardEditorLayout
                 projectId={projectId}
                 accessToken={accessToken}
-                activeBranch={defaultBranch}
+                activeBranch={resolvedBranch}
                 canEdit={false}
                 canSuggest={false}
                 isSuggestionMode={false}
