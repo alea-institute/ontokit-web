@@ -56,6 +56,7 @@ export interface Project {
 export interface ProjectListResponse {
   items: Project[];
   total: number;
+  unfiltered_total: number;
   skip: number;
   limit: number;
 }
