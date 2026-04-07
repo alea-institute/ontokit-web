@@ -2,7 +2,7 @@
 
 import { memo, useCallback } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { ChevronRight, ChevronDown, Circle, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown, Circle, Plus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { TreeNodeContextMenu } from "@/components/editor/TreeNodeContextMenu";
@@ -23,6 +23,8 @@ interface EntityTreeNodeProps {
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
   draftIris?: Set<string>;
+  /** IRIs of accepted LLM suggestions — shown with sparkle badge indicator */
+  suggestedIris?: Set<string>;
   /** Drag state for drag-and-drop reparenting. Undefined = drag disabled. */
   dragState?: DragState;
   /** Called when drag hovers over this node (for auto-expand) */
@@ -58,6 +60,7 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   onDelete,
   onViewInSource,
   draftIris,
+  suggestedIris,
   dragState,
   onDragEnterNode,
   onDragLeaveNode,
@@ -165,6 +168,7 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
                 onDelete={onDelete}
                 onViewInSource={onViewInSource}
                 draftIris={draftIris}
+                suggestedIris={suggestedIris}
               />
             ))}
           </div>
@@ -244,6 +248,15 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
         />
       )}
 
+      {/* Suggested entity sparkle badge (D-07) */}
+      {suggestedIris?.has(node.iri) && (
+        <Sparkles
+          className="h-3 w-3 shrink-0 text-amber-500"
+          aria-label="LLM-suggested entity"
+          role="img"
+        />
+      )}
+
       {/* Add child button — visible on hover */}
       {onAddChild && (
         <button
@@ -293,6 +306,7 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
             onDelete={onDelete}
             onViewInSource={onViewInSource}
             draftIris={draftIris}
+            suggestedIris={suggestedIris}
             dragState={dragState}
             onDragEnterNode={onDragEnterNode}
             onDragLeaveNode={onDragLeaveNode}

@@ -16,6 +16,8 @@ interface EntityTreeProps {
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
   draftIris?: Set<string>;
+  /** IRIs of accepted LLM suggestions — shown with sparkle badge indicator */
+  suggestedIris?: Set<string>;
   searchQuery?: string;
   enableKeyboardNav?: boolean;
   /** Drag state for drag-and-drop reparenting. Undefined = drag disabled. */
@@ -86,6 +88,7 @@ export function EntityTree({
   onDelete,
   onViewInSource,
   draftIris,
+  suggestedIris,
   searchQuery,
   enableKeyboardNav = false,
   dragState,
@@ -206,6 +209,7 @@ export function EntityTree({
           onDelete={onDelete}
           onViewInSource={onViewInSource}
           draftIris={draftIris}
+          suggestedIris={suggestedIris}
           dragState={dragState}
           onDragEnterNode={onDragEnterNode}
           onDragLeaveNode={onDragLeaveNode}

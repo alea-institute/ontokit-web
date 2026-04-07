@@ -24,6 +24,8 @@ interface ClassTreeProps {
   searchQuery?: string;
   /** IRIs that have uncommitted drafts — shown with amber dot indicator */
   draftIris?: Set<string>;
+  /** IRIs of accepted LLM suggestions — shown with sparkle badge indicator */
+  suggestedIris?: Set<string>;
   /** Pre-built filtered tree from useFilteredTree (ancestor-path search results) */
   filteredTree?: EntityTreeNode[] | null;
   /** Whether the filtered tree is still being built */
@@ -53,6 +55,7 @@ export function ClassTree({
   onSearchSelect,
   searchQuery,
   draftIris,
+  suggestedIris,
   filteredTree,
   isFilteredTreeBuilding,
   filteredTreeTruncated,
@@ -150,6 +153,7 @@ export function ClassTree({
       onDelete={onDelete}
       onViewInSource={onViewInSource}
       draftIris={draftIris}
+      suggestedIris={suggestedIris}
       enableKeyboardNav
       dragState={dragState}
       onDragEnterNode={onDragEnterNode}

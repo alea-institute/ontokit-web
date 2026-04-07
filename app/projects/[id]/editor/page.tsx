@@ -97,6 +97,9 @@ export default function EditorPage() {
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
 
+  // Track accepted suggestion IRIs for sparkle badges (D-07)
+  const [acceptedSuggestionIris, setAcceptedSuggestionIris] = useState<Set<string>>(new Set());
+
   // Commit dialog
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
   const [pendingSaveContent, setPendingSaveContent] = useState<string | null>(null);
@@ -321,6 +324,33 @@ export default function EditorPage() {
     },
     [canSuggest, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
   );
+
+  // Handle accepted child suggestion — creates entity directly in tree (D-07)
+  const handleAddSuggestedChild = useCallback((iri: string, label: string, parentIri: string) => {
+    // Generate Turtle snippet for the new entity (same as handleEntityConfirm)
+    const snippet = generateTurtleSnippet({
+      iri,
+      label,
+      entityType: "class",
+      parentIri,
+      ontologyPrefix,
+      ontologyNamespace,
+    });
+
+    // Insert into source
+    if (sourceEditorRef.current) {
+      sourceEditorRef.current.insertAtEnd(snippet);
+      setSourceContent(sourceEditorRef.current.getValue());
+    } else if (sourceContent) {
+      setSourceContent((prev) => prev + snippet);
+    }
+
+    // Add to tree immediately (D-07)
+    addOptimisticNode(iri, label, parentIri);
+
+    // Track as accepted-suggestion IRI for sparkle badge
+    setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
+  }, [ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, setSourceContent]);
 
   // Handle copy IRI
   const handleCopyIri = useCallback(async (iri: string) => {
@@ -766,6 +796,46 @@ export default function EditorPage() {
       global: true,
       ignoreWhenEditorFocused: false,
     },
+    // Suggestion curation shortcuts (D-16)
+    {
+      id: "suggestion-accept",
+      key: "Enter",
+      description: "Accept focused suggestion",
+      category: "Suggestions",
+      action: () => {
+        const focused = document.activeElement?.closest('[role="listitem"]');
+        if (focused) {
+          const acceptBtn = focused.querySelector('[aria-label="Accept suggestion"]') as HTMLButtonElement;
+          acceptBtn?.click();
+        }
+      },
+    },
+    {
+      id: "suggestion-reject",
+      key: "Delete",
+      description: "Reject focused suggestion",
+      category: "Suggestions",
+      action: () => {
+        const focused = document.activeElement?.closest('[role="listitem"]');
+        if (focused) {
+          const rejectBtn = focused.querySelector('[aria-label="Reject suggestion"]') as HTMLButtonElement;
+          rejectBtn?.click();
+        }
+      },
+    },
+    {
+      id: "suggestion-edit",
+      key: "e",
+      description: "Edit focused suggestion",
+      category: "Suggestions",
+      action: () => {
+        const focused = document.activeElement?.closest('[role="listitem"]');
+        if (focused) {
+          const editBtn = focused.querySelector('[aria-label="Edit suggestion before accepting"]') as HTMLButtonElement;
+          editBtn?.click();
+        }
+      },
+    },
   ], [handleAddEntity, shortcutDialogOpen, showHistory, canSuggest]);
 
   useKeyboardShortcuts(keyboardShortcuts);
@@ -1162,6 +1232,8 @@ export default function EditorPage() {
                   canPropose={canPropose && !isAnonymousProposalMode}
                   onProposeEdit={handleProposeEdit}
                   isAnonymousProposalMode={isAnonymousProposalMode}
+                  onAddSuggestedChild={handleAddSuggestedChild}
+                  acceptedSuggestionIris={acceptedSuggestionIris}
                 />
               </div>
             ) : (
@@ -1210,6 +1282,8 @@ export default function EditorPage() {
                 canPropose={canPropose && !isAnonymousProposalMode}
                 onProposeEdit={handleProposeEdit}
                 isAnonymousProposalMode={isAnonymousProposalMode}
+                onAddSuggestedChild={handleAddSuggestedChild}
+                acceptedSuggestionIris={acceptedSuggestionIris}
               />
             )}
           </div>

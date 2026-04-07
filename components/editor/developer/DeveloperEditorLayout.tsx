@@ -24,6 +24,10 @@ import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
 import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
 import { useTreeDragDrop, type DragMode } from "@/lib/hooks/useTreeDragDrop";
 import { useToast } from "@/lib/context/ToastContext";
+import { PendingSuggestionBadge } from "@/components/editor/PendingSuggestionBadge";
+import { BranchNavigator } from "@/components/editor/BranchNavigator";
+import { useSuggestionStore } from "@/lib/stores/suggestionStore";
+import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
 import type { ClassUpdatePayload } from "@/lib/api/client";
 import type { TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import type { TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
@@ -134,6 +138,10 @@ export interface DeveloperEditorLayoutProps {
   canPropose?: boolean;
   onProposeEdit?: () => void;
   isAnonymousProposalMode?: boolean;
+
+  // LLM suggestion support
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => void;
+  acceptedSuggestionIris?: Set<string>;
 }
 
 export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
@@ -191,11 +199,38 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     canPropose,
     onProposeEdit,
     isAnonymousProposalMode,
+    onAddSuggestedChild,
+    acceptedSuggestionIris,
   } = props;
 
   const toast = useToast();
   const { announce } = useAnnounce();
   const llmGate = useLLMGate(projectId, userRole);
+
+  // Suggestion store for pending count badge
+  const pendingCount = useSuggestionStore((s) => s.getPendingCount());
+  const byoEntry = useByoKeyStore((s) => s.getEntry(projectId));
+
+  const scrollToFirstPending = useCallback(() => {
+    const firstCard = document.querySelector('[role="listitem"]');
+    firstCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (firstCard as HTMLElement)?.focus();
+  }, []);
+
+  // D-09: State to trigger auto-suggest annotations on navigate
+  const [isAutoSuggesting, setIsAutoSuggesting] = useState(false);
+
+  const handleAutoSuggest = useCallback((_iri: string) => {
+    setIsAutoSuggesting(true);
+  }, []);
+
+  // Reset auto-suggest flag after ClassDetailPanel has consumed it
+  useEffect(() => {
+    if (isAutoSuggesting) {
+      const timer = setTimeout(() => setIsAutoSuggesting(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAutoSuggesting]);
 
   // Draft badges
   const getDraftIris = useDraftStore((s) => s.getDraftIris);
@@ -399,7 +434,10 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             <span className="hidden sm:inline">Graph</span>
           </button>
         </div>
-        {/* LLM Role Badge — shown in toolbar when user has LLM access */}
+        {/* LLM Role Badge + Pending Suggestion Badge — shown in toolbar */}
+        {pendingCount > 0 && (
+          <PendingSuggestionBadge count={pendingCount} onClick={scrollToFirstPending} />
+        )}
         <LLMRoleBadge
           roleLimitLabel={llmGate.roleLimitLabel}
           userRole={userRole ?? undefined}
@@ -491,6 +529,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                           onSearchSelect={handleSearchSelect}
                           searchQuery={searchQuery}
                           draftIris={draftIris}
+                          suggestedIris={acceptedSuggestionIris}
                           filteredTree={filteredNodes}
                           isFilteredTreeBuilding={isFilteredTreeBuilding}
                           filteredTreeTruncated={filteredTreeTruncated}
@@ -554,6 +593,19 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   canPropose={canPropose}
                   onProposeEdit={onProposeEdit}
                   isAnonymousProposalMode={isAnonymousProposalMode}
+                  canUseLLM={llmGate.canUseLLM}
+                  byoKey={byoEntry?.key}
+                  onAddSuggestedChild={onAddSuggestedChild}
+                  autoSuggestAnnotationsOnMount={isAutoSuggesting}
+                  headerActions={selectedIri ? (
+                    <BranchNavigator
+                      nodes={nodes}
+                      selectedIri={selectedIri}
+                      onNavigate={(iri) => selectNode(iri)}
+                      autoSuggestOnNavigate={true}
+                      onAutoSuggest={handleAutoSuggest}
+                    />
+                  ) : undefined}
                 />
               ) : activeTab === "properties" ? (
                 <PropertyDetailPanel
