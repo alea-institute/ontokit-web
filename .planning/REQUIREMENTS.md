@@ -70,11 +70,11 @@
 
 ### Property Support
 
-- [ ] **PROP-01**: User can browse the property tree separately from the class tree
-- [ ] **PROP-02**: User can request LLM suggestions for new ObjectProperty, DataProperty, and AnnotationProperty entities
-- [ ] **PROP-03**: User can request LLM suggestions for property domain and range
-- [ ] **PROP-04**: Duplicate detection and validation guardrails apply to properties as well as classes
-- [ ] **PROP-05**: Properties use the same dual UX (inline + iterator), clustering, and review pipeline as classes
+- [x] **PROP-01**: User can browse the property tree separately from the class tree
+- [x] **PROP-02**: User can request LLM suggestions for new ObjectProperty, DataProperty, and AnnotationProperty entities
+- [x] **PROP-03**: User can request LLM suggestions for property domain and range
+- [x] **PROP-04**: Duplicate detection and validation guardrails apply to properties as well as classes
+- [x] **PROP-05**: Properties use the same dual UX (inline + iterator), clustering, and review pipeline as classes
 
 ### Per-Role Access Model
 
@@ -192,11 +192,11 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | UX-04 | Phase 14 | Complete |
 | UX-05 | Phase 14 | Complete |
 | UX-06 | Phase 14 | Complete |
-| PROP-01 | Phase 14 | Pending |
-| PROP-02 | Phase 14 | Pending |
-| PROP-03 | Phase 14 | Pending |
-| PROP-04 | Phase 14 | Pending |
-| PROP-05 | Phase 14 | Pending |
+| PROP-01 | Phase 14 | Complete |
+| PROP-02 | Phase 14 | Complete |
+| PROP-03 | Phase 14 | Complete |
+| PROP-04 | Phase 14 | Complete |
+| PROP-05 | Phase 14 | Complete |
 | ROLE-01 | Phase 11 | Complete |
 | ROLE-02 | Phase 11 | Complete |
 | ROLE-03 | Phase 11 | Complete |

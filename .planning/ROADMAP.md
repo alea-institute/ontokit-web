@@ -31,7 +31,7 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 - [x] **Phase 11: Roles, LLM Abstraction & Cost Controls** - Per-role gating, multi-provider LLM dispatch, project budget caps, and per-user rate limits (completed 2026-04-06)
 - [x] **Phase 12: Toolchain Integration & Duplicate Detection** - folio-python, OpenGloss, OWL reasoner, plus whole-ontology embeddings index and ANN-based duplicate scoring (completed 2026-04-06)
 - [x] **Phase 13: Validation Guardrails & Suggestion Generation** - Pre-submit validation rules, Generative FOLIO prompt pipeline, and LLM suggestion endpoints for classes/annotations/edges (completed 2026-04-07)
-- [ ] **Phase 14: Inline Suggestion UX & Property Support** - "Suggest improvements" button on class detail panel, flashcard iterator mode, one-click suggestion actions, and property tree browsing with LLM suggestions
+- [x] **Phase 14: Inline Suggestion UX & Property Support** - "Suggest improvements" button on class detail panel, flashcard iterator mode, one-click suggestion actions, and property tree browsing with LLM suggestions (completed 2026-04-07)
 - [ ] **Phase 15: Session Clustering & Batch Submit** - Auto-clustering of session suggestions by ancestor, shard preview tree, per-shard PR creation, and batch traceability
 - [ ] **Phase 16: Reviewer Enhancements** - Provenance tags, confidence scores, similar-entity panels, and batch review view in the existing reviewer workflow
 
@@ -163,7 +163,7 @@ Plans:
 - [x] 14-01-PLAN.md — Data layer: Generation API client, Zustand suggestion store, useSuggestions hook
 - [x] 14-02-PLAN.md — UI components: SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton, ScopeToggle, GroupSection, PendingSuggestionBadge, BranchNavigator
 - [x] 14-03-PLAN.md — Class integration: ClassDetailPanel suggestion slots, editor layout wiring, keyboard shortcuts
-- [ ] 14-04-PLAN.md — Property integration: PropertyDetailPanel suggestion slots, property tab wiring
+- [x] 14-04-PLAN.md — Property integration: PropertyDetailPanel suggestion slots, property tab wiring
 **UI hint**: yes
 
 ### Phase 15: Session Clustering & Batch Submit
@@ -204,6 +204,6 @@ Plans:
 | 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete    | 2026-04-06 |
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete    | 2026-04-06 |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
-| 14. Inline Suggestion UX & Property Support | v0.4.0 | 4/5 | In Progress|  |
+| 14. Inline Suggestion UX & Property Support | v0.4.0 | 5/5 | Complete   | 2026-04-07 |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |
 | 16. Reviewer Enhancements | v0.4.0 | 0/TBD | Not started | - |
