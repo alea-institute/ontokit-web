@@ -55,18 +55,18 @@
 - [ ] **CLUSTER-04**: Cross-cutting changes that don't fit one ancestor form their own shard
 - [ ] **CLUSTER-05**: Each suggestion appears in exactly one shard (no cross-posting)
 - [ ] **CLUSTER-06**: At submit time, user sees a preview tree of proposed shards and can merge/split/rename them
-- [ ] **CLUSTER-07**: Each approved shard becomes one PR with one commit
-- [ ] **CLUSTER-08**: One session creates one "batch" that groups its N shards for traceability
-- [ ] **CLUSTER-09**: Reviewer can approve/reject the entire batch or individual shards within it
+- [ ] **CLUSTER-07**: Each shard becomes one commit; shards are grouped into PRs by subtree branch (1-N PRs per session)
+- [ ] **CLUSTER-08**: PRs split when exceeding ~10 shards or ~50 suggestions, splitting at the next subtree level; cross-cutting shards attach to the best-fit PR or get their own
+- [ ] **CLUSTER-09**: Reviewer approves/rejects per-PR; GitHub's commit tab serves as the shard navigator for per-shard drill-down and feedback
 
 ### Dual UX Modes
 
 - [ ] **UX-01**: Every class detail panel has an inline "✨ Suggest improvements" button (Mode A)
 - [ ] **UX-02**: User can enter flashcard iterator mode from a tree branch, walking through classes sequentially (Mode B)
 - [ ] **UX-03**: User can switch between inline and iterator modes mid-session
-- [ ] **UX-04**: Each LLM suggestion has one-click accept, one-click reject, and inline-edit-then-accept affordances
-- [ ] **UX-05**: Accepted suggestions land in the user's draft/staging area
-- [ ] **UX-06**: User can see a count of pending LLM suggestions for the current session
+- [x] **UX-04**: Each LLM suggestion has one-click accept, one-click reject, and inline-edit-then-accept affordances
+- [x] **UX-05**: Accepted suggestions land in the user's draft/staging area
+- [x] **UX-06**: User can see a count of pending LLM suggestions for the current session
 
 ### Property Support
 
@@ -102,7 +102,7 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 - [ ] **REVIEW-02**: Reviewer sees a similar-existing-entities panel for every suggestion (duplicate detection results)
 - [ ] **REVIEW-03**: Reviewer sees provenance tag on every suggestion (llm-proposed / user-written / user-edited-from-llm)
 - [ ] **REVIEW-04**: Reviewer sees LLM confidence score where available
-- [ ] **REVIEW-05**: Batch review view shows all shards in the existing review queue, allowing approve/reject per shard or for the whole batch
+- [ ] **REVIEW-05**: PR is the batch unit; reviewer approves/rejects per-PR and uses GitHub's commit tab to drill into individual shard-commits for feedback
 
 ### Toolchain Integration
 
@@ -189,9 +189,9 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | UX-01 | Phase 14 | Pending |
 | UX-02 | Phase 14 | Pending |
 | UX-03 | Phase 14 | Pending |
-| UX-04 | Phase 14 | Pending |
-| UX-05 | Phase 14 | Pending |
-| UX-06 | Phase 14 | Pending |
+| UX-04 | Phase 14 | Complete |
+| UX-05 | Phase 14 | Complete |
+| UX-06 | Phase 14 | Complete |
 | PROP-01 | Phase 14 | Pending |
 | PROP-02 | Phase 14 | Pending |
 | PROP-03 | Phase 14 | Pending |
