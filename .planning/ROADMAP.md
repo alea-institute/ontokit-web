@@ -176,7 +176,13 @@ Plans:
   3. A shard with fewer than 3 suggestions is automatically rolled into a "Miscellaneous improvements" shard rather than creating a near-empty PR
   4. Each shard becomes exactly one commit; shards are grouped into PRs by subtree branch (1-N PRs per session), splitting when a PR would exceed ~10 shards or ~50 suggestions; a suggestion never appears in more than one commit
   5. GitHub's commit tab within each PR serves as the shard navigator; the reviewer approves/rejects per-PR and drills into commits for shard-level feedback
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 15-00-PLAN.md — Wave 0: Test stubs for shardPreviewStore, cluster API, and DnD hook (Nyquist compliance)
+- [ ] 15-01-PLAN.md — Data layer: ShardPreviewStore (Zustand), suggestionsApi cluster + batchSubmit extensions
+- [ ] 15-02-PLAN.md — UI components: SummaryBar, PRGroup, ShardRow, EntityList, ProgressBar, Complete
+- [ ] 15-03-PLAN.md — Modal + DnD: ShardPreviewModal orchestrator, useShardDragDrop hook
+- [ ] 15-04-PLAN.md — Integration: Editor page clustering gate, dynamic import, batch submit wiring + visual verify
 **UI hint**: yes
 
 ### Phase 16: Reviewer Enhancements
@@ -205,5 +211,5 @@ Plans:
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete    | 2026-04-06 |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 5/5 | Complete   | 2026-04-07 |
-| 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |
+| 15. Session Clustering & Batch Submit | v0.4.0 | 0/5 | Planned | - |
 | 16. Reviewer Enhancements | v0.4.0 | 0/TBD | Not started | - |
