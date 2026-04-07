@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: planning
-stopped_at: Completed 14-00-PLAN.md
-last_updated: "2026-04-07T17:58:51.523Z"
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-04-07T18:03:31.298Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 10
   completed_phases: 6
   total_plans: 26
-  completed_plans: 22
-  percent: 85
+  completed_plans: 23
+  percent: 88
 ---
 
 # Project State
@@ -68,6 +68,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 13-validation-guardrails-suggestion-generation P02 | 5 | 2 tasks | 9 files |
 | Phase 13-validation-guardrails-suggestion-generation P03 | 15 | 2 tasks | 4 files |
 | Phase 14-inline-suggestion-ux-property-support P00 | 1 | 1 tasks | 3 files |
+| Phase 14 P01 | 3 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,9 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 13-validation-guardrails-suggestion-generation]: generate_suggestions catches non-auth LLM errors and returns empty suggestions list rather than 500 — prevents cascade failures from malformed LLM output
 - [Phase 13-validation-guardrails-suggestion-generation]: validate-entity endpoint defaults to branch='main' since ValidateEntityRequest has no branch field — consistent with schema definition
 - [Phase 14-inline-suggestion-ux-property-support]: Wave 0 stubs follow project pattern: import only describe/it, use comments referencing downstream plan number
+- [Phase 14]: Non-persisted Zustand store (no localStorage) since suggestions are session-ephemeral per D-13
+- [Phase 14]: Store key format entityIri::suggestionType for composite keying of per-section suggestions
+- [Phase 14]: AbortController cleanup on entityIri change prevents stale suggestion responses from overwriting current entity
 
 ### Key Facts
 
@@ -167,6 +171,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T17:58:51.521Z
-Stopped at: Completed 14-00-PLAN.md
+Last session: 2026-04-07T18:03:31.296Z
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None

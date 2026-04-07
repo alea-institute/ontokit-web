@@ -160,7 +160,7 @@ Plans:
 **Plans**: 5 plans
 Plans:
 - [x] 14-00-PLAN.md — Wave 0: Test stubs for suggestion store, hook, and API client (Nyquist compliance)
-- [ ] 14-01-PLAN.md — Data layer: Generation API client, Zustand suggestion store, useSuggestions hook
+- [x] 14-01-PLAN.md — Data layer: Generation API client, Zustand suggestion store, useSuggestions hook
 - [ ] 14-02-PLAN.md — UI components: SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton, ScopeToggle, GroupSection, PendingSuggestionBadge, BranchNavigator
 - [ ] 14-03-PLAN.md — Class integration: ClassDetailPanel suggestion slots, editor layout wiring, keyboard shortcuts
 - [ ] 14-04-PLAN.md — Property integration: PropertyDetailPanel suggestion slots, property tab wiring
@@ -204,6 +204,6 @@ Plans:
 | 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete    | 2026-04-06 |
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete    | 2026-04-06 |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
-| 14. Inline Suggestion UX & Property Support | v0.4.0 | 1/5 | In Progress|  |
+| 14. Inline Suggestion UX & Property Support | v0.4.0 | 2/5 | In Progress|  |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |
 | 16. Reviewer Enhancements | v0.4.0 | 0/TBD | Not started | - |
