@@ -46,11 +46,11 @@ created: 2026-04-07
 
 ## Wave 0 Requirements
 
-- [ ] Test stubs for suggestion UI hooks (useSuggestionStore, useGenerateSuggestions)
-- [ ] Test stubs for property tree integration
-- [ ] Test stubs for keyboard shortcut extensions
+- [ ] Test stubs for suggestion store (useSuggestionStore)
+- [ ] Test stubs for useSuggestions hook
+- [ ] Test stubs for generation API client (generationApi)
 
-*If none: "Existing infrastructure covers all phase requirements."*
+*Property tree integration and keyboard shortcut extensions are covered by Plans 03-04 acceptance criteria — no Wave 0 stubs needed.*
 
 ---
 
@@ -63,6 +63,8 @@ created: 2026-04-07
 | Keyboard shortcuts (Tab/Enter/Backspace/E) | UX-04 | Input interaction | Focus suggestion card, verify Tab moves focus, Enter accepts |
 | Next/Prev navigation walks branch | UX-02 | Tree navigation | Select branch node, click Next, verify sequential class navigation |
 | Property tree tab switching | PROP-01 | Tab interaction | Click Properties tab, verify property tree renders |
+| Accepted child appears with sparkle badge | D-07 | Visual check | Accept a child suggestion, verify sparkle icon appears on new tree node |
+| Auto-suggest on navigate | D-09 | Interaction flow | Use BranchNavigator Next, verify annotation suggestions auto-trigger |
 
 ---
 
