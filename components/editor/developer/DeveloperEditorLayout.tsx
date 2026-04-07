@@ -356,6 +356,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     }
   }, [activeTab, selectedIri, selectedPropertyIri, selectedIndividualIri, setSelection]);
 
+  // Property node list for BranchNavigator
+  const [propertyNodes, setPropertyNodes] = useState<{ iri: string; label: string }[]>([]);
+
   // Shared search state
   const {
     showSearch,
@@ -589,6 +592,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                     branch={activeBranch}
                     selectedIri={selectedPropertyIri}
                     onSelect={setSelectedPropertyIri}
+                    onNodesLoaded={setPropertyNodes}
                   />
                 )}
 
@@ -660,6 +664,19 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   onCopyIri={onCopyIri}
                   accessToken={accessToken}
                   labelHints={treeLabelHintsRecord}
+                  canUseLLM={llmGate.canUseLLM}
+                  byoKey={byoEntry?.key}
+                  onAddSuggestedProperty={onAddSuggestedChild}
+                  headerActions={selectedPropertyIri ? (
+                    <BranchNavigator
+                      nodes={nodes}
+                      simpleNodes={propertyNodes}
+                      selectedIri={selectedPropertyIri}
+                      onNavigate={(iri) => setSelectedPropertyIri(iri)}
+                      autoSuggestOnNavigate={true}
+                      onAutoSuggest={handleAutoSuggest}
+                    />
+                  ) : undefined}
                 />
               ) : (
                 <IndividualDetailPanel

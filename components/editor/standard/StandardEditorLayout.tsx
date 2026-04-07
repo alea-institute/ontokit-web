@@ -320,6 +320,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     }
   }, [activeTab, selectedIri, selectedPropertyIri, selectedIndividualIri, setSelection]);
 
+  // Property node list for BranchNavigator
+  const [propertyNodes, setPropertyNodes] = useState<{ iri: string; label: string }[]>([]);
+
   // Shared search state
   const {
     showSearch,
@@ -464,6 +467,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
               branch={activeBranch}
               selectedIri={selectedPropertyIri}
               onSelect={setSelectedPropertyIri}
+              onNodesLoaded={setPropertyNodes}
             />
           )}
 
@@ -571,6 +575,19 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onCopyIri={onCopyIri}
             accessToken={accessToken}
             labelHints={treeLabelHintsRecord}
+            canUseLLM={llmGate.canUseLLM}
+            byoKey={byoEntry?.key}
+            onAddSuggestedProperty={onAddSuggestedChild}
+            headerActions={selectedPropertyIri ? (
+              <BranchNavigator
+                nodes={nodes}
+                simpleNodes={propertyNodes}
+                selectedIri={selectedPropertyIri}
+                onNavigate={(iri) => setSelectedPropertyIri(iri)}
+                autoSuggestOnNavigate={true}
+                onAutoSuggest={handleAutoSuggest}
+              />
+            ) : undefined}
           />
         ) : (
           <IndividualDetailPanel
