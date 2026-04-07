@@ -37,6 +37,9 @@ import {
 } from "@/lib/ontology/entityDetailExtractors";
 import { type PropertyDraftEntry } from "@/lib/stores/draftStore";
 import { useIriLabels } from "@/lib/hooks/useIriLabels";
+import { useSuggestions } from "@/lib/hooks/useSuggestions";
+import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
+import type { GeneratedSuggestion } from "@/lib/api/generation";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
 function ensureTrailingEmpty(arr: LocalizedString[]): LocalizedString[] {
@@ -64,6 +67,11 @@ interface PropertyDetailPanelProps {
   onCopyIri?: (iri: string) => void;
   accessToken?: string;
   labelHints?: Record<string, string>;
+  // LLM suggestion support
+  canUseLLM?: boolean;
+  byoKey?: string;
+  headerActions?: React.ReactNode;
+  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string) => void;
 }
 
 export function PropertyDetailPanel({
@@ -78,6 +86,10 @@ export function PropertyDetailPanel({
   onCopyIri,
   accessToken,
   labelHints,
+  canUseLLM,
+  byoKey,
+  headerActions,
+  onAddSuggestedProperty,
 }: PropertyDetailPanelProps) {
   // Parse property detail from source
   const detail = useMemo((): ParsedPropertyDetail | null => {
@@ -397,6 +409,120 @@ export function PropertyDetailPanel({
     requestAnimationFrame(() => triggerSave());
   }, [triggerSave]);
 
+  // ── Suggestion support ──
+
+  const suggestionOpts = {
+    projectId,
+    entityIri: propertyIri,
+    branch: branch ?? "main",
+    canUseLLM: canUseLLM ?? false,
+    accessToken,
+    byoKey,
+  };
+
+  // Accept handlers
+  const handleAcceptAnnotation = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      if (!suggestion.property_iri) return;
+      const newValue = { value: editedValue ?? suggestion.value ?? suggestion.label, lang: suggestion.lang ?? "en" };
+      if (suggestion.property_iri.endsWith("#label")) {
+        setEditLabels((prev) => [...prev.filter((l) => l.value.trim()), newValue]);
+      } else if (suggestion.property_iri.endsWith("#comment")) {
+        setEditComments((prev) => ensureTrailingEmpty([...prev.filter((c) => c.value.trim()), newValue]));
+      } else {
+        setEditAnnotations((prev) => {
+          const existing = prev.find((a) => a.property_iri === suggestion.property_iri);
+          if (existing) {
+            return prev.map((a) =>
+              a.property_iri === suggestion.property_iri
+                ? { ...a, values: ensureTrailingEmpty([...a.values.filter((v) => v.value.trim()), newValue]) }
+                : a,
+            );
+          }
+          return [...prev, { property_iri: suggestion.property_iri!, values: ensureTrailingEmpty([newValue]) }];
+        });
+      }
+      requestAnimationFrame(() => triggerSave());
+    },
+    [triggerSave],
+  );
+
+  const handleAcceptDomainRange = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      const targetIri = suggestion.target_iri ?? suggestion.iri;
+      // Use relationship_type to distinguish domain vs range; default to domain
+      if (suggestion.relationship_type?.includes("range")) {
+        setEditRangeIris((prev) => prev.includes(targetIri) ? prev : [...prev, targetIri]);
+      } else {
+        setEditDomainIris((prev) => prev.includes(targetIri) ? prev : [...prev, targetIri]);
+      }
+      requestAnimationFrame(() => triggerSave());
+    },
+    [triggerSave],
+  );
+
+  const handleAcceptChildProperty = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      // PROP-02: Create new property entity directly (same pattern as class children)
+      onAddSuggestedProperty?.(suggestion.iri, editedValue ?? suggestion.label, propertyIri!);
+    },
+    [onAddSuggestedProperty, propertyIri],
+  );
+
+  const annotationsSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "annotations",
+    onAccepted: handleAcceptAnnotation,
+  });
+
+  const edgesSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "edges",
+    onAccepted: handleAcceptDomainRange,
+  });
+
+  const childrenSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "children",
+    onAccepted: handleAcceptChildProperty,
+  });
+
+  // Helper: Render suggestion slot for a section
+  const renderSuggestionSlot = useCallback((
+    suggestions: ReturnType<typeof useSuggestions>,
+  ) => (
+    <>
+      {suggestions.isLoading && (
+        <div role="list" className="space-y-2 mt-2">
+          <SuggestionSkeleton />
+          <SuggestionSkeleton />
+          <SuggestionSkeleton />
+        </div>
+      )}
+      {suggestions.error && (
+        <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+          Could not generate suggestions. <button onClick={suggestions.request} className="underline">Retry</button>
+        </div>
+      )}
+      {suggestions.items.filter((s) => s.status !== "rejected").length > 0 && (
+        <div role="list" className="space-y-2 mt-2">
+          {suggestions.items.map((item, i) =>
+            item.status !== "rejected" ? (
+              <SuggestionCard
+                key={item.suggestion.iri ?? i}
+                item={item}
+                onAccept={() => suggestions.accept(i)}
+                onReject={() => suggestions.reject(i)}
+                onEdit={(val) => { suggestions.edit(i, val); suggestions.accept(i); }}
+                disabled={item.suggestion.duplicate_verdict === "block"}
+              />
+            ) : null,
+          )}
+        </div>
+      )}
+    </>
+  ), []);
+
   // ── Render ──
   if (!propertyIri) {
     return (
@@ -474,6 +600,11 @@ export function PropertyDetailPanel({
                 </button>
               )}
             </div>
+            {headerActions && (
+              <div className="mt-2 flex items-center gap-2">
+                {headerActions}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -495,7 +626,7 @@ export function PropertyDetailPanel({
         <div className="p-4 space-y-3">
           {/* Labels */}
           {isEditing ? (
-            <Section title="Label(s)" icon={<Tag className="h-4 w-4" />}>
+            <Section title="Label(s)" icon={<Tag className="h-4 w-4" />} headerActions={canUseLLM ? <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!propertyIri} /> : undefined}>
               <div className="space-y-2">
                 {editLabels.map((label, index) => (
                   <div key={index} className="flex items-center gap-2">
@@ -509,9 +640,10 @@ export function PropertyDetailPanel({
                   </div>
                 ))}
               </div>
+              {renderSuggestionSlot(annotationsSuggestions)}
             </Section>
           ) : detail.labels.length > 0 ? (
-            <Section title="Label(s)" icon={<Tag className="h-4 w-4" />}>
+            <Section title="Label(s)" icon={<Tag className="h-4 w-4" />} headerActions={canUseLLM ? <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!propertyIri} /> : undefined}>
               <div className="space-y-1">
                 {detail.labels.map((label, index) => (
                   <div key={index} className="flex items-center gap-2">
@@ -519,6 +651,7 @@ export function PropertyDetailPanel({
                   </div>
                 ))}
               </div>
+              {renderSuggestionSlot(annotationsSuggestions)}
             </Section>
           ) : null}
 
@@ -590,7 +723,7 @@ export function PropertyDetailPanel({
 
           {/* Domain */}
           {(isEditing || detail.domainIris.length > 0) && (
-            <Section title="Domain" icon={<ArrowRight className="h-4 w-4" />}>
+            <Section title="Domain" icon={<ArrowRight className="h-4 w-4" />} headerActions={canUseLLM ? <SuggestImprovementsButton onRequest={edgesSuggestions.request} isLoading={edgesSuggestions.isLoading} disabled={!propertyIri} /> : undefined}>
               {isEditing ? (
                 <IriList
                   iris={editDomainIris}
@@ -607,12 +740,13 @@ export function PropertyDetailPanel({
               ) : (
                 <IriLinks iris={detail.domainIris} onNavigate={onNavigateToEntity} resolvedLabels={resolvedLabels} />
               )}
+              {renderSuggestionSlot(edgesSuggestions)}
             </Section>
           )}
 
           {/* Range */}
           {(isEditing || detail.rangeIris.length > 0) && (
-            <Section title="Range" icon={<ArrowRight className="h-4 w-4 rotate-180" />}>
+            <Section title="Range" icon={<ArrowRight className="h-4 w-4 rotate-180" />} headerActions={canUseLLM ? <SuggestImprovementsButton onRequest={edgesSuggestions.request} isLoading={edgesSuggestions.isLoading} disabled={!propertyIri} /> : undefined}>
               {isEditing ? (
                 <IriList
                   iris={editRangeIris}
@@ -629,6 +763,7 @@ export function PropertyDetailPanel({
               ) : (
                 <IriLinks iris={detail.rangeIris} onNavigate={onNavigateToEntity} resolvedLabels={resolvedLabels} />
               )}
+              {renderSuggestionSlot(edgesSuggestions)}
             </Section>
           )}
 
@@ -711,7 +846,7 @@ export function PropertyDetailPanel({
 
           {/* Annotations */}
           {isEditing ? (
-            <Section title="Annotations" icon={<StickyNote className="h-4 w-4" />}>
+            <Section title="Annotations" icon={<StickyNote className="h-4 w-4" />} headerActions={canUseLLM ? <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!propertyIri} /> : undefined}>
               <div className="space-y-3">
                 {editAnnotations.map((ann) => (
                   <div key={ann.property_iri} className="space-y-2">
@@ -746,6 +881,7 @@ export function PropertyDetailPanel({
                   }}
                   onSaveNeeded={() => triggerSave()}
                 />
+                {renderSuggestionSlot(annotationsSuggestions)}
               </div>
             </Section>
           ) : detail.annotations.length > 0 ? (
@@ -795,6 +931,18 @@ export function PropertyDetailPanel({
             </Section>
           )}
 
+          {/* Sub-Properties (PROP-02) — LLM suggestion for new property entities */}
+          {canUseLLM && (
+            <Section title="Sub-Properties" icon={<ArrowUp className="h-4 w-4 rotate-180" />} headerActions={<SuggestImprovementsButton onRequest={childrenSuggestions.request} isLoading={childrenSuggestions.isLoading} disabled={!propertyIri} />}>
+              {renderSuggestionSlot(childrenSuggestions)}
+              {!childrenSuggestions.isLoading && !childrenSuggestions.error && childrenSuggestions.items.filter((s) => s.status !== "rejected").length === 0 && (
+                <p className="text-xs text-slate-400 dark:text-slate-500 italic">
+                  Click &ldquo;Suggest improvements&rdquo; to get new sub-property suggestions
+                </p>
+              )}
+            </Section>
+          )}
+
           {/* Equivalents (read-only) */}
           {detail.equivalentIris.length > 0 && (
             <Section title="Equivalent Properties" icon={<Equal className="h-4 w-4" />}>
@@ -817,7 +965,7 @@ export function PropertyDetailPanel({
 
 // ── Shared sub-components ──
 
-function Section({ title, tooltip, icon, children }: { title: string; tooltip?: string; icon?: React.ReactNode; children: React.ReactNode }) {
+function Section({ title, tooltip, icon, children, headerActions }: { title: string; tooltip?: string; icon?: React.ReactNode; children: React.ReactNode; headerActions?: React.ReactNode }) {
   return (
     <div className="flex gap-4">
       <div
@@ -826,6 +974,7 @@ function Section({ title, tooltip, icon, children }: { title: string; tooltip?: 
       >
         {icon && <span className="text-slate-400 dark:text-slate-500">{icon}</span>}
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{title}</span>
+        {headerActions && <span className="ml-auto">{headerActions}</span>}
       </div>
       <div className="min-w-0 flex-1">
         {children}
