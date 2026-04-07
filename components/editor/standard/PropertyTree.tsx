@@ -12,6 +12,7 @@ interface PropertyTreeProps {
   branch?: string;
   selectedIri: string | null;
   onSelect: (iri: string) => void;
+  onNodesLoaded?: (nodes: { iri: string; label: string }[]) => void;
 }
 
 interface PropertyGroup {
@@ -27,6 +28,7 @@ export function PropertyTree({
   branch,
   selectedIri,
   onSelect,
+  onNodesLoaded,
 }: PropertyTreeProps) {
   const [groups, setGroups] = useState<PropertyGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,6 +102,15 @@ export function PropertyTree({
         }
 
         setGroups(newGroups);
+
+        // Notify parent of all loaded property nodes (for BranchNavigator)
+        if (onNodesLoaded) {
+          const allNodes = response.results.map((prop) => ({
+            iri: prop.iri,
+            label: prop.label || getLocalName(prop.iri),
+          }));
+          onNodesLoaded(allNodes);
+        }
       } catch (err) {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : "Failed to load properties");
@@ -113,7 +124,7 @@ export function PropertyTree({
 
     fetchProperties();
     return () => { cancelled = true; };
-  }, [projectId, accessToken, branch]);
+  }, [projectId, accessToken, branch, onNodesLoaded]);
 
   // Convert PropertyGroup[] to EntityTreeNode[]
   const entityNodes = useMemo((): EntityTreeNode[] => {
