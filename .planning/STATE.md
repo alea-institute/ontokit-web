@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: planning
-stopped_at: Phase 13 context gathered
-last_updated: "2026-04-06T22:59:42.608Z"
-last_activity: 2026-04-06
+status: executing
+stopped_at: Completed 13-00-PLAN.md
+last_updated: "2026-04-07T14:28:45.884Z"
+last_activity: 2026-04-07
 progress:
   total_phases: 10
   completed_phases: 5
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 21
+  completed_plans: 18
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Enable grassroots-level collaborative ontology editing in a modern, accessible web interface — where SMEs rapidly improve their ontology with LLM assistance while preserving integrity through human curation.
-**Current focus:** Phase 12 — toolchain-integration-duplicate-detection
+**Current focus:** Phase 13 — validation-guardrails-suggestion-generation
 
 ## Current Position
 
-Phase: 13
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-06
+Phase: 13 (validation-guardrails-suggestion-generation) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-04-07
 
 Progress: [ ] 0% (v0.4.0 phases)
 
@@ -63,6 +63,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 12-toolchain-integration-duplicate-detection P02 | 7 | 2 tasks | 7 files |
 | Phase 12 P03 | 30 | 2 tasks | 6 files |
 | Phase 12 P04 | 18 | 2 tasks | 6 files |
+| Phase 13-validation-guardrails-suggestion-generation P00 | 2 | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 12]: async def side_effect functions in tests avoid coroutine-awaiting ambiguity vs AsyncMock.side_effect with nested coroutines
 - [Phase 12]: rejected_iri in DuplicateRejection must be the entity IRI (data.entity_iri), not the session branch — _get_rejection_info queries by entity IRI
 - [Phase 12]: Test block verdict requires parent_iri; without it max composite=0.80 (exact+semantic ceiling) which lands on pass/warn boundary
+- [Phase 13-validation-guardrails-suggestion-generation]: Wave 0 stubs use @pytest.mark.skip decorator (not pytest.skip() in body) — consistent with Phase 11-12 established pattern
+- [Phase 13-validation-guardrails-suggestion-generation]: Unit-level conftest.py created at tests/unit/ to scope Phase 13 fixtures without polluting top-level conftest.py
 
 ### Key Facts
 
@@ -145,12 +148,12 @@ None yet.
 ### Entity Graph Port (`entity-graph-migration`)
 
 - **Issue:** CatholicOS/ontokit-web#81
-- **Status:** Ready to plan
+- **Status:** Ready to execute
 - **Handoff:** `.planning/features/entity-graph-port/HANDOFF.md`
 - **Next:** Visual verify with MCP chrome-devtools (headless), then create PR
 
 ## Session Continuity
 
-Last session: 2026-04-06T22:59:42.606Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-validation-guardrails-suggestion-generation/13-CONTEXT.md
+Last session: 2026-04-07T14:28:45.882Z
+Stopped at: Completed 13-00-PLAN.md
+Resume file: None

@@ -17,15 +17,15 @@
 
 ### Suggestion Generation
 
-- [ ] **GEN-01**: User can request LLM suggestions for child classes of the currently-selected class
-- [ ] **GEN-02**: User can request LLM suggestions for sibling classes of the currently-selected class
-- [ ] **GEN-03**: User can request LLM suggestions for annotations (altLabel, examples, notes, translations) on an existing class
-- [ ] **GEN-04**: User can request LLM suggestions for additional parent classes on an existing class
-- [ ] **GEN-05**: User can request LLM suggestions for seeAlso/isDefinedBy edges on an existing class
-- [ ] **GEN-06**: LLM prompts include existing ontology context (current class, parents, existing siblings, existing annotations)
-- [ ] **GEN-07**: Generative FOLIO prompt templates and validation routines are used for ontology-aware generation
-- [ ] **GEN-08**: Each generated suggestion includes LLM confidence score when available
-- [ ] **GEN-09**: Each generated suggestion is tagged with provenance (llm-proposed, user-written, user-edited-from-llm)
+- [x] **GEN-01**: User can request LLM suggestions for child classes of the currently-selected class
+- [x] **GEN-02**: User can request LLM suggestions for sibling classes of the currently-selected class
+- [x] **GEN-03**: User can request LLM suggestions for annotations (altLabel, examples, notes, translations) on an existing class
+- [x] **GEN-04**: User can request LLM suggestions for additional parent classes on an existing class
+- [x] **GEN-05**: User can request LLM suggestions for seeAlso/isDefinedBy edges on an existing class
+- [x] **GEN-06**: LLM prompts include existing ontology context (current class, parents, existing siblings, existing annotations)
+- [x] **GEN-07**: Generative FOLIO prompt templates and validation routines are used for ontology-aware generation
+- [x] **GEN-08**: Each generated suggestion includes LLM confidence score when available
+- [x] **GEN-09**: Each generated suggestion is tagged with provenance (llm-proposed, user-written, user-edited-from-llm)
 
 ### Duplicate Detection
 
@@ -40,12 +40,12 @@
 
 ### Pre-Submit Validation
 
-- [ ] **VALID-01**: Every new class/property must have at least one existing parent (cannot be a free-floating entity)
-- [ ] **VALID-02**: Every new class/property must have an rdfs:label in English (other languages optional)
-- [ ] **VALID-03**: System detects and blocks cycles in the class hierarchy
-- [ ] **VALID-04**: System blocks IRIs in namespaces the user doesn't own
-- [ ] **VALID-05**: Validation runs before the user can submit suggestions; failures show inline error messages
-- [ ] **VALID-06**: New IRIs are minted using the WebProtege-style creation schema (e.g., UUID-based local names under the project's namespace) — matches existing OntoKit conventions and ensures no accidental collisions
+- [x] **VALID-01**: Every new class/property must have at least one existing parent (cannot be a free-floating entity)
+- [x] **VALID-02**: Every new class/property must have an rdfs:label in English (other languages optional)
+- [x] **VALID-03**: System detects and blocks cycles in the class hierarchy
+- [x] **VALID-04**: System blocks IRIs in namespaces the user doesn't own
+- [x] **VALID-05**: Validation runs before the user can submit suggestions; failures show inline error messages
+- [x] **VALID-06**: New IRIs are minted using the WebProtege-style creation schema (e.g., UUID-based local names under the project's namespace) — matches existing OntoKit conventions and ensures no accidental collisions
 
 ### Session Clustering & Batches
 
@@ -154,15 +154,15 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | LLM-05 | Phase 11 | Complete |
 | LLM-06 | Phase 11 | Complete |
 | LLM-07 | Phase 11 | Complete |
-| GEN-01 | Phase 13 | Pending |
-| GEN-02 | Phase 13 | Pending |
-| GEN-03 | Phase 13 | Pending |
-| GEN-04 | Phase 13 | Pending |
-| GEN-05 | Phase 13 | Pending |
-| GEN-06 | Phase 13 | Pending |
-| GEN-07 | Phase 13 | Pending |
-| GEN-08 | Phase 13 | Pending |
-| GEN-09 | Phase 13 | Pending |
+| GEN-01 | Phase 13 | Complete |
+| GEN-02 | Phase 13 | Complete |
+| GEN-03 | Phase 13 | Complete |
+| GEN-04 | Phase 13 | Complete |
+| GEN-05 | Phase 13 | Complete |
+| GEN-06 | Phase 13 | Complete |
+| GEN-07 | Phase 13 | Complete |
+| GEN-08 | Phase 13 | Complete |
+| GEN-09 | Phase 13 | Complete |
 | DEDUP-01 | Phase 12 | Complete |
 | DEDUP-02 | Phase 12 | Complete |
 | DEDUP-03 | Phase 12 | Complete |
@@ -171,12 +171,12 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | DEDUP-06 | Phase 12 | Complete |
 | DEDUP-07 | Phase 12 | Complete |
 | DEDUP-08 | Phase 12 | Complete |
-| VALID-01 | Phase 13 | Pending |
-| VALID-02 | Phase 13 | Pending |
-| VALID-03 | Phase 13 | Pending |
-| VALID-04 | Phase 13 | Pending |
-| VALID-05 | Phase 13 | Pending |
-| VALID-06 | Phase 13 | Pending |
+| VALID-01 | Phase 13 | Complete |
+| VALID-02 | Phase 13 | Complete |
+| VALID-03 | Phase 13 | Complete |
+| VALID-04 | Phase 13 | Complete |
+| VALID-05 | Phase 13 | Complete |
+| VALID-06 | Phase 13 | Complete |
 | CLUSTER-01 | Phase 15 | Pending |
 | CLUSTER-02 | Phase 15 | Pending |
 | CLUSTER-03 | Phase 15 | Pending |

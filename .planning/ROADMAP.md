@@ -142,7 +142,7 @@ Plans:
   5. New IRIs are minted using the project's namespace with UUID-based local names — no accidental collisions with existing IRIs
 **Plans**: 4 plans
 Plans:
-- [ ] 13-00-PLAN.md — Wave 0: Test stubs for all Phase 13 services (Nyquist compliance)
+- [x] 13-00-PLAN.md — Wave 0: Test stubs for all Phase 13 services (Nyquist compliance)
 - [ ] 13-01-PLAN.md — Backend: Pydantic schemas, ValidationService (VALID-01..06), IRI minting
 - [ ] 13-02-PLAN.md — Backend: OntologyContextAssembler, 5 prompt templates, PROMPT_BUILDERS dispatch
 - [ ] 13-03-PLAN.md — Backend: SuggestionGenerationService pipeline, generate-suggestions + validate-entity API routes
@@ -197,7 +197,7 @@ Plans:
 | 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete | 2026-04-03 |
 | 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete    | 2026-04-06 |
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete    | 2026-04-06 |
-| 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 0/4 | Planning    | - |
+| 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 1/4 | In Progress|  |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/TBD | Not started | - |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |
 | 16. Reviewer Enhancements | v0.4.0 | 0/TBD | Not started | - |
