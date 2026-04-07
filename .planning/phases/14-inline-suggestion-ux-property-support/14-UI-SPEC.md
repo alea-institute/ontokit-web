@@ -43,10 +43,15 @@ Declared values (must be multiples of 4):
 | 2xl | 48px | Reserved for page-level spacing (not used in editor panels) |
 | 3xl | 64px | Not used in this phase |
 
-Exceptions:
-- Suggestion card icon buttons: 6px (`p-1.5`) to match existing `px-2.5 py-1.5` row button pattern
-- Inline scope toggle (This class / Siblings / Descendants): 6px vertical padding (`py-1.5`) for touch target comfort
-- Next/Prev navigation buttons in detail panel header: `px-2.5 py-1.5` to match existing header action button sizing
+**Inherited spacing (not newly declared by Phase 14):**
+The following non-multiples-of-4 spacing values appear in `SuggestionCard` and related components but are **inherited directly from pre-existing codebase button and row patterns** — they match `components/ui/button.tsx` (`sm` size: `h-8 px-3`) and `components/editor/ClassDetailPanel.tsx` row action buttons. Phase 14 does not introduce these values; it adopts them for visual consistency with adjacent rows:
+
+| Value | Tailwind | Inherited from |
+|-------|----------|----------------|
+| 6px | `p-1.5`, `py-1.5` | `components/ui/button.tsx` icon-button variant, `ClassDetailPanel.tsx` row action buttons |
+| 10px | `px-2.5` | `components/ui/button.tsx` `sm` size variant, existing header action button sizing |
+
+These values are excluded from the new-component spacing budget. New Phase 14 components use only the declared 4-multiple scale above for any spacing not inherited from existing patterns.
 
 **Source:** Observed from `components/editor/ClassDetailPanel.tsx` and `components/ui/button.tsx` (`h-8 px-3` for `sm` size).
 
@@ -54,12 +59,29 @@ Exceptions:
 
 ## Typography
 
+**Phase 14 declares exactly 2 font weights for new components:**
+
+| Weight | Value | Usage in new Phase 14 components |
+|--------|-------|----------------------------------|
+| Normal | 400 | Body annotation values, suggestion card text, error messages, section labels |
+| Semibold | 600 | Class/property name headings, confidence badge labels (emphasis only) |
+
+**Inherited weights (not newly declared by Phase 14):**
+The following weights exist in pre-existing components and are preserved by Phase 14 where it touches those components. They are not part of the new-component weight budget:
+
+| Weight | Value | Inherited from |
+|--------|-------|----------------|
+| Medium | 500 | `text-xs font-medium` — existing section header labels, action button text in `ClassDetailPanel.tsx` and `components/ui/button.tsx` |
+| Bold | 700 | `font-bold` — existing entity type badge letters ("C" for Class) in `ClassTree.tsx` |
+
+**Full type scale (informational — includes inherited):**
+
 | Role | Size | Weight | Line Height | Usage |
 |------|------|--------|-------------|-------|
 | Body | 14px (`text-sm`) | 400 (normal) | 1.5 | Annotation values, suggestion card text, error messages |
-| Label | 12px (`text-xs`) | 500 (medium) | 1.4 | Section headers, confidence badges, IRI truncation, scope toggle options |
+| Label | 12px (`text-xs`) | 500 (medium) — **inherited** | 1.4 | Section headers, confidence badges, IRI truncation, scope toggle options |
 | Heading | 18px (`text-lg`) | 600 (semibold) | 1.2 | Class/property name in detail panel header |
-| Micro | 9px (`text-[9px]`) | 700 (bold) | 1.0 | Entity type badge letters (existing "C" for Class) |
+| Micro | 9px (`text-[9px]`) | 700 (bold) — **inherited** | 1.0 | Entity type badge letters (existing "C" for Class) |
 
 **Source:** Observed directly from `components/editor/ClassDetailPanel.tsx` lines 544–605. Pattern: `text-lg font-semibold` for entity name, `text-sm` for content rows, `text-xs font-medium` for action buttons and badges.
 
@@ -67,16 +89,18 @@ Exceptions:
 
 ## Color
 
+**Primary focal point:** The amber `Sparkles` icon prefix on each `SuggestionCard` is the primary focal point for the new UI surface. It draws the user's eye to AI-generated content across all sections of the detail panel, enabling rapid scanning before review. Every interaction in this phase radiates outward from that amber marker.
+
 | Role | Value | Usage |
 |------|-------|-------|
 | Dominant (60%) | `bg-white` / `dark:bg-slate-900` (`rgb(var(--background-start-rgb))`) | Main panel background, editor surfaces |
 | Secondary (30%) | `bg-slate-50` / `dark:bg-slate-800` | Suggestion card backgrounds, tree panel, section dividers |
-| Accent (10%) | `primary-500` (#0ea5e9) / `primary-600` (#0284c7) | Accept button, active tree selection, focus rings, "Suggest Improvements" trigger button |
+| Accent (10%) | `primary-500` (#0ea5e9) / `primary-600` (#0284c7) | Accept button, active tree selection, focus rings, "Suggest improvements" trigger button |
 | AI/Sparkle accent | `amber-500` / `amber-100 bg` | Sparkle icon color, confidence badge tint for 70–89%, pending count badge in editor header |
 | Destructive | `red-600` / `red-50 bg` | Reject button (icon only, no fill), error banners, validation failure messages |
 
 Accent reserved for:
-1. The "Suggest Improvements" button (primary variant)
+1. The "Suggest improvements" button (primary variant)
 2. Accept action icon button on suggestion cards (check icon, `text-primary-600`)
 3. Active/selected tree item background
 4. Focus rings on all interactive elements
@@ -106,11 +130,11 @@ Inline card rendered below each section of `ClassDetailPanel` and the property d
 - Container: `flex items-start gap-2 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50`
 - Sparkle marker: `<Sparkles className="h-3 w-3 shrink-0 text-amber-500 mt-0.5" />` — always present, visually distinguishes AI content
 - Content text: `text-sm text-slate-700 dark:text-slate-300` (same as existing annotation row values)
-- Confidence badge: `inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium` with color per confidence thresholds above
+- Confidence badge: `inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium` with color per confidence thresholds above (inherited `font-medium` from existing badge pattern)
 - Accept button: `rounded-sm p-1 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20` + `<Check className="h-3.5 w-3.5" />`
 - Reject button: `rounded-sm p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20` + `<X className="h-3.5 w-3.5" />`
 - Edit button: `rounded-sm p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700` + `<Pencil className="h-3.5 w-3.5" />`
-- Edit mode (inline text field): `flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white`
+- Edit mode (inline text field): `flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white` — spacing values `px-2.5 py-1.5` are inherited from existing codebase input pattern
 
 Keyboard: Tab/Shift+Tab moves between cards, Enter accepts focused card, Backspace/Delete rejects, E opens edit mode.
 
@@ -125,9 +149,9 @@ Placeholder shown while LLM request is in-flight. Uses existing `animate-pulse` 
 #### `SuggestImprovementsButton`
 Trigger button in each section header of ClassDetailPanel (and property detail panel).
 
-- Variant: ghost + sparkle: `flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20`
+- Variant: ghost + sparkle: `flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20` — spacing values `px-2.5 py-1.5` are inherited from existing codebase button pattern
 - Icon: `<Sparkles className="h-3 w-3" />`
-- Label: "Suggest" (terse, fits in section header row without overflow)
+- Label: "Suggest improvements" (per D-05)
 - Disabled state when LLM budget exhausted: `opacity-50 cursor-not-allowed` — renders `LLMBudgetBanner` in its place
 
 #### `SuggestionScopeToggle`
@@ -152,7 +176,7 @@ Shown in editor header next to the existing action group. Updates in real time.
 Added to `ClassDetailPanel` header row when iterating a branch.
 
 - Container: `flex items-center gap-1` appended to existing header action row
-- Prev button: `rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30` + `<ChevronLeft className="h-4 w-4" />`
+- Prev button: `rounded-sm p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-30` + `<ChevronLeft className="h-4 w-4" />` — `p-1.5` inherited from existing header action button pattern
 - Next button: same + `<ChevronRight className="h-4 w-4" />`
 - Position label: `text-xs text-slate-400` e.g. "3 / 12" between the two buttons
 - aria-label: "Previous class" / "Next class"
@@ -199,7 +223,7 @@ For `ObjectProperty`: "Domain" and "Range" sections replace "Children" section. 
 | Hover | `border-solid border-slate-300`, subtle shadow `shadow-sm` |
 | Accept focused (keyboard) | `ring-2 ring-primary-500/50 ring-inset` |
 | Reject focused (keyboard) | `ring-2 ring-red-400/50 ring-inset` |
-| Editing | Text field replaces content text; accept/reject buttons hidden; "Save" + "Cancel" appear at right |
+| Editing | Text field replaces content text; accept/reject buttons hidden; "Accept" + "Discard edit" appear at right |
 | Accepted (flash) | 200ms transition to `bg-green-50 border-green-200 dark:bg-green-900/10 dark:border-green-900/50` before card transitions to normal annotation row |
 | Rejected (exit) | Card collapses with `max-height: 0` transition over 150ms, then removed from DOM |
 
@@ -227,7 +251,7 @@ All motion respects `@media (prefers-reduced-motion: reduce)` (set in `globals.c
 
 | Element | Copy |
 |---------|------|
-| Primary CTA | "Suggest" (section header trigger button) |
+| Primary CTA | "Suggest improvements" (section header trigger button — per D-05) |
 | Full trigger label (tooltip) | "Get LLM suggestions for this section" |
 | Empty state — no suggestions configured | "Configure an LLM provider in project settings to enable suggestions." |
 | Empty state — no suggestions returned | "No suggestions — the LLM found no additions for this section." |
@@ -240,7 +264,7 @@ All motion respects `@media (prefers-reduced-motion: reduce)` (set in `globals.c
 | Reject action aria-label | "Reject suggestion" |
 | Edit action aria-label | "Edit suggestion before accepting" |
 | Save edit action | "Accept" (replaces pencil icon button in edit mode) |
-| Cancel edit action | "Cancel" |
+| Cancel edit action | "Discard edit" (replaces generic "Cancel" — makes destructive intent explicit) |
 | Pending badge tooltip | "{N} pending suggestion{s} — click to scroll to first" |
 | Next navigation aria-label | "Next class in branch" |
 | Prev navigation aria-label | "Previous class in branch" |
@@ -253,9 +277,10 @@ All motion respects `@media (prefers-reduced-motion: reduce)` (set in `globals.c
 
 Destructive actions in this phase:
 - **Reject suggestion:** Single click on X icon button. No confirmation dialog — rejection is reversible within the session (rejected cards are hidden but session state persists). aria-label confirms intent: "Reject suggestion".
+- **Discard edit:** When the user clicks "Discard edit" in inline edit mode, the edited text reverts to the original suggestion without confirmation (edit-mode discard is low-stakes; the original suggestion remains visible). Button label "Discard edit" makes the consequence clear without a dialog.
 - **Discard all suggestions (session level):** Handled by existing session discard flow (out of scope for this phase's new components — deferred to existing `useSuggestionSession` discard path).
 
-**Source:** D-14, D-15 from `14-CONTEXT.md`; existing `LLMBudgetBanner` copy patterns.
+**Source:** D-05, D-14, D-15 from `14-CONTEXT.md`; existing `LLMBudgetBanner` copy patterns.
 
 ---
 
@@ -302,6 +327,8 @@ No third-party component blocks are introduced. All new components are hand-roll
 | Pending count badge in editor header | `14-CONTEXT.md` D-12 |
 | Skeleton placeholder rows during loading | `14-CONTEXT.md` D-14 |
 | Inline error banner on failure (no modal) | `14-CONTEXT.md` D-15 |
+| Primary CTA label "Suggest improvements" | `14-CONTEXT.md` D-05 |
+| Cancel-edit label "Discard edit" (not generic "Cancel") | Checker revision — specificity requirement |
 | Primary color: sky (`primary-500` = #0ea5e9) | `app/globals.css` `@theme` |
 | Font: Inter + JetBrains Mono | `app/layout.tsx` |
 | Icon library: lucide-react | `package.json`, existing component imports |
@@ -312,6 +339,9 @@ No third-party component blocks are introduced. All new components are hand-roll
 | Rejected card 150ms collapse | Discretion area |
 | 3 skeleton cards per section | Discretion area (D-14 left exact count open) |
 | Dashed border for suggestion cards | Discretion area (signals "pending/not yet committed" state) |
+| 2 declared weights (400, 600); 500 + 700 marked inherited | Checker revision — max 2 declared weights |
+| Non-4-multiple spacing (6px, 10px) marked inherited | Checker revision — inherited from existing button/row patterns |
+| Primary focal point: amber Sparkles icon on SuggestionCard | Checker recommendation — focal point statement |
 
 ---
 
