@@ -66,6 +66,8 @@ export default function HomePage() {
 
   const projects = data?.pages.flatMap((page) => page.items) ?? [];
   const total = data?.pages.at(-1)?.total ?? 0;
+  const unfilteredTotal = data?.pages.at(-1)?.unfiltered_total ?? 0;
+  const isFiltered = (!!debouncedSearch || filter !== "all") && unfilteredTotal > total;
 
   const [nextPageError, setNextPageError] = useState<string | null>(null);
 
@@ -223,6 +225,11 @@ export default function HomePage() {
                   {debouncedSearch
                     ? `${total} ${total === 1 ? "result" : "results"} for "${debouncedSearch}"`
                     : `${total} ${total === 1 ? "project" : "projects"}`}
+                  {isFiltered && (
+                    <span className="text-slate-400 dark:text-slate-500">
+                      {` (of ${unfilteredTotal})`}
+                    </span>
+                  )}
                 </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {projects.map((project) => (
