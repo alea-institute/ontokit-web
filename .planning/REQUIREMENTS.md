@@ -61,8 +61,8 @@
 
 ### Dual UX Modes
 
-- [ ] **UX-01**: Every class detail panel has an inline "✨ Suggest improvements" button (Mode A)
-- [ ] **UX-02**: User can enter flashcard iterator mode from a tree branch, walking through classes sequentially (Mode B)
+- [x] **UX-01**: Every class detail panel has an inline "✨ Suggest improvements" button (Mode A)
+- [x] **UX-02**: User can enter flashcard iterator mode from a tree branch, walking through classes sequentially (Mode B)
 - [ ] **UX-03**: User can switch between inline and iterator modes mid-session
 - [x] **UX-04**: Each LLM suggestion has one-click accept, one-click reject, and inline-edit-then-accept affordances
 - [x] **UX-05**: Accepted suggestions land in the user's draft/staging area
@@ -186,8 +186,8 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | CLUSTER-07 | Phase 15 | Pending |
 | CLUSTER-08 | Phase 15 | Pending |
 | CLUSTER-09 | Phase 15 | Pending |
-| UX-01 | Phase 14 | Pending |
-| UX-02 | Phase 14 | Pending |
+| UX-01 | Phase 14 | Complete |
+| UX-02 | Phase 14 | Complete |
 | UX-03 | Phase 14 | Pending |
 | UX-04 | Phase 14 | Complete |
 | UX-05 | Phase 14 | Complete |
