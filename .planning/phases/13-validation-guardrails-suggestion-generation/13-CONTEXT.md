@@ -80,8 +80,15 @@ LLM suggestions for child classes, sibling classes, annotations, parents, and re
 - `../ontokit-api/ontokit/services/ontology_index.py` — SQL-backed entity queries, hierarchy, labels, annotations
 - `../ontokit-api/ontokit/services/embedding_service.py` — Embedding generation and semantic search
 
-### Generative FOLIO (External)
-- `https://github.com/alea-institute/generative-folio` — Researcher must check for reusable prompt templates and validation routines (GEN-07)
+### Generative FOLIO (Private — alea-institute/generative-folio)
+- `../generative-folio/src/generative_folio/services/concept_generation.py` — `SYSTEM_INSTRUCTIONS` prompt for legal concept generation (GEN-07), `ConceptGenerationOutput` Pydantic model
+- `../generative-folio/src/generative_folio/services/quality_filter.py` — Hybrid heuristic+LLM quality filter: 143 legal keywords, 13 citation regex patterns, 31 FOLIO areas, 4 weighted signals (0.35 area + 0.30 keyword + 0.20 source + 0.15 completeness). Auto-accept >0.40, auto-reject <0.15, LLM borderline.
+- `../generative-folio/src/generative_folio/services/translation.py` — `TRANSLATION_SYSTEM_INSTRUCTIONS` for multilingual legal term translation (10 languages, BCP-47 tags)
+- `../generative-folio/src/generative_folio/qa/prompts.py` — 8 QA agent system prompts (dedup merge, orphan reparent, IS-A validation, cycle repair, area mismatch, etc.)
+- `../generative-folio/src/generative_folio/qa/detectors.py` — 9 deterministic zero-cost detectors (cycles, orphans, exact/fuzzy dupes, overloaded parents, area mismatches, suspicious IS-A)
+- `../generative-folio/src/generative_folio/qa/schemas.py` — 8 Pydantic output models for QA agents
+- `../generative-folio/src/generative_folio/models/concept.py` — `ConceptNode`, `RelationshipType` (14 controlled types), `AltLabel` with BCP-47 lang tags
+- `../generative-folio/src/generative_folio/services/openai_responses.py` — `parse_response_async()` structured output pattern
 
 </canonical_refs>
 
@@ -94,6 +101,9 @@ LLM suggestions for child classes, sibling classes, annotations, parents, and re
 - `ReasonerService.check_cycles()` — RDFLib DFS cycle detection, ready for VALID-03
 - `ontology_index.py` — SQL queries for parents, siblings, annotations (context assembly)
 - `embedding_service.semantic_search()` — for finding similar entities during validation
+- **generative-folio prompt templates** — adapt `SYSTEM_INSTRUCTIONS` from concept_generation.py for each suggestion type (children, siblings, annotations, parents, edges)
+- **generative-folio quality filter** — port the heuristic scoring (143 keywords, 13 citation patterns, 4 weighted signals) as a fast pre-filter before LLM quality checks
+- **generative-folio relationship types** — reuse the 14 controlled `RelationshipType` literals for edge suggestions (GEN-05)
 
 ### Established Patterns
 - FastAPI dependency injection for services (see existing routes)
