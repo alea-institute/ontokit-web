@@ -46,6 +46,10 @@ import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
+import { useSuggestions } from "@/lib/hooks/useSuggestions";
+import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton, SuggestionScopeToggle, type SuggestionScope } from "@/components/editor/suggestions";
+import type { GeneratedSuggestion } from "@/lib/api/generation";
+import type { ProjectRole } from "@/lib/api/projects";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
 function ensureTrailingEmpty(arr: LocalizedString[]): LocalizedString[] {
@@ -88,6 +92,14 @@ interface ClassDetailPanelProps {
   onProposeEdit?: () => void;
   /** True when anonymous proposal mode is active (editing is allowed) */
   isAnonymousProposalMode?: boolean;
+
+  // LLM suggestion support
+  canUseLLM?: boolean;
+  byoKey?: string;
+  userRole?: ProjectRole;
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => void;
+  /** When true, auto-fire annotation suggestions when classIri changes (D-09) */
+  autoSuggestAnnotationsOnMount?: boolean;
 }
 
 export function ClassDetailPanel({
@@ -109,6 +121,11 @@ export function ClassDetailPanel({
   canPropose,
   onProposeEdit,
   isAnonymousProposalMode: _isAnonymousProposalMode,
+  canUseLLM,
+  byoKey,
+  userRole: _userRole,
+  onAddSuggestedChild,
+  autoSuggestAnnotationsOnMount,
 }: ClassDetailPanelProps) {
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
   const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
@@ -501,6 +518,164 @@ export function ClassDetailPanel({
     ]);
   }, []);
 
+  // ── Annotation scope toggle state (D-05) ──
+  const [annotationScope, setAnnotationScope] = useState<SuggestionScope>("this-class");
+
+  // ── Suggestion hooks — one per section type ──
+  const suggestionOpts = {
+    projectId,
+    entityIri: classIri,
+    branch: branch ?? "main",
+    canUseLLM: canUseLLM ?? false,
+    accessToken,
+    byoKey,
+  };
+
+  // Accept handlers
+  const handleAcceptChildSuggestion = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      // D-07: Create entity directly in tree WITHOUT opening AddEntityDialog
+      onAddSuggestedChild?.(suggestion.iri, editedValue ?? suggestion.label, classIri!);
+    },
+    [onAddSuggestedChild, classIri],
+  );
+
+  const handleAcceptAnnotationSuggestion = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      if (!suggestion.property_iri) return;
+      // Merge into edit annotations state
+      setEditAnnotations((prev) => {
+        const existing = prev.find((a) => a.property_iri === suggestion.property_iri);
+        const newValue = { value: editedValue ?? suggestion.value ?? suggestion.label, lang: suggestion.lang ?? "en" };
+        if (existing) {
+          return prev.map((a) =>
+            a.property_iri === suggestion.property_iri
+              ? { ...a, values: ensureTrailingEmpty([...a.values.filter((v) => v.value.trim()), newValue]) }
+              : a,
+          );
+        }
+        return [...prev, { property_iri: suggestion.property_iri!, values: ensureTrailingEmpty([newValue]) }];
+      });
+      requestAnimationFrame(() => triggerSave());
+    },
+    [triggerSave],
+  );
+
+  const handleAcceptParentSuggestion = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      addParent(suggestion.iri, editedValue ?? suggestion.label);
+    },
+    [addParent],
+  );
+
+  const handleAcceptEdgeSuggestion = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      if (!suggestion.relationship_type || !suggestion.target_iri) return;
+      setEditRelationships((prev) => {
+        const existing = prev.find((g) => g.property_iri === suggestion.relationship_type);
+        const newTarget: RelationshipTarget = {
+          iri: suggestion.target_iri!,
+          label: editedValue ?? suggestion.label,
+        };
+        if (existing) {
+          return prev.map((g) =>
+            g.property_iri === suggestion.relationship_type
+              ? { ...g, targets: [...g.targets, newTarget] }
+              : g,
+          );
+        }
+        const propInfo = getAnnotationPropertyInfo(suggestion.relationship_type!);
+        return [...prev, {
+          property_iri: suggestion.relationship_type!,
+          property_label: propInfo.displayLabel,
+          targets: [newTarget],
+        }];
+      });
+      requestAnimationFrame(() => triggerSave());
+    },
+    [triggerSave],
+  );
+
+  const childrenSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "children",
+    onAccepted: handleAcceptChildSuggestion,
+  });
+
+  const siblingsSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "siblings",
+    onAccepted: handleAcceptChildSuggestion,
+  });
+
+  const annotationsSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "annotations",
+    onAccepted: handleAcceptAnnotationSuggestion,
+  });
+
+  const parentsSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "parents",
+    onAccepted: handleAcceptParentSuggestion,
+  });
+
+  const edgesSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "edges",
+    onAccepted: handleAcceptEdgeSuggestion,
+  });
+
+  // D-09: Auto-fire annotation suggestions when navigating via BranchNavigator
+  const prevAutoSuggestIriRef = useRef(classIri);
+  useEffect(() => {
+    if (
+      autoSuggestAnnotationsOnMount &&
+      classIri &&
+      classIri !== prevAutoSuggestIriRef.current &&
+      canUseLLM
+    ) {
+      annotationsSuggestions.request();
+    }
+    prevAutoSuggestIriRef.current = classIri;
+  }, [classIri, autoSuggestAnnotationsOnMount, canUseLLM]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Helper: Render suggestion slot for a section ──
+  const renderSuggestionSlot = useCallback((
+    suggestions: ReturnType<typeof useSuggestions>,
+  ) => (
+    <>
+      {suggestions.isLoading && (
+        <div role="list" className="space-y-2 mt-2">
+          <SuggestionSkeleton />
+          <SuggestionSkeleton />
+          <SuggestionSkeleton />
+        </div>
+      )}
+      {suggestions.error && (
+        <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+          Could not generate suggestions. <button onClick={suggestions.request} className="underline">Retry</button>
+        </div>
+      )}
+      {suggestions.items.filter((s) => s.status !== "rejected").length > 0 && (
+        <div role="list" className="space-y-2 mt-2">
+          {suggestions.items.map((item, i) =>
+            item.status !== "rejected" ? (
+              <SuggestionCard
+                key={item.suggestion.iri ?? i}
+                item={item}
+                onAccept={() => suggestions.accept(i)}
+                onReject={() => suggestions.reject(i)}
+                onEdit={(val) => { suggestions.edit(i, val); suggestions.accept(i); }}
+                disabled={item.suggestion.duplicate_verdict === "block"}
+              />
+            ) : null,
+          )}
+        </div>
+      )}
+    </>
+  ), []);
+
   // ── Render: empty state ──
   if (!classIri) {
     return (
@@ -774,7 +949,14 @@ export function ClassDetailPanel({
             if (isEditing) {
               const defValues = defAnnotation?.values || [];
               return (
-                <Section title="Definition" tooltip="skos:definition" icon={<BookOpen className="h-4 w-4" />}>
+                <Section
+                  title="Definition"
+                  tooltip="skos:definition"
+                  icon={<BookOpen className="h-4 w-4" />}
+                  headerActions={canUseLLM ? (
+                    <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
+                  ) : undefined}
+                >
                   <div className="space-y-2">
                     {defValues.map((val, vIdx) => {
                       const isGhost = vIdx === defValues.length - 1 && val.value.trim() === "";
@@ -794,13 +976,21 @@ export function ClassDetailPanel({
                       );
                     })}
                   </div>
+                  {renderSuggestionSlot(annotationsSuggestions)}
                 </Section>
               );
             }
 
             if (defAnnotation && defAnnotation.values.length > 0) {
               return (
-                <Section title="Definition" tooltip="skos:definition" icon={<BookOpen className="h-4 w-4" />}>
+                <Section
+                  title="Definition"
+                  tooltip="skos:definition"
+                  icon={<BookOpen className="h-4 w-4" />}
+                  headerActions={canUseLLM ? (
+                    <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
+                  ) : undefined}
+                >
                   <div className="space-y-1">
                     {defAnnotation.values.map((val, vIndex) => (
                       <div key={vIndex} className="flex items-start gap-2">
@@ -809,6 +999,7 @@ export function ClassDetailPanel({
                       </div>
                     ))}
                   </div>
+                  {renderSuggestionSlot(annotationsSuggestions)}
                 </Section>
               );
             }
@@ -951,13 +1142,33 @@ export function ClassDetailPanel({
                     }}
                   />
                 )}
+
+                {/* Annotation Suggestion Slot with scope toggle (D-05) */}
+                {canUseLLM && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <SuggestImprovementsButton
+                      onRequest={annotationsSuggestions.request}
+                      isLoading={annotationsSuggestions.isLoading}
+                      disabled={!classIri}
+                    />
+                    <SuggestionScopeToggle value={annotationScope} onChange={setAnnotationScope} />
+                  </div>
+                )}
+                {renderSuggestionSlot(annotationsSuggestions)}
               </>
             );
           })()}
 
           {/* ═══ PARENT CLASSES ═══ */}
           {isEditing ? (
-            <Section title="Parent(s)" tooltip="rdfs:subClassOf" icon={<ArrowUp className="h-4 w-4" />}>
+            <Section
+              title="Parent(s)"
+              tooltip="rdfs:subClassOf"
+              icon={<ArrowUp className="h-4 w-4" />}
+              headerActions={canUseLLM ? (
+                <SuggestImprovementsButton onRequest={parentsSuggestions.request} isLoading={parentsSuggestions.isLoading} disabled={!classIri} />
+              ) : undefined}
+            >
               <div className="space-y-2">
                 {editParentIris.map((parentIri) => (
                   <div key={parentIri} className="flex items-center gap-2">
@@ -998,9 +1209,17 @@ export function ClassDetailPanel({
                   </button>
                 )}
               </div>
+              {renderSuggestionSlot(parentsSuggestions)}
             </Section>
           ) : classDetail.parent_iris.length > 0 ? (
-            <Section title="Parent(s)" tooltip="rdfs:subClassOf" icon={<ArrowUp className="h-4 w-4" />}>
+            <Section
+              title="Parent(s)"
+              tooltip="rdfs:subClassOf"
+              icon={<ArrowUp className="h-4 w-4" />}
+              headerActions={canUseLLM ? (
+                <SuggestImprovementsButton onRequest={parentsSuggestions.request} isLoading={parentsSuggestions.isLoading} disabled={!classIri} />
+              ) : undefined}
+            >
               <div className="space-y-1">
                 {classDetail.parent_iris.map((parentIri) => (
                   <IriLink
@@ -1011,6 +1230,7 @@ export function ClassDetailPanel({
                   />
                 ))}
               </div>
+              {renderSuggestionSlot(parentsSuggestions)}
             </Section>
           ) : null}
 
@@ -1035,7 +1255,13 @@ export function ClassDetailPanel({
             if (!isEditing && !hasRelationships) return null;
 
             return (
-              <Section title="Relationship(s)" icon={<Link2 className="h-4 w-4" />}>
+              <Section
+                title="Relationship(s)"
+                icon={<Link2 className="h-4 w-4" />}
+                headerActions={canUseLLM ? (
+                  <SuggestImprovementsButton onRequest={edgesSuggestions.request} isLoading={edgesSuggestions.isLoading} disabled={!classIri} />
+                ) : undefined}
+              >
                 <RelationshipSection
                   groups={readRelationships}
                   isEditing={isEditing}
@@ -1049,9 +1275,28 @@ export function ClassDetailPanel({
                   onNavigateToClass={onNavigateToClass}
                   onSaveNeeded={() => triggerSave()}
                 />
+                {renderSuggestionSlot(edgesSuggestions)}
               </Section>
             );
           })()}
+
+          {/* ═══ CHILDREN (LLM suggestions) ═══ */}
+          {canUseLLM && (
+            <Section
+              title="Subclasses"
+              tooltip="Suggest child classes"
+              icon={<Plus className="h-4 w-4" />}
+              headerActions={
+                <SuggestImprovementsButton onRequest={childrenSuggestions.request} isLoading={childrenSuggestions.isLoading} disabled={!classIri} />
+              }
+            >
+              <div className="text-xs text-slate-400 dark:text-slate-500">
+                {classDetail.child_count} existing subclass{classDetail.child_count !== 1 ? "es" : ""}
+              </div>
+              {renderSuggestionSlot(childrenSuggestions)}
+              {renderSuggestionSlot(siblingsSuggestions)}
+            </Section>
+          )}
 
           {/* Statistics (always read-only) */}
           <Section title="Statistics" icon={<BarChart3 className="h-4 w-4" />}>
@@ -1143,9 +1388,11 @@ interface SectionProps {
   tooltip?: string;
   icon?: React.ReactNode;
   children: React.ReactNode;
+  /** Optional actions rendered after the section title (e.g. SuggestImprovementsButton) */
+  headerActions?: React.ReactNode;
 }
 
-function Section({ title, tooltip, icon, children }: SectionProps) {
+function Section({ title, tooltip, icon, children, headerActions }: SectionProps) {
   return (
     <div className="flex gap-4">
       <div
@@ -1154,6 +1401,7 @@ function Section({ title, tooltip, icon, children }: SectionProps) {
       >
         {icon && <span className="text-slate-400 dark:text-slate-500">{icon}</span>}
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{title}</span>
+        {headerActions && <span className="ml-auto">{headerActions}</span>}
       </div>
       <div className="min-w-0 flex-1">
         {children}
