@@ -157,7 +157,13 @@ Plans:
   3. Each suggestion card has three affordances visible without scrolling: accept (one click), reject (one click), and edit-then-accept (inline text edit)
   4. A counter in the editor header shows the current session's pending suggestion count, updating in real time as suggestions are accepted or rejected
   5. User can open a property tree panel, select an ObjectProperty, and request LLM suggestions for domain/range, duplicate detection, and validation — using the same UI affordances as the class workflow
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 14-00-PLAN.md — Wave 0: Test stubs for suggestion store, hook, and API client (Nyquist compliance)
+- [ ] 14-01-PLAN.md — Data layer: Generation API client, Zustand suggestion store, useSuggestions hook
+- [ ] 14-02-PLAN.md — UI components: SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton, ScopeToggle, GroupSection, PendingSuggestionBadge, BranchNavigator
+- [ ] 14-03-PLAN.md — Class integration: ClassDetailPanel suggestion slots, editor layout wiring, keyboard shortcuts
+- [ ] 14-04-PLAN.md — Property integration: PropertyDetailPanel suggestion slots, property tab wiring
 **UI hint**: yes
 
 ### Phase 15: Session Clustering & Batch Submit
@@ -168,8 +174,8 @@ Plans:
   1. Clicking "Submit session" triggers automatic clustering and shows the user a shard preview tree — a visual breakdown of which suggestions land in which proposed PR, grouped by common ancestor
   2. The preview tree lets the user merge two shards, split a shard, or rename a shard label before submitting — changes are reflected immediately in the preview
   3. A shard with fewer than 3 suggestions is automatically rolled into a "Miscellaneous improvements" shard rather than creating a near-empty PR
-  4. Each submitted shard produces exactly one PR with exactly one commit; a suggestion never appears in more than one PR
-  5. The reviewer queue shows a "Batch" grouping header that lets the reviewer approve or reject the entire batch in one action, or drill down to individual shards
+  4. Each shard becomes exactly one commit; shards are grouped into PRs by subtree branch (1-N PRs per session), splitting when a PR would exceed ~10 shards or ~50 suggestions; a suggestion never appears in more than one commit
+  5. GitHub's commit tab within each PR serves as the shard navigator; the reviewer approves/rejects per-PR and drills into commits for shard-level feedback
 **Plans**: TBD
 **UI hint**: yes
 
@@ -198,6 +204,6 @@ Plans:
 | 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete    | 2026-04-06 |
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete    | 2026-04-06 |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
-| 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/TBD | Not started | - |
+| 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/5 | Planning | - |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |
 | 16. Reviewer Enhancements | v0.4.0 | 0/TBD | Not started | - |
