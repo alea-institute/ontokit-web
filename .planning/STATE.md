@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: planning
-stopped_at: Phase 14 context gathered
-last_updated: "2026-04-07T16:46:01.969Z"
+stopped_at: Phase 14 UI-SPEC approved
+last_updated: "2026-04-07T17:00:29.248Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 10
@@ -165,6 +165,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T16:46:01.968Z
-Stopped at: Phase 14 context gathered
-Resume file: .planning/phases/14-inline-suggestion-ux-property-support/14-CONTEXT.md
+Last session: 2026-04-07T17:00:29.246Z
+Stopped at: Phase 14 UI-SPEC approved
+Resume file: .planning/phases/14-inline-suggestion-ux-property-support/14-UI-SPEC.md
