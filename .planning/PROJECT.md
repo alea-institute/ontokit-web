@@ -50,11 +50,11 @@ Enable grassroots-level collaborative ontology editing in a modern, accessible w
 - [x] Per-role access model (admin/editor/suggester/anonymous LLM gates) — Phase 11
 - [x] Cost controls (project budget, per-user daily caps, usage dashboard, BYO key) — Phase 11
 - [x] Duplicate detection (whole-ontology embeddings index + composite scoring) — Phase 12
-- [ ] Suggestion generation (Generative FOLIO integration, prompts, validation)
+- [x] Suggestion generation (context assembly, 5 prompt templates, generation pipeline) — Phase 13
+- [x] Pre-submit validation guardrails (parent, label, cycle, namespace, IRI minting) — Phase 13
 - [ ] Dual UX modes (inline button + flashcard iterator)
 - [ ] Session clustering into reviewable PR shards
 - [ ] Property support (ObjectProperty, DataProperty, AnnotationProperty)
-- [ ] Pre-submit validation guardrails (parent, label, cycle, namespace)
 
 ### Out of Scope
 
