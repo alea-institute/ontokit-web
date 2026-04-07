@@ -53,14 +53,14 @@ Exceptions:
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 14px (`text-sm`) | 400 (regular) | 1.5 |
-| Label | 12px (`text-xs`) | 500 (medium) | 1.4 |
+| Label | 12px (`text-xs`) | 600 (semibold) | 1.4 |
 | Heading | 16px (`text-base`) | 600 (semibold) | 1.25 |
 | Display | 20px (`text-xl`) | 600 (semibold) | 1.2 |
 
 Notes:
 - IRI values rendered in `font-mono` (JetBrains Mono) at 12px — consistent with existing IRI display patterns across the editor
 - Summary bar numbers (e.g., "12 suggestions") use 14px semibold (600) for the numeral, 14px regular (400) for the label text
-- Entity local names in shard rows use 13px (`text-[13px]`) regular — between `text-xs` and `text-sm`, matching existing tree item density
+- Entity local names in shard rows use 14px (`text-sm`) regular — consistent with body text density
 
 Source: `components/ui/button.tsx` (size scale), `app/globals.css` (.tree-item), `components/graph/EntityGraphModal.tsx` (header text)
 
