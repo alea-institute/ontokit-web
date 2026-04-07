@@ -30,7 +30,7 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 
 - [x] **Phase 11: Roles, LLM Abstraction & Cost Controls** - Per-role gating, multi-provider LLM dispatch, project budget caps, and per-user rate limits (completed 2026-04-06)
 - [x] **Phase 12: Toolchain Integration & Duplicate Detection** - folio-python, OpenGloss, OWL reasoner, plus whole-ontology embeddings index and ANN-based duplicate scoring (completed 2026-04-06)
-- [ ] **Phase 13: Validation Guardrails & Suggestion Generation** - Pre-submit validation rules, Generative FOLIO prompt pipeline, and LLM suggestion endpoints for classes/annotations/edges
+- [x] **Phase 13: Validation Guardrails & Suggestion Generation** - Pre-submit validation rules, Generative FOLIO prompt pipeline, and LLM suggestion endpoints for classes/annotations/edges (completed 2026-04-07)
 - [ ] **Phase 14: Inline Suggestion UX & Property Support** - "Suggest improvements" button on class detail panel, flashcard iterator mode, one-click suggestion actions, and property tree browsing with LLM suggestions
 - [ ] **Phase 15: Session Clustering & Batch Submit** - Auto-clustering of session suggestions by ancestor, shard preview tree, per-shard PR creation, and batch traceability
 - [ ] **Phase 16: Reviewer Enhancements** - Provenance tags, confidence scores, similar-entity panels, and batch review view in the existing reviewer workflow
@@ -145,7 +145,7 @@ Plans:
 - [x] 13-00-PLAN.md — Wave 0: Test stubs for all Phase 13 services (Nyquist compliance)
 - [x] 13-01-PLAN.md — Backend: Pydantic schemas, ValidationService (VALID-01..06), IRI minting
 - [x] 13-02-PLAN.md — Backend: OntologyContextAssembler, 5 prompt templates, PROMPT_BUILDERS dispatch
-- [ ] 13-03-PLAN.md — Backend: SuggestionGenerationService pipeline, generate-suggestions + validate-entity API routes
+- [x] 13-03-PLAN.md — Backend: SuggestionGenerationService pipeline, generate-suggestions + validate-entity API routes
 
 ### Phase 14: Inline Suggestion UX & Property Support
 **Goal**: Users can trigger LLM suggestions from the class detail panel or walk through a branch in flashcard mode, accept/reject/edit suggestions in one click, and browse and improve properties (ObjectProperty, DataProperty, AnnotationProperty) using the same pipeline
@@ -197,7 +197,7 @@ Plans:
 | 10. Anonymous Suggestions | v0.3.0 | 3/3 | Complete | 2026-04-03 |
 | 11. Roles, LLM Abstraction & Cost Controls | v0.4.0 | 6/6 | Complete    | 2026-04-06 |
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete    | 2026-04-06 |
-| 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 3/4 | In Progress|  |
+| 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete   | 2026-04-07 |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 0/TBD | Not started | - |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 0/TBD | Not started | - |
 | 16. Reviewer Enhancements | v0.4.0 | 0/TBD | Not started | - |

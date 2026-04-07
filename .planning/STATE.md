@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: executing
-stopped_at: Completed 13-02-PLAN.md
-last_updated: "2026-04-07T14:33:40.502Z"
+status: verifying
+stopped_at: Completed 13-03-PLAN.md
+last_updated: "2026-04-07T14:41:39.400Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 10
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 21
-  completed_plans: 20
+  completed_plans: 21
   percent: 0
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 
 Phase: 13 (validation-guardrails-suggestion-generation) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-07
 
 Progress: [ ] 0% (v0.4.0 phases)
@@ -66,6 +66,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 13-validation-guardrails-suggestion-generation P00 | 2 | 1 tasks | 4 files |
 | Phase 13-validation-guardrails-suggestion-generation P01 | 5 | 2 tasks | 4 files |
 | Phase 13-validation-guardrails-suggestion-generation P02 | 5 | 2 tasks | 9 files |
+| Phase 13-validation-guardrails-suggestion-generation P03 | 15 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,9 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase Phase 13-01]: CONTROLLED_RELATIONSHIP_TYPES as list[str] not Literal — allows runtime iteration; Literal aliases reserved for schema type discrimination
 - [Phase 13-validation-guardrails-suggestion-generation]: quality_filter.py uses plain string/list signatures instead of ConceptGenerationOutput — ontokit-api has no Pydantic model for that type
 - [Phase 13-validation-guardrails-suggestion-generation]: prompts/__init__.py avoids 'from __future__ import annotations' and aliases annotations module as annotations_module to prevent Python __future__ import shadowing the module name
+- [Phase 13-validation-guardrails-suggestion-generation]: SuggestionGenerationService.generate() runs validate+dedup sequentially per suggestion — AsyncSession not safe for concurrent use (Pitfall 5)
+- [Phase 13-validation-guardrails-suggestion-generation]: generate_suggestions catches non-auth LLM errors and returns empty suggestions list rather than 500 — prevents cascade failures from malformed LLM output
+- [Phase 13-validation-guardrails-suggestion-generation]: validate-entity endpoint defaults to branch='main' since ValidateEntityRequest has no branch field — consistent with schema definition
 
 ### Key Facts
 
@@ -155,12 +159,12 @@ None yet.
 ### Entity Graph Port (`entity-graph-migration`)
 
 - **Issue:** CatholicOS/ontokit-web#81
-- **Status:** Ready to execute
+- **Status:** Phase complete — ready for verification
 - **Handoff:** `.planning/features/entity-graph-port/HANDOFF.md`
 - **Next:** Visual verify with MCP chrome-devtools (headless), then create PR
 
 ## Session Continuity
 
-Last session: 2026-04-07T14:33:40.500Z
-Stopped at: Completed 13-02-PLAN.md
+Last session: 2026-04-07T14:41:39.399Z
+Stopped at: Completed 13-03-PLAN.md
 Resume file: None
