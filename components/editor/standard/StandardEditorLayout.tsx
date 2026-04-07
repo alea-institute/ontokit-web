@@ -22,6 +22,10 @@ import { DraggableTreeWrapper } from "@/components/editor/shared/DraggableTreeWr
 import { useTreeDragDrop, type DragMode } from "@/lib/hooks/useTreeDragDrop";
 import { useToast } from "@/lib/context/ToastContext";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
+import { PendingSuggestionBadge } from "@/components/editor/PendingSuggestionBadge";
+import { BranchNavigator } from "@/components/editor/BranchNavigator";
+import { useSuggestionStore } from "@/lib/stores/suggestionStore";
+import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
 
 const OntologyGraph = dynamic(
   () => import("@/components/graph/OntologyGraph").then((mod) => mod.OntologyGraph),
@@ -97,6 +101,11 @@ export interface StandardEditorLayoutProps {
   // Sign-in-to-edit affordance for anonymous users
   showSignInToEdit?: boolean;
   onSignInToEdit?: () => void;
+
+
+  // LLM suggestion support
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => void;
+  acceptedSuggestionIris?: Set<string>;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -137,11 +146,38 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     rollbackReparent,
     showSignInToEdit,
     onSignInToEdit,
+    onAddSuggestedChild,
+    acceptedSuggestionIris,
   } = props;
 
   const toast = useToast();
   const { announce } = useAnnounce();
   const llmGate = useLLMGate(projectId, userRole);
+
+  // Suggestion store for pending count badge
+  const pendingCount = useSuggestionStore((s) => s.getPendingCount());
+  const byoEntry = useByoKeyStore((s) => s.getEntry(projectId));
+
+  const scrollToFirstPending = useCallback(() => {
+    const firstCard = document.querySelector('[role="listitem"]');
+    firstCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (firstCard as HTMLElement)?.focus();
+  }, []);
+
+  // D-09: State to trigger auto-suggest annotations on navigate
+  const [isAutoSuggesting, setIsAutoSuggesting] = useState(false);
+
+  const handleAutoSuggest = useCallback((_iri: string) => {
+    setIsAutoSuggesting(true);
+  }, []);
+
+  // Reset auto-suggest flag after ClassDetailPanel has consumed it
+  useEffect(() => {
+    if (isAutoSuggesting) {
+      const timer = setTimeout(() => setIsAutoSuggesting(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAutoSuggesting]);
 
   // Draft badges
   const getDraftIris = useDraftStore((s) => s.getDraftIris);
@@ -326,9 +362,12 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         />
       )}
 
-      {/* LLM Role Badge — shown in a slim toolbar row when user has LLM access */}
-      {llmGate.roleLimitLabel && (
-        <div className="flex items-center justify-end border-b border-slate-200 bg-white px-4 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+      {/* LLM Role Badge + Pending Suggestion Badge — shown in a slim toolbar row when user has LLM access */}
+      {(llmGate.roleLimitLabel || pendingCount > 0) && (
+        <div className="flex items-center justify-end gap-2 border-b border-slate-200 bg-white px-4 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+          {pendingCount > 0 && (
+            <PendingSuggestionBadge count={pendingCount} onClick={scrollToFirstPending} />
+          )}
           <LLMRoleBadge
             roleLimitLabel={llmGate.roleLimitLabel}
             userRole={userRole ?? undefined}
@@ -405,6 +444,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                     onSearchSelect={handleSearchSelect}
                     searchQuery={searchQuery}
                     draftIris={draftIris}
+                    suggestedIris={acceptedSuggestionIris}
                     filteredTree={filteredNodes}
                     isFilteredTreeBuilding={isFilteredTreeBuilding}
                     filteredTreeTruncated={filteredTreeTruncated}
@@ -493,15 +533,28 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             refreshKey={detailRefreshKey}
             showSignInToEdit={showSignInToEdit}
             onSignInToEdit={onSignInToEdit}
+            canUseLLM={llmGate.canUseLLM}
+            byoKey={byoEntry?.key}
+            onAddSuggestedChild={onAddSuggestedChild}
+            autoSuggestAnnotationsOnMount={isAutoSuggesting}
             headerActions={selectedIri ? (
-              <button
-                onClick={() => setShowGraph(true)}
-                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
-                aria-label="Show relationship graph"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                Graph
-              </button>
+              <>
+                <BranchNavigator
+                  nodes={nodes}
+                  selectedIri={selectedIri}
+                  onNavigate={(iri) => selectNode(iri)}
+                  autoSuggestOnNavigate={true}
+                  onAutoSuggest={handleAutoSuggest}
+                />
+                <button
+                  onClick={() => setShowGraph(true)}
+                  className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
+                  aria-label="Show relationship graph"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                  Graph
+                </button>
+              </>
             ) : undefined}
           />
         ) : activeTab === "properties" ? (
