@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Completed 13-00-PLAN.md
-last_updated: "2026-04-07T14:28:45.884Z"
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-04-07T14:32:44.094Z"
 last_activity: 2026-04-07
 progress:
   total_phases: 10
   completed_phases: 5
   total_plans: 21
-  completed_plans: 18
+  completed_plans: 19
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 13 (validation-guardrails-suggestion-generation) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-07
 
@@ -64,6 +64,7 @@ Progress: [ ] 0% (v0.4.0 phases)
 | Phase 12 P03 | 30 | 2 tasks | 6 files |
 | Phase 12 P04 | 18 | 2 tasks | 6 files |
 | Phase 13-validation-guardrails-suggestion-generation P00 | 2 | 1 tasks | 4 files |
+| Phase 13-validation-guardrails-suggestion-generation P01 | 5 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -113,6 +114,9 @@ Progress: [ ] 0% (v0.4.0 phases)
 - [Phase 12]: Test block verdict requires parent_iri; without it max composite=0.80 (exact+semantic ceiling) which lands on pass/warn boundary
 - [Phase 13-validation-guardrails-suggestion-generation]: Wave 0 stubs use @pytest.mark.skip decorator (not pytest.skip() in body) — consistent with Phase 11-12 established pattern
 - [Phase 13-validation-guardrails-suggestion-generation]: Unit-level conftest.py created at tests/unit/ to scope Phase 13 fixtures without polluting top-level conftest.py
+- [Phase Phase 13-01]: VALID-03 uses OntologyIndexService.get_ancestor_path() SQL CTE not ReasonerService DFS — lightweight pre-submit gate per RESEARCH.md Pitfall 2
+- [Phase Phase 13-01]: VALID-04 skips namespace check when entity_iri empty/None — IRI minted after validation in generation pipeline
+- [Phase Phase 13-01]: CONTROLLED_RELATIONSHIP_TYPES as list[str] not Literal — allows runtime iteration; Literal aliases reserved for schema type discrimination
 
 ### Key Facts
 
@@ -154,6 +158,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-07T14:28:45.882Z
-Stopped at: Completed 13-00-PLAN.md
+Last session: 2026-04-07T14:32:44.092Z
+Stopped at: Completed 13-01-PLAN.md
 Resume file: None
