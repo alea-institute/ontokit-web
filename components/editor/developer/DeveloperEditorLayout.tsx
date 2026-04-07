@@ -28,7 +28,7 @@ import type { OntologySourceEditorRef } from "@/components/editor/OntologySource
 import type { IriPosition } from "@/lib/editor/indexWorker";
 import { useDraftStore } from "@/lib/stores/draftStore";
 import { getLocalName } from "@/lib/utils";
-import { extractTreeLabelMap } from "@/lib/graph/buildGraphData";
+import { extractTreeLabelMap } from "@/lib/graph/utils";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
 
 const OntologySourceEditor = dynamic(
@@ -378,9 +378,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             <OntologyGraph
               focusIri={selectedIri}
               projectId={projectId}
-              accessToken={accessToken}
               branch={activeBranch}
-              labelHints={treeLabelHints}
               onNavigateToClass={(iri) => {
                 handleViewModeChange("tree");
                 navigateToNode(iri);
