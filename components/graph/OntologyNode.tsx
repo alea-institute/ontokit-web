@@ -28,6 +28,8 @@ const nodeStyles: Record<GraphNodeType, string> = {
     "border border-slate-300 bg-white dark:bg-slate-800 dark:border-slate-600",
   root:
     "border-[3px] border-red-500 bg-red-50 dark:bg-red-950/30 dark:border-red-500/70 font-semibold",
+  secondary_root:
+    "border-2 border-slate-500 bg-slate-100 dark:bg-slate-800 dark:border-slate-400 font-semibold",
   individual:
     "border border-pink-300 bg-pink-50 dark:bg-pink-950/30 dark:border-pink-500/60",
   property:

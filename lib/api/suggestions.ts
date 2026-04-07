@@ -98,6 +98,71 @@ export interface SuggestionBeaconPayload {
   content: string;
 }
 
+// --- Clustering types (Phase 15) ---
+
+export interface ClusterSuggestionItem {
+  entity_iri: string;
+  parent_iri?: string | null;
+  suggestion_type: string;
+  label: string;
+}
+
+export interface ClusterRequest {
+  suggestion_items: ClusterSuggestionItem[];
+}
+
+export interface ClusterShard {
+  id: string;
+  label: string;
+  ancestor_path: string[];
+  entity_iris: string[];
+  is_misc: boolean;
+  is_cross_cutting: boolean;
+}
+
+export interface ClusterPRGroup {
+  id: string;
+  shards: ClusterShard[];
+}
+
+export interface ClusterResponse {
+  pr_groups: ClusterPRGroup[];
+  total_suggestions: number;
+  total_shards: number;
+  total_prs: number;
+  skip_clustering: boolean;
+}
+
+export interface BatchSubmitShardRef {
+  id: string;
+  label: string;
+  entity_iris: string[];
+}
+
+export interface BatchSubmitPRGroupRef {
+  shards: BatchSubmitShardRef[];
+}
+
+export interface BatchSubmitRequest {
+  pr_groups: BatchSubmitPRGroupRef[];
+  notes?: string;
+}
+
+export interface BatchSubmitPRResult {
+  pr_group_index: number;
+  pr_number?: number;
+  pr_url: string | null;
+  github_pr_url: string | null;
+  status: "success" | "failed";
+  error?: string;
+}
+
+export interface BatchSubmitResponse {
+  results: BatchSubmitPRResult[];
+  succeeded: number;
+  failed: number;
+}
+
 // --- Anonymous suggestion types ---
 
 /**
@@ -267,6 +332,38 @@ export const suggestionsApi = {
   ) =>
     api.post<SuggestionSubmitResponse>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/resubmit`,
+      data,
+      { headers: { Authorization: `Bearer ${token}` } },
+    ),
+
+  /**
+   * Cluster suggestion items into shards grouped by PR.
+   * Returns a proposed shard plan for user review before batch submit.
+   */
+  cluster: (
+    projectId: string,
+    sessionId: string,
+    data: ClusterRequest,
+    token: string,
+  ) =>
+    api.post<ClusterResponse>(
+      `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/cluster`,
+      data,
+      { headers: { Authorization: `Bearer ${token}` } },
+    ),
+
+  /**
+   * Batch submit a shard plan — creates one PR per PR group.
+   * Each PR contains the entities from its shards.
+   */
+  batchSubmit: (
+    projectId: string,
+    sessionId: string,
+    data: BatchSubmitRequest,
+    token: string,
+  ) =>
+    api.post<BatchSubmitResponse>(
+      `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/batch-submit`,
       data,
       { headers: { Authorization: `Bearer ${token}` } },
     ),
