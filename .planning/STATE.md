@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: executing
+status: planning
 stopped_at: "Completed 15-04-PLAN.md (checkpoint:human-verify)"
-last_updated: "2026-04-08T00:17:13.886Z"
+last_updated: "2026-04-08T03:40:45.974Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 10
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 
 ## Current Position
 
-Phase: 15 (session-clustering-batch-submit) — EXECUTING
-Plan: 4 of 5
+Phase: 16
+Plan: Not started
 Status: Ready to execute
 Last activity: 2026-04-08
 
@@ -36,7 +36,7 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 
 **Velocity:**
 
-- Total plans completed: 0 (this milestone)
+- Total plans completed: 5 (this milestone)
 - Average duration: —
 - Total execution time: —
 
@@ -44,7 +44,7 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 15 | 5 | - | - |
 
 *Updated after each plan completion*
 | Phase 08-optional-auth P01 | 4min | 2 tasks | 3 files |
@@ -188,7 +188,7 @@ None yet.
 ### Entity Graph Port (`entity-graph-migration`)
 
 - **Issue:** CatholicOS/ontokit-web#81
-- **Status:** Ready to execute
+- **Status:** Ready to plan
 - **Handoff:** `.planning/features/entity-graph-port/HANDOFF.md`
 - **Next:** Visual verify with MCP chrome-devtools (headless), then create PR
 

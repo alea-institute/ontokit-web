@@ -211,5 +211,5 @@ Plans:
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete    | 2026-04-06 |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 5/5 | Complete   | 2026-04-07 |
-| 15. Session Clustering & Batch Submit | v0.4.0 | 5/5 | Complete   | 2026-04-08 |
+| 15. Session Clustering & Batch Submit | v0.4.0 | 5/5 | Complete    | 2026-04-08 |
 | 16. Reviewer Enhancements | v0.4.0 | 0/TBD | Not started | - |
