@@ -129,10 +129,15 @@ components/suggestions/
 lib/api/
 └── suggestions.ts                # Extended: add getSessionDetail(), postShardReviews()
 
+lib/editor/
+└── entityLineAttribution.ts      # Pure function: Turtle patch line → entity IRI attribution
+
 __tests__/lib/api/
 └── suggestionDetailApi.test.ts   # Unit stubs for new API methods
 __tests__/components/suggestions/
 └── provenanceBadge.test.ts       # Unit stubs for ProvenanceBadge rendering
+__tests__/lib/editor/
+└── entityLineAttribution.test.ts # Unit test for entity-to-line attribution logic
 ```
 
 Files modified this phase:
@@ -183,7 +188,7 @@ The challenge: a raw patch line like `+ rdfs:label "Fraud Prevention"@en ;` cont
 
 **Recommended approach:** The enriched session detail includes entity IRIs and their shard membership. When the diff is rendered, the reviewer page keeps a running `currentEntityIri` state as it walks the patch — the `+` lines that look like subject declarations (`+ <iri>` or `+ localname:prefix`) update the current entity context. All subsequent `+` lines until the next subject declaration inherit that entity's provenance/confidence.
 
-This is client-side parsing — no additional API calls needed for line attribution once entity metadata is loaded.
+This is client-side parsing — no additional API calls needed for line attribution once entity metadata is loaded. The attribution logic is extracted into a pure function (`lib/editor/entityLineAttribution.ts`) for testability.
 
 ```typescript
 // Source: 16-CONTEXT.md D-01, D-02; existing DiffView in review/page.tsx
@@ -436,20 +441,23 @@ className={cn(
 
 ## Open Questions
 
-1. **Where is per-entity provenance stored after batch-submit?**
+1. **Where is per-entity provenance stored after batch-submit? (RESOLVED)**
    - What we know: `GeneratedSuggestion.provenance` and `.confidence` exist in the generation response (Phase 13). The suggestion session `save` endpoint stores Turtle content but not entity-level metadata.
    - What's unclear: Whether the batch-submit pipeline persists provenance/confidence per entity IRI to a DB table, or whether that data is lost after generation.
    - Recommendation: This is Wave 0 for the backend — if provenance is not persisted, backend needs a new table (`suggestion_entity_metadata`) before the enriched detail endpoint can be built. Frontend planning should account for this as a potential Wave 1 blocker.
+   - **Resolution (frontend plan):** This is a frontend-only phase. The frontend assumes the backend enriched endpoint (`/detail`) returns `EntityReviewMetadata` with `provenance`, `confidence`, and `duplicate_candidates` fields. If the backend does not persist provenance at batch-submit time, the `getSessionDetail` response will omit or null-out `confidence`/`provenance` fields. The UI degrades gracefully: `ProvenanceBadge` renders a dash for null confidence and the component is simply not rendered when metadata is absent. No frontend blocker.
 
-2. **Does the existing `PRCommitListResponse` include enough data to correlate commits to shards?**
+2. **Does the existing `PRCommitListResponse` include enough data to correlate commits to shards? (RESOLVED)**
    - What we know: Phase 15 D-10 specifies hybrid commit messages with shard metadata in the commit body. `PRCommitListResponse` returns `PRCommit[]` with `message` field.
    - What's unclear: Whether the shard ID is in the commit message and whether the frontend can parse it reliably.
    - Recommendation: If shard ID is in the commit body, the frontend can build the shard tab navigator from `pullRequestsApi.getCommits()` without a new enriched endpoint. This would simplify D-14 significantly.
+   - **Resolution (frontend plan):** The enriched session detail endpoint (`/detail`) returns `ShardReviewInfo[]` with shard IDs, labels, and entity IRIs (per D-14). The frontend builds the shard tab navigator from this response, not from parsing commit messages. Commit-message parsing is not needed.
 
-3. **What is the source of duplicate_candidates at review time?**
+3. **What is the source of duplicate_candidates at review time? (RESOLVED)**
    - What we know: `GeneratedSuggestion.duplicate_candidates` has `iri`, `label`, `score`. These come from the duplicate detection pipeline at generation time.
    - What's unclear: Are these stored per entity at submit time, or recomputed on-demand at review time?
    - Recommendation: Recomputing at review time is expensive (ANN search per entity); storing at submit time is preferred. If stored, they come from the persisted entity metadata table (same question as #1 above).
+   - **Resolution (frontend plan):** The frontend assumes the backend enriched endpoint returns `duplicate_candidates` per entity. If the backend does not store them at submit time, the array will be empty and `SimilarEntitiesInlinePanel` simply does not render (it already returns null when no candidates above 0.40 threshold exist). No frontend blocker.
 
 ---
 
@@ -472,16 +480,16 @@ Step 2.6: SKIPPED — Phase 16 is a code-only frontend extension with no new ext
 
 [VERIFIED: ran `npm run test -- --run` successfully in this session — 16 passed, 2 skipped, 140 tests, 1.25s]
 
-### Phase Requirements → Test Map
+### Phase Requirements -> Test Map
 
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
-| REVIEW-01 | DiffView renders patch lines for LLM suggestions identically to human-written | unit | `npm run test -- --run __tests__/components/suggestions/provenanceBadge.test.ts` | ❌ Wave 0 |
-| REVIEW-02 | SimilarEntitiesInlinePanel only renders when candidates exist with score > 0.40 | unit | `npm run test -- --run __tests__/components/suggestions/provenanceBadge.test.ts` | ❌ Wave 0 |
-| REVIEW-03 | ProvenanceBadge renders correct icon/label for each provenance value | unit | `npm run test -- --run __tests__/components/suggestions/provenanceBadge.test.ts` | ❌ Wave 0 |
-| REVIEW-04 | ProvenanceBadge renders confidence % when available, dash when null | unit | `npm run test -- --run __tests__/components/suggestions/provenanceBadge.test.ts` | ❌ Wave 0 |
-| REVIEW-05 | ShardTabNavigator renders "All" + per-shard tabs; shard filter produces correct entity subset | unit | `npm run test -- --run __tests__/components/suggestions/shardTabNavigator.test.ts` | ❌ Wave 0 |
-| — | New API methods (getSessionDetail, postShardReviews) call correct endpoints | unit | `npm run test -- --run __tests__/lib/api/suggestionDetailApi.test.ts` | ❌ Wave 0 |
+| REVIEW-01 | DiffView renders patch lines for LLM suggestions identically to human-written | unit | `npm run test -- --run __tests__/components/suggestions/provenanceBadge.test.ts` | No Wave 0 |
+| REVIEW-02 | SimilarEntitiesInlinePanel only renders when candidates exist with score > 0.40 | unit | `npm run test -- --run __tests__/components/suggestions/provenanceBadge.test.ts` | No Wave 0 |
+| REVIEW-03 | ProvenanceBadge renders correct icon/label for each provenance value | unit | `npm run test -- --run __tests__/components/suggestions/provenanceBadge.test.ts` | No Wave 0 |
+| REVIEW-04 | ProvenanceBadge renders confidence % when available, dash when null | unit | `npm run test -- --run __tests__/components/suggestions/provenanceBadge.test.ts` | No Wave 0 |
+| REVIEW-05 | ShardTabNavigator renders "All" + per-shard tabs; shard filter produces correct entity subset | unit | `npm run test -- --run __tests__/components/suggestions/shardTabNavigator.test.ts` | No Wave 0 |
+| -- | New API methods (getSessionDetail, postShardReviews) call correct endpoints | unit | `npm run test -- --run __tests__/lib/api/suggestionDetailApi.test.ts` | No Wave 0 |
 
 ### Sampling Rate
 
@@ -503,11 +511,11 @@ Step 2.6: SKIPPED — Phase 16 is a code-only frontend extension with no new ext
 
 | ASVS Category | Applies | Standard Control |
 |---------------|---------|-----------------|
-| V2 Authentication | no (all endpoints already require `RequiredUser`) | — |
-| V3 Session Management | no | — |
+| V2 Authentication | no (all endpoints already require `RequiredUser`) | -- |
+| V3 Session Management | no | -- |
 | V4 Access Control | yes — `canReview` check already in review page | `project.user_role in [owner, admin, editor, superadmin]` |
 | V5 Input Validation | yes — per-shard feedback text | max 500 chars (UI-SPEC); backend should validate `reason` min_length per existing `SuggestionRejectRequest` pattern |
-| V6 Cryptography | no | — |
+| V6 Cryptography | no | -- |
 
 ### Known Threat Patterns
 
