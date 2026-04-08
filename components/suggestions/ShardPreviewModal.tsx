@@ -207,7 +207,23 @@ export function ShardPreviewModal({
         retryRequest,
         accessToken,
       );
-      setSubmitResponse(response);
+
+      // Merge: keep original successes, replace failed entries with retry results
+      const mergedResults = submitResponse.results.map((original) => {
+        if (original.status === "success") return original;
+        // Find the corresponding retry result by matching failed PR group indices
+        const retryIdx = failedPrIds.indexOf(prGroupOrder[original.pr_group_index]);
+        if (retryIdx >= 0 && response.results[retryIdx]) {
+          return { ...response.results[retryIdx], pr_group_index: original.pr_group_index };
+        }
+        return original;
+      });
+
+      setSubmitResponse({
+        results: mergedResults,
+        succeeded: mergedResults.filter((r) => r.status === "success").length,
+        failed: mergedResults.filter((r) => r.status !== "success").length,
+      });
       setPhase("complete");
     } catch {
       setProgressSteps((prev) =>
