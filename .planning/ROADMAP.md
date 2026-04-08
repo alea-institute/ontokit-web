@@ -32,7 +32,7 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 - [x] **Phase 12: Toolchain Integration & Duplicate Detection** - folio-python, OpenGloss, OWL reasoner, plus whole-ontology embeddings index and ANN-based duplicate scoring (completed 2026-04-06)
 - [x] **Phase 13: Validation Guardrails & Suggestion Generation** - Pre-submit validation rules, Generative FOLIO prompt pipeline, and LLM suggestion endpoints for classes/annotations/edges (completed 2026-04-07)
 - [x] **Phase 14: Inline Suggestion UX & Property Support** - "Suggest improvements" button on class detail panel, flashcard iterator mode, one-click suggestion actions, and property tree browsing with LLM suggestions (completed 2026-04-07)
-- [ ] **Phase 15: Session Clustering & Batch Submit** - Auto-clustering of session suggestions by ancestor, shard preview tree, per-shard PR creation, and batch traceability
+- [x] **Phase 15: Session Clustering & Batch Submit** - Auto-clustering of session suggestions by ancestor, shard preview tree, per-shard PR creation, and batch traceability (completed 2026-04-08)
 - [ ] **Phase 16: Reviewer Enhancements** - Provenance tags, confidence scores, similar-entity panels, and batch review view in the existing reviewer workflow
 
 ## Phase Details
@@ -182,7 +182,7 @@ Plans:
 - [x] 15-01-PLAN.md — Data layer: ShardPreviewStore (Zustand), suggestionsApi cluster + batchSubmit extensions
 - [x] 15-02-PLAN.md — UI components: SummaryBar, PRGroup, ShardRow, EntityList, ProgressBar, Complete
 - [x] 15-03-PLAN.md — Modal + DnD: ShardPreviewModal orchestrator, useShardDragDrop hook
-- [ ] 15-04-PLAN.md — Integration: Editor page clustering gate, dynamic import, batch submit wiring + visual verify
+- [x] 15-04-PLAN.md — Integration: Editor page clustering gate, dynamic import, batch submit wiring + visual verify
 **UI hint**: yes
 
 ### Phase 16: Reviewer Enhancements
@@ -211,5 +211,5 @@ Plans:
 | 12. Toolchain Integration & Duplicate Detection | v0.4.0 | 5/5 | Complete    | 2026-04-06 |
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 5/5 | Complete   | 2026-04-07 |
-| 15. Session Clustering & Batch Submit | v0.4.0 | 4/5 | In Progress|  |
+| 15. Session Clustering & Batch Submit | v0.4.0 | 5/5 | Complete   | 2026-04-08 |
 | 16. Reviewer Enhancements | v0.4.0 | 0/TBD | Not started | - |

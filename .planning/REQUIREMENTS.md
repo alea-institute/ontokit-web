@@ -51,12 +51,12 @@
 
 - [x] **CLUSTER-01**: System auto-clusters a user's session suggestions by common class ancestor
 - [ ] **CLUSTER-02**: Shards have a max size of 50 items; shards exceeding this split by the next taxonomy level down
-- [ ] **CLUSTER-03**: Shards have a min size of 3 items; smaller orphans roll into a "Miscellaneous improvements" shard
+- [x] **CLUSTER-03**: Shards have a min size of 3 items; smaller orphans roll into a "Miscellaneous improvements" shard
 - [ ] **CLUSTER-04**: Cross-cutting changes that don't fit one ancestor form their own shard
 - [x] **CLUSTER-05**: Each suggestion appears in exactly one shard (no cross-posting)
 - [x] **CLUSTER-06**: At submit time, user sees a preview tree of proposed shards and can merge/split/rename them
 - [x] **CLUSTER-07**: Each shard becomes one commit; shards are grouped into PRs by subtree branch (1-N PRs per session)
-- [ ] **CLUSTER-08**: PRs split when exceeding ~10 shards or ~50 suggestions, splitting at the next subtree level; cross-cutting shards attach to the best-fit PR or get their own
+- [x] **CLUSTER-08**: PRs split when exceeding ~10 shards or ~50 suggestions, splitting at the next subtree level; cross-cutting shards attach to the best-fit PR or get their own
 - [x] **CLUSTER-09**: Reviewer approves/rejects per-PR; GitHub's commit tab serves as the shard navigator for per-shard drill-down and feedback
 
 ### Dual UX Modes
@@ -179,12 +179,12 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | VALID-06 | Phase 13 | Complete |
 | CLUSTER-01 | Phase 15 | Complete |
 | CLUSTER-02 | Phase 15 | Pending |
-| CLUSTER-03 | Phase 15 | Pending |
+| CLUSTER-03 | Phase 15 | Complete |
 | CLUSTER-04 | Phase 15 | Pending |
 | CLUSTER-05 | Phase 15 | Complete |
 | CLUSTER-06 | Phase 15 | Complete |
 | CLUSTER-07 | Phase 15 | Complete |
-| CLUSTER-08 | Phase 15 | Pending |
+| CLUSTER-08 | Phase 15 | Complete |
 | CLUSTER-09 | Phase 15 | Complete |
 | UX-01 | Phase 14 | Complete |
 | UX-02 | Phase 14 | Complete |
