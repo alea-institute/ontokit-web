@@ -151,10 +151,8 @@ export function ShardPreviewModal({
       setSubmitResponse(response);
       setPhase("complete");
     } catch {
-      // On error show all steps as error
-      setProgressSteps((prev) =>
-        prev.map((step) => ({ ...step, status: "error" as const })),
-      );
+      // On error, return to preview so user can retry or close
+      setPhase("preview");
     }
   }, [prGroupOrder, prGroups, shards, notes, projectId, sessionId, accessToken]);
 
