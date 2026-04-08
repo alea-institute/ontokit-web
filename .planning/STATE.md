@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
-status: executing
-stopped_at: Completed 16-03-PLAN.md
-last_updated: "2026-04-08T14:34:04.069Z"
+status: verifying
+stopped_at: Completed 16-04-PLAN.md — awaiting human-verify checkpoint
+last_updated: "2026-04-08T14:40:23.436Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 10
-  completed_phases: 8
+  completed_phases: 9
   total_plans: 35
-  completed_plans: 34
-  percent: 97
+  completed_plans: 35
+  percent: 100
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 
 Phase: 16 (reviewer-enhancements) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-08
 
 Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
@@ -78,6 +78,7 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 | Phase 16-reviewer-enhancements P01 | 1 | 1 tasks | 2 files |
 | Phase 16-reviewer-enhancements P02 | 2 | 2 tasks | 4 files |
 | Phase 16-reviewer-enhancements P03 | 2 | 2 tasks | 5 files |
+| Phase 16-reviewer-enhancements P04 | 4 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,9 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 - [Phase 16-03]: scoreColor() defined locally in each component (not shared util) — matches SimilarConceptsPanel pattern, avoids premature abstraction
 - [Phase 16-03]: DuplicateComparisonExpander fetches on mount (useEffect []) — component only mounts when candidate is clicked so lazy-load semantics are preserved
 - [Phase 16-03]: ShardReviewMarker localFeedback state initialized from mark?.feedback so textarea retains pre-existing feedback on re-render
+- [Phase 16-04]: attributeLinesToEntities uses IRI-match state machine; prefix match is best-effort (retains prior context)
+- [Phase 16-04]: shardMarks cleared ONLY in finally blocks of PR action handlers — NOT in handleSelectSession (RESEARCH.md Pitfall 4)
+- [Phase 16-04]: Enriched session detail fetch graceful fallback (catch → null) — diff renders correctly without it
 
 ### Key Facts
 
@@ -198,12 +202,12 @@ None yet.
 ### Entity Graph Port (`entity-graph-migration`)
 
 - **Issue:** CatholicOS/ontokit-web#81
-- **Status:** Ready to execute
+- **Status:** Phase complete — ready for verification
 - **Handoff:** `.planning/features/entity-graph-port/HANDOFF.md`
 - **Next:** Visual verify with MCP chrome-devtools (headless), then create PR
 
 ## Session Continuity
 
-Last session: 2026-04-08T14:34:04.067Z
-Stopped at: Completed 16-03-PLAN.md
+Last session: 2026-04-08T14:40:23.434Z
+Stopped at: Completed 16-04-PLAN.md — awaiting human-verify checkpoint
 Resume file: None

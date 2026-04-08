@@ -33,7 +33,7 @@ Phases 1-6: Mode system, editor decomposition, auto-save, form editing, suggesti
 - [x] **Phase 13: Validation Guardrails & Suggestion Generation** - Pre-submit validation rules, Generative FOLIO prompt pipeline, and LLM suggestion endpoints for classes/annotations/edges (completed 2026-04-07)
 - [x] **Phase 14: Inline Suggestion UX & Property Support** - "Suggest improvements" button on class detail panel, flashcard iterator mode, one-click suggestion actions, and property tree browsing with LLM suggestions (completed 2026-04-07)
 - [x] **Phase 15: Session Clustering & Batch Submit** - Auto-clustering of session suggestions by ancestor, shard preview tree, per-shard PR creation, and batch traceability (completed 2026-04-08)
-- [ ] **Phase 16: Reviewer Enhancements** - Provenance tags, confidence scores, similar-entity panels, and batch review view in the existing reviewer workflow
+- [x] **Phase 16: Reviewer Enhancements** - Provenance tags, confidence scores, similar-entity panels, and batch review view in the existing reviewer workflow (completed 2026-04-08)
 
 ## Phase Details
 
@@ -199,7 +199,7 @@ Plans:
 - [x] 16-01-PLAN.md — Data layer: Enriched session detail types, API methods (getSessionDetail, postShardReviews, createCleanPR)
 - [x] 16-02-PLAN.md — UI components: ProvenanceBadge + ShardTabNavigator
 - [x] 16-03-PLAN.md — UI components: SimilarEntitiesInlinePanel, DuplicateComparisonExpander, ShardReviewMarker
-- [ ] 16-04-PLAN.md — Integration: Review page wiring + visual verification
+- [x] 16-04-PLAN.md — Integration: Review page wiring + visual verification
 **UI hint**: yes
 
 ## Progress
@@ -217,4 +217,4 @@ Plans:
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 5/5 | Complete   | 2026-04-07 |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 5/5 | Complete    | 2026-04-08 |
-| 16. Reviewer Enhancements | v0.4.0 | 3/4 | In Progress|  |
+| 16. Reviewer Enhancements | v0.4.0 | 4/4 | Complete   | 2026-04-08 |
