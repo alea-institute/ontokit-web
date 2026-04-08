@@ -57,7 +57,7 @@ export function DuplicateComparisonExpander({
   useEffect(() => {
     fetchEntityDetail();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [candidateIri, projectId, branch]);
 
   const toggleShowMore = (index: number) => {
     setShowMoreAnnotations((prev) => {
