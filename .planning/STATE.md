@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: planning
-stopped_at: Phase 16 context gathered
-last_updated: "2026-04-08T12:46:29.093Z"
+stopped_at: Phase 16 UI-SPEC approved
+last_updated: "2026-04-08T12:56:27.841Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 10
@@ -194,6 +194,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T12:46:29.091Z
-Stopped at: Phase 16 context gathered
-Resume file: .planning/phases/16-reviewer-enhancements/16-CONTEXT.md
+Last session: 2026-04-08T12:56:27.839Z
+Stopped at: Phase 16 UI-SPEC approved
+Resume file: .planning/phases/16-reviewer-enhancements/16-UI-SPEC.md
