@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -18,6 +18,7 @@ import {
   FileMinus,
   FileEdit,
   Clock,
+  Scissors,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,9 @@ import { ApiError } from "@/lib/api/client";
 import {
   suggestionsApi,
   type SuggestionSessionSummary,
+  type SessionDetailResponse,
+  type EntityReviewMetadata,
+  type ShardReviewMark,
 } from "@/lib/api/suggestions";
 import {
   pullRequestsApi,
@@ -35,6 +39,11 @@ import {
 import { RejectSuggestionDialog } from "@/components/suggestions/RejectSuggestionDialog";
 import { RequestChangesDialog } from "@/components/suggestions/RequestChangesDialog";
 import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/hooks/useNotifications";
+import { ProvenanceBadge } from "@/components/suggestions/ProvenanceBadge";
+import { ShardTabNavigator, type ShardTabInfo } from "@/components/suggestions/ShardTabNavigator";
+import { SimilarEntitiesInlinePanel } from "@/components/suggestions/SimilarEntitiesInlinePanel";
+import { ShardReviewMarker, type ShardMark } from "@/components/suggestions/ShardReviewMarker";
+import { attributeLinesToEntities } from "@/lib/editor/entityLineAttribution";
 import { cn } from "@/lib/utils";
 
 function formatTimeAgo(date: Date): string {
@@ -51,7 +60,21 @@ function formatTimeAgo(date: Date): string {
   return date.toLocaleDateString();
 }
 
-function DiffView({ diff }: { diff: PRDiffResponse }) {
+function DiffView({
+  diff,
+  entityMetadataMap,
+  activeShardId,
+  sessionDetail,
+  projectId,
+  accessToken,
+}: {
+  diff: PRDiffResponse;
+  entityMetadataMap: Map<string, EntityReviewMetadata>;
+  activeShardId: string | null;
+  sessionDetail: SessionDetailResponse | null;
+  projectId: string;
+  accessToken?: string;
+}) {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(
     () => new Set(diff.files.map((f) => f.path)),
   );
@@ -91,6 +114,21 @@ function DiffView({ diff }: { diff: PRDiffResponse }) {
         const Icon = config.icon;
         const isExpanded = expandedFiles.has(file.path);
 
+        // Entity-to-line attribution using tested pure function
+        const patchLines = file.patch ? file.patch.split("\n") : [];
+        const attributions = attributeLinesToEntities(patchLines, entityMetadataMap);
+
+        // Determine which entity IRIs belong to the active shard
+        const activeShardIris = activeShardId && sessionDetail
+          ? new Set(sessionDetail.shards.find(s => s.id === activeShardId)?.entity_iris ?? [])
+          : null;
+
+        // Track which entities appear in this file's patch (for similar entities panels)
+        const entitiesInPatch = new Set<string>();
+        for (const attr of attributions) {
+          if (attr.entityIri) entitiesInPatch.add(attr.entityIri);
+        }
+
         return (
           <div
             key={file.path}
@@ -121,7 +159,16 @@ function DiffView({ diff }: { diff: PRDiffResponse }) {
             </button>
             {isExpanded && file.patch && (
               <div className="overflow-x-auto border-t border-slate-200 bg-white text-xs dark:border-slate-700 dark:bg-slate-900">
-                {file.patch.split("\n").map((line, idx) => {
+                {patchLines.map((line, idx) => {
+                  const attribution = attributions[idx];
+
+                  // Shard filter: hide addition lines for entities not in active shard (Pitfall 3: hunk-level)
+                  if (activeShardIris && attribution.entityIri && !activeShardIris.has(attribution.entityIri)) {
+                    if (line.startsWith("+") && !line.startsWith("+++")) {
+                      return null; // Skip this line — not in active shard
+                    }
+                  }
+
                   let bgClass = "";
                   let textClass = "text-slate-700 dark:text-slate-300";
 
@@ -137,9 +184,31 @@ function DiffView({ diff }: { diff: PRDiffResponse }) {
                   }
 
                   return (
-                    <div key={idx} className={cn("px-4 py-0.5 font-mono whitespace-pre", bgClass, textClass)}>
-                      {line || " "}
+                    <div key={idx} className={cn("flex items-center px-4 py-0.5 font-mono whitespace-pre", bgClass, textClass)}>
+                      <span className="flex-1">{line || " "}</span>
+                      {line.startsWith("+") && !line.startsWith("+++") && attribution.metadata && (
+                        <ProvenanceBadge
+                          provenance={attribution.metadata.provenance}
+                          confidence={attribution.metadata.confidence}
+                        />
+                      )}
                     </div>
+                  );
+                })}
+
+                {/* Similar entities panels for entities in this file's patch */}
+                {Array.from(entitiesInPatch).map(iri => {
+                  const meta = entityMetadataMap.get(iri);
+                  if (!meta || meta.duplicate_candidates.length === 0) return null;
+                  return (
+                    <SimilarEntitiesInlinePanel
+                      key={iri}
+                      entityIri={iri}
+                      entityLabel={meta.entity_label}
+                      candidates={meta.duplicate_candidates}
+                      projectId={projectId}
+                      accessToken={accessToken}
+                    />
                   );
                 })}
               </div>
@@ -168,6 +237,16 @@ export default function SuggestionReviewPage() {
   const [activeTab, setActiveTab] = useState<DetailTab>("summary");
   const [diff, setDiff] = useState<PRDiffResponse | null>(null);
   const [isDiffLoading, setIsDiffLoading] = useState(false);
+
+  // Enriched session detail (Phase 16)
+  const [sessionDetail, setSessionDetail] = useState<SessionDetailResponse | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+
+  // Shard tab filter
+  const [activeShardId, setActiveShardId] = useState<string | null>(null); // null = "All"
+
+  // Per-shard review marks (buffered in state, sent with PR action)
+  const [shardMarks, setShardMarks] = useState<Record<string, ShardMark>>({});
 
   // Action dialogs
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -209,30 +288,56 @@ export default function SuggestionReviewPage() {
     fetchData();
   }, [fetchData]);
 
-  // Load diff when selecting a session and switching to files tab
+  // Load diff + enriched session detail when selecting a session and switching to files tab
   useEffect(() => {
-    if (!selectedSession?.pr_number || activeTab !== "files" || diff || isDiffLoading) return;
+    if (!selectedSession || activeTab !== "files" || isDiffLoading) return;
     if (!session?.accessToken) return;
+    // Skip if both already loaded
+    if (diff && sessionDetail) return;
 
     let cancelled = false;
     setIsDiffLoading(true);
-    pullRequestsApi
-      .getDiff(projectId, selectedSession.pr_number, session.accessToken)
-      .then((data) => { if (!cancelled) setDiff(data); })
-      .catch(() => {
-        // Diff may not be available
+    setIsDetailLoading(true);
+
+    const diffPromise = selectedSession.pr_number
+      ? pullRequestsApi.getDiff(projectId, selectedSession.pr_number, session.accessToken)
+      : Promise.resolve(null);
+
+    const detailPromise = suggestionsApi
+      .getSessionDetail(projectId, selectedSession.session_id, session.accessToken)
+      .catch(() => null); // Graceful fallback — enriched detail is optional; diff still works without it
+
+    Promise.all([diffPromise, detailPromise])
+      .then(([diffData, detailData]) => {
+        if (cancelled) return;
+        if (diffData) setDiff(diffData);
+        if (detailData) setSessionDetail(detailData);
       })
-      .finally(() => { if (!cancelled) setIsDiffLoading(false); });
+      .catch(() => {
+        // diff may not be available
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsDiffLoading(false);
+          setIsDetailLoading(false);
+        }
+      });
     return () => { cancelled = true; };
-  }, [selectedSession, activeTab, diff, isDiffLoading, projectId, session?.accessToken]);
+  }, [selectedSession, activeTab, diff, sessionDetail, isDiffLoading, projectId, session?.accessToken]);
 
   const handleSelectSession = (s: SuggestionSessionSummary) => {
     if (selectedSession?.session_id === s.session_id) {
       setSelectedSession(null);
       setDiff(null);
+      setSessionDetail(null);
+      setActiveShardId(null);
+      // NOTE: shardMarks intentionally NOT cleared here (RESEARCH.md Pitfall 4)
     } else {
       setSelectedSession(s);
       setDiff(null);
+      setSessionDetail(null);
+      setActiveShardId(null);
+      // NOTE: shardMarks intentionally NOT cleared here (RESEARCH.md Pitfall 4)
       setActiveTab("summary");
     }
   };
@@ -241,15 +346,41 @@ export default function SuggestionReviewPage() {
     if (!selectedSession || !session?.accessToken) return;
     setActionInProgress(true);
     try {
+      // Send per-shard review marks if any exist (Phase 16: D-09, D-10)
+      const hasShardMarks = Object.keys(shardMarks).length > 0;
+      if (hasShardMarks) {
+        const marks: ShardReviewMark[] = Object.entries(shardMarks).map(([shard_id, mark]) => ({
+          shard_id,
+          status: mark.status,
+          feedback: mark.feedback,
+        }));
+        await suggestionsApi.postShardReviews(
+          projectId,
+          selectedSession.session_id,
+          { marks },
+          session.accessToken,
+        ).catch(() => {
+          // Non-blocking — shard marks are additive metadata per D-10
+        });
+
+        // D-12: Dispatch notification refresh for rejected shards with feedback
+        const hasRejectedWithFeedback = marks.some(m => m.status === "rejected" && m.feedback);
+        if (hasRejectedWithFeedback) {
+          window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+        }
+      }
+
       await suggestionsApi.approve(projectId, selectedSession.session_id, session.accessToken);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
       setSelectedSession(null);
       setDiff(null);
+      setSessionDetail(null);
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to approve suggestion");
     } finally {
       setActionInProgress(false);
+      setShardMarks({}); // Only clear marks after action completes
     }
   };
 
@@ -257,15 +388,41 @@ export default function SuggestionReviewPage() {
     if (!selectedSession || !session?.accessToken) return;
     setActionInProgress(true);
     try {
+      // Send per-shard review marks if any exist (Phase 16: D-09, D-10)
+      const hasShardMarks = Object.keys(shardMarks).length > 0;
+      if (hasShardMarks) {
+        const marks: ShardReviewMark[] = Object.entries(shardMarks).map(([shard_id, mark]) => ({
+          shard_id,
+          status: mark.status,
+          feedback: mark.feedback,
+        }));
+        await suggestionsApi.postShardReviews(
+          projectId,
+          selectedSession.session_id,
+          { marks },
+          session.accessToken,
+        ).catch(() => {
+          // Non-blocking — shard marks are additive metadata per D-10
+        });
+
+        // D-12: Dispatch notification refresh for rejected shards with feedback
+        const hasRejectedWithFeedback = marks.some(m => m.status === "rejected" && m.feedback);
+        if (hasRejectedWithFeedback) {
+          window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+        }
+      }
+
       await suggestionsApi.reject(projectId, selectedSession.session_id, { reason }, session.accessToken);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
       setSelectedSession(null);
       setDiff(null);
+      setSessionDetail(null);
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to reject suggestion");
     } finally {
       setActionInProgress(false);
+      setShardMarks({}); // Only clear marks after action completes
     }
   };
 
@@ -273,17 +430,72 @@ export default function SuggestionReviewPage() {
     if (!selectedSession || !session?.accessToken) return;
     setActionInProgress(true);
     try {
+      // Send per-shard review marks if any exist (Phase 16: D-09, D-10)
+      const hasShardMarks = Object.keys(shardMarks).length > 0;
+      if (hasShardMarks) {
+        const marks: ShardReviewMark[] = Object.entries(shardMarks).map(([shard_id, mark]) => ({
+          shard_id,
+          status: mark.status,
+          feedback: mark.feedback,
+        }));
+        await suggestionsApi.postShardReviews(
+          projectId,
+          selectedSession.session_id,
+          { marks },
+          session.accessToken,
+        ).catch(() => {
+          // Non-blocking — shard marks are additive metadata per D-10
+        });
+
+        // D-12: Dispatch notification refresh for rejected shards with feedback
+        const hasRejectedWithFeedback = marks.some(m => m.status === "rejected" && m.feedback);
+        if (hasRejectedWithFeedback) {
+          window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+        }
+      }
+
       await suggestionsApi.requestChanges(projectId, selectedSession.session_id, { feedback }, session.accessToken);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
       setSelectedSession(null);
       setDiff(null);
+      setSessionDetail(null);
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to request changes");
     } finally {
       setActionInProgress(false);
+      setShardMarks({}); // Only clear marks after action completes
     }
   };
+
+  // Build entity IRI lookup from session detail
+  const entityMetadataMap = useMemo(() => {
+    if (!sessionDetail) return new Map<string, EntityReviewMetadata>();
+    const map = new Map<string, EntityReviewMetadata>();
+    for (const entity of sessionDetail.entities) {
+      map.set(entity.entity_iri, entity);
+    }
+    return map;
+  }, [sessionDetail]);
+
+  // Compute shard tab info
+  const shardTabs: ShardTabInfo[] = useMemo(() => {
+    if (!sessionDetail?.shards) return [];
+    return sessionDetail.shards.map(s => ({
+      id: s.id,
+      label: s.label,
+      entityCount: s.entity_iris.length,
+    }));
+  }, [sessionDetail]);
+
+  // Build shard mark status lookup for ShardTabNavigator
+  const shardMarkStatuses = useMemo(() => {
+    const statuses: Record<string, "approved" | "rejected"> = {};
+    for (const [id, mark] of Object.entries(shardMarks)) {
+      statuses[id] = mark.status;
+    }
+    return statuses;
+  }, [shardMarks]);
 
   if (isLoading || status === "loading") {
     return (
@@ -610,12 +822,53 @@ export default function SuggestionReviewPage() {
                           ) : (
                             // Files tab
                             <div>
+                              {/* Shard tab navigator (Phase 16) */}
+                              {shardTabs.length > 0 && (
+                                <div className="mb-4">
+                                  <ShardTabNavigator
+                                    shards={shardTabs}
+                                    activeShardId={activeShardId}
+                                    shardMarks={shardMarkStatuses}
+                                    onShardChange={setActiveShardId}
+                                  />
+                                </div>
+                              )}
+
                               {isDiffLoading ? (
                                 <div className="flex items-center justify-center py-8">
                                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
                                 </div>
                               ) : diff ? (
-                                <DiffView diff={diff} />
+                                <>
+                                  <DiffView
+                                    diff={diff}
+                                    entityMetadataMap={entityMetadataMap}
+                                    activeShardId={activeShardId}
+                                    sessionDetail={sessionDetail}
+                                    projectId={projectId}
+                                    accessToken={session?.accessToken}
+                                  />
+
+                                  {/* Per-shard review marker (Phase 16) */}
+                                  {activeShardId && sessionDetail && (
+                                    <ShardReviewMarker
+                                      shardId={activeShardId}
+                                      shardLabel={sessionDetail.shards.find(sh => sh.id === activeShardId)?.label ?? activeShardId}
+                                      mark={shardMarks[activeShardId]}
+                                      onChange={(id, mark) => {
+                                        setShardMarks(prev => {
+                                          const next = { ...prev };
+                                          if (mark) {
+                                            next[id] = mark;
+                                          } else {
+                                            delete next[id];
+                                          }
+                                          return next;
+                                        });
+                                      }}
+                                    />
+                                  )}
+                                </>
                               ) : (
                                 <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
                                   {s.pr_number
@@ -629,6 +882,44 @@ export default function SuggestionReviewPage() {
 
                         {/* Action bar */}
                         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3 dark:border-slate-700">
+                          {/* Create clean PR (stretch goal — D-11, D-16) */}
+                          {Object.values(shardMarks).some(m => m.status === "rejected") && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={async () => {
+                                if (!selectedSession || !session?.accessToken) return;
+                                const approvedIds = Object.entries(shardMarks)
+                                  .filter(([, m]) => m.status === "approved")
+                                  .map(([id]) => id);
+                                if (approvedIds.length === 0) return;
+                                setActionInProgress(true);
+                                try {
+                                  await suggestionsApi.createCleanPR(
+                                    projectId,
+                                    selectedSession.session_id,
+                                    { approved_shard_ids: approvedIds },
+                                    session.accessToken,
+                                  );
+                                  window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+                                  setSelectedSession(null);
+                                  setDiff(null);
+                                  setSessionDetail(null);
+                                  setShardMarks({});
+                                  fetchData();
+                                } catch (err) {
+                                  setError(err instanceof Error ? err.message : "Failed to create clean PR");
+                                } finally {
+                                  setActionInProgress(false);
+                                }
+                              }}
+                              disabled={actionInProgress || !Object.values(shardMarks).some(m => m.status === "approved")}
+                            >
+                              <Scissors className="h-4 w-4" />
+                              Create PR from approved shards
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
