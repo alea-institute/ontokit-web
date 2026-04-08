@@ -124,18 +124,19 @@ export function ShardPreviewModal({
     setProgressSteps(steps);
 
     // Build BatchSubmitRequest from current store state (T-15-04: store-sourced only)
+    // Filter out empty shards that may result from split/move-all operations (WR-03)
     const request = {
       pr_groups: prGroupOrder.map((prId) => {
         const prGroup = prGroups[prId];
         return {
-          shards: prGroup.shardIds.map((shardId) => {
-            const shard = shards[shardId];
-            return {
+          shards: prGroup.shardIds
+            .map((shardId) => shards[shardId])
+            .filter((shard) => shard && shard.entityIris.length > 0)
+            .map((shard) => ({
               id: shard.id,
               label: shard.label,
               entity_iris: shard.entityIris,
-            };
-          }),
+            })),
         };
       }),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
@@ -185,14 +186,14 @@ export function ShardPreviewModal({
       pr_groups: failedPrIds.map((prId) => {
         const prGroup = prGroups[prId];
         return {
-          shards: prGroup.shardIds.map((shardId) => {
-            const shard = shards[shardId];
-            return {
+          shards: prGroup.shardIds
+            .map((shardId) => shards[shardId])
+            .filter((shard) => shard && shard.entityIris.length > 0)
+            .map((shard) => ({
               id: shard.id,
               label: shard.label,
               entity_iris: shard.entityIris,
-            };
-          }),
+            })),
         };
       }),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
