@@ -10,6 +10,7 @@
  */
 
 import { api } from "./client";
+import type { Provenance, DuplicateCandidate } from "./generation";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -161,6 +162,50 @@ export interface BatchSubmitResponse {
   results: BatchSubmitPRResult[];
   succeeded: number;
   failed: number;
+}
+
+// --- Enriched review types (Phase 16) ---
+
+export interface EntityReviewMetadata {
+  entity_iri: string;
+  entity_label: string;
+  shard_id: string;
+  shard_label: string;
+  provenance: Provenance;
+  confidence: number | null;
+  duplicate_candidates: DuplicateCandidate[];
+}
+
+export interface ShardReviewInfo {
+  id: string;
+  label: string;
+  entity_iris: string[];
+}
+
+export interface SessionDetailResponse {
+  session_id: string;
+  entities: EntityReviewMetadata[];
+  shards: ShardReviewInfo[];
+}
+
+export type ShardReviewMark = {
+  shard_id: string;
+  status: "approved" | "rejected";
+  feedback?: string;
+};
+
+export interface ShardReviewsRequest {
+  marks: ShardReviewMark[];
+}
+
+export interface CleanPRRequest {
+  approved_shard_ids: string[];
+}
+
+export interface CleanPRResponse {
+  pr_number: number;
+  pr_url: string | null;
+  github_pr_url: string | null;
 }
 
 // --- Anonymous suggestion types ---
@@ -364,6 +409,50 @@ export const suggestionsApi = {
   ) =>
     api.post<BatchSubmitResponse>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/batch-submit`,
+      data,
+      { headers: { Authorization: `Bearer ${token}` } },
+    ),
+
+  /**
+   * Get enriched session detail for review — includes per-entity
+   * provenance, confidence, duplicate candidates, and shard structure.
+   * (Phase 16: D-13, D-14)
+   */
+  getSessionDetail: (projectId: string, sessionId: string, token: string) =>
+    api.get<SessionDetailResponse>(
+      `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/detail`,
+      { headers: { Authorization: `Bearer ${token}` } },
+    ),
+
+  /**
+   * Submit per-shard review marks (approve/reject + feedback) as additive metadata.
+   * Called before or alongside the PR-level action (approve/reject/request-changes).
+   * (Phase 16: D-09, D-10, D-15)
+   */
+  postShardReviews: (
+    projectId: string,
+    sessionId: string,
+    data: ShardReviewsRequest,
+    token: string,
+  ) =>
+    api.post<void>(
+      `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/shard-reviews`,
+      data,
+      { headers: { Authorization: `Bearer ${token}` } },
+    ),
+
+  /**
+   * Create a new PR from only the approved shard entities.
+   * Stretch goal (D-11, D-16) — only available after per-shard marking.
+   */
+  createCleanPR: (
+    projectId: string,
+    sessionId: string,
+    data: CleanPRRequest,
+    token: string,
+  ) =>
+    api.post<CleanPRResponse>(
+      `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/clean-pr`,
       data,
       { headers: { Authorization: `Bearer ${token}` } },
     ),
