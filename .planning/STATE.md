@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Phase 16 UI-SPEC approved
-last_updated: "2026-04-08T13:44:51.692Z"
-last_activity: 2026-04-08 -- Phase 16 planning complete
+stopped_at: Completed 16-01-PLAN.md
+last_updated: "2026-04-08T14:25:12.982Z"
+last_activity: 2026-04-08
 progress:
   total_phases: 10
   completed_phases: 8
   total_plans: 35
-  completed_plans: 31
-  percent: 89
+  completed_plans: 32
+  percent: 91
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-05)
 
 **Core value:** Enable grassroots-level collaborative ontology editing in a modern, accessible web interface — where SMEs rapidly improve their ontology with LLM assistance while preserving integrity through human curation.
-**Current focus:** Phase 15 — session-clustering-batch-submit
+**Current focus:** Phase 16 — reviewer-enhancements
 
 ## Current Position
 
-Phase: 16
-Plan: Not started
+Phase: 16 (reviewer-enhancements) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-04-08 -- Phase 16 planning complete
+Last activity: 2026-04-08
 
 Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 
@@ -75,6 +75,7 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 | Phase 15-session-clustering-batch-submit P02 | 8 | 2 tasks | 6 files |
 | Phase 15-session-clustering-batch-submit P03 | 3 | 2 tasks | 3 files |
 | Phase 15-session-clustering-batch-submit P04 | 3 | 1 tasks | 1 files |
+| Phase 16-reviewer-enhancements P01 | 1 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -153,6 +154,8 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 - [Phase Phase 15]: Escape key only closes ShardPreviewModal in preview phase — suppressed during submitting to prevent accidental dismissal while PRs are being created
 - [Phase 15-session-clustering-batch-submit]: Clustering gate uses changesCount (session-level) not accepted suggestion count from store — changesCount is the authoritative measure of how many edits the suggester made
 - [Phase 15-session-clustering-batch-submit]: Fallback to SuggestionSubmitDialog on cluster API error ensures user is never stuck — no suggestion session is orphaned
+- [Phase 16-01]: Imported Provenance and DuplicateCandidate from ./generation (not redefined) to keep Phase 16 types DRY
+- [Phase 16-01]: postShardReviews returns api.post<void> — backend stores shard metadata, no response body needed per D-15
 
 ### Key Facts
 
@@ -194,6 +197,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T12:56:27.839Z
-Stopped at: Phase 16 UI-SPEC approved
-Resume file: .planning/phases/16-reviewer-enhancements/16-UI-SPEC.md
+Last session: 2026-04-08T14:25:12.980Z
+Stopped at: Completed 16-01-PLAN.md
+Resume file: None

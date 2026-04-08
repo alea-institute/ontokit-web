@@ -98,11 +98,11 @@
 
 Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/review/page.tsx` (shipped in v0.2.0 / v0.3.0). No new reviewer UI is built — these requirements add LLM-specific affordances to the existing diff + approve/reject/request-changes workflow.
 
-- [ ] **REVIEW-01**: Existing diff view works for LLM-proposed suggestions identically to human-written ones
-- [ ] **REVIEW-02**: Reviewer sees a similar-existing-entities panel for every suggestion (duplicate detection results)
-- [ ] **REVIEW-03**: Reviewer sees provenance tag on every suggestion (llm-proposed / user-written / user-edited-from-llm)
-- [ ] **REVIEW-04**: Reviewer sees LLM confidence score where available
-- [ ] **REVIEW-05**: PR is the batch unit; reviewer approves/rejects per-PR and uses GitHub's commit tab to drill into individual shard-commits for feedback
+- [x] **REVIEW-01**: Existing diff view works for LLM-proposed suggestions identically to human-written ones
+- [x] **REVIEW-02**: Reviewer sees a similar-existing-entities panel for every suggestion (duplicate detection results)
+- [x] **REVIEW-03**: Reviewer sees provenance tag on every suggestion (llm-proposed / user-written / user-edited-from-llm)
+- [x] **REVIEW-04**: Reviewer sees LLM confidence score where available
+- [x] **REVIEW-05**: PR is the batch unit; reviewer approves/rejects per-PR and uses GitHub's commit tab to drill into individual shard-commits for feedback
 
 ### Toolchain Integration
 
@@ -209,11 +209,11 @@ Enhancements to the existing reviewer page at `app/projects/[id]/suggestions/rev
 | COST-05 | Phase 11 | Complete |
 | COST-06 | Phase 11 | Complete |
 | COST-07 | Phase 11 | Complete |
-| REVIEW-01 | Phase 16 | Pending |
-| REVIEW-02 | Phase 16 | Pending |
-| REVIEW-03 | Phase 16 | Pending |
-| REVIEW-04 | Phase 16 | Pending |
-| REVIEW-05 | Phase 16 | Pending |
+| REVIEW-01 | Phase 16 | Complete |
+| REVIEW-02 | Phase 16 | Complete |
+| REVIEW-03 | Phase 16 | Complete |
+| REVIEW-04 | Phase 16 | Complete |
+| REVIEW-05 | Phase 16 | Complete |
 | TOOL-01 | Phase 12 | Complete |
 | TOOL-02 | Phase 12 | Complete |
 | TOOL-03 | Phase 12 | Complete |

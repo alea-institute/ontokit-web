@@ -196,7 +196,7 @@ Plans:
   4. Batch-submitted suggestions appear under a batch header in the review queue; the reviewer can approve or reject the entire batch with one action, or expand it to act per-shard
 **Plans**: 4 plans
 Plans:
-- [ ] 16-01-PLAN.md — Data layer: Enriched session detail types, API methods (getSessionDetail, postShardReviews, createCleanPR)
+- [x] 16-01-PLAN.md — Data layer: Enriched session detail types, API methods (getSessionDetail, postShardReviews, createCleanPR)
 - [ ] 16-02-PLAN.md — UI components: ProvenanceBadge + ShardTabNavigator
 - [ ] 16-03-PLAN.md — UI components: SimilarEntitiesInlinePanel, DuplicateComparisonExpander, ShardReviewMarker
 - [ ] 16-04-PLAN.md — Integration: Review page wiring + visual verification
@@ -217,4 +217,4 @@ Plans:
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 5/5 | Complete   | 2026-04-07 |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 5/5 | Complete    | 2026-04-08 |
-| 16. Reviewer Enhancements | v0.4.0 | 0/4 | Planning complete | - |
+| 16. Reviewer Enhancements | v0.4.0 | 1/4 | In Progress|  |
