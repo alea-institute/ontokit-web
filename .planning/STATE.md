@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Completed 15-02-PLAN.md
-last_updated: "2026-04-08T00:08:27.565Z"
+stopped_at: Completed 15-03-PLAN.md
+last_updated: "2026-04-08T00:13:32.973Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 31
-  completed_plans: 29
-  percent: 94
+  completed_plans: 30
+  percent: 97
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 15 (session-clustering-batch-submit) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
 Last activity: 2026-04-08
 
@@ -73,6 +73,7 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 | Phase 14 P03 | 11 | 2 tasks | 7 files |
 | Phase 14 P04 | 5 | 2 tasks | 4 files |
 | Phase 15-session-clustering-batch-submit P02 | 8 | 2 tasks | 6 files |
+| Phase 15-session-clustering-batch-submit P03 | 3 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,9 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 - [Phase Phase 15]: @radix-ui/react-dropdown-menu imported directly (no wrapper) — no components/ui/dropdown-menu.tsx exists in codebase; direct Radix import is consistent with this phase's patterns
 - [Phase Phase 15]: ShardPreviewShardRow passes split state to children via React.cloneElement — keeps split state co-located with the shard row rather than lifting to context
 - [Phase Phase 15]: useDraggable id for entity rows includes shardId suffix to prevent ID collisions across shard contexts
+- [Phase Phase 15]: useShardDragDrop tested via renderHook (not direct call) — React hooks require a React environment; renderHook from @testing-library/react is the correct vitest pattern for unit-testing hooks
+- [Phase Phase 15]: ShardPreviewModal passes siblingShardIds (same PR group only) to ShardPreviewShardRow.allShardIds — merge submenu should only offer shards within the same PR group
+- [Phase Phase 15]: Escape key only closes ShardPreviewModal in preview phase — suppressed during submitting to prevent accidental dismissal while PRs are being created
 
 ### Key Facts
 
@@ -187,6 +191,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T00:08:27.563Z
-Stopped at: Completed 15-02-PLAN.md
+Last session: 2026-04-08T00:13:32.971Z
+Stopped at: Completed 15-03-PLAN.md
 Resume file: None
