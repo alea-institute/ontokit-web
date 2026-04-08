@@ -323,7 +323,7 @@ export default function SuggestionReviewPage() {
         }
       });
     return () => { cancelled = true; };
-  }, [selectedSession, activeTab, diff, sessionDetail, isDiffLoading, projectId, session?.accessToken]);
+  }, [selectedSession, activeTab, diff, sessionDetail, projectId, session?.accessToken]);
 
   const handleSelectSession = (s: SuggestionSessionSummary) => {
     if (selectedSession?.session_id === s.session_id) {
@@ -337,7 +337,7 @@ export default function SuggestionReviewPage() {
       setDiff(null);
       setSessionDetail(null);
       setActiveShardId(null);
-      // NOTE: shardMarks intentionally NOT cleared here (RESEARCH.md Pitfall 4)
+      setShardMarks({}); // Clear marks when switching to a different session
       setActiveTab("summary");
     }
   };
@@ -890,6 +890,7 @@ export default function SuggestionReviewPage() {
                               className="gap-1.5"
                               onClick={async () => {
                                 if (!selectedSession || !session?.accessToken) return;
+                                setError(null); // Clear any prior error before starting
                                 const approvedIds = Object.entries(shardMarks)
                                   .filter(([, m]) => m.status === "approved")
                                   .map(([id]) => id);
