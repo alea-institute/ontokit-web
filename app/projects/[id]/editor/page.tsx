@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn, Pencil } from "lucide-react";
+import dynamic from "next/dynamic";
+import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn, Pencil, Loader2 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -40,8 +41,19 @@ import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
 import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
 import { useAnonymousSuggestion } from "@/lib/hooks/useAnonymousSuggestion";
 import { CreditModal } from "@/components/suggestions/CreditModal";
+import type { ClusterResponse, ClusterSuggestionItem, BatchSubmitPRResult } from "@/lib/api/suggestions";
+import { suggestionsApi } from "@/lib/api/suggestions";
+import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+
+// Dynamically imported to avoid SSR (modal uses DnD and window APIs)
+const ShardPreviewModal = dynamic(
+  () => import("@/components/suggestions/ShardPreviewModal").then((m) => ({ default: m.ShardPreviewModal })),
+  { ssr: false },
+);
+
+const SMALL_SESSION_THRESHOLD = 5;
 
 export default function EditorPage() {
   const { data: session, status } = useSession();
@@ -136,6 +148,9 @@ export default function EditorPage() {
 
   // Suggestion session (only active for suggesters who can't directly edit)
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+  const [shardPreviewOpen, setShardPreviewOpen] = useState(false);
+  const [clusterResponse, setClusterResponse] = useState<ClusterResponse | null>(null);
+  const [isClusterLoading, setIsClusterLoading] = useState(false);
 
   // Anonymous proposal mode: available when AUTH_MODE != required and user is NOT signed in as editor/suggester
   const canPropose = authMode !== "required" && !canEdit && !canSuggest;
@@ -676,6 +691,72 @@ export default function EditorPage() {
     await anonymousSuggestion.submitSession(undefined, name ?? undefined, email ?? undefined);
   }, [anonymousSuggestion]);
 
+  // Handle "Submit Suggestions" — gates through clustering for large sessions (per D-03)
+  const handleSubmitClick = useCallback(async () => {
+    if (!suggestionSession.sessionId || !session?.accessToken) return;
+
+    if (suggestionSession.changesCount <= SMALL_SESSION_THRESHOLD) {
+      // Small session bypass — use existing single-PR flow (per D-03)
+      setSubmitDialogOpen(true);
+      return;
+    }
+
+    // Large session — call cluster API first (per D-16)
+    setIsClusterLoading(true);
+    try {
+      // Snapshot accepted suggestions from the suggestion store
+      const allSuggestions = useSuggestionStore.getState().suggestions;
+      const items: ClusterSuggestionItem[] = [];
+
+      for (const [key, stored] of Object.entries(allSuggestions)) {
+        for (const s of stored) {
+          if (s.status === "accepted") {
+            // Key format is "entityIri::suggestionType" — entityIri is the parent context
+            const [parentIri] = key.split("::");
+            items.push({
+              entity_iri: s.suggestion.iri,
+              parent_iri: parentIri || null,
+              suggestion_type: s.suggestion.suggestion_type,
+              label: s.editedValue || s.suggestion.label,
+            });
+          }
+        }
+      }
+
+      const response = await suggestionsApi.cluster(
+        projectId,
+        suggestionSession.sessionId,
+        { suggestion_items: items },
+        session.accessToken,
+      );
+
+      if (response.skip_clustering) {
+        // Server says session is too small — fall back to single-PR
+        setSubmitDialogOpen(true);
+      } else {
+        setClusterResponse(response);
+        setShardPreviewOpen(true);
+      }
+    } catch (err) {
+      toast.error("Clustering failed", err instanceof Error ? err.message : "Failed to group suggestions");
+      // Fall back to single-PR submit so user is not stuck
+      setSubmitDialogOpen(true);
+    } finally {
+      setIsClusterLoading(false);
+    }
+  }, [projectId, suggestionSession.sessionId, suggestionSession.changesCount, session?.accessToken, toast]);
+
+  // Handle batch submit success — reset session and suggestion state
+  const handleBatchSubmitted = useCallback((results: BatchSubmitPRResult[]) => {
+    const successCount = results.filter((r) => r.status === "success").length;
+    if (successCount > 0) {
+      toast.success(`${successCount} PR${successCount > 1 ? "s" : ""} created for review`);
+    }
+    useSuggestionStore.getState().clearAllSuggestions();
+    setShardPreviewOpen(false);
+    setClusterResponse(null);
+  }, [toast]);
+
   // Handle drag-and-drop reparent class
   // Fetches full class detail, modifies parent_iris, then routes through the appropriate save handler
   const handleReparentClass = useCallback(async (
@@ -1010,9 +1091,14 @@ export default function EditorPage() {
                   variant="primary"
                   size="sm"
                   className="gap-2 bg-amber-600 hover:bg-amber-700"
-                  onClick={() => setSubmitDialogOpen(true)}
+                  onClick={handleSubmitClick}
+                  disabled={isClusterLoading}
                 >
-                  <Lightbulb className="h-4 w-4" />
+                  {isClusterLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Lightbulb className="h-4 w-4" />
+                  )}
                   {suggestionSession.isResumed ? "Resubmit Suggestions" : "Submit Suggestions"}
                   <span className="rounded-full bg-amber-500/30 px-1.5 py-0.5 text-xs">
                     {suggestionSession.changesCount}
@@ -1343,7 +1429,7 @@ export default function EditorPage() {
         />
       </ConfirmDialog>
 
-      {/* Suggestion Submit Dialog */}
+      {/* Suggestion Submit Dialog (small sessions — <=5 suggestions) */}
       {isSuggestionMode && (
         <SuggestionSubmitDialog
           open={submitDialogOpen}
@@ -1351,6 +1437,21 @@ export default function EditorPage() {
           onConfirm={suggestionSession.isResumed ? suggestionSession.resubmitSession : suggestionSession.submitSession}
           entitiesModified={suggestionSession.entitiesModified}
           changesCount={suggestionSession.changesCount}
+        />
+      )}
+
+      {/* Shard Preview Modal (large sessions — >5 suggestions, per D-05/CLUSTER-06) */}
+      {shardPreviewOpen && clusterResponse && suggestionSession.sessionId && session?.accessToken && (
+        <ShardPreviewModal
+          projectId={projectId}
+          sessionId={suggestionSession.sessionId}
+          accessToken={session.accessToken}
+          clusterResponse={clusterResponse}
+          onBatchSubmitted={handleBatchSubmitted}
+          onClose={() => {
+            setShardPreviewOpen(false);
+            setClusterResponse(null);
+          }}
         />
       )}
 
