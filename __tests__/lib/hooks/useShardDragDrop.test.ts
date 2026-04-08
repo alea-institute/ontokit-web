@@ -28,6 +28,7 @@ function makeDragEnd(
   activeId: string,
   activeData: Record<string, unknown> | undefined,
   overId: string | null,
+  overData?: Record<string, unknown>,
 ): DragEndEvent {
   return {
     active: {
@@ -39,7 +40,7 @@ function makeDragEnd(
       overId != null
         ? {
             id: overId,
-            data: { current: {} },
+            data: { current: overData ?? {} },
             rect: { width: 0, height: 0, left: 0, top: 0, right: 0, bottom: 0 },
           }
         : null,
@@ -63,6 +64,7 @@ describe("useShardDragDrop", () => {
       "entity-iri:Foo-shard-1",
       { type: "entity", entityIri: "iri:Foo", fromShardId: "shard-1" },
       "shard-2",
+      { type: "shard" },
     );
 
     result.current.handleDragEnd(event);
@@ -80,6 +82,7 @@ describe("useShardDragDrop", () => {
       "shard-1",
       { type: "shard", shardId: "shard-1", fromPrId: "pr-A" },
       "pr-B",
+      { type: "pr-group" },
     );
 
     result.current.handleDragEnd(event);
@@ -113,6 +116,7 @@ describe("useShardDragDrop", () => {
       "entity-iri:Foo-shard-1",
       { type: "entity", entityIri: "iri:Foo", fromShardId: "shard-1" },
       "shard-1",
+      { type: "shard" },
     );
 
     result.current.handleDragEnd(event);
@@ -129,6 +133,7 @@ describe("useShardDragDrop", () => {
       "shard-1",
       { type: "shard", shardId: "shard-1", fromPrId: "pr-A" },
       "pr-A",
+      { type: "pr-group" },
     );
 
     result.current.handleDragEnd(event);
