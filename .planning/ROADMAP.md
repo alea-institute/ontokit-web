@@ -194,7 +194,12 @@ Plans:
   2. Every suggestion in the diff view shows a provenance badge (llm-proposed / user-written / user-edited-from-llm) and, where available, an LLM confidence score
   3. A collapsible "Similar existing entities" panel appears for each suggestion, showing the top duplicate-detection candidates and their composite scores
   4. Batch-submitted suggestions appear under a batch header in the review queue; the reviewer can approve or reject the entire batch with one action, or expand it to act per-shard
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 16-01-PLAN.md — Data layer: Enriched session detail types, API methods (getSessionDetail, postShardReviews, createCleanPR)
+- [ ] 16-02-PLAN.md — UI components: ProvenanceBadge + ShardTabNavigator
+- [ ] 16-03-PLAN.md — UI components: SimilarEntitiesInlinePanel, DuplicateComparisonExpander, ShardReviewMarker
+- [ ] 16-04-PLAN.md — Integration: Review page wiring + visual verification
 **UI hint**: yes
 
 ## Progress
@@ -212,4 +217,4 @@ Plans:
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 5/5 | Complete   | 2026-04-07 |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 5/5 | Complete    | 2026-04-08 |
-| 16. Reviewer Enhancements | v0.4.0 | 0/TBD | Not started | - |
+| 16. Reviewer Enhancements | v0.4.0 | 0/4 | Planning complete | - |
