@@ -22,7 +22,7 @@ decisions:
 metrics:
   duration_minutes: 3
   completed_date: "2026-04-08T00:16:29Z"
-  tasks_completed: 1
+  tasks_completed: 2
   files_changed: 1
 requirements:
   - CLUSTER-01
