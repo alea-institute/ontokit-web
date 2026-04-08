@@ -197,7 +197,7 @@ Plans:
 **Plans**: 4 plans
 Plans:
 - [x] 16-01-PLAN.md — Data layer: Enriched session detail types, API methods (getSessionDetail, postShardReviews, createCleanPR)
-- [ ] 16-02-PLAN.md — UI components: ProvenanceBadge + ShardTabNavigator
+- [x] 16-02-PLAN.md — UI components: ProvenanceBadge + ShardTabNavigator
 - [ ] 16-03-PLAN.md — UI components: SimilarEntitiesInlinePanel, DuplicateComparisonExpander, ShardReviewMarker
 - [ ] 16-04-PLAN.md — Integration: Review page wiring + visual verification
 **UI hint**: yes
@@ -217,4 +217,4 @@ Plans:
 | 13. Validation Guardrails & Suggestion Generation | v0.4.0 | 4/4 | Complete    | 2026-04-07 |
 | 14. Inline Suggestion UX & Property Support | v0.4.0 | 5/5 | Complete   | 2026-04-07 |
 | 15. Session Clustering & Batch Submit | v0.4.0 | 5/5 | Complete    | 2026-04-08 |
-| 16. Reviewer Enhancements | v0.4.0 | 1/4 | In Progress|  |
+| 16. Reviewer Enhancements | v0.4.0 | 2/4 | In Progress|  |
