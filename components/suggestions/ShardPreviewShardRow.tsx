@@ -47,12 +47,17 @@ export function ShardPreviewShardRow({
   const mergeShards = useShardPreviewStore((s) => s.mergeShards);
   const moveShard = useShardPreviewStore((s) => s.moveShard);
   const splitShard = useShardPreviewStore((s) => s.splitShard);
+  const renameShard = useShardPreviewStore((s) => s.renameShard);
 
   const isExpanded = expandedShardIds.has(shard.id);
 
   // Split mode state
   const [isSplitting, setIsSplitting] = useState(false);
   const [splitSelectedIris, setSplitSelectedIris] = useState<Set<string>>(new Set());
+
+  // Rename state
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(shard.label);
 
   const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: shard.id,
@@ -137,9 +142,31 @@ export function ShardPreviewShardRow({
           )}
         </button>
 
-        {/* Shard label — special badges for misc and cross-cutting */}
+        {/* Shard label — special badges for misc and cross-cutting, inline rename */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          {shard.isMisc ? (
+          {isRenaming ? (
+            <input
+              type="text"
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={() => {
+                const trimmed = renameValue.trim();
+                if (trimmed && trimmed !== shard.label) renameShard(shard.id, trimmed);
+                setIsRenaming(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  (e.target as HTMLInputElement).blur();
+                } else if (e.key === "Escape") {
+                  setRenameValue(shard.label);
+                  setIsRenaming(false);
+                }
+              }}
+              autoFocus
+              aria-label={`Rename shard ${shard.label}`}
+              className="min-w-0 flex-1 rounded border border-primary-400 bg-white px-2 py-0.5 text-sm font-medium text-slate-800 outline-none focus:ring-2 focus:ring-primary-500 dark:border-primary-600 dark:bg-slate-800 dark:text-slate-200"
+            />
+          ) : shard.isMisc ? (
             <span className="rounded bg-amber-50 px-2 py-0.5 text-sm font-medium text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">
               Miscellaneous improvements
             </span>
@@ -212,6 +239,17 @@ export function ShardPreviewShardRow({
                 }}
               >
                 Split shard
+              </DropdownMenu.Item>
+
+              {/* Rename shard */}
+              <DropdownMenu.Item
+                className="cursor-pointer px-3 py-1.5 text-sm text-slate-700 hover:bg-slate-100 focus:bg-slate-100 focus:outline-none dark:text-slate-200 dark:hover:bg-slate-700 dark:focus:bg-slate-700"
+                onSelect={() => {
+                  setRenameValue(shard.label);
+                  setIsRenaming(true);
+                }}
+              >
+                Rename
               </DropdownMenu.Item>
 
               {/* Move to PR... */}

@@ -74,6 +74,9 @@ interface ShardPreviewState {
   /** Split selected entityIris out of shardId into a new shard. */
   splitShard: (shardId: string, entityIris: string[], newLabel: string) => void;
 
+  /** Rename a shard's label. CLUSTER-06. */
+  renameShard: (shardId: string, newLabel: string) => void;
+
   /** Move a shard between PR groups. */
   moveShard: (shardId: string, fromPrId: string, toPrId: string) => void;
 
@@ -269,6 +272,19 @@ export const useShardPreviewStore = create<ShardPreviewState>()((set, get) => ({
       }
 
       return { shards: newShards, prGroups: newPrGroups };
+    });
+  },
+
+  renameShard: (shardId, newLabel) => {
+    set((state) => {
+      const shard = state.shards[shardId];
+      if (!shard || shard.label === newLabel) return state;
+      return {
+        shards: {
+          ...state.shards,
+          [shardId]: { ...shard, label: newLabel },
+        },
+      };
     });
   },
 
