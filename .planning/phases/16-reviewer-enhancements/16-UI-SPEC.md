@@ -56,14 +56,15 @@ Source: existing DiffView in `app/projects/[id]/suggestions/review/page.tsx`
 | Role | Size | Weight | Line Height |
 |------|------|--------|-------------|
 | Body | 14px (text-sm) | 400 (normal) | 1.5 |
-| Label / Meta | 12px (text-xs) | 500 (medium) | 1.4 |
-| Section heading | 12px (text-xs) | 500 (medium), uppercase, tracking-wider | 1.4 |
+| Label / Meta | 12px (text-xs) | 400 (normal) | 1.4 |
+| Section heading | 12px (text-xs) | 600 (semibold), uppercase, tracking-wider | 1.4 |
 | Panel heading | 16px (text-base) | 600 (semibold) | 1.2 |
 
 Notes:
 - Diff patch text uses `font-mono` (JetBrains Mono) at 12px, consistent with existing DiffView
 - Provenance badge text: 10px (text-[10px]) matching score badge convention in SimilarConceptsPanel
-- Section headings follow existing pattern: `text-xs font-medium uppercase tracking-wider text-slate-400`
+- Section headings follow updated pattern: `text-xs font-semibold uppercase tracking-wider text-slate-400`
+- Only 2 weights used: 400 (normal) for body and label/meta; 600 (semibold) for all heading roles
 
 Source: existing review page + `SimilarConceptsPanel.tsx`
 
@@ -99,6 +100,14 @@ Semantic palette (not accent):
 | Shard: pending | `text-slate-400` | Per-shard unmarked state |
 
 Source: `SimilarConceptsPanel.tsx` scoreColor(), `app/globals.css` tokens, existing review page action buttons (D-03, D-05 from CONTEXT.md)
+
+---
+
+## Visual Hierarchy
+
+Primary focal point: the diff view with inline provenance badges — this is the primary decision surface and must dominate the layout. The shard tab navigator is an organizational aid sitting directly above it. The action bar (Approve / Reject / Request Changes) is intentionally secondary — positioned below the diff content to require the reviewer to read before acting.
+
+Supporting panels (SimilarEntitiesInlinePanel, DuplicateComparisonExpander) are subordinate and collapsed by default, surfacing only when the reviewer explicitly requests them.
 
 ---
 
