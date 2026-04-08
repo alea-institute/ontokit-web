@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v0.4.0
 milestone_name: LLM-Assisted Ontology Improvements
 status: executing
-stopped_at: Phase 15 UI-SPEC approved
-last_updated: "2026-04-07T23:27:59.728Z"
-last_activity: 2026-04-07 -- Phase 15 execution started
+stopped_at: Completed 15-02-PLAN.md
+last_updated: "2026-04-08T00:08:27.565Z"
+last_activity: 2026-04-08
 progress:
   total_phases: 10
   completed_phases: 7
   total_plans: 31
-  completed_plans: 26
-  percent: 84
+  completed_plans: 29
+  percent: 94
 ---
 
 # Project State
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-05)
 ## Current Position
 
 Phase: 15 (session-clustering-batch-submit) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 15
-Last activity: 2026-04-07 -- Phase 15 execution started
+Plan: 2 of 5
+Status: Ready to execute
+Last activity: 2026-04-08
 
 Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 
@@ -72,6 +72,7 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 | Phase 14 P02 | 3 | 2 tasks | 8 files |
 | Phase 14 P03 | 11 | 2 tasks | 7 files |
 | Phase 14 P04 | 5 | 2 tasks | 4 files |
+| Phase 15-session-clustering-batch-submit P02 | 8 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,9 @@ Progress: [=======   ] 70% (v0.4.0 phases: 11-14 complete, 15-16 remaining)
 - [Phase 14]: Reused children suggestion type for new property entity creation -- backend treats children uniformly
 - [Phase 14]: Domain/Range sections share edgesSuggestions hook -- relationship_type field distinguishes domain vs range
 - [Phase 14]: Sub-Properties section only renders when canUseLLM is true since existing panel has no sub-property list
+- [Phase Phase 15]: @radix-ui/react-dropdown-menu imported directly (no wrapper) — no components/ui/dropdown-menu.tsx exists in codebase; direct Radix import is consistent with this phase's patterns
+- [Phase Phase 15]: ShardPreviewShardRow passes split state to children via React.cloneElement — keeps split state co-located with the shard row rather than lifting to context
+- [Phase Phase 15]: useDraggable id for entity rows includes shardId suffix to prevent ID collisions across shard contexts
 
 ### Key Facts
 
@@ -177,12 +181,12 @@ None yet.
 ### Entity Graph Port (`entity-graph-migration`)
 
 - **Issue:** CatholicOS/ontokit-web#81
-- **Status:** Executing Phase 15
+- **Status:** Ready to execute
 - **Handoff:** `.planning/features/entity-graph-port/HANDOFF.md`
 - **Next:** Visual verify with MCP chrome-devtools (headless), then create PR
 
 ## Session Continuity
 
-Last session: 2026-04-07T22:16:51.725Z
-Stopped at: Phase 15 UI-SPEC approved
-Resume file: .planning/phases/15-session-clustering-batch-submit/15-UI-SPEC.md
+Last session: 2026-04-08T00:08:27.563Z
+Stopped at: Completed 15-02-PLAN.md
+Resume file: None
