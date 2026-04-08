@@ -37,7 +37,7 @@ export function ProvenanceBadge({ provenance, confidence }: ProvenanceBadgeProps
       <Icon className={cn("h-3 w-3", config.color)} />
       <span className={cn("font-medium", config.color)}>{config.label}</span>
       {pct !== null ? (
-        <span className={cn(confidenceColor(confidence!))}>{pct}%</span>
+        <span className={cn(confidenceColor(pct / 100))}>{pct}%</span>
       ) : (
         <span className="text-slate-400">---</span>
       )}
