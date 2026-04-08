@@ -7,7 +7,7 @@ import {
   GripVertical,
   MoreVertical,
 } from "lucide-react";
-import { useDraggable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { useShardPreviewStore } from "@/lib/stores/shardPreviewStore";
 import type { ShardDefinition } from "@/lib/stores/shardPreviewStore";
@@ -54,9 +54,15 @@ export function ShardPreviewShardRow({
   const [isSplitting, setIsSplitting] = useState(false);
   const [splitSelectedIris, setSplitSelectedIris] = useState<Set<string>>(new Set());
 
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+  const { attributes, listeners, setNodeRef: setDragRef, isDragging } = useDraggable({
     id: shard.id,
     data: { type: "shard", shardId: shard.id, fromPrId: prId },
+  });
+
+  // Register shard as a drop target for entity drag-and-drop
+  const { setNodeRef: setDropRef, isOver: isDropOver } = useDroppable({
+    id: shard.id,
+    data: { type: "shard" },
   });
 
   // Other shards in same PR group (for merge submenu)
@@ -93,9 +99,11 @@ export function ShardPreviewShardRow({
 
   return (
     <div
+      ref={setDropRef}
       className={[
         "border-b border-slate-200 dark:border-slate-700",
         isDragging ? "opacity-50" : "",
+        isDropOver ? "ring-2 ring-inset ring-primary-500" : "",
       ]
         .filter(Boolean)
         .join(" ")}
@@ -104,7 +112,7 @@ export function ShardPreviewShardRow({
       <div className="flex items-center gap-2 bg-white px-6 py-2 dark:bg-slate-900">
         {/* Drag handle */}
         <button
-          ref={setNodeRef}
+          ref={setDragRef}
           type="button"
           aria-label={`Drag ${shard.label} to reorder`}
           className="flex h-6 w-6 shrink-0 cursor-grab items-center justify-center rounded active:cursor-grabbing"

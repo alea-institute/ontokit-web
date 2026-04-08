@@ -41,11 +41,17 @@ export function useShardDragDrop() {
       const data = active.data.current as ShardDragData | undefined;
       if (!data) return;
 
+      const overData = over.data.current as { type?: string } | undefined;
+
       if (data.type === "entity" && data.entityIri && data.fromShardId) {
+        // Entities can only be dropped on shard targets
+        if (overData?.type !== "shard") return;
         const toShardId = String(over.id);
         if (toShardId === data.fromShardId) return; // no-op: same shard
         moveEntity(data.entityIri, data.fromShardId, toShardId);
       } else if (data.type === "shard" && data.shardId && data.fromPrId) {
+        // Shards can only be dropped on PR group targets
+        if (overData?.type !== "pr-group") return;
         const toPrId = String(over.id);
         if (toPrId === data.fromPrId) return; // no-op: same PR group
         moveShard(data.shardId, data.fromPrId, toPrId);
