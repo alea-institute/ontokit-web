@@ -1,6 +1,6 @@
 {
   "name": "ontokit-web",
-  "version": "0.3.0",
+  "version": "0.4.0-dev",
   "private": true,
   "engines": {
     "node": ">=20.9.0"

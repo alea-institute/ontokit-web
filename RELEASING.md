@@ -73,27 +73,35 @@ This script:
 3. Updates `package.json`.
 4. Creates a git commit: `chore: releasing 0.3.0`.
 
-### 2. Merge to `main`
+### 2. Push `dev` and open a PR to `main`
 
 ```bash
-git checkout main
-git merge dev
+git push origin dev
+gh pr create --base main --head dev \
+  --title "Release ontokit-web 0.3.0" \
+  --body "Release ontokit-web 0.3.0"
 ```
 
-This brings the release commit onto `main`, which always reflects the current release.
+CI will run the quality checks on the PR. Once they pass, approve and merge the PR.
+
+> **Note:** `main` is protected — direct pushes are not allowed. All changes to `main` must go through a pull request with passing status checks and an approving review.
 
 ### 3. Tag the release (on `main`)
 
+After the PR is merged, pull `main` and tag it:
+
 ```bash
+git checkout main
+git pull origin main
 git tag -s ontokit-web-0.3.0
 ```
 
 Tags must match the pattern `ontokit-web-*` to trigger the publish pipeline.
 
-### 4. Push `main` and the tag
+### 4. Push the tag
 
 ```bash
-git push origin main --tags
+git push origin ontokit-web-0.3.0
 ```
 
 ### 5. CI publishes automatically
@@ -122,16 +130,16 @@ This script:
 
 ```
 dev branch:
-  0.3.0-dev ──prepare-release.mjs──▸ 0.3.0
-                                       │
-main branch:                    merge & tag
-                                       │              ┌─ GitHub Release
-                                       ▼──push──▸  CI─┤
-                                                       └─ GHCR (Docker image)
+  0.3.0-dev ──prepare-release.mjs──▸ 0.3.0 ──push──▸ PR to main
+                                                          │
+main branch:                                       merge & tag
+                                                          │        ┌─ GitHub Release
+                                                          ▼─push─▸ CI─┤
+                                                                       └─ GHCR (Docker image)
 dev branch:
-                             set-version.mjs 0.4.0
-                                       │
-                                   0.4.0-dev  (next cycle)
+                                            set-version.mjs 0.4.0
+                                                          │
+                                                      0.4.0-dev  (next cycle)
 ```
 
 ## Patch releases
@@ -169,12 +177,12 @@ git push -u origin release/0.3.x && git push --tags
 
 CI will run the quality checks and publish the GitHub Release and Docker image as usual. The `release/0.3.x` branch can be kept for future patches on the same line.
 
-After publishing, fast-forward `main` to the patch tag so it continues to reflect the latest release:
+After publishing, open a PR from the release branch to `main` so it reflects the latest release:
 
 ```bash
-git checkout main
-git merge release/0.3.x
-git push origin main
+gh pr create --base main --head release/0.3.x \
+  --title "Merge patch release 0.3.1 into main" \
+  --body "Fast-forward main to patch release 0.3.1"
 ```
 
 > **Note:** The `latest` Docker tag will point to the patch release. If the latest minor/major release should remain `latest`, manually retag after publishing.
