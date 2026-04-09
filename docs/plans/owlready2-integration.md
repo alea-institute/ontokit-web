@@ -314,6 +314,105 @@ New component for visualizing what the reasoner inferred:
 
 ---
 
+## Phase 7: SHACL Shapes Validation
+
+**Goal:** Let users define SHACL shapes to validate their ontology data against expected constraints. SHACL operates under the Closed World Assumption (unlike OWL's Open World), making it ideal for data quality validation — e.g., "every class MUST have at least one rdfs:label" or "every individual of type Person MUST have exactly one foaf:name."
+
+### New dependency
+- **pySHACL** (`pyshacl>=0.31.0`) — the only mature Python SHACL validator, part of the RDFLib ecosystem. Works directly with `rdflib.Graph`, compatible with rdflib 7.x and Python 3.13.
+- pySHACL includes optional OWL-RL inference (`inference='owlrl'`) so shapes can validate inferred triples without going through the owlready2 bridge.
+
+### Two validation modes
+1. **Raw validation**: Validate the asserted graph as-is against SHACL shapes (fast, default)
+2. **Post-reasoning validation**: Materialize inferences first, then validate. Two paths:
+   - **Lightweight**: pySHACL's built-in `inference='owlrl'` (OWL-RL profile, stays in rdflib, no Java needed)
+   - **Full**: owlready2 reasoning (HermiT/Pellet, Phase 2) → export inferred graph → pySHACL validates (more powerful but slower, requires Java)
+
+### Storage approach
+- SHACL shapes stored as a Turtle file in git: `shapes.ttl` alongside the ontology file
+- Follows the same sidecar pattern as SWRL rules (Phase 4)
+- Users can also paste/upload shapes inline or import from a URL
+
+### Backend files to create
+
+| File | Purpose |
+|------|---------|
+| `ontokit/services/shacl_service.py` | `SHACLService` — load shapes, run validation, parse results |
+| `ontokit/schemas/shacl.py` | `SHACLValidationResult`, `SHACLViolation`, `SHACLTriggerResponse`, `SHACLShapesResponse` |
+| `ontokit/api/routes/shacl.py` | Shapes CRUD + validation trigger endpoints |
+| `tests/unit/test_shacl_service.py` | Validation tests with conforming and non-conforming data |
+
+### SHACLService
+```python
+class SHACLService:
+    def validate(
+        self,
+        data_graph: Graph,
+        shapes_graph: Graph,
+        inference: str = "none",       # "none", "owlrl", "rdfs", "both"
+        ont_graph: Graph | None = None, # optional ontology for import resolution
+    ) -> SHACLValidationResult:
+        conforms, results_graph, results_text = pyshacl.validate(
+            data_graph,
+            shacl_graph=shapes_graph,
+            ont_graph=ont_graph,
+            inference=inference,
+        )
+        return self._parse_results(conforms, results_graph)
+```
+
+### API routes (`ontokit/api/routes/shacl.py`)
+- `GET /{project_id}/shacl/shapes` — get current shapes file content
+- `PUT /{project_id}/shacl/shapes` — update shapes file (commits to git)
+- `POST /{project_id}/shacl/validate` — trigger validation (options: `inference` mode, `branch`)
+- `GET /{project_id}/shacl/validate/{job_id}` — get validation results
+
+### Worker task (`ontokit/worker.py`)
+- Add `run_shacl_validation_task(ctx, project_id, branch, inference="none")`
+- Pattern follows lint/reasoning: load graph + shapes → run pySHACL → persist results → publish to `shacl:updates` Redis channel
+- Validation with `inference='owlrl'` or full owlready2 reasoning runs as async task; raw validation can run synchronously
+
+### Route registration (`ontokit/api/routes/__init__.py`)
+- `router.include_router(shacl.router, prefix="/projects", tags=["SHACL"])`
+
+### Frontend
+
+#### API client (`lib/api/shacl.ts`)
+```typescript
+export const shaclApi = {
+  getShapes: (projectId, branch?, token?) => ...,
+  updateShapes: (projectId, content, token?) => ...,
+  triggerValidation: (projectId, token?, options?) => ...,  // options: inference, branch
+  getValidationResult: (projectId, jobId, token?) => ...,
+};
+```
+
+TypeScript types: `SHACLValidationResult`, `SHACLViolation` (focusNode, resultPath, value, message, severity, sourceShape).
+
+#### Shapes editor (`components/editor/SHACLShapesEditor.tsx`)
+New panel for editing SHACL shapes:
+- Monaco editor with Turtle syntax highlighting (reuses existing Turtle language support from `lib/editor/languages/turtle.ts`)
+- Load/save shapes file from/to git
+- "Validate" button with inference mode dropdown (None / OWL-RL / Full Reasoning)
+- Gated behind `canManage` permission
+
+#### HealthCheckPanel integration (`components/editor/HealthCheckPanel.tsx`)
+Add a **Shapes** tab alongside Lint / Consistency / Duplicates / Reasoning:
+- **Validation trigger**: "Validate Shapes" button with inference mode selector
+- **Results view**: Violations displayed as cards with:
+  - Focus node IRI (clickable, navigates to entity)
+  - Result path (the property that failed)
+  - Expected vs actual value
+  - Severity (Violation / Warning / Info, mapped from `sh:resultSeverity`)
+  - Source shape name
+- **Conformance banner**: Green "Conforms" or red "X violations found"
+
+#### Editor page integration
+- Shapes editor accessible from editor header (alongside Health Check, SWRL Rules)
+- Toggle `showSHACLEditor` state
+
+---
+
 ## Frontend Files Summary
 
 | Phase | New/Modified Frontend Files |
@@ -323,6 +422,7 @@ New component for visualizing what the reasoner inferred:
 | 4 | `lib/api/swrl.ts` (new), `components/editor/SWRLRulesPanel.tsx` (new), `app/projects/[id]/editor/page.tsx` (add SWRL button/panel) |
 | 5 | `components/editor/ClassDetailPanel.tsx` (add Restrictions section), `lib/api/reasoning.ts` (add closed-world method), `components/editor/HealthCheckPanel.tsx` (closed-world button) |
 | 6 | `components/editor/ReasoningDiffPanel.tsx` (new), `lib/api/reasoning.ts` (add diff method), `components/editor/HealthCheckPanel.tsx` (diff button) |
+| 7 | `lib/api/shacl.ts` (new), `components/editor/SHACLShapesEditor.tsx` (new), `components/editor/HealthCheckPanel.tsx` (add Shapes tab), `app/projects/[id]/editor/page.tsx` (add Shapes editor button) |
 
 ---
 
@@ -338,9 +438,12 @@ Phase 2 (Reasoning Task) — backend + frontend (API client, Reasoning tab, WebS
    +---> Phase 4 (SWRL Rules) — backend + frontend (SWRL panel)
    +---> Phase 5 (Restrictions + Closed World) — backend + frontend (restrictions display, closed-world UI)
    +---> Phase 6 (World Comparison) — backend + frontend (diff visualization)
+   +---> Phase 7 (SHACL Validation) — backend + frontend (shapes editor, validation tab)
 ```
 
-Phases 3-6 are independent of each other and can be done in any order after Phase 2.
+Phase 7 depends on Phase 1 only for the optional full-reasoning validation mode (owlready2 → rdflib → pySHACL). For raw and OWL-RL validation, Phase 7 can be implemented independently — it only requires rdflib + pySHACL, no owlready2 bridge needed. In practice, implementing it after Phase 2 is recommended so the full-reasoning path is available.
+
+Phases 3-7 are independent of each other and can be done in any order after Phase 2.
 
 ---
 
@@ -353,6 +456,7 @@ Phases 3-6 are independent of each other and can be done in any order after Phas
 | Reasoner memory/CPU for large ontologies | ARQ `job_timeout` (300s) as hard cutoff; warn users above a triple-count threshold |
 | **Java not in Docker images** | Add `default-jre-headless` to both Dockerfiles (prerequisite for Phase 2) |
 | Concurrent reasoning tasks | Each task gets its own temp dir with uuid4 — fully isolated |
+| pySHACL validation on large graphs | OWL-RL inference can be slow on large ontologies; offer "none" as default inference mode, document that OWL-RL adds overhead |
 
 ## Verification
 
@@ -371,3 +475,4 @@ Phases 3-6 are independent of each other and can be done in any order after Phas
    - **Phase 4**: Open SWRL Rules panel, create/edit/delete/toggle rules, execute rules and verify reasoning results appear
    - **Phase 5**: Open a class with restrictions, verify Restrictions section renders with human-readable statements and clickable IRIs; trigger closed-world check and verify violation display
    - **Phase 6**: Trigger reasoning diff, verify categorized inferred triples display with entity navigation
+   - **Phase 7**: Open SHACL shapes editor, write/save shapes, trigger validation in each inference mode, verify violations display with focus node navigation and severity badges
