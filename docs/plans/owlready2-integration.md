@@ -79,6 +79,41 @@ owlready2's HermiT/Pellet are Java-based. **Both Dockerfiles need `default-jre-h
 ### Route registration (`ontokit/api/routes/__init__.py`)
 - `router.include_router(reasoning.router, prefix="/projects", tags=["Reasoning"])`
 
+### Frontend
+
+#### API client (`lib/api/reasoning.ts`)
+New module following the `lintApi` / `qualityApi` pattern:
+```typescript
+export const reasoningApi = {
+  triggerReasoning: (projectId, token, options?) => ...,  // POST, returns job_id
+  getStatus: (projectId, token?) => ...,                   // GET latest run summary
+  getRuns: (projectId, token?, options?) => ...,           // GET paginated history
+  getRunDetail: (projectId, runId, token?) => ...,         // GET run with findings
+};
+```
+
+TypeScript types: `ReasoningRun`, `ReasoningFinding`, `ReasoningResult`, `ReasoningTriggerResponse`.
+
+#### WebSocket (`ReasoningWebSocketManager` in `lib/api/reasoning.ts`)
+Follow `LintWebSocketManager` pattern from `lib/api/lint.ts`:
+- Connect to `ws://[API_URL]/api/v1/projects/{projectId}/reasoning/ws`
+- Message types: `reasoning_started`, `reasoning_complete`, `reasoning_failed`
+- Auto-reconnect with exponential backoff (max 5 attempts)
+
+#### HealthCheckPanel integration (`components/editor/HealthCheckPanel.tsx`)
+Add a **Reasoning** tab alongside the existing Lint / Consistency / Duplicates tabs:
+- **Trigger button**: "Run Reasoner" with reasoner selection (HermiT/Pellet dropdown)
+- **Status display**: Running spinner with WebSocket progress, or last run timestamp + duration
+- **Results view**: Findings displayed as cards (same pattern as lint issues), categorized:
+  - Inferred subsumptions (info severity)
+  - Reclassified individuals (info severity)
+  - Inconsistent classes (error severity)
+  - Consistency status banner (consistent/inconsistent)
+- **Navigation**: Clicking an entity IRI in a finding navigates to that class in the tree (reuse `onNavigateToClass`)
+
+#### Editor page (`app/projects/[id]/editor/page.tsx`)
+- Gate the "Run Reasoner" button behind `canManage` permission (same as "Run Lint")
+
 ---
 
 ## Phase 3: Enhanced Consistency Checking with Reasoner
@@ -101,6 +136,18 @@ owlready2's HermiT/Pellet are Java-based. **Both Dockerfiles need `default-jre-h
 ### Behavior change
 - `include_reasoning=False` (default): current sync behavior, structural checks only
 - `include_reasoning=True`: async ARQ task (like lint), returns job_id for polling
+
+### Frontend
+
+#### HealthCheckPanel Consistency tab (`components/editor/HealthCheckPanel.tsx`)
+- Add an "Include Reasoning" toggle/checkbox to the Consistency tab
+- When enabled, the trigger call passes `include_reasoning=true` and switches to async polling (job_id pattern) instead of waiting for a synchronous response
+- New semantic rule findings (`unsatisfiable_class`, `unintended_equivalence`, `logical_inconsistency`) render with a "Reasoner" badge to distinguish them from structural checks
+- These findings use error severity and include explanatory detail text
+
+#### Quality API client (`lib/api/quality.ts`)
+- Update `triggerConsistencyCheck()` to accept an `includeReasoning?: boolean` option
+- When `includeReasoning=true`, the response shape changes to a job_id (like lint trigger) — handle both response patterns
 
 ---
 
@@ -132,6 +179,35 @@ owlready2's HermiT/Pellet are Java-based. **Both Dockerfiles need `default-jre-h
 - Extend `run_reasoning_task` in worker.py to accept optional `swrl_rules` parameter
 - Rules injected into owlready2 World via `Imp()` API before reasoning
 
+### Frontend
+
+#### API client (`lib/api/swrl.ts`)
+New module for SWRL rule CRUD:
+```typescript
+export const swrlApi = {
+  listRules: (projectId, branch?, token?) => ...,
+  createRule: (projectId, rule, token?) => ...,
+  updateRule: (projectId, ruleId, update, token?) => ...,
+  deleteRule: (projectId, ruleId, token?) => ...,
+  executeRules: (projectId, token?) => ...,  // triggers reasoning with SWRL
+};
+```
+
+TypeScript types: `SWRLRule`, `SWRLRuleCreate`, `SWRLRuleUpdate`.
+
+#### SWRL Rules panel (`components/editor/SWRLRulesPanel.tsx`)
+New panel accessible from the editor, gated behind `canManage` permission:
+- **Rules list**: Table or card list showing each rule's name, description, body (code-formatted), and enabled toggle
+- **Add rule**: Dialog/form with fields for name, description, body (with SWRL syntax hint/reference), enabled checkbox
+- **Edit/delete**: Inline edit or dialog for existing rules; delete with confirmation
+- **Execute button**: "Run Rules" triggers `swrlApi.executeRules()`, returns reasoning job_id, shows progress via WebSocket (reuses `ReasoningWebSocketManager`)
+- **Results**: After execution, display inferred triples from the reasoning run (link to Phase 2 reasoning results view)
+
+#### Editor page integration
+- Add a "SWRL Rules" button/tab in the editor header or settings area (next to Health Check)
+- Toggle `showSWRLRules` state to show/hide the panel
+- Only visible to users with `canManage` permission
+
 ---
 
 ## Phase 5: Class Restrictions & Closed World Reasoning
@@ -162,6 +238,39 @@ BNode parents of a class represent OWL restrictions:
 | `ontokit/schemas/reasoning.py` | Add `ClosedWorldViolation`, `ClosedWorldCheckResult` |
 | `ontokit/api/routes/reasoning.py` | Add `POST /{project_id}/reasoning/closed-world` |
 
+### Frontend
+
+#### ClassDetailPanel restrictions display (`components/editor/ClassDetailPanel.tsx`)
+Add a **Restrictions** section (after Parent Classes, before Annotations):
+- Render each restriction as a human-readable statement, e.g.:
+  - `someProp **some** SomeClass` (existential)
+  - `someProp **only** SomeClass` (universal)
+  - `someProp **min** 2 SomeClass` (min cardinality)
+  - `someProp **value** someIndividual` (has value)
+- Property and filler IRIs are clickable (navigate to entity in tree or open external IRI)
+- Read-only display initially; editing restrictions is out of scope for this plan
+
+TypeScript type additions to existing `OWLClassResponse`:
+```typescript
+interface OWLRestriction {
+  restriction_type: "some_values_from" | "all_values_from" | "has_value" |
+    "min_cardinality" | "max_cardinality" | "exact_cardinality";
+  property_iri: string;
+  property_label?: string;
+  filler_iri?: string;
+  filler_label?: string;
+  cardinality?: number;
+}
+```
+
+#### Closed-world check in Reasoning tab (`components/editor/HealthCheckPanel.tsx`)
+- Add a "Closed World Check" button within the Reasoning tab
+- Optional: class multi-select to scope the check to specific classes (or run on full ontology)
+- Results displayed as violation cards with entity navigation
+
+#### Reasoning API client (`lib/api/reasoning.ts`)
+- Add `triggerClosedWorldCheck(projectId, token, targetClasses?)` method
+
 ---
 
 ## Phase 6: World Comparison (Before/After Reasoning Diff)
@@ -183,20 +292,52 @@ BNode parents of a class represent OWL restrictions:
 4. Compute triple diff (triples in "after" but not "before" = inferred)
 5. Categorize: new subsumptions, new type assertions, new property values
 
+### Frontend
+
+#### Reasoning diff view (`components/editor/ReasoningDiffPanel.tsx`)
+New component for visualizing what the reasoner inferred:
+- **Summary banner**: "Reasoner inferred X new triples" with breakdown by category
+- **Categorized sections** (collapsible):
+  - **New subsumptions**: "ClassA is now a subclass of ClassB" — table with child/parent columns, IRIs clickable
+  - **Reclassified individuals**: "IndividualX was reclassified from TypeA to TypeB" — old vs new types
+  - **New property assertions**: "Subject predicate Object" triple display
+- **Filter/search**: Text filter to find specific entities in the diff
+- Each entity IRI is clickable (navigates to class in tree via `onNavigateToClass`)
+
+#### Integration in HealthCheckPanel (`components/editor/HealthCheckPanel.tsx`)
+- The Reasoning tab gets a "Show Reasoning Diff" button that triggers the diff endpoint
+- Results open in the `ReasoningDiffPanel` (could be inline in the tab or a wider overlay/dialog for better readability)
+
+#### Reasoning API client (`lib/api/reasoning.ts`)
+- Add `triggerReasoningDiff(projectId, token, branch?)` method
+- TypeScript types: `WorldDiffResponse`, `InferredTriple`
+
+---
+
+## Frontend Files Summary
+
+| Phase | New/Modified Frontend Files |
+|-------|----------------------------|
+| 2 | `lib/api/reasoning.ts` (new), `components/editor/HealthCheckPanel.tsx` (add Reasoning tab), `app/projects/[id]/editor/page.tsx` (permission gating) |
+| 3 | `lib/api/quality.ts` (add `includeReasoning` option), `components/editor/HealthCheckPanel.tsx` (reasoning toggle in Consistency tab) |
+| 4 | `lib/api/swrl.ts` (new), `components/editor/SWRLRulesPanel.tsx` (new), `app/projects/[id]/editor/page.tsx` (add SWRL button/panel) |
+| 5 | `components/editor/ClassDetailPanel.tsx` (add Restrictions section), `lib/api/reasoning.ts` (add closed-world method), `components/editor/HealthCheckPanel.tsx` (closed-world button) |
+| 6 | `components/editor/ReasoningDiffPanel.tsx` (new), `lib/api/reasoning.ts` (add diff method), `components/editor/HealthCheckPanel.tsx` (diff button) |
+
 ---
 
 ## Dependency Graph
 
 ```
-Phase 1 (Bridge Layer)
+Phase 1 (Bridge Layer) — backend only
    |
    v
-Phase 2 (Reasoning Task)
+Phase 2 (Reasoning Task) — backend + frontend (API client, Reasoning tab, WebSocket)
    |
-   +---> Phase 3 (Enhanced Consistency)
-   +---> Phase 4 (SWRL Rules)
-   +---> Phase 5 (Restrictions + Closed World)
-   +---> Phase 6 (World Comparison)
+   +---> Phase 3 (Enhanced Consistency) — backend + frontend (reasoning toggle)
+   +---> Phase 4 (SWRL Rules) — backend + frontend (SWRL panel)
+   +---> Phase 5 (Restrictions + Closed World) — backend + frontend (restrictions display, closed-world UI)
+   +---> Phase 6 (World Comparison) — backend + frontend (diff visualization)
 ```
 
 Phases 3-6 are independent of each other and can be done in any order after Phase 2.
@@ -215,8 +356,18 @@ Phases 3-6 are independent of each other and can be done in any order after Phas
 
 ## Verification
 
-After each phase:
+### Backend (after each phase)
 1. Run `pytest tests/ -v --cov=ontokit` — all existing + new tests pass
 2. Run `ruff check ontokit/ && ruff format --check ontokit/ && mypy ontokit/` — code quality
 3. Manual test: start dev server, trigger new endpoints via Swagger UI (`/docs`)
 4. For Phase 2+: verify with a known ontology (e.g., Pizza ontology) that reasoning produces expected inferences
+
+### Frontend (Phases 2-6)
+1. Run `npm run lint && npm run type-check` — no lint/type errors
+2. Run `npm run test` — all existing + new tests pass
+3. Manual test per phase:
+   - **Phase 2**: Trigger reasoning from HealthCheckPanel Reasoning tab, verify WebSocket updates show progress, verify findings display with entity navigation
+   - **Phase 3**: Toggle "Include Reasoning" in Consistency tab, verify async polling works, verify semantic findings render with "Reasoner" badge
+   - **Phase 4**: Open SWRL Rules panel, create/edit/delete/toggle rules, execute rules and verify reasoning results appear
+   - **Phase 5**: Open a class with restrictions, verify Restrictions section renders with human-readable statements and clickable IRIs; trigger closed-world check and verify violation display
+   - **Phase 6**: Trigger reasoning diff, verify categorized inferred triples display with entity navigation
