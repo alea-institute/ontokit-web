@@ -6,6 +6,7 @@
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![Docker](https://img.shields.io/badge/Docker-ghcr.io-2496ED?logo=docker)](https://github.com/CatholicOS/ontokit-web/pkgs/container/ontokit-web)
+[![codecov](https://codecov.io/gh/CatholicOS/ontokit-web/graph/badge.svg?token=HIQ9Y8ZWDA)](https://codecov.io/gh/CatholicOS/ontokit-web)
 
 The web frontend for OntoKit — a collaborative OWL ontology curation platform.
 
