@@ -7,11 +7,11 @@ This document describes the full lifecycle of OntoKit Web from local development
 Version is managed in `package.json`:
 
 ```json
-"version": "0.2.0-dev"
+"version": "0.3.0-dev"
 ```
 
-- During development the version carries a `-dev` suffix (e.g. `0.2.0-dev`).
-- At release time the suffix is stripped (e.g. `0.2.0`).
+- The `dev` branch carries the `-dev` suffix (e.g. `0.3.0-dev`) during development.
+- At release time the suffix is stripped (e.g. `0.3.0`) and merged to `main`.
 
 ## Development
 
@@ -47,104 +47,135 @@ The GitHub Actions workflow (`.github/workflows/release.yml`) runs on every push
 
 This job runs on all pushes (except `renovate/**` branches) and on PRs. The publish jobs described in the next section only run when a release tag is pushed.
 
+## Branching Model
+
+OntoKit Web uses a two-branch model:
+
+| Branch | Purpose |
+|--------|---------|
+| **`dev`** | Default branch. All feature PRs target this branch. Carries the `-dev` version suffix. |
+| **`main`** | Stable release branch. Always reflects the latest tagged release. |
+
 ## Releasing
 
 Releases follow a Weblate-inspired workflow. All commands below are run from the `ontokit-web/` directory.
 
-### 1. Prepare the release
+### 1. Prepare the release (on `dev`)
 
 ```bash
+git checkout dev
 node scripts/prepare-release.mjs
 ```
 
 This script:
-1. Reads the current version from `package.json` (e.g. `0.2.0-dev`).
-2. Strips the `-dev` suffix to produce the release version (`0.2.0`).
+1. Reads the current version from `package.json` (e.g. `0.3.0-dev`).
+2. Strips the `-dev` suffix to produce the release version (`0.3.0`).
 3. Updates `package.json`.
-4. Creates a git commit: `chore: releasing 0.2.0`.
+4. Creates a git commit: `chore: releasing 0.3.0`.
 
-### 2. Tag the release
+### 2. Merge to `main`
 
 ```bash
-git tag -s ontokit-web-0.2.0
+git checkout main
+git merge dev
+```
+
+This brings the release commit onto `main`, which always reflects the current release.
+
+### 3. Tag the release (on `main`)
+
+```bash
+git tag -s ontokit-web-0.3.0
 ```
 
 Tags must match the pattern `ontokit-web-*` to trigger the publish pipeline.
 
-### 3. Push
+### 4. Push `main` and the tag
 
 ```bash
-git push && git push --tags
+git push origin main --tags
 ```
 
-### 4. CI publishes automatically
+### 5. CI publishes automatically
 
-When the tag reaches GitHub, the CI workflow runs the quality job and then two publish jobs in parallel:
+When the tag reaches GitHub, the CI workflow runs the quality jobs and then two publish jobs in parallel:
 
 - **publish_github** &mdash; Creates a GitHub Release with auto-generated release notes.
-- **publish_docker** &mdash; Builds the production Docker image and pushes it to the GitHub Container Registry. The image is tagged with the release version, the major.minor version, and `latest`. For example, the tag `ontokit-web-0.2.0` produces:
-  - `ghcr.io/<owner>/ontokit-web:0.2.0`
-  - `ghcr.io/<owner>/ontokit-web:0.2`
+- **publish_docker** &mdash; Builds the production Docker image and pushes it to the GitHub Container Registry. The image is tagged with the release version, the major.minor version, and `latest`. For example, the tag `ontokit-web-0.3.0` produces:
+  - `ghcr.io/<owner>/ontokit-web:0.3.0`
+  - `ghcr.io/<owner>/ontokit-web:0.3`
   - `ghcr.io/<owner>/ontokit-web:latest`
 
-### 5. Set the next development version
+### 6. Set the next development version (on `dev`)
 
 ```bash
-node scripts/set-version.mjs 0.3.0
+git checkout dev
+node scripts/set-version.mjs 0.4.0
+git push origin dev
 ```
 
 This script:
-1. Updates `package.json` to `0.3.0-dev`.
-2. Creates a git commit: `chore: setting version to 0.3.0-dev`.
-
-Push the commit to start the next development cycle.
+1. Updates `package.json` to `0.4.0-dev`.
+2. Creates a git commit: `chore: setting version to 0.4.0-dev`.
 
 ### Quick reference
 
 ```
-                                                            ┌─ GitHub Release
-0.2.0-dev ──prepare-release.mjs──▸ 0.2.0 ──tag & push──▸ CI─┤
-                                                            └─ GHCR (Docker image)
-                                                   │
-                                 set-version.mjs 0.3.0
-                                         │
-                                     0.3.0-dev  (next cycle)
+dev branch:
+  0.3.0-dev ──prepare-release.mjs──▸ 0.3.0
+                                       │
+main branch:                    merge & tag
+                                       │              ┌─ GitHub Release
+                                       ▼──push──▸  CI─┤
+                                                       └─ GHCR (Docker image)
+dev branch:
+                             set-version.mjs 0.4.0
+                                       │
+                                   0.4.0-dev  (next cycle)
 ```
 
 ## Patch releases
 
-Patch releases are for **backporting critical bug fixes** to an older release line after `main` has already moved to the next development version. New features always ship in the next minor or major release on `main`.
+Patch releases are for **backporting critical bug fixes** to an older release line after `dev` has already moved to the next development version. New features always ship in the next minor or major release on `dev`.
 
-For example, if `main` is at `0.3.0-dev` but a bug is found in `0.2.0`:
+For example, if `dev` is at `0.4.0-dev` but a bug is found in `0.3.0`:
 
 ### 1. Create a release branch from the tag
 
 ```bash
-git checkout -b release/0.2.x ontokit-web-0.2.0
+git checkout -b release/0.3.x ontokit-web-0.3.0
 ```
 
 ### 2. Cherry-pick the fix
 
 ```bash
-git cherry-pick <commit-sha>    # the fix from main
+git cherry-pick <commit-sha>    # the fix from dev or main
 ```
 
 ### 3. Bump to the patch version
 
 ```bash
-npm pkg set version=0.2.1
+npm pkg set version=0.3.1
 git add package.json
-git commit -m "chore: releasing 0.2.1"
+git commit -m "chore: releasing 0.3.1"
 ```
 
 ### 4. Tag and push
 
 ```bash
-git tag -s ontokit-web-0.2.1
-git push -u origin release/0.2.x && git push --tags
+git tag -s ontokit-web-0.3.1
+git push -u origin release/0.3.x && git push --tags
 ```
 
-CI will run the quality checks and publish the GitHub Release and Docker image as usual. The `release/0.2.x` branch can be kept for future patches on the same line.
+CI will run the quality checks and publish the GitHub Release and Docker image as usual. The `release/0.3.x` branch can be kept for future patches on the same line.
+
+After publishing, fast-forward `main` to the patch tag so it continues to reflect the latest release:
+
+```bash
+git checkout main
+git merge release/0.3.x
+git push origin main
+```
 
 > **Note:** The `latest` Docker tag will point to the patch release. If the latest minor/major release should remain `latest`, manually retag after publishing.
 
@@ -159,7 +190,7 @@ Pull the pre-built production image published by CI:
 docker pull ghcr.io/<owner>/ontokit-web:latest
 
 # specific version
-docker pull ghcr.io/<owner>/ontokit-web:0.2.0
+docker pull ghcr.io/<owner>/ontokit-web:0.3.0
 ```
 
 Run it directly:
@@ -170,7 +201,7 @@ docker run -d \
   -p 3000:3000 \
   -e NEXT_PUBLIC_API_URL=https://api.example.com \
   -e NEXT_PUBLIC_WS_URL=wss://api.example.com \
-  ghcr.io/<owner>/ontokit-web:0.2.0
+  ghcr.io/<owner>/ontokit-web:0.3.0
 ```
 
 Or reference it in a compose file:
@@ -178,7 +209,7 @@ Or reference it in a compose file:
 ```yaml
 services:
   web:
-    image: ghcr.io/<owner>/ontokit-web:0.2.0
+    image: ghcr.io/<owner>/ontokit-web:0.3.0
     ports:
       - "3000:3000"
     environment:
