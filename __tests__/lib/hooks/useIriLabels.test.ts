@@ -1,0 +1,177 @@
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { renderHook, waitFor } from "@testing-library/react";
+import { useIriLabels } from "@/lib/hooks/useIriLabels";
+
+vi.mock("@/lib/api/client", () => ({
+  projectOntologyApi: {
+    getClassDetail: vi.fn(),
+    searchEntities: vi.fn(),
+  },
+}));
+
+import { projectOntologyApi } from "@/lib/api/client";
+
+const mockedGetClassDetail = projectOntologyApi.getClassDetail as ReturnType<typeof vi.fn>;
+const mockedSearchEntities = projectOntologyApi.searchEntities as ReturnType<typeof vi.fn>;
+
+describe("useIriLabels", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("returns empty object when iris array is empty", () => {
+    const { result } = renderHook(() =>
+      useIriLabels([], { projectId: "proj-1", accessToken: "token" }),
+    );
+    expect(result.current).toEqual({});
+    expect(mockedGetClassDetail).not.toHaveBeenCalled();
+  });
+
+  it("resolves labels via getClassDetail", async () => {
+    mockedGetClassDetail.mockResolvedValue({
+      labels: [{ value: "Person", language: "en" }],
+    });
+
+    const { result } = renderHook(() =>
+      useIriLabels(["http://example.org/Person"], {
+        projectId: "proj-1",
+        accessToken: "token",
+        branch: "main",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current["http://example.org/Person"]).toBe("Person");
+    });
+    expect(mockedGetClassDetail).toHaveBeenCalledWith(
+      "proj-1",
+      "http://example.org/Person",
+      "token",
+      "main",
+    );
+  });
+
+  it("falls back to searchEntities when getClassDetail fails", async () => {
+    mockedGetClassDetail.mockRejectedValue(new Error("Not a class"));
+    mockedSearchEntities.mockResolvedValue({
+      results: [
+        { iri: "http://example.org/hasPart", label: "has Part" },
+      ],
+    });
+
+    const { result } = renderHook(() =>
+      useIriLabels(["http://example.org/hasPart"], {
+        projectId: "proj-1",
+        accessToken: "token",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current["http://example.org/hasPart"]).toBe("has Part");
+    });
+  });
+
+  it("returns labelHints for known IRIs without fetching", () => {
+    const hints = { "http://example.org/Known": "Known Label" };
+    const { result } = renderHook(() =>
+      useIriLabels(["http://example.org/Known"], {
+        projectId: "proj-1",
+        accessToken: "token",
+        labelHints: hints,
+      }),
+    );
+
+    // labelHints are returned immediately, no fetch needed
+    expect(result.current["http://example.org/Known"]).toBe("Known Label");
+    expect(mockedGetClassDetail).not.toHaveBeenCalled();
+    expect(mockedSearchEntities).not.toHaveBeenCalled();
+  });
+
+  it("merges labelHints with fetched labels", async () => {
+    const hints = { "http://example.org/Known": "Known Label" };
+    mockedGetClassDetail.mockResolvedValue({
+      labels: [{ value: "Fetched", language: "en" }],
+    });
+
+    const { result } = renderHook(() =>
+      useIriLabels(
+        ["http://example.org/Known", "http://example.org/Unknown"],
+        {
+          projectId: "proj-1",
+          accessToken: "token",
+          labelHints: hints,
+        },
+      ),
+    );
+
+    expect(result.current["http://example.org/Known"]).toBe("Known Label");
+
+    await waitFor(() => {
+      expect(result.current["http://example.org/Unknown"]).toBe("Fetched");
+    });
+    expect(result.current["http://example.org/Known"]).toBe("Known Label");
+  });
+
+  it("filters out falsy IRIs", () => {
+    const { result } = renderHook(() =>
+      useIriLabels(["", ""], { projectId: "proj-1", accessToken: "token" }),
+    );
+    expect(result.current).toEqual({});
+    expect(mockedGetClassDetail).not.toHaveBeenCalled();
+  });
+
+  it("resets cache when projectId changes", async () => {
+    mockedGetClassDetail.mockResolvedValue({
+      labels: [{ value: "Label1", language: "en" }],
+    });
+
+    const { result, rerender } = renderHook(
+      ({ projectId, iris }: { projectId: string; iris: string[] }) =>
+        useIriLabels(iris, {
+          projectId,
+          accessToken: "token",
+        }),
+      { initialProps: { projectId: "proj-1", iris: ["http://example.org/E"] } },
+    );
+
+    await waitFor(() => {
+      expect(result.current["http://example.org/E"]).toBe("Label1");
+    });
+
+    mockedGetClassDetail.mockResolvedValue({
+      labels: [{ value: "Label2", language: "en" }],
+    });
+
+    // Change projectId AND iris to trigger both the context reset and the IRI effect
+    rerender({ projectId: "proj-2", iris: ["http://example.org/F"] });
+
+    await waitFor(
+      () => {
+        expect(result.current["http://example.org/F"]).toBe("Label2");
+      },
+      { timeout: 3000 },
+    );
+    // Old label should be cleared
+    expect(result.current["http://example.org/E"]).toBeUndefined();
+  });
+
+  it("handles case where both class detail and search fail gracefully", async () => {
+    mockedGetClassDetail.mockRejectedValue(new Error("fail"));
+    mockedSearchEntities.mockRejectedValue(new Error("search fail"));
+
+    const { result } = renderHook(() =>
+      useIriLabels(["http://example.org/Unknown"], {
+        projectId: "proj-1",
+        accessToken: "token",
+      }),
+    );
+
+    // Wait for both API paths to complete (getClassDetail fails, searchEntities fallback runs)
+    await waitFor(() => {
+      expect(mockedSearchEntities).toHaveBeenCalled();
+    });
+
+    // No label resolved, but no crash
+    expect(result.current["http://example.org/Unknown"]).toBeUndefined();
+  });
+});

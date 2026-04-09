@@ -22,6 +22,7 @@ export function useCollaborationStatus({
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
   const isClosingRef = useRef(false);
+  const connectRef = useRef<() => void>(() => {});
 
   const getWsUrl = useCallback(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -64,7 +65,7 @@ export function useCollaborationStatus({
 
           reconnectTimeoutRef.current = setTimeout(() => {
             setStatus("connecting");
-            connect();
+            connectRef.current();
           }, delay);
         }
       };
@@ -89,6 +90,11 @@ export function useCollaborationStatus({
       setStatus("disconnected");
     }
   }, [enabled, projectId, getWsUrl]);
+
+  // Keep the ref in sync so the onclose callback always calls the latest version
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   const disconnect = useCallback(() => {
     isClosingRef.current = true;

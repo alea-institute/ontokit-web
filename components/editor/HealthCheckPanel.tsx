@@ -320,7 +320,7 @@ export function HealthCheckPanel({
                 {isDetectingDuplicates ? "Detecting..." : "Find Duplicates"}
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0" aria-label="Close">
               <X className="h-4 w-4" />
             </Button>
           </div>

@@ -47,7 +47,7 @@ import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
-function ensureTrailingEmpty(arr: LocalizedString[]): LocalizedString[] {
+export function ensureTrailingEmpty(arr: LocalizedString[]): LocalizedString[] {
   if (arr.length === 0 || arr[arr.length - 1].value.trim() !== "") {
     return [...arr, { value: "", lang: "en" }];
   }
