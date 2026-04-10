@@ -87,12 +87,6 @@ describe("AnnotationRow", () => {
     expect(chip.getAttribute("title")).toBe("rdfs:label");
   });
 
-  it("renders the LanguagePicker with the correct lang", () => {
-    render(<AnnotationRow {...defaultProps} />);
-    const picker = screen.getByTestId("lang-picker") as HTMLSelectElement;
-    expect(picker.value).toBe("en");
-  });
-
   it("renders the language picker with correct value", () => {
     render(<AnnotationRow {...defaultProps} />);
     const langPicker = screen.getByLabelText("Language tag") as HTMLSelectElement;
@@ -156,12 +150,14 @@ describe("AnnotationRow", () => {
     expect(onBlur).toHaveBeenCalledTimes(1);
   });
 
-  it("does not crash when language picker is present (onBlur only on value input)", () => {
+  it("calls onBlur after language picker changes to trigger auto-save", () => {
     const onBlur = vi.fn();
-    render(<AnnotationRow {...defaultProps} onBlur={onBlur} />);
-    // The LanguagePicker is a combobox, not a plain input, so onBlur
-    // is only triggered on the value input. Verify the picker renders.
-    expect(screen.getByTestId("lang-picker")).toBeDefined();
+    const onLangChange = vi.fn();
+    render(<AnnotationRow {...defaultProps} onBlur={onBlur} onLangChange={onLangChange} />);
+    const langPicker = screen.getByLabelText("Language tag");
+    fireEvent.change(langPicker, { target: { value: "fr" } });
+    expect(onLangChange).toHaveBeenCalledWith("fr");
+    expect(onBlur).toHaveBeenCalledTimes(1);
   });
 
   it("uses custom placeholder when provided", () => {
