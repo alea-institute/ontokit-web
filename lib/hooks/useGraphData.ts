@@ -27,12 +27,14 @@ export function useGraphData({
   const [graphData, setGraphData] = useState<EntityGraphResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showDescendants, setShowDescendants] = useState(false);
+  const [resetKey, setResetKey] = useState(0);
   const expandedNodes = useRef(new Set<string>());
 
   // Fetch graph from backend BFS endpoint
   useEffect(() => {
     if (!focusIri) {
       setGraphData(null);
+      setIsLoading(false);
       return;
     }
 
@@ -59,13 +61,12 @@ export function useGraphData({
     return () => {
       cancelled = true;
     };
-  }, [focusIri, projectId, branch, showDescendants]);
+  }, [focusIri, projectId, branch, showDescendants, resetKey]);
 
   // Progressive expansion: fetch 1-hop neighborhood and merge
   const expandNode = useCallback(
     (iri: string) => {
       if (!graphData || expandedNodes.current.has(iri)) return;
-      expandedNodes.current.add(iri);
 
       graphApi
         .getEntityGraph(projectId, iri, {
@@ -75,6 +76,7 @@ export function useGraphData({
           maxNodes: 50,
         })
         .then((newData) => {
+          expandedNodes.current.add(iri);
           setGraphData((prev) => {
             if (!prev) return newData;
 
@@ -91,13 +93,14 @@ export function useGraphData({
                 ...prev.edges,
                 ...newData.edges.filter((e) => !existingEdgeIds.has(e.id)),
               ],
+              truncated: prev.truncated || newData.truncated,
               total_concept_count:
                 prev.total_concept_count + newData.nodes.filter((n) => !existingNodeIds.has(n.id)).length,
             };
           });
         })
         .catch(() => {
-          // Silently fail expansion
+          // Expansion failed — node stays retryable
         });
     },
     [graphData, projectId, branch],
@@ -106,6 +109,7 @@ export function useGraphData({
   const resetGraph = useCallback(() => {
     expandedNodes.current = new Set();
     setGraphData(null);
+    setResetKey((k) => k + 1);
   }, []);
 
   const resolvedCount = useMemo(

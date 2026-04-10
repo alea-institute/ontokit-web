@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Node, Edge } from "@xyflow/react";
 import type { EntityGraphResponse } from "@/lib/api/graph";
 import type { OntologyNodeData } from "@/components/graph/OntologyNode";
@@ -23,9 +23,11 @@ export function useELKLayout(): LayoutResult {
   const [nodes, setNodes] = useState<Node<OntologyNodeData>[]>([]);
   const [edges, setEdges] = useState<Edge<OntologyEdgeData>[]>([]);
   const [isLayouting, setIsLayouting] = useState(false);
+  const layoutRunRef = useRef(0);
 
   const runLayout = useCallback(
     async (data: EntityGraphResponse, direction: LayoutDirection = "TB") => {
+      const localRunId = ++layoutRunRef.current;
       setIsLayouting(true);
 
       try {
@@ -99,10 +101,11 @@ export function useELKLayout(): LayoutResult {
           },
         }));
 
+        if (layoutRunRef.current !== localRunId) return;
         setNodes(layoutedNodes);
         setEdges(layoutedEdges);
       } finally {
-        setIsLayouting(false);
+        if (layoutRunRef.current === localRunId) setIsLayouting(false);
       }
     },
     [],

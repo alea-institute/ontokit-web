@@ -199,7 +199,7 @@ describe("useGraphData", () => {
     expect(parentCount).toBe(1);
   });
 
-  it("resets graph data on resetGraph", async () => {
+  it("resetGraph clears data and re-fetches baseline", async () => {
     const response = makeGraphResponse();
     mockGetEntityGraph.mockResolvedValue(response);
 
@@ -211,11 +211,63 @@ describe("useGraphData", () => {
       expect(result.current.graphData).not.toBeNull();
     });
 
+    const callCountBefore = mockGetEntityGraph.mock.calls.length;
+
     act(() => {
       result.current.resetGraph();
     });
 
     expect(result.current.graphData).toBeNull();
+
+    // Should re-fetch the baseline graph
+    await waitFor(() => {
+      expect(mockGetEntityGraph.mock.calls.length).toBeGreaterThan(callCountBefore);
+      expect(result.current.graphData).not.toBeNull();
+    });
+  });
+
+  it("preserves truncated flag when merging expansion", async () => {
+    const initial = makeGraphResponse({ truncated: false });
+    const expansion = makeGraphResponse({
+      focus_iri: "urn:parent",
+      focus_label: "Parent",
+      truncated: true,
+      nodes: [
+        {
+          id: "urn:new-node",
+          label: "New",
+          iri: "urn:new-node",
+          definition: null,
+          is_focus: false,
+          is_root: false,
+          depth: 1,
+          node_type: "class",
+          child_count: 0,
+        },
+      ],
+      edges: [],
+      total_concept_count: 1,
+    });
+
+    mockGetEntityGraph
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(expansion);
+
+    const { result } = renderHook(() =>
+      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.graphData).not.toBeNull();
+    });
+
+    act(() => {
+      result.current.expandNode("urn:parent");
+    });
+
+    await waitFor(() => {
+      expect(result.current.graphData!.truncated).toBe(true);
+    });
   });
 
   it("reports resolvedCount from node count", async () => {

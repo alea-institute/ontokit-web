@@ -73,8 +73,8 @@ Parameters: `ontology_id`, `class_iri`, `branch`, `ancestors_depth=5`, `descenda
 
 **File:** `ontokit/api/routes/classes.py` — add endpoint
 
-```
-GET /ontologies/{ontology_id}/classes/{class_iri:path}/graph
+```text
+GET /api/v1/projects/{id}/ontology/graph/{class_iri}
 ```
 
 Query params: `ancestors_depth`, `descendants_depth`, `max_nodes`, `include_see_also`, `branch`
@@ -235,7 +235,7 @@ Delete files replaced by the port:
 
 ## Execution Order
 
-```
+```text
 Plan 1 (backend) → Plan 2 (frontend components) → Plan 3 (integration)
 ```
 

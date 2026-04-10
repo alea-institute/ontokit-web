@@ -22,7 +22,7 @@ This is a standalone feature — separate from the v0.4.0 LLM-Assisted Ontology 
 
 ### Backend graph endpoint
 - **D-04:** Add a server-side BFS graph building endpoint to ontokit-api, ported from folio-mapper's `build_entity_graph()` in `folio_service.py`
-- **D-05:** Endpoint signature: `GET /concept/{iri_hash}/graph?ancestors_depth=5&descendants_depth=2&max_nodes=200&include_see_also=true`
+- **D-05:** Endpoint signature: `GET /api/v1/projects/{id}/ontology/graph/{class_iri}?ancestors_depth=5&descendants_depth=2&max_nodes=200&include_see_also=true` — client call: `graphApi.getEntityGraph(projectId, focusIri, { ancestorsDepth, descendantsDepth, maxNodes, includeSeeAlso })`
 - **D-06:** Returns `EntityGraphResponse` with nodes, edges, truncation flag, and total concept count
 - **D-07:** Full stack in one feature — backend endpoint + frontend components ship together
 

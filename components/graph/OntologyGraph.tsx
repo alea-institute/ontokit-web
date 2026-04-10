@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -181,19 +181,22 @@ export function OntologyGraph({
     }
   }, [layoutNodes, layoutEdges, setNodes, setEdges]);
 
-  // Progressive expansion: click to expand or navigate
-  const expandedNodes = useMemo(() => new Set<string>(focusIri ? [focusIri] : []), [focusIri]);
+  // Progressive expansion: track which nodes have been clicked to expand
+  const expandedNodes = useRef(new Set<string>(focusIri ? [focusIri] : []));
+
+  // Reset expanded set when focus changes
+  useEffect(() => {
+    expandedNodes.current = new Set<string>(focusIri ? [focusIri] : []);
+  }, [focusIri]);
 
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
-      if (expandedNodes.has(node.id)) {
-        onNavigateToClass?.(node.id);
-        return;
+      if (!expandedNodes.current.has(node.id)) {
+        expandedNodes.current.add(node.id);
+        expandNode(node.id);
       }
-      expandedNodes.add(node.id);
-      expandNode(node.id);
     },
-    [expandedNodes, expandNode, onNavigateToClass],
+    [expandNode],
   );
 
   const handleNodeDoubleClick: NodeMouseHandler = useCallback(

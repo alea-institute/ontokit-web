@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, lazy, useCallback, useEffect } from "react";
+import { Suspense, lazy, useCallback, useEffect, useRef } from "react";
 import { X } from "lucide-react";
 
 const OntologyGraph = lazy(() =>
@@ -24,9 +24,48 @@ export function EntityGraphModal({
   onNavigateToClass,
   onClose,
 }: EntityGraphModalProps) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<Element | null>(null);
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement;
+
+    // Focus the dialog container
+    dialogRef.current?.focus();
+
+    return () => {
+      // Restore focus on unmount
+      if (previousFocusRef.current instanceof HTMLElement) {
+        previousFocusRef.current.focus();
+      }
+    };
+  }, []);
+
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onClose();
+        return;
+      }
+
+      // Trap focus within the modal
+      if (e.key === "Tab" && dialogRef.current) {
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+        );
+        if (focusable.length === 0) return;
+
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
@@ -42,7 +81,14 @@ export function EntityGraphModal({
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40">
-      <div className="flex h-[97vh] w-[98vw] flex-col overflow-hidden rounded-xl bg-white shadow-2xl dark:bg-slate-900">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="entity-graph-title"
+        tabIndex={-1}
+        className="flex h-[97vh] w-[98vw] flex-col overflow-hidden rounded-xl bg-white shadow-2xl outline-none dark:bg-slate-900"
+      >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-200 bg-slate-100 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center gap-3">
@@ -59,7 +105,7 @@ export function EntityGraphModal({
               <line x1="8" y1="7" x2="11" y2="16" strokeLinecap="round" />
               <line x1="16" y1="7" x2="13" y2="16" strokeLinecap="round" />
             </svg>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+            <h2 id="entity-graph-title" className="text-lg font-bold text-slate-900 dark:text-white">
               <span className="font-medium text-slate-400 dark:text-slate-500">
                 Entity Graph
               </span>
