@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useId } from "react";
 import { Command } from "cmdk";
 import { ChevronDown } from "lucide-react";
 import { langToFlag } from "@/lib/utils";
@@ -25,6 +25,11 @@ const OTHER_LANGUAGES: LanguageOption[] = ALL_LANGUAGES.filter(
   (l) => !FREQUENT_CODES.has(l.code)
 );
 
+/** Strip diacritics for accent-insensitive search (e.g. "francais" matches "Français") */
+function stripDiacritics(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
 /**
  * Compact searchable combobox for selecting a BCP 47 language tag.
  *
@@ -35,6 +40,7 @@ const OTHER_LANGUAGES: LanguageOption[] = ALL_LANGUAGES.filter(
 export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
 
   // Close on outside click
   useEffect(() => {
@@ -74,6 +80,9 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
         onClick={() => !disabled && setOpen((prev) => !prev)}
         disabled={disabled}
         aria-label="Language tag"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-controls={open ? listId : undefined}
         title={langInfo ? `${langInfo.name} (${langInfo.nativeName})` : value || "Select language"}
         className="flex w-14 items-center justify-center gap-0.5 rounded-md border border-slate-300 bg-white px-1 py-1.5 text-xs text-slate-700 hover:border-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
       >
@@ -88,10 +97,10 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
             filter={(value, search) => {
               const lang = ALL_LANGUAGES.find((l) => l.code === value);
               if (!lang) return 0;
-              const q = search.toLowerCase();
-              if (lang.code.toLowerCase().includes(q)) return 1;
-              if (lang.name.toLowerCase().includes(q)) return 1;
-              if (lang.nativeName.toLowerCase().includes(q)) return 1;
+              const q = stripDiacritics(search.toLowerCase());
+              if (stripDiacritics(lang.code.toLowerCase()).includes(q)) return 1;
+              if (stripDiacritics(lang.name.toLowerCase()).includes(q)) return 1;
+              if (stripDiacritics(lang.nativeName.toLowerCase()).includes(q)) return 1;
               return 0;
             }}
           >
@@ -102,7 +111,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
                 className="w-full bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden dark:text-white dark:placeholder:text-slate-500"
               />
             </div>
-            <Command.List className="max-h-60 overflow-y-auto py-1">
+            <Command.List id={listId} role="listbox" className="max-h-60 overflow-y-auto py-1">
               <Command.Empty className="py-3 text-center text-xs text-slate-500 dark:text-slate-400">
                 No matching languages
               </Command.Empty>
