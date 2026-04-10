@@ -1,11 +1,12 @@
 /**
  * React hook for remote sync management.
  *
- * Handles config CRUD, manual check triggering with job polling,
- * and sync event history.
+ * Uses React Query for config/history fetching and cache management.
+ * Keeps manual check triggering with job polling as mutations.
  */
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   remoteSyncApi,
   type RemoteSyncConfig,
@@ -14,8 +15,12 @@ import {
   type SyncEvent,
 } from "@/lib/api/remoteSync";
 
-
 const JOB_POLL_INTERVAL = 2000; // 2 seconds
+
+export const remoteSyncQueryKeys = {
+  config: (projectId: string) => ["remoteSync", "config", projectId] as const,
+  history: (projectId: string) => ["remoteSync", "history", projectId] as const,
+};
 
 interface UseRemoteSyncOptions {
   projectId: string;
@@ -41,11 +46,9 @@ export function useRemoteSync({
   accessToken,
   enabled = true,
 }: UseRemoteSyncOptions): UseRemoteSyncReturn {
-  const [config, setConfig] = useState<RemoteSyncConfig | null>(null);
-  const [history, setHistory] = useState<SyncEvent[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [isChecking, setIsChecking] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
 
   const jobIdRef = useRef<string | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -59,38 +62,30 @@ export function useRemoteSync({
     };
   }, []);
 
-  // Fetch config + history
-  const fetchData = useCallback(async () => {
-    if (!projectId || !enabled) return;
+  // Fetch config via React Query
+  const configQuery = useQuery({
+    queryKey: remoteSyncQueryKeys.config(projectId),
+    queryFn: () => remoteSyncApi.getConfig(projectId, accessToken),
+    enabled: !!projectId && enabled,
+  });
 
-    setIsLoading(true);
-    setError(null);
+  // Fetch history via React Query (only when config exists)
+  const historyQuery = useQuery({
+    queryKey: remoteSyncQueryKeys.history(projectId),
+    queryFn: async () => {
+      const data = await remoteSyncApi.getHistory(projectId, 20, accessToken);
+      return data.items;
+    },
+    enabled: !!projectId && enabled && !!configQuery.data,
+  });
 
-    try {
-      const configData = await remoteSyncApi.getConfig(projectId, accessToken);
-      setConfig(configData);
-
-      // Fetch history if config exists
-      if (configData) {
-        try {
-          const historyData = await remoteSyncApi.getHistory(projectId, 20, accessToken);
-          setHistory(historyData.items);
-        } catch {
-          // History may be empty, ignore
-        }
-      } else {
-        setHistory([]);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load remote sync config");
-    } finally {
-      setIsLoading(false);
-    }
-  }, [projectId, accessToken, enabled]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // Invalidate both queries
+  const refetchAll = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: remoteSyncQueryKeys.config(projectId) }),
+      queryClient.invalidateQueries({ queryKey: remoteSyncQueryKeys.history(projectId) }),
+    ]);
+  }, [queryClient, projectId]);
 
   // Poll for job status
   const startPolling = useCallback(
@@ -109,7 +104,7 @@ export function useRemoteSync({
           const status = await remoteSyncApi.getJobStatus(
             projectId,
             jobIdRef.current,
-            accessToken
+            accessToken,
           );
 
           if (status.status === "complete" || status.status === "failed") {
@@ -121,25 +116,25 @@ export function useRemoteSync({
             setIsChecking(false);
 
             if (status.status === "failed" && status.error) {
-              setError(status.error);
+              setCheckError(status.error);
             }
 
             // Refresh data after job completes
-            await fetchData();
+            await refetchAll();
           }
         } catch {
           // Polling error — keep trying
         }
       }, JOB_POLL_INTERVAL);
     },
-    [projectId, accessToken, fetchData]
+    [projectId, accessToken, refetchAll],
   );
 
   // Trigger a manual check
   const triggerCheck = useCallback(async () => {
     if (!accessToken) return;
 
-    setError(null);
+    setCheckError(null);
     setIsChecking(true);
 
     try {
@@ -147,55 +142,69 @@ export function useRemoteSync({
       startPolling(response.job_id);
     } catch (err) {
       setIsChecking(false);
-      setError(err instanceof Error ? err.message : "Failed to trigger check");
+      setCheckError(err instanceof Error ? err.message : "Failed to trigger check");
     }
   }, [projectId, accessToken, startPolling]);
 
-  // Save config
+  // Save config mutation
+  const saveConfigMutation = useMutation({
+    mutationFn: (data: RemoteSyncConfigCreate | RemoteSyncConfigUpdate) =>
+      remoteSyncApi.saveConfig(projectId, data, accessToken!),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(remoteSyncQueryKeys.config(projectId), updated);
+    },
+  });
+
   const saveConfig = useCallback(
     async (data: RemoteSyncConfigCreate | RemoteSyncConfigUpdate) => {
       if (!accessToken) return;
-
-      setError(null);
-
+      setCheckError(null);
       try {
-        const updated = await remoteSyncApi.saveConfig(projectId, data, accessToken);
-        setConfig(updated);
+        await saveConfigMutation.mutateAsync(data);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to save config";
-        setError(msg);
+        setCheckError(msg);
         throw err;
       }
     },
-    [projectId, accessToken]
+    [accessToken, saveConfigMutation],
   );
 
-  // Delete config
+  // Delete config mutation
+  const deleteConfigMutation = useMutation({
+    mutationFn: () => remoteSyncApi.deleteConfig(projectId, accessToken!),
+    onSuccess: () => {
+      queryClient.setQueryData(remoteSyncQueryKeys.config(projectId), null);
+      queryClient.setQueryData(remoteSyncQueryKeys.history(projectId), []);
+    },
+  });
+
   const deleteConfig = useCallback(async () => {
     if (!accessToken) return;
-
-    setError(null);
-
+    setCheckError(null);
     try {
-      await remoteSyncApi.deleteConfig(projectId, accessToken);
-      setConfig(null);
-      setHistory([]);
+      await deleteConfigMutation.mutateAsync();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to remove config";
-      setError(msg);
+      setCheckError(msg);
       throw err;
     }
-  }, [projectId, accessToken]);
+  }, [accessToken, deleteConfigMutation]);
+
+  // Combine errors: prefer check/mutation errors, then fallback to query error
+  const error =
+    checkError ??
+    (configQuery.error instanceof Error ? configQuery.error.message : null);
 
   return {
-    config,
-    history,
-    isLoading,
+    config: configQuery.data ?? null,
+    history: historyQuery.data ?? [],
+    isLoading: configQuery.isLoading,
     isChecking,
     error,
     triggerCheck,
     saveConfig,
     deleteConfig,
-    refetch: fetchData,
+    refetch: refetchAll,
   };
 }

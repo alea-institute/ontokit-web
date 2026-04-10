@@ -1,5 +1,7 @@
+import React, { type ReactNode } from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useRemoteSync } from "@/lib/hooks/useRemoteSync";
 import type { RemoteSyncConfig, SyncEvent } from "@/lib/api/remoteSync";
 
@@ -23,6 +25,13 @@ const mockedTriggerCheck = remoteSyncApi.triggerCheck as ReturnType<typeof vi.fn
 const mockedGetJobStatus = remoteSyncApi.getJobStatus as ReturnType<typeof vi.fn>;
 const mockedSaveConfig = remoteSyncApi.saveConfig as ReturnType<typeof vi.fn>;
 const mockedDeleteConfig = remoteSyncApi.deleteConfig as ReturnType<typeof vi.fn>;
+
+function createWrapper() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // eslint-disable-next-line react/display-name
+  return ({ children }: { children: ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: qc }, children);
+}
 
 function makeConfig(overrides: Partial<RemoteSyncConfig> = {}): RemoteSyncConfig {
   return {
@@ -56,6 +65,7 @@ describe("useRemoteSync", () => {
 
     renderHook(() =>
       useRemoteSync({ projectId: "proj-1", accessToken: "token", enabled: false }),
+      { wrapper: createWrapper() },
     );
 
     // Give time for any potential async calls
@@ -69,6 +79,7 @@ describe("useRemoteSync", () => {
 
     renderHook(() =>
       useRemoteSync({ projectId: "", accessToken: "token" }),
+      { wrapper: createWrapper() },
     );
 
     await act(async () => {});
@@ -97,6 +108,7 @@ describe("useRemoteSync", () => {
 
     const { result } = renderHook(() =>
       useRemoteSync({ projectId: "proj-1", accessToken: "token" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -111,6 +123,7 @@ describe("useRemoteSync", () => {
 
     const { result } = renderHook(() =>
       useRemoteSync({ projectId: "proj-1", accessToken: "token" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -124,6 +137,7 @@ describe("useRemoteSync", () => {
 
     const { result } = renderHook(() =>
       useRemoteSync({ projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -149,6 +163,7 @@ describe("useRemoteSync", () => {
 
     const { result } = renderHook(() =>
       useRemoteSync({ projectId: "proj-1", accessToken: "token" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -171,6 +186,7 @@ describe("useRemoteSync", () => {
 
     const { result } = renderHook(() =>
       useRemoteSync({ projectId: "proj-1", accessToken: "token" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -190,6 +206,7 @@ describe("useRemoteSync", () => {
 
     const { result } = renderHook(() =>
       useRemoteSync({ projectId: "proj-1", accessToken: "token" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
@@ -213,6 +230,7 @@ describe("useRemoteSync", () => {
 
     const { result } = renderHook(() =>
       useRemoteSync({ projectId: "proj-1", accessToken: "token" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));

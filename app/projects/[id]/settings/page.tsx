@@ -12,6 +12,7 @@ function isHttpUrl(url: string): boolean {
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, UserPlus, Trash2, Tag, Check, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff, Database, ExternalLink } from "lucide-react";
 import { GithubIcon as Github } from "@/components/icons/github";
@@ -53,6 +54,10 @@ import {
   type JoinRequest as JoinRequestType,
 } from "@/lib/api/joinRequests";
 import { useRemoteSync } from "@/lib/hooks/useRemoteSync";
+import { useProject, projectQueryKeys } from "@/lib/hooks/useProject";
+import { useMembers, memberQueryKeys } from "@/lib/hooks/useMembers";
+import { useNormalizationStatus, normalizationQueryKeys } from "@/lib/hooks/useNormalizationStatus";
+import { useIndexStatus, indexQueryKeys } from "@/lib/hooks/useIndexStatus";
 import type {
   SyncFrequency,
   SyncUpdateMode,
@@ -89,13 +94,37 @@ export default function ProjectSettingsPage() {
   const params = useParams();
   const projectId = params.id as string;
 
+  const queryClient = useQueryClient();
+
+  // React Query hooks for initial data
+  const {
+    project: projectData,
+    isLoading: isProjectLoading,
+    error: projectError,
+  } = useProject(projectId, session?.accessToken);
+  const { data: membersData } = useMembers(projectId, session?.accessToken);
+
+  // Local state seeded from React Query (allows optimistic updates in mutation handlers)
   const [project, setProject] = useState<Project | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+
+  // Sync local state from query data
+  useEffect(() => {
+    if (projectData) setProject(projectData);
+  }, [projectData]);
+  useEffect(() => {
+    if (membersData?.items) setMembers(membersData.items);
+  }, [membersData]);
+
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(projectError);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Sync project-level error from query
+  useEffect(() => {
+    if (projectError) setError(projectError);
+  }, [projectError]);
 
   // Add member form state
   const [showAddMember, setShowAddMember] = useState(false);
@@ -113,8 +142,18 @@ export default function ProjectSettingsPage() {
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
   const [preferencesSaved, setPreferencesSaved] = useState(false);
 
-  // Normalization state
+  // Normalization status via React Query
+  const {
+    data: normalizationQueryData,
+  } = useNormalizationStatus(projectId, session?.accessToken, {
+    enabled: !!project?.source_file_path,
+  });
+  // Local normalization state (for optimistic updates during dry run / normalization)
   const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
+  useEffect(() => {
+    if (normalizationQueryData) setNormalizationStatus(normalizationQueryData);
+  }, [normalizationQueryData]);
+
   const [normalizationHistory, setNormalizationHistory] = useState<NormalizationRunResponse[]>([]);
   const [isCheckingNormalization, setIsCheckingNormalization] = useState(false);
   const [isRunningNormalization, setIsRunningNormalization] = useState(false);
@@ -130,8 +169,18 @@ export default function ProjectSettingsPage() {
   const [normalizationJobId, setNormalizationJobId] = useState<string | null>(null);
   const [normalizationJobStatus, setNormalizationJobStatus] = useState<string | null>(null);
 
-  // Ontology index state
+  // Ontology index status via React Query
+  const {
+    data: indexQueryData,
+  } = useIndexStatus(projectId, session?.accessToken, {
+    enabled: !!project?.source_file_path,
+  });
+  // Local index state (for optimistic updates during reindex)
   const [indexStatus, setIndexStatus] = useState<IndexStatusResponse | null>(null);
+  useEffect(() => {
+    if (indexQueryData) setIndexStatus(indexQueryData);
+  }, [indexQueryData]);
+
   const [isReindexing, setIsReindexing] = useState(false);
   const reindexPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -167,91 +216,52 @@ export default function ProjectSettingsPage() {
   const [githubOutputPath, setGithubOutputPath] = useState<string | null>(null);
 
   const isAuthenticated = status === "authenticated";
+  const isLoading = isProjectLoading || status === "loading";
 
+  // Sync label preferences from project data
   useEffect(() => {
-    const fetchData = async () => {
-      if (!session?.accessToken) return;
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const [projectData, membersData] = await Promise.all([
-          projectApi.get(projectId, session.accessToken),
-          projectApi.listMembers(projectId, session.accessToken),
-        ]);
-        setProject(projectData);
-        setMembers(membersData.items);
-        setLabelPreferences(projectData.label_preferences || []);
-
-        // Fetch normalization status if project has an ontology file
-        if (projectData.source_file_path) {
-          try {
-            const normStatus = await normalizationApi.getStatus(projectId, session.accessToken);
-            setNormalizationStatus(normStatus);
-          } catch {
-            // Normalization status may not be available, ignore
-          }
-
-          // Fetch ontology index status
-          try {
-            const idxStatus = await projectOntologyApi.getIndexStatus(projectId, session.accessToken);
-            setIndexStatus(idxStatus);
-          } catch {
-            // Index status endpoint may not be available, ignore
-          }
-        }
-
-        // Fetch PR settings and GitHub integration for owners/admins/superadmins
-        if (projectData.user_role === "owner" || projectData.user_role === "admin" || projectData.is_superadmin) {
-          try {
-            const prSettingsData = await prSettingsApi.get(projectId, session.accessToken);
-            setPrSettings(prSettingsData);
-            setGithubIntegration(prSettingsData.github_integration || null);
-            setPrApprovalRequired(prSettingsData.pr_approval_required);
-          } catch {
-            // PR settings may not be available, ignore
-          }
-
-          // Fetch join requests for public projects
-          if (projectData.is_public) {
-            try {
-              const jrData = await joinRequestApi.list(projectId, session.accessToken);
-              setJoinRequests(jrData.items);
-              setJoinRequestCount(jrData.total);
-            } catch {
-              // Join requests may not be available, ignore
-            }
-          }
-
-          // Check if user has a GitHub token (for the repo picker)
-          try {
-            const tokenStatus = await userSettingsApi.getGitHubTokenStatus(session.accessToken);
-            setHasGithubToken(tokenStatus.has_token);
-          } catch {
-            setHasGithubToken(false);
-          }
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
-          setError("You don't have permission to access project settings");
-        } else if (err instanceof Error && err.message.includes("404")) {
-          setError("Project not found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load project");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (status !== "loading" && projectId && isAuthenticated) {
-      fetchData();
-    } else if (status !== "loading" && !isAuthenticated) {
-      setError("You must be signed in to access project settings");
-      setIsLoading(false);
+    if (project) {
+      setLabelPreferences(project.label_preferences || []);
     }
-  }, [projectId, session?.accessToken, status, isAuthenticated]);
+  }, [project]);
+
+  // Fetch admin-only data (PR settings, join requests, GitHub token status) when project loads
+  useEffect(() => {
+    if (!project || !session?.accessToken) return;
+    const isAdmin = project.user_role === "owner" || project.user_role === "admin" || project.is_superadmin;
+    if (!isAdmin) return;
+
+    // PR settings + GitHub integration
+    prSettingsApi.get(projectId, session.accessToken)
+      .then((prSettingsData) => {
+        setPrSettings(prSettingsData);
+        setGithubIntegration(prSettingsData.github_integration || null);
+        setPrApprovalRequired(prSettingsData.pr_approval_required);
+      })
+      .catch(() => { /* PR settings may not be available */ });
+
+    // Join requests for public projects
+    if (project.is_public) {
+      joinRequestApi.list(projectId, session.accessToken)
+        .then((jrData) => {
+          setJoinRequests(jrData.items);
+          setJoinRequestCount(jrData.total);
+        })
+        .catch(() => { /* ignore */ });
+    }
+
+    // GitHub token status
+    userSettingsApi.getGitHubTokenStatus(session.accessToken)
+      .then((tokenStatus) => setHasGithubToken(tokenStatus.has_token))
+      .catch(() => setHasGithubToken(false));
+  }, [project, projectId, session?.accessToken]);
+
+  // Handle unauthenticated state
+  useEffect(() => {
+    if (status !== "loading" && !isAuthenticated) {
+      setError("You must be signed in to access project settings");
+    }
+  }, [status, isAuthenticated]);
 
   // Scroll to hash on page load (for #normalization link from editor)
   useEffect(() => {
@@ -287,6 +297,7 @@ export default function ProjectSettingsPage() {
     try {
       const updated = await projectApi.update(project.id, data as ProjectUpdate, session.accessToken);
       setProject(updated);
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
       setSuccessMessage("Project settings saved successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -315,6 +326,8 @@ export default function ProjectSettingsPage() {
       );
       setMembers([...members, newMember]);
       setProject({ ...project, member_count: project.member_count + 1 });
+      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
       setShowAddMember(false);
       setNewMemberUserId("");
       setNewMemberRole("suggester");
@@ -340,6 +353,7 @@ export default function ProjectSettingsPage() {
         session.accessToken
       );
       setMembers(members.map((m) => (m.user_id === userId ? updated : m)));
+      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update member role");
     }
@@ -352,6 +366,8 @@ export default function ProjectSettingsPage() {
       await projectApi.removeMember(project.id, userId, session.accessToken);
       setMembers(members.filter((m) => m.user_id !== userId));
       setProject({ ...project, member_count: project.member_count - 1 });
+      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
 
       // If user removed themselves, redirect to projects
       if (userId === session.user?.id) {
@@ -385,6 +401,8 @@ export default function ProjectSettingsPage() {
       // Refresh the project to get updated owner_id and user_role
       const updatedProject = await projectApi.get(project.id, session.accessToken);
       setProject(updatedProject);
+      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
       setSuccessMessage("Ownership transferred successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -407,6 +425,8 @@ export default function ProjectSettingsPage() {
           const updatedProject = await projectApi.get(project.id, session.accessToken);
           setProject(updatedProject);
           setGithubIntegration(null);
+          queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
+          queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
           setSuccessMessage(
             "Ownership transferred. GitHub integration was disconnected because the new owner has no GitHub token."
           );
@@ -454,6 +474,7 @@ export default function ProjectSettingsPage() {
         session.accessToken
       );
       setProject(updated);
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
       setPreferencesSaved(true);
       setTimeout(() => setPreferencesSaved(false), 3000);
     } catch (err) {
@@ -582,10 +603,12 @@ export default function ProjectSettingsPage() {
       await joinRequestApi.approve(project.id, requestId, session.accessToken);
       setJoinRequests(joinRequests.filter((jr) => jr.id !== requestId));
       setJoinRequestCount(Math.max(0, joinRequestCount - 1));
-      // Refresh member list
-      const membersData = await projectApi.listMembers(project.id, session.accessToken);
-      setMembers(membersData.items);
-      setProject({ ...project, member_count: membersData.total });
+      // Refresh member list via React Query
+      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
+      const refreshedMembers = await projectApi.listMembers(project.id, session.accessToken);
+      setMembers(refreshedMembers.items);
+      setProject({ ...project, member_count: refreshedMembers.total });
       setSuccessMessage("Join request approved — user added as suggester");
       setTimeout(() => setSuccessMessage(null), 3000);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
@@ -645,6 +668,7 @@ export default function ProjectSettingsPage() {
             clearInterval(reindexPollRef.current!);
             reindexPollRef.current = null;
             setIsReindexing(false);
+            queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId) });
           }
         } catch {
           clearInterval(reindexPollRef.current!);
@@ -667,6 +691,7 @@ export default function ProjectSettingsPage() {
     try {
       const status = await normalizationApi.getStatus(project.id, session.accessToken);
       setNormalizationStatus(status);
+      queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId) });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to check normalization status");
     } finally {
@@ -748,6 +773,7 @@ export default function ProjectSettingsPage() {
               // Refresh status
               const newStatus = await normalizationApi.getStatus(project.id, session.accessToken);
               setNormalizationStatus(newStatus);
+              queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId) });
               setSuccessMessage("Normalization completed successfully");
               setTimeout(() => setSuccessMessage(null), 3000);
             } else if (jobStatus.status === "failed" || jobStatus.status === "not_found") {
@@ -784,7 +810,7 @@ export default function ProjectSettingsPage() {
     }
   };
 
-  if (isLoading || status === "loading") {
+  if (isLoading) {
     return (
       <>
         <Header />
