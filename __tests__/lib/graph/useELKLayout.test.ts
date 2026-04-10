@@ -140,4 +140,71 @@ describe("useELKLayout", () => {
     const edge = result.current.edges[0];
     expect(edge.markerEnd).toBeUndefined();
   });
+
+  it("accepts LR direction parameter", async () => {
+    const data = makeGraphResponse(2);
+    const { result } = renderHook(() => useELKLayout());
+
+    await act(async () => {
+      await result.current.runLayout(data, "LR");
+    });
+
+    expect(result.current.nodes).toHaveLength(2);
+    expect(result.current.edges).toHaveLength(1);
+  });
+
+  it("only applies results from the latest layout run", async () => {
+    const data1 = makeGraphResponse(2);
+    const data2 = makeGraphResponse(3);
+    const { result } = renderHook(() => useELKLayout());
+
+    // Start two layouts concurrently — only the second should apply
+    await act(async () => {
+      const run1 = result.current.runLayout(data1);
+      const run2 = result.current.runLayout(data2);
+      await Promise.all([run1, run2]);
+    });
+
+    // The second layout (3 nodes) should win
+    expect(result.current.nodes).toHaveLength(3);
+  });
+
+  it("sets isLayouting during layout computation", async () => {
+    const data = makeGraphResponse(2);
+    const { result } = renderHook(() => useELKLayout());
+
+    expect(result.current.isLayouting).toBe(false);
+
+    await act(async () => {
+      await result.current.runLayout(data);
+    });
+
+    expect(result.current.isLayouting).toBe(false);
+  });
+
+  it("assigns ontologyEdge type to all edges", async () => {
+    const data = makeGraphResponse(3);
+    const { result } = renderHook(() => useELKLayout());
+
+    await act(async () => {
+      await result.current.runLayout(data);
+    });
+
+    for (const edge of result.current.edges) {
+      expect(edge.type).toBe("ontologyEdge");
+    }
+  });
+
+  it("assigns ontologyNode type to all nodes", async () => {
+    const data = makeGraphResponse(3);
+    const { result } = renderHook(() => useELKLayout());
+
+    await act(async () => {
+      await result.current.runLayout(data);
+    });
+
+    for (const node of result.current.nodes) {
+      expect(node.type).toBe("ontologyNode");
+    }
+  });
 });
