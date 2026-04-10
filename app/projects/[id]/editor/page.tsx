@@ -12,7 +12,7 @@ import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
 import { useToast } from "@/lib/context/ToastContext";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
-import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingToggle";
+
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
@@ -823,19 +823,17 @@ export default function EditorPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
-                href={`/projects/${projectId}`}
+                href={`/projects/${projectId}${selectedIri ? `?classIri=${encodeURIComponent(selectedIri)}` : ''}`}
                 className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
               >
-                <ArrowLeft className="h-4 w-4" />
-                Back
+                <Eye className="h-4 w-4" />
+                Close Editor
               </Link>
               <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
               <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
               {/* Mode Switcher */}
               <ModeSwitcher />
-              {canSuggest && <ContinuousEditingToggle />}
-
               {/* Suggestion mode indicator */}
               {isSuggestionMode && (
                 <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">

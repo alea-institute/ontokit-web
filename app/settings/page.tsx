@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Pencil, Save } from "lucide-react";
+import { ArrowLeft, Trash2, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Save } from "lucide-react";
 import { GithubIcon as Github } from "@/components/icons/github";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -328,9 +328,6 @@ function EditorPreferencesSection() {
   const setEditorMode = useEditorModeStore((s) => s.setEditorMode);
   const theme = useEditorModeStore((s) => s.theme);
   const setTheme = useEditorModeStore((s) => s.setTheme);
-  const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
-  const setContinuousEditing = useEditorModeStore((s) => s.setContinuousEditing);
-
   const [highlightedSetting, setHighlightedSetting] = useState<string | null>(null);
 
   // Highlight and scroll to the setting referenced by the URL hash
@@ -425,46 +422,6 @@ function EditorPreferencesSection() {
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Continuous Editing */}
-      <div className="mt-6">
-        <span id="continuous-editing-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Continuous Editing
-        </span>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={continuousEditing}
-          aria-labelledby="continuous-editing-label"
-          onClick={() => setContinuousEditing(!continuousEditing)}
-          className={cn(
-            "flex items-center gap-3 rounded-lg border p-4 text-left transition-colors w-full",
-            continuousEditing
-              ? "border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/20"
-              : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
-          )}
-        >
-          <Pencil className={cn(
-            "h-5 w-5 flex-shrink-0",
-            continuousEditing
-              ? "text-primary-600 dark:text-primary-400"
-              : "text-slate-400",
-          )} />
-          <div>
-            <p className={cn(
-              "font-medium",
-              continuousEditing
-                ? "text-primary-700 dark:text-primary-300"
-                : "text-slate-900 dark:text-white",
-            )}>
-              {continuousEditing ? "On" : "Off"}
-            </p>
-            <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              When enabled, classes open in edit mode automatically. When disabled, classes open read-only until you click &ldquo;Edit Item&rdquo;.
-            </p>
-          </div>
-        </button>
       </div>
 
       {/* Hide Save Button */}

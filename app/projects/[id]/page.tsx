@@ -258,7 +258,7 @@ function ViewerContent({
 
               {/* Open Editor / Sign In */}
               {canSuggest ? (
-                <Link href={`/projects/${projectId}/editor`}>
+                <Link href={`/projects/${projectId}/editor${selectedIri ? `?classIri=${encodeURIComponent(selectedIri)}` : ''}`}>
                   <Button size="sm" className="gap-2">
                     <Pencil className="h-4 w-4" />
                     <span className="hidden sm:inline">Open Editor</span>

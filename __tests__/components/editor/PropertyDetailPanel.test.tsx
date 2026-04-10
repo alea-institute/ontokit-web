@@ -48,7 +48,7 @@ vi.mock("@/lib/hooks/useEntityAutoSave", () => ({
 
 vi.mock("@/lib/stores/editorModeStore", () => ({
   useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ editorMode: "standard", continuousEditing: false, ...editorModeOverrides }),
+    selector({ editorMode: "standard", ...editorModeOverrides }),
 }));
 
 vi.mock("@/lib/hooks/useIriLabels", () => ({
@@ -367,7 +367,7 @@ describe("PropertyDetailPanel", () => {
 
   // ── Edit mode (canEdit=true) ──
 
-  it("shows Edit Item button when canEdit is true and onUpdateProperty provided", () => {
+  it("auto-enters edit mode when canEdit is true and onUpdateProperty provided", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -376,7 +376,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    expect(screen.getByText("Edit Item")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
   });
 
   it("enters edit mode when Edit Item is clicked", async () => {
@@ -389,7 +391,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Auto-save bar should appear
     expect(screen.getByTestId("auto-save-bar")).toBeDefined();
   });
@@ -460,7 +464,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const labelInputs = screen.getAllByPlaceholderText("Label text");
     expect(labelInputs.length).toBeGreaterThanOrEqual(1);
   });
@@ -475,7 +481,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // The comment section title should be visible
     expect(screen.getByText("Comment(s)")).not.toBeNull();
   });
@@ -490,7 +498,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Definition")).not.toBeNull();
   });
 
@@ -504,7 +514,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Domain")).not.toBeNull();
   });
 
@@ -518,7 +530,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Range")).not.toBeNull();
   });
 
@@ -532,7 +546,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Functional")).not.toBeNull();
     expect(screen.getByText("Transitive")).not.toBeNull();
     expect(screen.getByText("Symmetric")).not.toBeNull();
@@ -548,7 +564,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Inverse Of")).not.toBeNull();
   });
 
@@ -562,7 +580,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Annotations")).not.toBeNull();
   });
 
@@ -576,7 +596,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Relationships")).not.toBeNull();
   });
 
@@ -592,7 +614,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const labelInput = screen.getAllByPlaceholderText("Label text")[0];
     await user.clear(labelInput);
     await user.type(labelInput, "newLabel");
@@ -611,7 +635,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Find the "Functional" checkbox (unchecked by default since not in characteristics)
     const functionalCheckbox = container.querySelector(
       'input[type="checkbox"]'
@@ -639,7 +665,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Verify we are in edit mode
     expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
 
@@ -656,10 +684,9 @@ describe("PropertyDetailPanel", () => {
     });
   });
 
-  // ── Continuous editing auto-entry ──
+  // ── Auto-enter edit mode in editor context ──
 
-  it("auto-enters edit mode when continuousEditing is true", () => {
-    editorModeOverrides = { continuousEditing: true };
+  it("auto-enters edit mode when onUpdateProperty is provided (editor context)", () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -757,10 +784,9 @@ describe("PropertyDetailPanel", () => {
 
   // ── Does not auto-enter edit mode when canEdit is false ──
 
-  it("does not auto-enter edit mode when canEdit is false even with continuousEditing", () => {
-    editorModeOverrides = { continuousEditing: true };
+  it("does not auto-enter edit mode when canEdit is false even with onUpdateProperty", () => {
     render(
-      <PropertyDetailPanel {...DEFAULT_PROPS} canEdit={false} />
+      <PropertyDetailPanel {...DEFAULT_PROPS} canEdit={false} onUpdateProperty={vi.fn()} />
     );
     expect(screen.queryByTestId("auto-save-bar")).toBeNull();
   });
@@ -786,7 +812,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const langInputs = container.querySelectorAll('input[title="Language tag"]');
     expect(langInputs.length).toBeGreaterThanOrEqual(1);
   });
@@ -803,7 +831,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const labelInput = screen.getAllByPlaceholderText("Label text")[0];
     await user.click(labelInput);
     await user.tab();
@@ -836,13 +866,15 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Parent Properties")).not.toBeNull();
   });
 
   // ── Does not enter edit mode on draft restoration when entityType mismatches ──
 
-  it("does not restore draft when entityType does not match property", () => {
+  it("does not restore draft when entityType does not match property", async () => {
     autoSaveOverrides = {
       restoredDraft: {
         entityType: "class",
@@ -858,8 +890,12 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    // Should not auto-enter edit mode since entityType is "class" not "property"
-    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
+    // Edit mode auto-enters (editor context), but the wrong-type draft should not be applied
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
+    // The "Wrong type" label from the class draft should not appear
+    expect(screen.queryByDisplayValue("Wrong type")).toBeNull();
   });
 
   // ── Remove label button in edit mode ──
@@ -882,7 +918,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const removeButtons = container.querySelectorAll('button[title="Remove"]');
     expect(removeButtons.length).toBeGreaterThanOrEqual(1);
   });
@@ -899,7 +937,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const langInput = container.querySelector('input[title="Language tag"]') as HTMLInputElement;
     expect(langInput).not.toBeNull();
     await user.clear(langInput);
@@ -922,7 +962,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Comment section should still render in edit mode
     expect(screen.getByText("Comment(s)")).not.toBeNull();
   });
@@ -942,7 +984,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Definition")).not.toBeNull();
   });
 
@@ -961,7 +1005,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Domain")).not.toBeNull();
   });
 
@@ -978,7 +1024,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Range")).not.toBeNull();
   });
 
@@ -997,7 +1045,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Parent Properties")).not.toBeNull();
   });
 
@@ -1016,7 +1066,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Inverse Of")).not.toBeNull();
   });
 
@@ -1035,7 +1087,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const checkboxes = container.querySelectorAll('input[type="checkbox"]');
     // Should have 7 characteristic checkboxes
     expect(checkboxes.length).toBe(7);
@@ -1109,7 +1163,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Click the "Functional" checkbox
     const functionalLabel = screen.getByText("Functional");
     await user.click(functionalLabel);
@@ -1174,7 +1230,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedAutoSaveBarProps).not.toBeNull();
     // Call the onCancel callback from AutoSaveAffordanceBar
     const onCancel = capturedAutoSaveBarProps!.onCancel as () => void;
@@ -1194,7 +1252,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedAutoSaveBarProps).not.toBeNull();
     const onManualSave = capturedAutoSaveBarProps!.onManualSave as () => Promise<void>;
     await onManualSave();
@@ -1214,7 +1274,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedAutoSaveBarProps).not.toBeNull();
     const onRetry = capturedAutoSaveBarProps!.onRetry as () => void;
     onRetry();
@@ -1233,7 +1295,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Find the AnnotationRow for comments (COMMENT_IRI)
     const commentRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2000/01/rdf-schema#comment"
@@ -1275,7 +1339,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const defRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#definition"
     );
@@ -1303,7 +1369,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const commentRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2000/01/rdf-schema#comment"
     );
@@ -1333,7 +1401,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const commentRows = capturedAnnotationRowProps.filter(
       (p) => p.propertyIri === "http://www.w3.org/2000/01/rdf-schema#comment"
     );
@@ -1368,7 +1438,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const defRows = capturedAnnotationRowProps.filter(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#definition"
     );
@@ -1399,7 +1471,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
 
     // Test addTarget
@@ -1425,7 +1499,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     const onRemoveTarget = capturedRelationshipSectionProps!.onRemoveTarget as (groupIdx: number, targetIdx: number) => void;
     onRemoveTarget(0, 0);
@@ -1444,7 +1520,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     const onChangeProperty = capturedRelationshipSectionProps!.onChangeProperty as (groupIdx: number, newIri: string, newLabel: string) => void;
     onChangeProperty(0, "http://www.w3.org/2000/01/rdf-schema#isDefinedBy", "Defined By");
@@ -1463,7 +1541,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     const groupsBefore = (capturedRelationshipSectionProps!.groups as unknown[]).length;
     const onAddGroup = capturedRelationshipSectionProps!.onAddGroup as () => void;
@@ -1497,7 +1577,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Find annotation row for the custom annotation
     const annRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#prefLabel"
@@ -1547,7 +1629,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const annRows = capturedAnnotationRowProps.filter(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#prefLabel"
     );
@@ -1579,7 +1663,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     expect(capturedRelationshipSectionProps!.isEditing).toBe(true);
   });
@@ -1604,7 +1690,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const removeButtons = container.querySelectorAll('button[title="Remove"]');
     expect(removeButtons.length).toBeGreaterThanOrEqual(1);
     await user.click(removeButtons[0]);
@@ -1643,7 +1731,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedAutoSaveBarProps).not.toBeNull();
     const onManualSave = capturedAutoSaveBarProps!.onManualSave as () => Promise<void>;
     await onManualSave();
@@ -1676,7 +1766,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     await waitFor(() => {
       expect(capturedInlineAnnotationAdderProps).not.toBeNull();
@@ -1710,7 +1802,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     await waitFor(() => {
       expect(capturedInlineAnnotationAdderProps).not.toBeNull();
@@ -1739,7 +1833,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     await waitFor(() => {
       expect(capturedInlineAnnotationAdderProps).not.toBeNull();
@@ -1762,7 +1858,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     await waitFor(() => {
       expect(capturedRelationshipSectionProps).not.toBeNull();
@@ -1780,10 +1878,9 @@ describe("PropertyDetailPanel", () => {
     expect(screen.getByText("Label(s)")).not.toBeNull();
   });
 
-  // ── Cancel after continuous editing prevents re-entry ──
+  // ── Cancel in editor context prevents re-entry ──
 
-  it("does not re-enter edit mode after cancel even with continuousEditing", async () => {
-    editorModeOverrides = { continuousEditing: true };
+  it("does not re-enter edit mode after cancel in editor context", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1827,7 +1924,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const annRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#prefLabel"
     );
@@ -1858,7 +1957,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const labelInputs = screen.getAllByPlaceholderText("Label text");
     expect(labelInputs.length).toBeGreaterThanOrEqual(1);
     expect((labelInputs[0] as HTMLInputElement).value).toBe("");
@@ -1882,7 +1983,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     const groups = capturedRelationshipSectionProps!.groups as Array<{ property_label: string }>;
     const definedByGroup = groups.find((g) => g.property_label === "Defined By");

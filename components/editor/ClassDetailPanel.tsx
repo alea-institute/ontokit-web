@@ -43,7 +43,6 @@ import { CrossReferencesPanel } from "@/components/editor/CrossReferencesPanel";
 import { SimilarConceptsPanel } from "@/components/editor/SimilarConceptsPanel";
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
-import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
@@ -115,11 +114,8 @@ export function ClassDetailPanel({
   // Track the previous classIri so we can flush on navigate
   const prevClassIriRef = useRef<string | null>(null);
   const editInitializedRef = useRef(false);
-  // Track if user explicitly cancelled for this classIri (prevents continuous-editing auto-re-entry)
+  // Track if user explicitly cancelled editing for this classIri (prevents auto-re-entry)
   const cancelledIriRef = useRef<string | null>(null);
-
-  // Continuous editing from store
-  const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
 
   // Toast for error feedback
   const toast = useToast();
@@ -221,12 +217,13 @@ export function ClassDetailPanel({
       return;
     }
 
-    // Continuous editing → auto-enter (unless user explicitly cancelled for this class)
-    if (continuousEditing && cancelledIriRef.current !== classIri) {
+    // In editor context (canEdit + onUpdateClass), auto-enter edit mode
+    // unless user explicitly cancelled for this class
+    if (!!onUpdateClass && cancelledIriRef.current !== classIri) {
       enterEditMode();
       return;
     }
-  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, continuousEditing, isEditing, enterEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, onUpdateClass, isEditing, enterEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Initialize edit state from OWLClassDetail
   const initEditState = useCallback((detail: OWLClassDetail) => {

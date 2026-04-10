@@ -7,11 +7,9 @@ export type ThemePreference = "light" | "dark" | "system";
 interface EditorModeState {
   editorMode: EditorMode;
   theme: ThemePreference;
-  continuousEditing: boolean;
   hideSaveButton: boolean;
   setEditorMode: (mode: EditorMode) => void;
   setTheme: (theme: ThemePreference) => void;
-  setContinuousEditing: (on: boolean) => void;
   setHideSaveButton: (on: boolean) => void;
 }
 
@@ -39,7 +37,6 @@ export const useEditorModeStore = create<EditorModeState>()(
     (set) => ({
       editorMode: "standard",
       theme: "system",
-      continuousEditing: false,
       hideSaveButton: false,
 
       setEditorMode: (mode) => set({ editorMode: mode }),
@@ -49,7 +46,6 @@ export const useEditorModeStore = create<EditorModeState>()(
         set({ theme });
       },
 
-      setContinuousEditing: (on) => set({ continuousEditing: on }),
       setHideSaveButton: (on) => set({ hideSaveButton: on }),
     }),
     {

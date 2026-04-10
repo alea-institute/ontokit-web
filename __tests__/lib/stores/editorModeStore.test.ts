@@ -82,7 +82,6 @@ describe("useEditorModeStore", () => {
     useEditorModeStore.setState({
       editorMode: "standard",
       theme: "system",
-      continuousEditing: false,
       hideSaveButton: false,
     });
   });
@@ -92,7 +91,6 @@ describe("useEditorModeStore", () => {
       const state = useEditorModeStore.getState();
       expect(state.editorMode).toBe("standard");
       expect(state.theme).toBe("system");
-      expect(state.continuousEditing).toBe(false);
       expect(state.hideSaveButton).toBe(false);
     });
   });
@@ -130,19 +128,6 @@ describe("useEditorModeStore", () => {
       useEditorModeStore.getState().setTheme("light");
       expect(useEditorModeStore.getState().theme).toBe("light");
       expect(document.documentElement.classList.remove).toHaveBeenCalledWith("dark");
-    });
-  });
-
-  describe("setContinuousEditing", () => {
-    it("enables continuous editing", () => {
-      useEditorModeStore.getState().setContinuousEditing(true);
-      expect(useEditorModeStore.getState().continuousEditing).toBe(true);
-    });
-
-    it("disables continuous editing", () => {
-      useEditorModeStore.getState().setContinuousEditing(true);
-      useEditorModeStore.getState().setContinuousEditing(false);
-      expect(useEditorModeStore.getState().continuousEditing).toBe(false);
     });
   });
 
