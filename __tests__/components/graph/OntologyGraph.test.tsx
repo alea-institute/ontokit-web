@@ -1,9 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import type { EntityGraphResponse } from "@/lib/api/graph";
 
 // ── Mocks ──────────────────────────────────────────────────────────
 
 const mockUseGraphData = vi.fn();
+const mockRunLayout = vi.fn().mockResolvedValue(undefined);
 
 vi.mock("@xyflow/react", () => ({
   ReactFlow: ({ children, nodes }: { children?: React.ReactNode; nodes?: unknown[] }) => (
@@ -25,8 +27,13 @@ vi.mock("@/lib/hooks/useGraphData", () => ({
   useGraphData: (...args: unknown[]) => mockUseGraphData(...args),
 }));
 
-vi.mock("@/lib/graph/elkLayout", () => ({
-  computeLayout: vi.fn().mockResolvedValue(new Map()),
+vi.mock("@/lib/graph/useELKLayout", () => ({
+  useELKLayout: () => ({
+    nodes: [],
+    edges: [],
+    isLayouting: false,
+    runLayout: mockRunLayout,
+  }),
 }));
 
 vi.mock("@/components/graph/OntologyNode", () => ({
@@ -46,19 +53,25 @@ import { OntologyGraph } from "@/components/graph/OntologyGraph";
 
 // ── Fixtures ───────────────────────────────────────────────────────
 
-const mockGraphData = {
+const mockGraphData: EntityGraphResponse = {
+  focus_iri: "iri:Class1",
+  focus_label: "Class1",
   nodes: [
-    { id: "iri:Class1", label: "Class1", nodeType: "focus" as const, deprecated: false, childCount: 2, isExpanded: true },
-    { id: "iri:Class2", label: "Class2", nodeType: "class" as const, deprecated: false, childCount: 0, isExpanded: false },
+    { id: "iri:Class1", label: "Class1", iri: "iri:Class1", definition: null, is_focus: true, is_root: false, depth: 0, node_type: "focus", child_count: 2 },
+    { id: "iri:Class2", label: "Class2", iri: "iri:Class2", definition: null, is_focus: false, is_root: false, depth: 1, node_type: "class", child_count: 0 },
   ],
   edges: [
-    { id: "e1", source: "iri:Class1", target: "iri:Class2", edgeType: "subClassOf" as const },
+    { id: "e1", source: "iri:Class1", target: "iri:Class2", edge_type: "subClassOf", label: null },
   ],
+  truncated: false,
+  total_concept_count: 2,
 };
 
 const defaultReturn = {
   graphData: mockGraphData,
   isLoading: false,
+  showDescendants: false,
+  setShowDescendants: vi.fn(),
   expandNode: vi.fn(),
   resetGraph: vi.fn(),
   resolvedCount: 2,
@@ -67,7 +80,6 @@ const defaultReturn = {
 const defaultProps = {
   focusIri: "iri:Class1",
   projectId: "proj-1",
-  accessToken: "tok",
   branch: "main",
   onNavigateToClass: vi.fn(),
 };
@@ -124,11 +136,12 @@ describe("OntologyGraph", () => {
 
   // --- No relationships state ---
 
-  it("shows no-relationships message when single node and no edges", () => {
+  it("shows no-relationships message when graphData has no nodes and no edges", () => {
     mockUseGraphData.mockReturnValue({
       ...defaultReturn,
       graphData: {
-        nodes: [{ id: "iri:Class1", label: "Class1", nodeType: "focus", deprecated: false, childCount: 0, isExpanded: false }],
+        ...mockGraphData,
+        nodes: [],
         edges: [],
       },
     });
@@ -143,17 +156,6 @@ describe("OntologyGraph", () => {
   it("shows node and edge counts", () => {
     render(<OntologyGraph {...defaultProps} />);
     expect(screen.getByText(/2 nodes, 1 edges/)).toBeDefined();
-  });
-
-  it("shows resolved count when > 0", () => {
-    render(<OntologyGraph {...defaultProps} />);
-    expect(screen.getByText(/2 resolved/)).toBeDefined();
-  });
-
-  it("does not show resolved count when 0", () => {
-    mockUseGraphData.mockReturnValue({ ...defaultReturn, resolvedCount: 0 });
-    render(<OntologyGraph {...defaultProps} />);
-    expect(screen.queryByText(/resolved/)).toBeNull();
   });
 
   // --- Layout direction toggle ---
@@ -188,17 +190,10 @@ describe("OntologyGraph", () => {
     expect(defaultReturn.resetGraph).toHaveBeenCalledTimes(1);
   });
 
-  // --- Fit view button ---
-
-  it("renders Fit view button inside controls", () => {
-    render(<OntologyGraph {...defaultProps} />);
-    expect(screen.getByLabelText("Fit view")).toBeDefined();
-  });
-
   // --- Null graphData ---
 
   it("renders without crashing when graphData is null", () => {
-    mockUseGraphData.mockReturnValue({ ...defaultReturn, graphData: null });
+    mockUseGraphData.mockReturnValue({ ...defaultReturn, graphData: null, resolvedCount: 0 });
     render(<OntologyGraph {...defaultProps} />);
     expect(screen.getByTestId("react-flow")).toBeDefined();
     expect(screen.getByText(/0 nodes, 0 edges/)).toBeDefined();
@@ -212,10 +207,27 @@ describe("OntologyGraph", () => {
       expect.objectContaining({
         focusIri: "iri:Class1",
         projectId: "proj-1",
-        accessToken: "tok",
         branch: "main",
       })
     );
+  });
+
+  // --- Show Descendants button ---
+
+  it("shows Show Descendants button", () => {
+    render(<OntologyGraph {...defaultProps} />);
+    expect(screen.getByLabelText("Show descendants")).toBeDefined();
+  });
+
+  // --- Truncation badge ---
+
+  it("shows truncation badge when graphData is truncated", () => {
+    mockUseGraphData.mockReturnValue({
+      ...defaultReturn,
+      graphData: { ...mockGraphData, truncated: true, total_concept_count: 200 },
+    });
+    render(<OntologyGraph {...defaultProps} />);
+    expect(screen.getByText(/Truncated/)).toBeDefined();
   });
 });
 
@@ -248,7 +260,7 @@ describe("GraphLegend", () => {
     fireEvent.click(screen.getByLabelText("Expand legend"));
     expect(screen.getByText("Focus")).toBeDefined();
     expect(screen.getByText("Class")).toBeDefined();
-    expect(screen.getByText("Root")).toBeDefined();
+    expect(screen.getByText("Root ancestor")).toBeDefined();
     expect(screen.getByText("Individual")).toBeDefined();
     expect(screen.getByText("Property")).toBeDefined();
     expect(screen.getByText("External")).toBeDefined();
@@ -261,7 +273,7 @@ describe("GraphLegend", () => {
     expect(screen.getByText("subClassOf")).toBeDefined();
     expect(screen.getByText("equivalentTo")).toBeDefined();
     expect(screen.getByText("disjointWith")).toBeDefined();
-    expect(screen.getByText("seeAlso")).toBeDefined();
+    expect(screen.getByText("rdfs:seeAlso")).toBeDefined();
   });
 
   it("collapses legend when clicked again", () => {
