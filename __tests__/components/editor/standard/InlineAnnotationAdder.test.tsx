@@ -28,11 +28,29 @@ const { mockRdfsLabel, mockSkosPrefLabel, mockSkosDefinition } = vi.hoisted(() =
 
 vi.mock("@/lib/utils", () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(" "),
+  langToFlag: () => null,
 }));
 
-vi.mock("@/components/editor/LanguageFlag", () => ({
-  LanguageFlag: ({ lang }: { lang: string }) => (
-    <span data-testid="lang-flag">{lang}</span>
+vi.mock("@/components/editor/LanguagePicker", () => ({
+  LanguagePicker: ({
+    value,
+    onChange,
+    disabled,
+  }: {
+    value: string;
+    onChange: (code: string) => void;
+    disabled?: boolean;
+  }) => (
+    <select
+      data-testid="lang-picker"
+      aria-label="Language tag"
+      value={value}
+      disabled={disabled}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      <option value="en">en</option>
+      <option value="fr">fr</option>
+    </select>
   ),
 }));
 
@@ -70,10 +88,10 @@ describe("InlineAnnotationAdder", () => {
     expect(valueInput.placeholder).toBe("Select a property first");
   });
 
-  it("renders language input defaulting to 'en'", () => {
+  it("renders language picker defaulting to 'en'", () => {
     render(<InlineAnnotationAdder {...defaultProps} />);
-    const langInput = screen.getByLabelText("Language tag") as HTMLInputElement;
-    expect(langInput.value).toBe("en");
+    const langPicker = screen.getByLabelText("Language tag") as HTMLSelectElement;
+    expect(langPicker.value).toBe("en");
   });
 
   it("opens dropdown when property input is focused", () => {
@@ -142,7 +160,7 @@ describe("InlineAnnotationAdder", () => {
     fireEvent.click(screen.getByText("Definition"));
 
     expect((screen.getByLabelText("Annotation value") as HTMLInputElement).disabled).toBe(false);
-    expect((screen.getByLabelText("Language tag") as HTMLInputElement).disabled).toBe(false);
+    expect((screen.getByLabelText("Language tag") as HTMLSelectElement).disabled).toBe(false);
   });
 
   it("calls onAdd when Enter is pressed with a value", async () => {
