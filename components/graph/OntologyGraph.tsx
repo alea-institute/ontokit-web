@@ -175,10 +175,8 @@ export function OntologyGraph({
 
   // Sync layout results to React Flow state
   useEffect(() => {
-    if (layoutNodes.length > 0) {
-      setNodes(layoutNodes);
-      setEdges(layoutEdges);
-    }
+    setNodes(layoutNodes);
+    setEdges(layoutEdges);
   }, [layoutNodes, layoutEdges, setNodes, setEdges]);
 
   // Progressive expansion: track which nodes have been clicked to expand

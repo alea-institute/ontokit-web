@@ -103,7 +103,7 @@ export interface GraphEdge { ... }
 export interface EntityGraphResponse { ... }
 
 export const graphApi = {
-  getEntityGraph(ontologyId: string, classIri: string, options?: {
+  getEntityGraph(projectId: string, classIri: string, options?: {
     branch?: string;
     ancestorsDepth?: number;
     descendantsDepth?: number;
@@ -178,7 +178,7 @@ Port from folio-mapper:
 **File:** `lib/hooks/useGraphData.ts` — rewrite
 
 Replace client-side iterative fetching with single API call:
-- `fetchGraph(ontologyId, classIri, options)` → `EntityGraphResponse`
+- `graphApi.getEntityGraph(projectId, classIri, options)` → `EntityGraphResponse`
 - `expandNode(iri)` → fetch 1-hop neighbors, merge into existing data
 - `resetGraph()` → clear state
 - Progressive expansion: track expanded nodes, merge new data without full refetch
@@ -206,7 +206,7 @@ Port folio-mapper's `EntityGraph.tsx` structure:
 
 - Keep inline graph toggle (showGraph state, Graph button in detail panel header)
 - Add expand button that opens EntityGraphModal
-- Pass `ontologyId` (from project data) to graph components
+- Pass `projectId` (from project data) to graph components
 - EntityGraphModal rendered at layout level
 
 ### Task 3.2: DeveloperEditorLayout integration
@@ -243,7 +243,7 @@ Plans 1 and 2 could partially overlap (frontend can mock API while backend is bu
 
 ## Success Criteria
 
-1. Backend: `GET /ontologies/{id}/classes/{iri}/graph` returns BFS subgraph with correct nodes/edges/truncation
+1. Backend: `GET /api/v1/projects/{id}/ontology/graph/{class_iri}` returns BFS subgraph with correct nodes/edges/truncation
 2. Frontend: Graph renders with lineage-based coloring (root=red, ancestor=dark gray, focus=blue, seeAlso=purple)
 3. Inline graph toggle works in both standard and developer layouts
 4. Full-screen modal opens via expand button, closes via button/Esc
