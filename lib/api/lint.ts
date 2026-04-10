@@ -75,6 +75,15 @@ export interface LintRulesResponse {
   rules: LintRuleInfo[];
 }
 
+export interface LintConfig {
+  lint_level: number; // 1-5 for presets, 0 for custom
+  enabled_rules: string[]; // rule_id list (used when lint_level is 0/custom)
+}
+
+export interface LintConfigResponse {
+  config: LintConfig;
+}
+
 // WebSocket message types
 export interface LintWebSocketMessage {
   type: "lint_started" | "lint_complete" | "lint_failed";
@@ -165,6 +174,26 @@ export const lintApi = {
    * Get the list of available lint rules
    */
   getRules: () => api.get<LintRulesResponse>("/api/v1/projects/lint/rules"),
+
+  /**
+   * Get lint configuration for a project
+   */
+  getLintConfig: (projectId: string, token?: string) =>
+    api.get<LintConfigResponse>(`/api/v1/projects/${projectId}/lint/config`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }),
+
+  /**
+   * Update lint configuration for a project
+   */
+  updateLintConfig: (projectId: string, config: LintConfig, token?: string) =>
+    api.put<LintConfigResponse>(
+      `/api/v1/projects/${projectId}/lint/config`,
+      config,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      }
+    ),
 };
 
 /**

@@ -14,7 +14,7 @@ import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Trash2, Tag, Check, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff, Database, ExternalLink } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Tag, Check, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff, Database, ExternalLink, Shield } from "lucide-react";
 import { GithubIcon as Github } from "@/components/icons/github";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -74,6 +74,11 @@ import {
   type EmbeddingProvider,
   type EmbeddingStatus,
 } from "@/lib/api/embeddings";
+import {
+  lintApi,
+  type LintConfig,
+  type LintRuleInfo,
+} from "@/lib/api/lint";
 
 // Dynamically import the diff viewer to avoid SSR issues with Monaco
 const NormalizationDiffViewer = dynamic(
@@ -1957,6 +1962,15 @@ export default function ProjectSettingsPage() {
             />
           )}
 
+          {/* Lint Rule Configuration - only for projects with an ontology */}
+          {project.source_file_path && (
+            <LintConfigSection
+              projectId={projectId}
+              accessToken={session?.accessToken}
+              canManage={canManage ?? false}
+            />
+          )}
+
           {/* Danger Zone — hidden for exemplar projects unless superadmin */}
           {(isOwner || project?.is_superadmin) && !(project?.is_exemplar && !project?.is_superadmin) && (
             <section className="rounded-lg border border-red-200 bg-white p-6 dark:border-red-900/50 dark:bg-slate-800">
@@ -3322,6 +3336,354 @@ function EmbeddingSettingsSection({
           )}
           {success && (
             <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// --- Lint Level Presets ---
+
+const LINT_LEVEL_OPTIONS = [
+  { value: 1, label: "Critical", description: "Only error-severity rules" },
+  { value: 2, label: "Standard", description: "Error and warning rules" },
+  { value: 3, label: "Thorough", description: "Error, warning, and info rules" },
+  { value: 4, label: "Strict", description: "All available rules" },
+  { value: 5, label: "Maximum", description: "All rules (future-proof)" },
+  { value: 0, label: "Custom", description: "Choose rules individually" },
+] as const;
+
+const SEVERITY_ORDER: Record<string, number> = { error: 0, warning: 1, info: 2 };
+
+function getRulesForLevel(allRules: LintRuleInfo[], level: number): string[] {
+  switch (level) {
+    case 1:
+      return allRules.filter((r) => r.severity === "error").map((r) => r.rule_id);
+    case 2:
+      return allRules
+        .filter((r) => r.severity === "error" || r.severity === "warning")
+        .map((r) => r.rule_id);
+    case 3:
+      return allRules.map((r) => r.rule_id); // error + warning + info = all
+    case 4:
+    case 5:
+      return allRules.map((r) => r.rule_id);
+    default:
+      return [];
+  }
+}
+
+function getSeverityColor(severity: string) {
+  switch (severity) {
+    case "error":
+      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+    case "warning":
+      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+    case "info":
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+    default:
+      return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+  }
+}
+
+function LintConfigSection({
+  projectId,
+  accessToken,
+  canManage,
+}: {
+  projectId: string;
+  accessToken?: string;
+  canManage: boolean;
+}) {
+  const [rules, setRules] = useState<LintRuleInfo[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Editable state
+  const [lintLevel, setLintLevel] = useState<number>(2); // Default: Standard
+  const [enabledRules, setEnabledRules] = useState<Set<string>>(new Set());
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Track saved state to detect changes
+  const [savedLevel, setSavedLevel] = useState<number>(2);
+  const [savedRules, setSavedRules] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        // Always fetch available rules
+        const rulesRes = await lintApi.getRules();
+        const sortedRules = [...rulesRes.rules].sort(
+          (a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3)
+        );
+        setRules(sortedRules);
+
+        // Try to fetch existing config
+        if (accessToken) {
+          try {
+            const configRes = await lintApi.getLintConfig(projectId, accessToken);
+            const cfg = configRes.config;
+            setLintLevel(cfg.lint_level);
+            setSavedLevel(cfg.lint_level);
+            if (cfg.lint_level === 0) {
+              const ruleSet = new Set(cfg.enabled_rules);
+              setEnabledRules(ruleSet);
+              setSavedRules(ruleSet);
+            } else {
+              const presetRules = new Set(getRulesForLevel(sortedRules, cfg.lint_level));
+              setEnabledRules(presetRules);
+              setSavedRules(presetRules);
+            }
+          } catch {
+            // Backend config endpoint may not exist yet — use defaults
+            const defaultRules = new Set(getRulesForLevel(sortedRules, 2));
+            setEnabledRules(defaultRules);
+            setSavedRules(defaultRules);
+          }
+        }
+      } catch {
+        setError("Failed to load lint rules");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, [projectId, accessToken]);
+
+  // Detect changes
+  useEffect(() => {
+    if (lintLevel !== savedLevel) {
+      setHasChanges(true);
+      return;
+    }
+    if (lintLevel === 0) {
+      // Custom mode: compare rule sets
+      const currentIds = [...enabledRules].sort().join(",");
+      const savedIds = [...savedRules].sort().join(",");
+      setHasChanges(currentIds !== savedIds);
+    } else {
+      setHasChanges(false);
+    }
+  }, [lintLevel, enabledRules, savedLevel, savedRules]);
+
+  const handleLevelChange = (level: number) => {
+    setLintLevel(level);
+    setError(null);
+    setSuccess(null);
+    if (level !== 0) {
+      setEnabledRules(new Set(getRulesForLevel(rules, level)));
+    }
+  };
+
+  const handleRuleToggle = (ruleId: string) => {
+    if (lintLevel !== 0) return; // Only toggle in custom mode
+    setError(null);
+    setSuccess(null);
+    setEnabledRules((prev) => {
+      const next = new Set(prev);
+      if (next.has(ruleId)) {
+        next.delete(ruleId);
+      } else {
+        next.add(ruleId);
+      }
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!accessToken) return;
+    setIsSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const config: LintConfig = {
+        lint_level: lintLevel,
+        enabled_rules: lintLevel === 0 ? [...enabledRules] : getRulesForLevel(rules, lintLevel),
+      };
+      await lintApi.updateLintConfig(projectId, config, accessToken);
+      setSavedLevel(lintLevel);
+      setSavedRules(new Set(enabledRules));
+      setHasChanges(false);
+      setSuccess("Lint configuration saved");
+    } catch (err) {
+      if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
+        setError("Backend lint config endpoint is not yet available");
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to save lint configuration");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const isCustom = lintLevel === 0;
+
+  return (
+    <section
+      id="lint-config"
+      className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+    >
+      <div className="mb-4 flex items-center gap-2">
+        <Shield className="h-5 w-5 text-slate-500" />
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          Lint Rule Configuration
+        </h2>
+      </div>
+      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        Configure which lint rules are applied during ontology health checks.
+        Choose a preset level or customize individual rules.
+      </p>
+
+      {isLoading ? (
+        <div className="flex h-16 items-center justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Lint Level Selector */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Lint Level
+            </label>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {LINT_LEVEL_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => canManage && handleLevelChange(opt.value)}
+                  disabled={!canManage}
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-all",
+                    lintLevel === opt.value
+                      ? "border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:border-primary-400 dark:bg-primary-900/20"
+                      : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
+                    !canManage && "cursor-not-allowed opacity-60"
+                  )}
+                >
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {opt.value === 0 ? opt.label : `Level ${opt.value} — ${opt.label}`}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {opt.description}
+                  </p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rule List */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Rules ({enabledRules.size} of {rules.length} enabled)
+              </label>
+              {isCustom && canManage && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setEnabledRules(new Set(rules.map((r) => r.rule_id)))}
+                    className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                  >
+                    Enable all
+                  </button>
+                  <span className="text-xs text-slate-300 dark:text-slate-600">|</span>
+                  <button
+                    onClick={() => setEnabledRules(new Set())}
+                    className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                  >
+                    Disable all
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-slate-600">
+              {rules.map((rule) => {
+                const enabled = enabledRules.has(rule.rule_id);
+                return (
+                  <div
+                    key={rule.rule_id}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 transition-colors",
+                      enabled
+                        ? "bg-slate-50 dark:bg-slate-700/50"
+                        : "bg-transparent opacity-60"
+                    )}
+                  >
+                    {/* Toggle */}
+                    <button
+                      onClick={() => handleRuleToggle(rule.rule_id)}
+                      disabled={!canManage || !isCustom}
+                      className={cn(
+                        "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+                        enabled
+                          ? "bg-primary-600 dark:bg-primary-500"
+                          : "bg-slate-300 dark:bg-slate-600",
+                        (!canManage || !isCustom) && "cursor-not-allowed opacity-60"
+                      )}
+                      aria-label={`Toggle ${rule.name}`}
+                    >
+                      <span
+                        className={cn(
+                          "absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform",
+                          enabled && "translate-x-4"
+                        )}
+                      />
+                    </button>
+                    {/* Rule info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-900 dark:text-white">
+                          {rule.name}
+                        </span>
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none",
+                            getSeverityColor(rule.severity)
+                          )}
+                        >
+                          {rule.severity}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {rule.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {rules.length === 0 && (
+                <p className="py-4 text-center text-sm text-slate-500 dark:text-slate-400">
+                  No lint rules available.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Save button */}
+          {canManage && (
+            <div className="flex items-center justify-end gap-3">
+              {success && (
+                <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+              )}
+              {error && (
+                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              )}
+              <Button
+                onClick={handleSave}
+                disabled={isSaving || !hasChanges}
+                size="sm"
+              >
+                {isSaving ? "Saving..." : "Save Lint Configuration"}
+              </Button>
+            </div>
+          )}
+
+          {!canManage && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Only project owners and admins can modify lint configuration.
+            </p>
           )}
         </div>
       )}
