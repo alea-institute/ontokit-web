@@ -74,7 +74,9 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
 
   const flag = langToFlag(value);
   const langInfo = findLanguageByCode(value);
-  const displayLabel = langInfo ? langInfo.code : value || "lang";
+  // Use canonical code from lookup for display and comparison (handles legacy "EN", "pt-br", etc.)
+  const canonicalCode = langInfo?.code ?? value;
+  const displayLabel = canonicalCode || "lang";
 
   const handleSelect = (code: string) => {
     onChange(code);
@@ -132,7 +134,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
                   <LanguageItem
                     key={lang.code}
                     lang={lang}
-                    selected={lang.code === value}
+                    selected={lang.code === canonicalCode}
                     onSelect={handleSelect}
                   />
                 ))}
@@ -146,7 +148,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
                   <LanguageItem
                     key={lang.code}
                     lang={lang}
-                    selected={lang.code === value}
+                    selected={lang.code === canonicalCode}
                     onSelect={handleSelect}
                   />
                 ))}
