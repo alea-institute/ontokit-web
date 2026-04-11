@@ -26,6 +26,7 @@ interface OntologyGraphProps {
   focusIri: string | null;
   projectId: string;
   branch?: string;
+  accessToken?: string;
   onNavigateToClass?: (iri: string) => void;
 }
 
@@ -131,6 +132,7 @@ export function OntologyGraph({
   focusIri,
   projectId,
   branch,
+  accessToken,
   onNavigateToClass,
 }: OntologyGraphProps) {
   const {
@@ -141,7 +143,7 @@ export function OntologyGraph({
     expandNode,
     resetGraph,
     resolvedCount,
-  } = useGraphData({ focusIri, projectId, branch });
+  } = useGraphData({ focusIri, projectId, branch, accessToken });
 
   const [direction, setDirection] = useState<LayoutDirection>("TB");
   const toggleDirection = useCallback(() => setDirection((d) => (d === "TB" ? "LR" : "TB")), []);

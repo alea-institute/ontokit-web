@@ -7,6 +7,7 @@ interface UseGraphDataOptions {
   focusIri: string | null;
   projectId: string;
   branch?: string;
+  accessToken?: string;
 }
 
 interface UseGraphDataReturn {
@@ -23,6 +24,7 @@ export function useGraphData({
   focusIri,
   projectId,
   branch,
+  accessToken,
 }: UseGraphDataOptions): UseGraphDataReturn {
   const [graphData, setGraphData] = useState<EntityGraphResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +49,7 @@ export function useGraphData({
         branch,
         ancestorsDepth: 5,
         descendantsDepth: showDescendants ? 2 : 0,
-      })
+      }, accessToken)
       .then((data) => {
         if (!cancelled) setGraphData(data);
       })
@@ -74,7 +76,7 @@ export function useGraphData({
           ancestorsDepth: 1,
           descendantsDepth: 1,
           maxNodes: 50,
-        })
+        }, accessToken)
         .then((newData) => {
           expandedNodes.current.add(iri);
           setGraphData((prev) => {
@@ -103,7 +105,7 @@ export function useGraphData({
           // Expansion failed — node stays retryable
         });
     },
-    [graphData, projectId, branch],
+    [graphData, projectId, branch, accessToken],
   );
 
   const resetGraph = useCallback(() => {

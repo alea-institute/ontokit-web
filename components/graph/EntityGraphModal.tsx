@@ -12,6 +12,7 @@ interface EntityGraphModalProps {
   label: string;
   projectId: string;
   branch?: string;
+  accessToken?: string;
   onNavigateToClass?: (iri: string) => void;
   onClose: () => void;
 }
@@ -21,6 +22,7 @@ export function EntityGraphModal({
   label,
   projectId,
   branch,
+  accessToken,
   onNavigateToClass,
   onClose,
 }: EntityGraphModalProps) {
@@ -144,6 +146,7 @@ export function EntityGraphModal({
               focusIri={focusIri}
               projectId={projectId}
               branch={branch}
+              accessToken={accessToken}
               onNavigateToClass={handleNavigate}
             />
           </Suspense>

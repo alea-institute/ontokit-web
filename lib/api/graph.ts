@@ -48,6 +48,7 @@ export const graphApi = {
     projectId: string,
     classIri: string,
     options: FetchGraphOptions = {},
+    token?: string,
   ) =>
     api.get<EntityGraphResponse>(
       `/api/v1/projects/${projectId}/ontology/classes/graph`,
@@ -60,6 +61,7 @@ export const graphApi = {
           max_nodes: options.maxNodes,
           include_see_also: options.includeSeeAlso,
         },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       },
     ),
 };

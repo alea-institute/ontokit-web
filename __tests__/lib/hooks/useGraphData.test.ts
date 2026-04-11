@@ -89,7 +89,7 @@ describe("useGraphData", () => {
       branch: "main",
       ancestorsDepth: 5,
       descendantsDepth: 0,
-    });
+    }, undefined);
   });
 
   it("passes descendantsDepth=2 when showDescendants is toggled", async () => {
@@ -113,7 +113,7 @@ describe("useGraphData", () => {
         branch: undefined,
         ancestorsDepth: 5,
         descendantsDepth: 2,
-      });
+      }, undefined);
     });
   });
 

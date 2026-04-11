@@ -379,6 +379,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               focusIri={selectedIri}
               projectId={projectId}
               branch={activeBranch}
+              accessToken={accessToken}
               onNavigateToClass={(iri) => {
                 handleViewModeChange("tree");
                 navigateToNode(iri);
