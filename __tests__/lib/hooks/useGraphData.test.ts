@@ -270,6 +270,60 @@ describe("useGraphData", () => {
     });
   });
 
+  it("skips expandNode when node was already expanded", async () => {
+    const initial = makeGraphResponse();
+    const expansion = makeGraphResponse({
+      focus_iri: "urn:parent",
+      nodes: [
+        { id: "urn:new", label: "New", iri: "urn:new", definition: null, is_focus: false, is_root: false, depth: 1, node_type: "class", child_count: 0 },
+      ],
+      edges: [],
+      total_concept_count: 1,
+    });
+
+    mockGetEntityGraph
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce(expansion);
+
+    const { result } = renderHook(() =>
+      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.graphData).not.toBeNull();
+    });
+
+    const callsBefore = mockGetEntityGraph.mock.calls.length;
+
+    // First expand
+    act(() => { result.current.expandNode("urn:parent"); });
+    await waitFor(() => {
+      expect(mockGetEntityGraph.mock.calls.length).toBe(callsBefore + 1);
+    });
+
+    // Second expand of same node — should be skipped
+    act(() => { result.current.expandNode("urn:parent"); });
+    // No additional call
+    expect(mockGetEntityGraph.mock.calls.length).toBe(callsBefore + 1);
+  });
+
+  it("expandNode does nothing when graphData is null", async () => {
+    mockGetEntityGraph.mockRejectedValue(new Error("fail"));
+
+    const { result } = renderHook(() =>
+      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    );
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+
+    expect(result.current.graphData).toBeNull();
+    const callsBefore = mockGetEntityGraph.mock.calls.length;
+    act(() => { result.current.expandNode("urn:parent"); });
+    expect(mockGetEntityGraph.mock.calls.length).toBe(callsBefore);
+  });
+
   it("reports resolvedCount from node count", async () => {
     const response = makeGraphResponse();
     mockGetEntityGraph.mockResolvedValue(response);

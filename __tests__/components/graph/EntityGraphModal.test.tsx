@@ -3,10 +3,16 @@ import { render, screen, fireEvent } from "@testing-library/react";
 
 // ── Mocks ──────────────────────────────────────────────────────────
 
-vi.mock("./OntologyGraph", () => ({
-  OntologyGraph: ({ focusIri, projectId }: { focusIri: string; projectId: string }) => (
-    <div data-testid="ontology-graph" data-focus-iri={focusIri} data-project-id={projectId} />
-  ),
+let capturedOnNavigateToClass: ((iri: string) => void) | undefined;
+vi.mock("@/components/graph/OntologyGraph", () => ({
+  OntologyGraph: ({ focusIri, projectId, onNavigateToClass }: { focusIri: string; projectId: string; onNavigateToClass?: (iri: string) => void }) => {
+    capturedOnNavigateToClass = onNavigateToClass;
+    return (
+      <div data-testid="ontology-graph" data-focus-iri={focusIri} data-project-id={projectId}>
+        <button data-testid="graph-action">Action</button>
+      </div>
+    );
+  },
 }));
 
 import { EntityGraphModal } from "@/components/graph/EntityGraphModal";
@@ -121,11 +127,10 @@ describe("EntityGraphModal", () => {
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
 
-    if (focusables.length > 1) {
-      focusables[0].focus();
-      fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
-      expect(document.activeElement).toBe(focusables[focusables.length - 1]);
-    }
+    expect(focusables.length).toBeGreaterThan(1);
+    focusables[0].focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(focusables[focusables.length - 1]);
   });
 
   it("traps focus: tab from last focusable wraps to first", () => {
@@ -135,11 +140,26 @@ describe("EntityGraphModal", () => {
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
     );
 
-    if (focusables.length > 1) {
-      focusables[focusables.length - 1].focus();
-      fireEvent.keyDown(document, { key: "Tab", shiftKey: false });
-      expect(document.activeElement).toBe(focusables[0]);
-    }
+    expect(focusables.length).toBeGreaterThan(1);
+    focusables[focusables.length - 1].focus();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: false });
+    expect(document.activeElement).toBe(focusables[0]);
+  });
+
+  it("does not trap focus when Tab is pressed but focus is in the middle", () => {
+    render(<EntityGraphModal {...defaultProps} />);
+    const dialog = screen.getByRole("dialog");
+    const focusables = dialog.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+
+    expect(focusables.length).toBeGreaterThan(1);
+    // Focus the first element and press Tab (not at last) — should not prevent default
+    focusables[0].focus();
+    const event = new KeyboardEvent("keydown", { key: "Tab", bubbles: true });
+    const preventSpy = vi.spyOn(event, "preventDefault");
+    document.dispatchEvent(event);
+    expect(preventSpy).not.toHaveBeenCalled();
   });
 
   // --- Esc keyboard hint ---
@@ -149,10 +169,20 @@ describe("EntityGraphModal", () => {
     expect(screen.getByText("Esc")).toBeDefined();
   });
 
-  // --- Loading fallback ---
+  // --- Navigate callback ---
 
-  it("renders the Suspense loading fallback", () => {
+  it("calls onNavigateToClass and onClose when graph triggers navigation", () => {
     render(<EntityGraphModal {...defaultProps} />);
-    expect(screen.getByText("Loading graph viewer...")).toBeDefined();
+    expect(capturedOnNavigateToClass).toBeDefined();
+    capturedOnNavigateToClass!("urn:target:Class");
+    expect(defaultProps.onNavigateToClass).toHaveBeenCalledWith("urn:target:Class");
+    expect(defaultProps.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  // --- OntologyGraph rendered ---
+
+  it("renders the OntologyGraph component", () => {
+    render(<EntityGraphModal {...defaultProps} />);
+    expect(screen.getByTestId("ontology-graph")).toBeDefined();
   });
 });
