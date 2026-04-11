@@ -76,15 +76,13 @@ export function useGraphData({
     staleTime: 30_000,
   });
 
-  // Reset expansion tracking when the base query result changes
+  // Reset expansion tracking when the graph context changes
   useEffect(() => {
-    if (query.data) {
-      graphEpoch.current++;
-      expandedNodes.current = new Set([focusIri!]);
-      expandingNodes.current = new Set();
-      setExpansions([]);
-    }
-  }, [query.data, focusIri]);
+    graphEpoch.current++;
+    expandedNodes.current = focusIri ? new Set([focusIri]) : new Set();
+    expandingNodes.current = new Set();
+    setExpansions([]);
+  }, [projectId, focusIri, branch, showDescendants, resetKey]);
 
   // Merge base query data with accumulated expansions
   const graphData = useMemo(() => {
