@@ -55,8 +55,10 @@ describe("OntologyEdge", () => {
     );
     const edge = screen.getByTestId("base-edge-edge-1");
     expect(edge).toBeDefined();
-    // Marker is now applied at the React Flow edge level, not inside OntologyEdge
-    expect(edge).toBeDefined();
+    // Default edge type is subClassOf: solid stroke in slate color, strokeWidth 1.5
+    expect(edge.style.stroke).toBe("rgb(148, 163, 184)"); // #94a3b8
+    expect(edge.style.strokeWidth).toBe("1.5");
+    expect(edge.style.strokeDasharray).toBeFalsy();
   });
 
   it("passes markerEnd prop through to BaseEdge", () => {
@@ -163,8 +165,10 @@ describe("OntologyEdge", () => {
       </svg>
     );
     const edge = screen.getByTestId("base-edge-edge-1");
-    // Marker is applied at React Flow edge level, not inside OntologyEdge
-    expect(edge).toBeDefined();
+    // Without data, edge defaults to subClassOf style
+    expect(edge.style.stroke).toBe("rgb(148, 163, 184)");
+    expect(edge.style.strokeWidth).toBe("1.5");
+    expect(edge.style.strokeDasharray).toBeFalsy();
   });
 
   it("renders invisible hover detection path with strokeWidth 16", () => {
