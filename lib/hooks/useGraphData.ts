@@ -63,7 +63,7 @@ export function useGraphData({
     return () => {
       cancelled = true;
     };
-  }, [focusIri, projectId, branch, showDescendants, resetKey]);
+  }, [focusIri, projectId, branch, showDescendants, resetKey, accessToken]);
 
   // Progressive expansion: fetch 1-hop neighborhood and merge
   const expandNode = useCallback(
