@@ -74,7 +74,7 @@ export function useGraphData({
         .getEntityGraph(projectId, iri, {
           branch,
           ancestorsDepth: 1,
-          descendantsDepth: 1,
+          descendantsDepth: showDescendants ? 1 : 0,
           maxNodes: 50,
         }, accessToken)
         .then((newData) => {
@@ -105,7 +105,7 @@ export function useGraphData({
           // Expansion failed — node stays retryable
         });
     },
-    [graphData, projectId, branch, accessToken],
+    [graphData, projectId, branch, accessToken, showDescendants],
   );
 
   const resetGraph = useCallback(() => {
