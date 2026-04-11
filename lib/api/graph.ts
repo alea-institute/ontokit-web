@@ -50,7 +50,7 @@ export const graphApi = {
     options: FetchGraphOptions = {},
   ) =>
     api.get<EntityGraphResponse>(
-      `/api/v1/projects/${projectId}/ontology/graph/${encodeURIComponent(classIri)}`,
+      `/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}/graph`,
       {
         params: {
           branch: options.branch,

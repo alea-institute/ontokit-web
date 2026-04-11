@@ -23,7 +23,7 @@ describe("graphApi", () => {
       await graphApi.getEntityGraph("proj-1", "urn:test:Class1");
 
       expect(mockGet).toHaveBeenCalledWith(
-        `/api/v1/projects/proj-1/ontology/graph/${encodeURIComponent("urn:test:Class1")}`,
+        `/api/v1/projects/proj-1/ontology/classes/${encodeURIComponent("urn:test:Class1")}/graph`,
         expect.any(Object),
       );
     });
