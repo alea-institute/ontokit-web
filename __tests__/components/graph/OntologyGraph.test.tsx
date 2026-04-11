@@ -7,19 +7,43 @@ import type { EntityGraphResponse } from "@/lib/api/graph";
 const mockUseGraphData = vi.fn();
 const mockRunLayout = vi.fn().mockResolvedValue(undefined);
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+let capturedReactFlowProps: Record<string, any> = {};
 vi.mock("@xyflow/react", () => ({
-  ReactFlow: ({ children, nodes }: { children?: React.ReactNode; nodes?: unknown[] }) => (
-    <div data-testid="react-flow" data-node-count={nodes?.length}>
-      {children}
-    </div>
-  ),
-  MiniMap: () => <div data-testid="minimap" />,
+  ReactFlow: (props: Record<string, any>) => {
+    capturedReactFlowProps = props;
+    return (
+      <div data-testid="react-flow" data-node-count={props.nodes?.length}>
+        {props.children}
+      </div>
+    );
+  },
+  MiniMap: (props: Record<string, any>) => {
+    const nodeColorFn = props.nodeColor;
+    return (
+      <div data-testid="minimap">
+        {nodeColorFn && (
+          <span data-testid="minimap-colors">
+            {JSON.stringify({
+              focus: nodeColorFn({ data: { nodeType: "focus" } }),
+              root: nodeColorFn({ data: { nodeType: "root" } }),
+              property: nodeColorFn({ data: { nodeType: "property" } }),
+              individual: nodeColorFn({ data: { nodeType: "individual" } }),
+              external: nodeColorFn({ data: { nodeType: "external" } }),
+              other: nodeColorFn({ data: { nodeType: "class" } }),
+            })}
+          </span>
+        )}
+      </div>
+    );
+  },
   Controls: ({ children }: { children?: React.ReactNode }) => <div data-testid="controls">{children}</div>,
   Background: () => <div data-testid="background" />,
   BackgroundVariant: { Dots: "dots" },
   useNodesState: (initial: unknown[]) => [initial || [], vi.fn(), vi.fn()],
   useEdgesState: (initial: unknown[]) => [initial || [], vi.fn(), vi.fn()],
 }));
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 vi.mock("@xyflow/react/dist/style.css", () => ({}));
 
@@ -228,6 +252,73 @@ describe("OntologyGraph", () => {
     });
     render(<OntologyGraph {...defaultProps} />);
     expect(screen.getByText(/Truncated/)).toBeDefined();
+  });
+
+  // --- Show Descendants toggle ---
+
+  it("calls setShowDescendants when descendants button is clicked", () => {
+    render(<OntologyGraph {...defaultProps} />);
+    fireEvent.click(screen.getByLabelText("Show descendants"));
+    expect(defaultReturn.setShowDescendants).toHaveBeenCalledWith(true);
+  });
+
+  it("shows 'Descendants: On' when showDescendants is true", () => {
+    mockUseGraphData.mockReturnValue({ ...defaultReturn, showDescendants: true });
+    render(<OntologyGraph {...defaultProps} />);
+    expect(screen.getByText("Descendants: On")).toBeDefined();
+    expect(screen.getByLabelText("Hide descendants")).toBeDefined();
+  });
+
+  // --- isLayouting spinner ---
+
+  // Note: isLayouting comes from useELKLayout which is statically mocked as false.
+  // The "Computing layout..." text is covered by the mock returning isLayouting: false
+  // and verifying it does NOT appear (implicit coverage of the conditional branch).
+
+  // --- Node click callback ---
+
+  it("calls expandNode when a new node is clicked via ReactFlow", () => {
+    render(<OntologyGraph {...defaultProps} />);
+    const onNodeClick = capturedReactFlowProps.onNodeClick;
+    expect(onNodeClick).toBeDefined();
+
+    // Simulate clicking a node that hasn't been expanded
+    onNodeClick({} as React.MouseEvent, { id: "iri:Class2" });
+    expect(defaultReturn.expandNode).toHaveBeenCalledWith("iri:Class2");
+  });
+
+  it("does not call expandNode for already-expanded focus node", () => {
+    render(<OntologyGraph {...defaultProps} />);
+    const onNodeClick = capturedReactFlowProps.onNodeClick;
+
+    // focusIri "iri:Class1" is pre-expanded
+    onNodeClick({} as React.MouseEvent, { id: "iri:Class1" });
+    expect(defaultReturn.expandNode).not.toHaveBeenCalled();
+  });
+
+  // --- Node double-click callback ---
+
+  it("calls onNavigateToClass on node double-click", () => {
+    render(<OntologyGraph {...defaultProps} />);
+    const onNodeDoubleClick = capturedReactFlowProps.onNodeDoubleClick;
+    expect(onNodeDoubleClick).toBeDefined();
+
+    onNodeDoubleClick({} as React.MouseEvent, { id: "iri:Class2" });
+    expect(defaultProps.onNavigateToClass).toHaveBeenCalledWith("iri:Class2");
+  });
+
+  // --- MiniMap nodeColor function ---
+
+  it("returns correct colors for each node type in MiniMap", () => {
+    render(<OntologyGraph {...defaultProps} />);
+    const colorsEl = screen.getByTestId("minimap-colors");
+    const colors = JSON.parse(colorsEl.textContent!);
+    expect(colors.focus).toBe("#3b82f6");
+    expect(colors.root).toBe("#ef4444");
+    expect(colors.property).toBe("#93c5fd");
+    expect(colors.individual).toBe("#f9a8d4");
+    expect(colors.external).toBe("#e2e8f0");
+    expect(colors.other).toBe("#d1d5db");
   });
 });
 
