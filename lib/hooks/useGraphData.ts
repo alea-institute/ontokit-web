@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { graphApi, type EntityGraphResponse } from "@/lib/api/graph";
 
@@ -76,8 +76,9 @@ export function useGraphData({
     staleTime: 30_000,
   });
 
-  // Reset expansion tracking when the graph context changes
-  useEffect(() => {
+  // Reset expansion tracking synchronously in the commit phase so stale
+  // expandNode() promise callbacks cannot pass the epoch guard before the reset.
+  useLayoutEffect(() => {
     graphEpoch.current++;
     expandedNodes.current = focusIri ? new Set([focusIri]) : new Set();
     expandingNodes.current = new Set();
