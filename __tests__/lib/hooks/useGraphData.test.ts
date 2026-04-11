@@ -301,9 +301,9 @@ describe("useGraphData", () => {
       expect(mockGetEntityGraph.mock.calls.length).toBe(callsBefore + 1);
     });
 
-    // Second expand of same node — should be skipped
+    // Second expand of same node — should be skipped because expandedNodes.current
+    // was updated in the .then() callback, which has resolved by the time waitFor above passed.
     act(() => { result.current.expandNode("urn:parent"); });
-    // No additional call
     expect(mockGetEntityGraph.mock.calls.length).toBe(callsBefore + 1);
   });
 

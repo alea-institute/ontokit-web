@@ -95,7 +95,7 @@ export function useGraphData({
               ],
               truncated: prev.truncated || newData.truncated,
               total_concept_count:
-                prev.total_concept_count + newData.nodes.filter((n) => !existingNodeIds.has(n.id)).length,
+                Math.max(prev.total_concept_count, newData.total_concept_count),
             };
           });
         })

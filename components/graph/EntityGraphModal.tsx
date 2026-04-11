@@ -57,6 +57,7 @@ export function EntityGraphModal({
 
         const first = focusable[0];
         const last = focusable[focusable.length - 1];
+        // When length === 1, first === last — both branches below keep focus on the single element
 
         if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
