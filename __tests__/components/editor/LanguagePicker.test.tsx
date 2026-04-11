@@ -1,7 +1,10 @@
-import { describe, expect, it, vi, beforeAll } from "vitest";
+import { describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 
 // cmdk uses ResizeObserver and scrollIntoView which jsdom doesn't provide
+const _origResizeObserver = global.ResizeObserver;
+const _origScrollIntoView = Element.prototype.scrollIntoView;
+
 beforeAll(() => {
   global.ResizeObserver = class {
     observe() {}
@@ -9,6 +12,12 @@ beforeAll(() => {
     disconnect() {}
   };
   Element.prototype.scrollIntoView = vi.fn();
+});
+
+afterAll(() => {
+  global.ResizeObserver = _origResizeObserver;
+  Element.prototype.scrollIntoView = _origScrollIntoView;
+  vi.restoreAllMocks();
 });
 
 // langToFlag needs the utils module
@@ -73,6 +82,11 @@ describe("LanguagePicker", () => {
     }
 
     expect(onChange).toHaveBeenCalledWith("fr");
+    // Verify the menu closed
+    const btn = screen.getByLabelText("Language tag");
+    await waitFor(() => {
+      expect(btn.getAttribute("aria-expanded")).toBe("false");
+    });
   });
 
   it("does not open when disabled", () => {
@@ -132,9 +146,12 @@ describe("LanguagePicker", () => {
     const btn = screen.getByLabelText("Language tag");
     fireEvent.click(btn);
     await waitFor(() => {
-      const controlsId = btn.getAttribute("aria-controls");
-      expect(controlsId).toBeTruthy();
-      expect(document.getElementById(controlsId!)).toBeDefined();
+      expect(btn.getAttribute("aria-expanded")).toBe("true");
     });
+    const controlsId = btn.getAttribute("aria-controls");
+    expect(controlsId).toBeTruthy();
+    // Verify a listbox element with the matching id exists
+    const list = screen.getByRole("listbox");
+    expect(list.getAttribute("id")).toBe(controlsId);
   });
 });
