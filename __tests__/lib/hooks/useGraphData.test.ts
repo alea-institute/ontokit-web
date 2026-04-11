@@ -101,11 +101,11 @@ describe("useGraphData", () => {
     expect(mockGetEntityGraph).toHaveBeenCalledWith("proj-1", "urn:focus", {
       branch: "main",
       ancestorsDepth: 5,
-      descendantsDepth: 0,
+      descendantsDepth: 1,
     }, undefined);
   });
 
-  it("passes descendantsDepth=2 when showDescendants is toggled", async () => {
+  it("passes descendantsDepth=2 when showAllDescendants is toggled", async () => {
     const response = makeGraphResponse();
     mockGetEntityGraph.mockResolvedValue(response);
 
@@ -119,7 +119,7 @@ describe("useGraphData", () => {
     });
 
     act(() => {
-      result.current.setShowDescendants(true);
+      result.current.setShowAllDescendants(true);
     });
 
     await waitFor(() => {

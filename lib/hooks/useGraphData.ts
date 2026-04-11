@@ -14,8 +14,8 @@ interface UseGraphDataOptions {
 interface UseGraphDataReturn {
   graphData: EntityGraphResponse | null;
   isLoading: boolean;
-  showDescendants: boolean;
-  setShowDescendants: (v: boolean) => void;
+  showAllDescendants: boolean;
+  setShowAllDescendants: (v: boolean) => void;
   expandNode: (iri: string) => void;
   resetGraph: () => void;
   resolvedCount: number;
@@ -58,19 +58,19 @@ export function useGraphData({
   accessToken,
 }: UseGraphDataOptions): UseGraphDataReturn {
   const [expansions, setExpansions] = useState<EntityGraphResponse[]>([]);
-  const [showDescendants, setShowDescendants] = useState(false);
+  const [showAllDescendants, setShowAllDescendants] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const expandedNodes = useRef(new Set<string>());
   const graphEpoch = useRef(0);
   const expandingNodes = useRef(new Set<string>());
 
   const query = useQuery({
-    queryKey: ["entityGraph", projectId, focusIri, branch, showDescendants, resetKey, !!accessToken],
+    queryKey: ["entityGraph", projectId, focusIri, branch, showAllDescendants, resetKey, !!accessToken],
     queryFn: () =>
       graphApi.getEntityGraph(projectId, focusIri!, {
         branch,
         ancestorsDepth: 5,
-        descendantsDepth: showDescendants ? 2 : 0,
+        descendantsDepth: showAllDescendants ? 2 : 1,
       }, accessToken),
     enabled: !!focusIri,
     staleTime: 30_000,
@@ -82,7 +82,7 @@ export function useGraphData({
     expandedNodes.current = focusIri ? new Set([focusIri]) : new Set();
     expandingNodes.current = new Set();
     setExpansions([]);
-  }, [projectId, focusIri, branch, showDescendants, resetKey]);
+  }, [projectId, focusIri, branch, showAllDescendants, resetKey]);
 
   // Merge base query data with accumulated expansions
   const graphData = useMemo(() => {
@@ -102,7 +102,7 @@ export function useGraphData({
         .getEntityGraph(projectId, iri, {
           branch,
           ancestorsDepth: 1,
-          descendantsDepth: showDescendants ? 1 : 0,
+          descendantsDepth: 1,
           maxNodes: 50,
         }, accessToken)
         .then((newData) => {
@@ -117,7 +117,7 @@ export function useGraphData({
           expandingNodes.current.delete(iri);
         });
     },
-    [graphData, projectId, branch, accessToken, showDescendants],
+    [graphData, projectId, branch, accessToken],
   );
 
   const resetGraph = useCallback(() => {
@@ -134,8 +134,8 @@ export function useGraphData({
   return {
     graphData,
     isLoading: query.isLoading,
-    showDescendants,
-    setShowDescendants,
+    showAllDescendants,
+    setShowAllDescendants,
     expandNode,
     resetGraph,
     resolvedCount,

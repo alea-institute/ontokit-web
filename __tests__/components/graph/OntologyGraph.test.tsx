@@ -100,8 +100,8 @@ const mockGraphData: EntityGraphResponse = {
 const defaultReturn = {
   graphData: mockGraphData,
   isLoading: false,
-  showDescendants: false,
-  setShowDescendants: vi.fn(),
+  showAllDescendants: false,
+  setShowAllDescendants: vi.fn(),
   expandNode: vi.fn(),
   resetGraph: vi.fn(),
   resolvedCount: 2,
@@ -246,7 +246,7 @@ describe("OntologyGraph", () => {
 
   it("shows Show Descendants button", () => {
     render(<OntologyGraph {...defaultProps} />);
-    expect(screen.getByLabelText("Show descendants")).toBeDefined();
+    expect(screen.getByLabelText("Show all descendants")).toBeDefined();
   });
 
   // --- Truncation badge ---
@@ -262,17 +262,17 @@ describe("OntologyGraph", () => {
 
   // --- Show Descendants toggle ---
 
-  it("calls setShowDescendants when descendants button is clicked", () => {
+  it("calls setShowAllDescendants when descendants button is clicked", () => {
     render(<OntologyGraph {...defaultProps} />);
-    fireEvent.click(screen.getByLabelText("Show descendants"));
-    expect(defaultReturn.setShowDescendants).toHaveBeenCalledWith(true);
+    fireEvent.click(screen.getByLabelText("Show all descendants"));
+    expect(defaultReturn.setShowAllDescendants).toHaveBeenCalledWith(true);
   });
 
-  it("shows 'Descendants: On' when showDescendants is true", () => {
-    mockUseGraphData.mockReturnValue({ ...defaultReturn, showDescendants: true });
+  it("shows 'All Descendants' when showAllDescendants is true", () => {
+    mockUseGraphData.mockReturnValue({ ...defaultReturn, showAllDescendants: true });
     render(<OntologyGraph {...defaultProps} />);
-    expect(screen.getByText("Descendants: On")).toBeDefined();
-    expect(screen.getByLabelText("Hide descendants")).toBeDefined();
+    expect(screen.getByText("All Descendants")).toBeDefined();
+    expect(screen.getByLabelText("Show one level of descendants")).toBeDefined();
   });
 
   // --- isLayouting spinner ---

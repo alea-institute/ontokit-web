@@ -139,8 +139,8 @@ export function OntologyGraph({
   const {
     graphData,
     isLoading,
-    showDescendants,
-    setShowDescendants,
+    showAllDescendants,
+    setShowAllDescendants,
     expandNode,
     resetGraph,
     resolvedCount,
@@ -240,16 +240,16 @@ export function OntologyGraph({
           {direction === "TB" ? "Top-Down" : "Left-Right"}
         </button>
         <button
-          onClick={() => setShowDescendants(!showDescendants)}
+          onClick={() => setShowAllDescendants(!showAllDescendants)}
           className={cn(
             "rounded border px-2 py-0.5 text-xs",
-            showDescendants
+            showAllDescendants
               ? "border-blue-300 bg-blue-50 font-medium text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-900/50"
               : "border-slate-300 bg-white text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700",
           )}
-          aria-label={showDescendants ? "Hide descendants" : "Show descendants"}
+          aria-label={showAllDescendants ? "Show one level of descendants" : "Show all descendants"}
         >
-          {showDescendants ? "Descendants: On" : "Show Descendants"}
+          {showAllDescendants ? "All Descendants" : "Descendants"}
         </button>
         <button
           onClick={resetGraph}
