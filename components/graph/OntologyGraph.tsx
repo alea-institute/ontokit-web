@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -188,20 +188,9 @@ export function OntologyGraph({
     setEdges(layoutEdges);
   }, [layoutNodes, layoutEdges, setNodes, setEdges]);
 
-  // Progressive expansion: track which nodes have been clicked to expand
-  const expandedNodes = useRef(new Set<string>(focusIri ? [focusIri] : []));
-
-  // Reset expanded set when focus changes
-  useEffect(() => {
-    expandedNodes.current = new Set<string>(focusIri ? [focusIri] : []);
-  }, [focusIri]);
-
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
-      if (!expandedNodes.current.has(node.id)) {
-        expandedNodes.current.add(node.id);
-        expandNode(node.id);
-      }
+      expandNode(node.id);
     },
     [expandNode],
   );

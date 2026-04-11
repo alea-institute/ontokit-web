@@ -293,13 +293,14 @@ describe("OntologyGraph", () => {
     expect(defaultReturn.expandNode).toHaveBeenCalledWith("iri:Class2");
   });
 
-  it("does not call expandNode for already-expanded focus node", () => {
+  it("delegates expansion deduplication to useGraphData hook", () => {
     render(<OntologyGraph {...defaultProps} />);
     const onNodeClick = capturedReactFlowProps.onNodeClick;
 
-    // focusIri "iri:Class1" is pre-expanded
+    // Click on focus node — component always calls expandNode,
+    // deduplication is handled inside useGraphData.expandNode
     onNodeClick({} as React.MouseEvent, { id: "iri:Class1" });
-    expect(defaultReturn.expandNode).not.toHaveBeenCalled();
+    expect(defaultReturn.expandNode).toHaveBeenCalledWith("iri:Class1");
   });
 
   // --- Node double-click callback ---
