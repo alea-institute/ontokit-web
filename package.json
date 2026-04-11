@@ -34,7 +34,7 @@
     "elkjs": "^0.11.0",
     "lucide-react": "^1.7.0",
     "monaco-editor": "^0.55.1",
-    "next": "^16.2.2",
+    "next": "^16.2.3",
     "next-auth": "^5.0.0-beta.25",
     "next-intl": "^4.9.0",
     "react": "^19.0.0",
