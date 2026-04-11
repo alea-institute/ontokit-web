@@ -50,6 +50,20 @@ vi.mock("@/lib/hooks/useIriLabels", () => ({
 vi.mock("@/components/editor/LanguageFlag", () => ({
   LanguageFlag: () => null,
 }));
+vi.mock("@/components/editor/LanguagePicker", () => ({
+  LanguagePicker: ({ value, onChange }: { value: string; onChange: (code: string) => void }) => (
+    <select
+      data-testid="lang-picker"
+      aria-label="Language tag"
+      value={value}
+      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
+    >
+      <option value="en">en</option>
+      <option value="de">de</option>
+      <option value="fr">fr</option>
+    </select>
+  ),
+}));
 
 let capturedAnnotationRowProps: Array<Record<string, unknown>> = [];
 vi.mock("@/components/editor/standard/AnnotationRow", () => ({
@@ -699,10 +713,10 @@ describe("IndividualDetailPanel", () => {
 
   // ── Language tag input in edit mode ──
 
-  it("renders language tag inputs in edit mode", async () => {
+  it("renders language tag pickers in edit mode", async () => {
     const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
-    const { container } = render(
+    render(
       <IndividualDetailPanel
         {...DEFAULT_PROPS}
         canEdit={true}
@@ -710,8 +724,8 @@ describe("IndividualDetailPanel", () => {
       />
     );
     await user.click(screen.getByText("Edit Item"));
-    const langInputs = container.querySelectorAll('input[title="Language tag"]');
-    expect(langInputs.length).toBeGreaterThanOrEqual(1);
+    const langPickers = screen.getAllByLabelText("Language tag");
+    expect(langPickers.length).toBeGreaterThanOrEqual(1);
   });
 
   // ── triggerSave on blur of label input ──
@@ -856,10 +870,10 @@ describe("IndividualDetailPanel", () => {
 
   // ── Language tag editing in edit mode ──
 
-  it("allows editing language tag input", async () => {
+  it("allows editing language tag via picker", async () => {
     const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
-    const { container } = render(
+    render(
       <IndividualDetailPanel
         {...DEFAULT_PROPS}
         canEdit={true}
@@ -867,11 +881,10 @@ describe("IndividualDetailPanel", () => {
       />
     );
     await user.click(screen.getByText("Edit Item"));
-    const langInput = container.querySelector('input[title="Language tag"]') as HTMLInputElement;
-    expect(langInput).not.toBeNull();
-    await user.clear(langInput);
-    await user.type(langInput, "fr");
-    expect(langInput.value).toBe("fr");
+    const langPickers = screen.getAllByLabelText("Language tag");
+    expect(langPickers.length).toBeGreaterThanOrEqual(1);
+    await user.selectOptions(langPickers[0], "fr");
+    expect((langPickers[0] as HTMLSelectElement).value).toBe("fr");
   });
 
   // ── Edit mode with no initial comments ──
