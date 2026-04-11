@@ -2,9 +2,10 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Position } from "@xyflow/react";
 
+let mockGraphEdgeStyle = "smoothstep";
 vi.mock("@/lib/stores/editorModeStore", () => ({
   useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ graphEdgeStyle: "smoothstep" }),
+    selector({ graphEdgeStyle: mockGraphEdgeStyle }),
 }));
 
 import { OntologyEdge } from "@/components/graph/OntologyEdge";
@@ -22,6 +23,7 @@ vi.mock("@xyflow/react", () => ({
     <div data-testid="edge-label-renderer">{children}</div>
   ),
   getSmoothStepPath: (): [string, number, number] => ["M0,0 L10,10 L20,20 L30,30", 15, 15],
+  getBezierPath: (): [string, number, number] => ["M0,0 C10,10 20,20 30,30", 15, 15],
   Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },
 }));
 
@@ -183,5 +185,18 @@ describe("OntologyEdge", () => {
       (p) => p.getAttribute("stroke") === "transparent"
     );
     expect(hoverPath?.getAttribute("stroke-width")).toBe("16");
+  });
+
+  it("renders with bezier path when graphEdgeStyle is bezier", () => {
+    mockGraphEdgeStyle = "bezier";
+    render(
+      <svg>
+        <OntologyEdge {...baseProps} />
+      </svg>
+    );
+    const edge = screen.getByTestId("base-edge-edge-1");
+    // getBezierPath mock returns a cubic bezier path
+    expect(edge.getAttribute("d")).toBe("M0,0 C10,10 20,20 30,30");
+    mockGraphEdgeStyle = "smoothstep";
   });
 });
