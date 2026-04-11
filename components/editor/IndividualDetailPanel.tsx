@@ -21,6 +21,7 @@ import {
 import type { LocalizedString, AnnotationUpdate } from "@/lib/api/client";
 import { cn, getLocalName } from "@/lib/utils";
 import { LanguageFlag } from "@/components/editor/LanguageFlag";
+import { LanguagePicker } from "@/components/editor/LanguagePicker";
 import { AnnotationRow } from "@/components/editor/standard/AnnotationRow";
 import { InlineAnnotationAdder } from "@/components/editor/standard/InlineAnnotationAdder";
 import { RelationshipSection, type RelationshipGroup, type RelationshipTarget } from "@/components/editor/standard/RelationshipSection";
@@ -463,8 +464,7 @@ export function IndividualDetailPanel({
                 {editLabels.map((label, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <input type="text" value={label.value} onChange={(e) => updateLabel(index, "value", e.target.value)} onBlur={() => triggerSave()} placeholder="Label text" className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                    <LanguageFlag lang={label.lang} />
-                    <input type="text" value={label.lang} onChange={(e) => updateLabel(index, "lang", e.target.value)} onBlur={() => triggerSave()} className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" title="Language tag" />
+                    <LanguagePicker value={label.lang} onChange={(code) => { updateLabel(index, "lang", code); triggerSave(); }} />
                     {editLabels.length > 1 ? (
                       <button onClick={() => removeLabel(index)} className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></button>
                     ) : <div className="rounded-sm p-1"><div className="h-3.5 w-3.5" /></div>}
