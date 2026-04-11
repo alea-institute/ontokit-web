@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import React from "react";
+import type { ReactNode } from "react";
 import { useGraphData } from "@/lib/hooks/useGraphData";
 import { graphApi, type EntityGraphResponse } from "@/lib/api/graph";
 
@@ -10,6 +13,12 @@ vi.mock("@/lib/api/graph", () => ({
 }));
 
 const mockGetEntityGraph = vi.mocked(graphApi.getEntityGraph);
+
+function createWrapper() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return ({ children }: { children: ReactNode }) =>
+    React.createElement(QueryClientProvider, { client: qc }, children);
+}
 
 function makeGraphResponse(overrides: Partial<EntityGraphResponse> = {}): EntityGraphResponse {
   return {
@@ -64,8 +73,9 @@ describe("useGraphData", () => {
   });
 
   it("returns null graphData when focusIri is null", () => {
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: null, projectId: "proj-1" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: null, projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     expect(result.current.graphData).toBeNull();
@@ -77,8 +87,9 @@ describe("useGraphData", () => {
     const response = makeGraphResponse();
     mockGetEntityGraph.mockResolvedValue(response);
 
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: "urn:focus", projectId: "proj-1", branch: "main" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", branch: "main" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -96,8 +107,9 @@ describe("useGraphData", () => {
     const response = makeGraphResponse();
     mockGetEntityGraph.mockResolvedValue(response);
 
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -120,8 +132,9 @@ describe("useGraphData", () => {
   it("sets graphData to null on API error", async () => {
     mockGetEntityGraph.mockRejectedValue(new Error("Network error"));
 
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -176,8 +189,9 @@ describe("useGraphData", () => {
       .mockResolvedValueOnce(initial)
       .mockResolvedValueOnce(expansion);
 
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -203,8 +217,9 @@ describe("useGraphData", () => {
     const response = makeGraphResponse();
     mockGetEntityGraph.mockResolvedValue(response);
 
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -253,8 +268,9 @@ describe("useGraphData", () => {
       .mockResolvedValueOnce(initial)
       .mockResolvedValueOnce(expansion);
 
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -285,8 +301,9 @@ describe("useGraphData", () => {
       .mockResolvedValueOnce(initial)
       .mockResolvedValueOnce(expansion);
 
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -310,8 +327,9 @@ describe("useGraphData", () => {
   it("expandNode does nothing when graphData is null", async () => {
     mockGetEntityGraph.mockRejectedValue(new Error("fail"));
 
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {
@@ -328,8 +346,9 @@ describe("useGraphData", () => {
     const response = makeGraphResponse();
     mockGetEntityGraph.mockResolvedValue(response);
 
-    const { result } = renderHook(() =>
-      useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      { wrapper: createWrapper() },
     );
 
     await waitFor(() => {

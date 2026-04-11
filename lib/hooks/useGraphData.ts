@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { graphApi, type EntityGraphResponse } from "@/lib/api/graph";
 
 interface UseGraphDataOptions {
@@ -27,47 +28,35 @@ export function useGraphData({
   accessToken,
 }: UseGraphDataOptions): UseGraphDataReturn {
   const [graphData, setGraphData] = useState<EntityGraphResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [showDescendants, setShowDescendants] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const expandedNodes = useRef(new Set<string>());
   const graphEpoch = useRef(0);
   const expandingNodes = useRef(new Set<string>());
 
-  // Fetch graph from backend BFS endpoint
-  useEffect(() => {
-    if (!focusIri) {
-      setGraphData(null);
-      setIsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    const epoch = ++graphEpoch.current;
-    setIsLoading(true);
-    expandedNodes.current = new Set([focusIri]);
-    expandingNodes.current = new Set();
-
-    graphApi
-      .getEntityGraph(projectId, focusIri, {
+  const query = useQuery({
+    queryKey: ["entityGraph", projectId, focusIri, branch, showDescendants, resetKey, !!accessToken],
+    queryFn: () =>
+      graphApi.getEntityGraph(projectId, focusIri!, {
         branch,
         ancestorsDepth: 5,
         descendantsDepth: showDescendants ? 2 : 0,
-      }, accessToken)
-      .then((data) => {
-        if (!cancelled) setGraphData(data);
-      })
-      .catch(() => {
-        if (!cancelled) setGraphData(null);
-      })
-      .finally(() => {
-        if (!cancelled) setIsLoading(false);
-      });
+      }, accessToken),
+    enabled: !!focusIri,
+    staleTime: 30_000,
+  });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [focusIri, projectId, branch, showDescendants, resetKey, accessToken]);
+  // Seed local graphData from query result and reset expansion tracking
+  useEffect(() => {
+    if (query.data) {
+      graphEpoch.current++;
+      expandedNodes.current = new Set([focusIri!]);
+      expandingNodes.current = new Set();
+      setGraphData(query.data);
+    } else if (!focusIri) {
+      setGraphData(null);
+    }
+  }, [query.data, focusIri]);
 
   // Progressive expansion: fetch 1-hop neighborhood and merge
   const expandNode = useCallback(
@@ -132,7 +121,7 @@ export function useGraphData({
 
   return {
     graphData,
-    isLoading,
+    isLoading: query.isLoading,
     showDescendants,
     setShowDescendants,
     expandNode,
