@@ -21,13 +21,43 @@ interface UseGraphDataReturn {
   resolvedCount: number;
 }
 
+function mergeExpansions(
+  base: EntityGraphResponse,
+  expansions: EntityGraphResponse[],
+): EntityGraphResponse {
+  if (expansions.length === 0) return base;
+
+  let result = base;
+  for (const expansion of expansions) {
+    const existingNodeIds = new Set(result.nodes.map((n) => n.id));
+    const existingEdgeIds = new Set(result.edges.map((e) => e.id));
+    result = {
+      ...result,
+      nodes: [
+        ...result.nodes,
+        ...expansion.nodes.filter((n) => !existingNodeIds.has(n.id)),
+      ],
+      edges: [
+        ...result.edges,
+        ...expansion.edges.filter((e) => !existingEdgeIds.has(e.id)),
+      ],
+      truncated: result.truncated || expansion.truncated,
+      total_concept_count: Math.max(
+        result.total_concept_count,
+        expansion.total_concept_count,
+      ),
+    };
+  }
+  return result;
+}
+
 export function useGraphData({
   focusIri,
   projectId,
   branch,
   accessToken,
 }: UseGraphDataOptions): UseGraphDataReturn {
-  const [graphData, setGraphData] = useState<EntityGraphResponse | null>(null);
+  const [expansions, setExpansions] = useState<EntityGraphResponse[]>([]);
   const [showDescendants, setShowDescendants] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const expandedNodes = useRef(new Set<string>());
@@ -46,17 +76,21 @@ export function useGraphData({
     staleTime: 30_000,
   });
 
-  // Seed local graphData from query result and reset expansion tracking
+  // Reset expansion tracking when the base query result changes
   useEffect(() => {
     if (query.data) {
       graphEpoch.current++;
       expandedNodes.current = new Set([focusIri!]);
       expandingNodes.current = new Set();
-      setGraphData(query.data);
-    } else if (!focusIri) {
-      setGraphData(null);
+      setExpansions([]);
     }
   }, [query.data, focusIri]);
+
+  // Merge base query data with accumulated expansions
+  const graphData = useMemo(() => {
+    if (!query.data) return null;
+    return mergeExpansions(query.data, expansions);
+  }, [query.data, expansions]);
 
   // Progressive expansion: fetch 1-hop neighborhood and merge
   const expandNode = useCallback(
@@ -79,27 +113,7 @@ export function useGraphData({
 
           expandingNodes.current.delete(iri);
           expandedNodes.current.add(iri);
-          setGraphData((prev) => {
-            if (!prev) return newData;
-
-            const existingNodeIds = new Set(prev.nodes.map((n) => n.id));
-            const existingEdgeIds = new Set(prev.edges.map((e) => e.id));
-
-            return {
-              ...prev,
-              nodes: [
-                ...prev.nodes,
-                ...newData.nodes.filter((n) => !existingNodeIds.has(n.id)),
-              ],
-              edges: [
-                ...prev.edges,
-                ...newData.edges.filter((e) => !existingEdgeIds.has(e.id)),
-              ],
-              truncated: prev.truncated || newData.truncated,
-              total_concept_count:
-                Math.max(prev.total_concept_count, newData.total_concept_count),
-            };
-          });
+          setExpansions((prev) => [...prev, newData]);
         })
         .catch(() => {
           expandingNodes.current.delete(iri);
@@ -110,7 +124,7 @@ export function useGraphData({
 
   const resetGraph = useCallback(() => {
     expandedNodes.current = new Set();
-    setGraphData(null);
+    setExpansions([]);
     setResetKey((k) => k + 1);
   }, []);
 

@@ -16,8 +16,10 @@ const mockGetEntityGraph = vi.mocked(graphApi.getEntityGraph);
 
 function createWrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: ReactNode }) =>
+  const Wrapper = ({ children }: { children: ReactNode }) =>
     React.createElement(QueryClientProvider, { client: qc }, children);
+  Wrapper.displayName = "QueryWrapper";
+  return Wrapper;
 }
 
 function makeGraphResponse(overrides: Partial<EntityGraphResponse> = {}): EntityGraphResponse {
