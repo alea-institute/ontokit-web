@@ -60,6 +60,10 @@ OntoKit Web uses a two-branch model:
 
 Releases follow a Weblate-inspired workflow. All commands below are run from the `ontokit-web/` directory.
 
+### 0. Update the documentation changelog
+
+Before preparing the release, add an entry for the new version to the in-app changelog at `app/docs/changelog/page.tsx`. Summarize the release highlights (new features, improvements, bug fixes) so users can see what changed at `/docs/changelog`.
+
 ### 1. Prepare the release (on `dev`)
 
 ```bash
