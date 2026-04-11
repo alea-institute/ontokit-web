@@ -1,6 +1,12 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Position } from "@xyflow/react";
+
+vi.mock("@/lib/stores/editorModeStore", () => ({
+  useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ graphEdgeStyle: "smoothstep" }),
+}));
+
 import { OntologyEdge } from "@/components/graph/OntologyEdge";
 
 vi.mock("@xyflow/react", () => ({
@@ -15,7 +21,7 @@ vi.mock("@xyflow/react", () => ({
   EdgeLabelRenderer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="edge-label-renderer">{children}</div>
   ),
-  getBezierPath: (): [string, number, number] => ["M0,0 C10,10 20,20 30,30", 15, 15],
+  getSmoothStepPath: (): [string, number, number] => ["M0,0 L10,10 L20,20 L30,30", 15, 15],
   Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },
 }));
 
@@ -49,7 +55,18 @@ describe("OntologyEdge", () => {
     );
     const edge = screen.getByTestId("base-edge-edge-1");
     expect(edge).toBeDefined();
-    expect(edge.getAttribute("data-marker-end")).toBe("url(#arrow-slate)");
+    // Marker is now applied at the React Flow edge level, not inside OntologyEdge
+    expect(edge).toBeDefined();
+  });
+
+  it("passes markerEnd prop through to BaseEdge", () => {
+    render(
+      <svg>
+        <OntologyEdge {...baseProps} markerEnd="url(#test-marker)" />
+      </svg>
+    );
+    const edge = screen.getByTestId("base-edge-edge-1");
+    expect(edge.getAttribute("data-marker-end")).toBe("url(#test-marker)");
   });
 
   it("renders with equivalentClass edge type", () => {
@@ -146,7 +163,8 @@ describe("OntologyEdge", () => {
       </svg>
     );
     const edge = screen.getByTestId("base-edge-edge-1");
-    expect(edge.getAttribute("data-marker-end")).toBe("url(#arrow-slate)");
+    // Marker is applied at React Flow edge level, not inside OntologyEdge
+    expect(edge).toBeDefined();
   });
 
   it("renders invisible hover detection path with strokeWidth 16", () => {

@@ -5,9 +5,11 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
+  getSmoothStepPath,
   type EdgeProps,
 } from "@xyflow/react";
 import type { GraphEdgeType } from "@/lib/graph/types";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 
 export interface OntologyEdgeData {
   [key: string]: unknown;
@@ -22,12 +24,10 @@ const edgeTypeConfig: Record<GraphEdgeType, {
   stroke: string;
   strokeDasharray?: string;
   label: string;
-  markerEnd?: string;
 }> = {
   subClassOf: {
     stroke: "#94a3b8",
     label: "subClassOf",
-    markerEnd: "url(#arrow-slate)",
   },
   equivalentClass: {
     stroke: "#3b82f6",
@@ -54,19 +54,23 @@ export const OntologyEdge = memo(function OntologyEdge({
   targetY,
   sourcePosition,
   targetPosition,
+  markerEnd,
   data,
 }: OntologyEdgeProps) {
   const [hovered, setHovered] = useState(false);
   const edgeType = data?.edgeType ?? "subClassOf";
   const config = edgeTypeConfig[edgeType];
+  const graphEdgeStyle = useEditorModeStore((s) => s.graphEdgeStyle);
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const pathFn = graphEdgeStyle === "bezier" ? getBezierPath : getSmoothStepPath;
+  const [edgePath, labelX, labelY] = pathFn({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
+    ...(graphEdgeStyle === "smoothstep" && { borderRadius: 16 }),
   });
 
   return (
@@ -88,7 +92,7 @@ export const OntologyEdge = memo(function OntologyEdge({
           strokeDasharray: config.strokeDasharray,
           strokeWidth: edgeType === "subClassOf" ? 1.5 : 1,
         }}
-        markerEnd={config.markerEnd}
+        markerEnd={markerEnd}
       />
       {hovered && (
         <EdgeLabelRenderer>

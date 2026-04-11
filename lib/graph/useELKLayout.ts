@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import type { Node, Edge } from "@xyflow/react";
+import { MarkerType, type Node, type Edge } from "@xyflow/react";
 import type { EntityGraphResponse } from "@/lib/api/graph";
 import type { OntologyNodeData } from "@/components/graph/OntologyNode";
 import type { OntologyEdgeData } from "@/components/graph/OntologyEdge";
@@ -86,16 +86,14 @@ export function useELKLayout(): LayoutResult {
           },
         );
 
-        const edgeMarkers: Partial<Record<GraphEdgeType, { type: "arrowclosed"; color: string }>> = {
-          subClassOf: { type: "arrowclosed", color: "#94a3b8" },
-        };
-
         const layoutedEdges: Edge<OntologyEdgeData>[] = data.edges.map((e) => ({
           id: e.id,
           source: e.source,
           target: e.target,
           type: "ontologyEdge",
-          markerEnd: edgeMarkers[e.edge_type as GraphEdgeType],
+          ...(e.edge_type === "subClassOf" && {
+            markerEnd: { type: MarkerType.ArrowClosed, color: "#94a3b8", width: 16, height: 16 },
+          }),
           data: {
             edgeType: e.edge_type as GraphEdgeType,
           },

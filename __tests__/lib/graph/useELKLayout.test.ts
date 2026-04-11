@@ -128,7 +128,20 @@ describe("useELKLayout", () => {
     expect(result.current.nodes).toHaveLength(1);
   });
 
-  it("adds arrowhead marker only for subClassOf edges", async () => {
+  it("adds arrowhead marker for subClassOf edges", async () => {
+    const data = makeGraphResponse(2);
+    const { result } = renderHook(() => useELKLayout());
+
+    await act(async () => {
+      await result.current.runLayout(data);
+    });
+
+    const edge = result.current.edges[0];
+    expect(edge.markerEnd).toBeDefined();
+    expect((edge.markerEnd as { type: string }).type).toBe("arrowclosed");
+  });
+
+  it("does not add arrowhead marker for non-subClassOf edges", async () => {
     const data = makeGraphResponse(2);
     data.edges[0].edge_type = "seeAlso";
     const { result } = renderHook(() => useELKLayout());

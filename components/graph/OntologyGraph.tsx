@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -15,8 +15,9 @@ import {
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowDown, ArrowRight, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
+import { ArrowDown, ArrowRight, ChevronDown, ChevronUp, RotateCcw, Spline, CornerDownRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useGraphData } from "@/lib/hooks/useGraphData";
 import { useELKLayout, type LayoutDirection } from "@/lib/graph/useELKLayout";
 import { OntologyNode } from "./OntologyNode";
@@ -147,6 +148,8 @@ export function OntologyGraph({
 
   const [direction, setDirection] = useState<LayoutDirection>("TB");
   const toggleDirection = useCallback(() => setDirection((d) => (d === "TB" ? "LR" : "TB")), []);
+  const graphEdgeStyle = useEditorModeStore((s) => s.graphEdgeStyle);
+  const setGraphEdgeStyle = useEditorModeStore((s) => s.setGraphEdgeStyle);
   const { nodes: layoutNodes, edges: layoutEdges, isLayouting, runLayout } = useELKLayout();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -206,27 +209,6 @@ export function OntologyGraph({
     [onNavigateToClass],
   );
 
-  // SVG marker definitions
-  const arrowMarker = useMemo(
-    () => (
-      <svg style={{ position: "absolute", width: 0, height: 0 }}>
-        <defs>
-          <marker
-            id="arrow-slate"
-            viewBox="0 0 10 10"
-            refX="10"
-            refY="5"
-            markerWidth="6"
-            markerHeight="6"
-            orient="auto-start-reverse"
-          >
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
-          </marker>
-        </defs>
-      </svg>
-    ),
-    [],
-  );
 
   if (!focusIri) {
     return (
@@ -277,6 +259,21 @@ export function OntologyGraph({
           <RotateCcw className="h-3.5 w-3.5" />
           Reset
         </button>
+        <button
+          onClick={() => setGraphEdgeStyle(graphEdgeStyle === "bezier" ? "smoothstep" : "bezier")}
+          className={cn(
+            "flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
+            "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700",
+          )}
+          aria-label={`Switch to ${graphEdgeStyle === "bezier" ? "smooth step" : "bezier"} edges`}
+        >
+          {graphEdgeStyle === "bezier" ? (
+            <Spline className="h-3.5 w-3.5" />
+          ) : (
+            <CornerDownRight className="h-3.5 w-3.5" />
+          )}
+          {graphEdgeStyle === "bezier" ? "Bezier" : "Smooth Step"}
+        </button>
         {isLayouting && (
           <span className="flex items-center gap-1 text-xs text-slate-400">
             <span className="inline-block h-3 w-3 animate-spin rounded-full border border-slate-300 border-t-blue-600" />
@@ -296,7 +293,6 @@ export function OntologyGraph({
 
       {/* Graph */}
       <div className="relative flex-1">
-        {arrowMarker}
         {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-slate-900/60">
             <div className="flex items-center gap-2">

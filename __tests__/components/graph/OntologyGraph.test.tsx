@@ -4,6 +4,12 @@ import type { EntityGraphResponse } from "@/lib/api/graph";
 
 // ── Mocks ──────────────────────────────────────────────────────────
 
+const mockSetGraphEdgeStyle = vi.fn();
+vi.mock("@/lib/stores/editorModeStore", () => ({
+  useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
+    selector({ graphEdgeStyle: "smoothstep", setGraphEdgeStyle: mockSetGraphEdgeStyle }),
+}));
+
 const mockUseGraphData = vi.fn();
 const mockRunLayout = vi.fn().mockResolvedValue(undefined);
 
