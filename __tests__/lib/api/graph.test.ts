@@ -43,7 +43,7 @@ describe("graphApi", () => {
 
       await graphApi.getEntityGraph("proj-1", "urn:c", { branch: "dev" });
 
-      const config = mockGet.mock.calls[0][1];
+      const config = mockGet.mock.calls[0]?.[1] as { params: Record<string, unknown> };
       expect(config.params.branch).toBe("dev");
     });
 
@@ -55,7 +55,7 @@ describe("graphApi", () => {
         descendantsDepth: 1,
       });
 
-      const config = mockGet.mock.calls[0][1];
+      const config = mockGet.mock.calls[0]?.[1] as { params: Record<string, unknown> };
       expect(config.params.ancestors_depth).toBe(3);
       expect(config.params.descendants_depth).toBe(1);
     });
@@ -68,7 +68,7 @@ describe("graphApi", () => {
         includeSeeAlso: false,
       });
 
-      const config = mockGet.mock.calls[0][1];
+      const config = mockGet.mock.calls[0]?.[1] as { params: Record<string, unknown> };
       expect(config.params.max_nodes).toBe(100);
       expect(config.params.include_see_also).toBe(false);
     });
@@ -78,7 +78,7 @@ describe("graphApi", () => {
 
       await graphApi.getEntityGraph("proj-1", "urn:c");
 
-      const config = mockGet.mock.calls[0][1];
+      const config = mockGet.mock.calls[0]?.[1] as { params: Record<string, unknown> };
       expect(config.params.branch).toBeUndefined();
       expect(config.params.ancestors_depth).toBeUndefined();
       expect(config.params.descendants_depth).toBeUndefined();
