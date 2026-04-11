@@ -873,6 +873,7 @@ describe("IndividualDetailPanel", () => {
   it("allows editing language tag via picker", async () => {
     const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
+    mockTriggerSave.mockClear();
     render(
       <IndividualDetailPanel
         {...DEFAULT_PROPS}
@@ -885,6 +886,7 @@ describe("IndividualDetailPanel", () => {
     expect(langPickers.length).toBeGreaterThanOrEqual(1);
     await user.selectOptions(langPickers[0], "fr");
     expect((langPickers[0] as HTMLSelectElement).value).toBe("fr");
+    expect(mockTriggerSave).toHaveBeenCalled();
   });
 
   // ── Edit mode with no initial comments ──

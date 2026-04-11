@@ -906,6 +906,7 @@ describe("PropertyDetailPanel", () => {
   it("allows editing language tag via picker", async () => {
     const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
+    mockTriggerSave.mockClear();
     render(
       <PropertyDetailPanel
         {...DEFAULT_PROPS}
@@ -918,6 +919,7 @@ describe("PropertyDetailPanel", () => {
     expect(langPickers.length).toBeGreaterThanOrEqual(1);
     await user.selectOptions(langPickers[0], "fr");
     expect((langPickers[0] as HTMLSelectElement).value).toBe("fr");
+    expect(mockTriggerSave).toHaveBeenCalled();
   });
 
   // ── Edit mode with no initial comments ──
