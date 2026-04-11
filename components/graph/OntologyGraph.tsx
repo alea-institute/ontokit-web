@@ -177,8 +177,8 @@ export function OntologyGraph({
       setEdges([]);
       return;
     }
-    runLayout(graphData, direction).catch(() => {
-      // Layout failed — nodes stay empty
+    runLayout(graphData, direction).catch((err) => {
+      console.error("[OntologyGraph] ELK layout failed:", err);
     });
   }, [graphData, direction, runLayout, setNodes, setEdges]);
 
