@@ -18,7 +18,7 @@ export function LanguageFlag({ lang, className }: LanguageFlagProps) {
       aria-label={flag ? `Language: ${lang}` : undefined}
       aria-hidden={!flag ? true : undefined}
       title={lang || undefined}
-      className={className ?? "inline-flex h-5 w-5 shrink-0 items-center justify-center text-sm leading-none"}
+      className={className ?? "inline-flex h-5 w-5 shrink-0 items-center justify-center font-emoji text-sm leading-none"}
     >
       {flag}
     </span>
