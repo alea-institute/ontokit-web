@@ -283,24 +283,34 @@ describe("OntologyGraph", () => {
 
   // --- Node click callback ---
 
-  it("calls expandNode when a new node is clicked via ReactFlow", () => {
+  it("calls expandNode after click delay when a node is clicked", () => {
+    vi.useFakeTimers();
     render(<OntologyGraph {...defaultProps} />);
     const onNodeClick = capturedReactFlowProps.onNodeClick;
     expect(onNodeClick).toBeDefined();
 
-    // Simulate clicking a node that hasn't been expanded
     onNodeClick({} as React.MouseEvent, { id: "iri:Class2" });
+    // expandNode is delayed to distinguish from double-click
+    expect(defaultReturn.expandNode).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(200);
     expect(defaultReturn.expandNode).toHaveBeenCalledWith("iri:Class2");
+    vi.useRealTimers();
   });
 
-  it("delegates expansion deduplication to useGraphData hook", () => {
+  it("cancels expand when double-click follows single click", () => {
+    vi.useFakeTimers();
     render(<OntologyGraph {...defaultProps} />);
     const onNodeClick = capturedReactFlowProps.onNodeClick;
+    const onNodeDoubleClick = capturedReactFlowProps.onNodeDoubleClick;
 
-    // Click on focus node — component always calls expandNode,
-    // deduplication is handled inside useGraphData.expandNode
+    // Single click, then double-click before timer fires
     onNodeClick({} as React.MouseEvent, { id: "iri:Class1" });
-    expect(defaultReturn.expandNode).toHaveBeenCalledWith("iri:Class1");
+    onNodeDoubleClick({} as React.MouseEvent, { id: "iri:Class1" });
+    vi.advanceTimersByTime(200);
+
+    expect(defaultReturn.expandNode).not.toHaveBeenCalled();
+    expect(defaultProps.onNavigateToClass).toHaveBeenCalledWith("iri:Class1");
+    vi.useRealTimers();
   });
 
   // --- Node double-click callback ---

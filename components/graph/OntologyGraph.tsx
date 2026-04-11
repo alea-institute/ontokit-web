@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -188,19 +188,37 @@ export function OntologyGraph({
     setEdges(layoutEdges);
   }, [layoutNodes, layoutEdges, setNodes, setEdges]);
 
+  // Click-delay guard: distinguish single click (expand) from double click (navigate)
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleNodeClick: NodeMouseHandler = useCallback(
     (_event, node) => {
-      expandNode(node.id);
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = setTimeout(() => {
+        clickTimerRef.current = null;
+        expandNode(node.id);
+      }, 200);
     },
     [expandNode],
   );
 
   const handleNodeDoubleClick: NodeMouseHandler = useCallback(
     (_event, node) => {
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current);
+        clickTimerRef.current = null;
+      }
       onNavigateToClass?.(node.id);
     },
     [onNavigateToClass],
   );
+
+  // Clean up pending click timer on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+    };
+  }, []);
 
 
   if (!focusIri) {
