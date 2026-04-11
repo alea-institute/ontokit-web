@@ -94,7 +94,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
         title={langInfo ? `${langInfo.name} (${langInfo.nativeName})` : value || "Select language"}
         className="flex w-14 items-center justify-center gap-0.5 rounded-md border border-slate-300 bg-white px-1 py-1.5 text-xs text-slate-700 hover:border-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
       >
-        {flag && <span className="text-sm leading-none">{flag}</span>}
+        {flag && <span className="font-emoji text-sm leading-none">{flag}</span>}
         <span className="truncate">{displayLabel}</span>
         <ChevronDown className="h-2.5 w-2.5 shrink-0 text-slate-400" />
       </button>
@@ -176,7 +176,7 @@ function LanguageItem({
       onSelect={() => onSelect(lang.code)}
       className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs aria-selected:bg-slate-100 dark:aria-selected:bg-slate-600"
     >
-      <span className="inline-flex w-5 shrink-0 items-center justify-center text-sm leading-none">
+      <span className="inline-flex w-5 shrink-0 items-center justify-center font-emoji text-sm leading-none">
         {flag}
       </span>
       <span className="font-medium text-slate-700 dark:text-slate-200">{lang.name}</span>

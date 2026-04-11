@@ -22,6 +22,7 @@
 
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), monospace;
+  --font-emoji: var(--font-noto-emoji), "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
 }
 
 /*
