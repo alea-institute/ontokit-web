@@ -11,6 +11,65 @@ interface ChangelogEntry {
 
 const changelog: ChangelogEntry[] = [
   {
+    version: "0.3.0",
+    date: "2026-04-09",
+    categories: [
+      {
+        title: "New features",
+        items: [
+          "Projects list as landing page with Public, My Projects, Private, and All tabs.",
+          "Separate viewer and editor routes for projects with role-appropriate default views.",
+          "Ontology search index management UI for PostgreSQL-backed entity indexing.",
+          "Multi-page Ontology Guide documentation accessible from the app.",
+          "Upstream source loop prevention UI with informational banners when sync config matches GitHub integration.",
+          "Exemplar ontology support in project UI for template-based project creation.",
+          "Explicit Save button in detail panel edit mode.",
+          "Branch topology visualization in revision history graph.",
+          "Share button to copy project permalink.",
+          "Unfiltered project count shown when search or filter is active.",
+        ],
+      },
+      {
+        title: "Improvements",
+        items: [
+          "Upgraded to Next.js 16, Tailwind CSS 4, Zod 4, and lucide-react 1.7.",
+          "Renamed 'upstream sync' to 'remote sync' / 'Sync from Remote' for clarity.",
+          "Renamed misleading 'Private' tab to 'My Projects'.",
+          "Skip project dashboard — navigate directly to editor.",
+          "Improved auth UX for private projects in the editor.",
+          "Improved import error UX with server-reachability probe.",
+          "Improved lint issue display consistency and prevented UI freeze on large rule sets.",
+          "Replaced window.location.reload() with React Query refetch for smoother navigation.",
+          "Removed accessToken from React Query keys to prevent unnecessary refetches.",
+          "Disabled branch switching for unauthenticated users.",
+          "Moved Tooltip provider to app level for shared usage.",
+          "Docker deployment configuration with multi-stage build.",
+          "Test coverage increased to 80% with 2400+ tests.",
+        ],
+      },
+      {
+        title: "Bug fixes",
+        items: [
+          "Fixed viewer source tab appearing empty in developer mode.",
+          "Fixed total project count not shown with Load More pagination.",
+          "Fixed duplicate BranchBadge in editor header.",
+          "Fixed nullable index fields from API causing runtime errors.",
+          "Fixed manualSave prop renamed to hideSaveButton with correct default behavior.",
+          "Fixed exhaustive-deps false positive in useProjectViewer.",
+          "Resolved Dependabot security alerts and CodeQL findings.",
+        ],
+      },
+      {
+        title: "CI/CD & Quality",
+        items: [
+          "Split CI quality gate into parallel lint, type-check, test, and build jobs.",
+          "Added Codecov bundle analysis and test coverage reporting.",
+          "Upgraded Vite to 8.0.7 for security fix.",
+        ],
+      },
+    ],
+  },
+  {
     version: "0.2.0",
     date: "2026-03-09",
     categories: [
