@@ -19,6 +19,17 @@ interface LayoutResult {
 const NODE_WIDTH = 180;
 const NODE_HEIGHT = 44;
 
+const VALID_NODE_TYPES = new Set<GraphNodeType>([
+  "focus", "class", "root", "individual", "property", "external", "unexplored",
+]);
+
+function normalizeNodeType(raw: string | undefined): GraphNodeType {
+  if (raw && VALID_NODE_TYPES.has(raw as GraphNodeType)) return raw as GraphNodeType;
+  // Map backend-specific values to closest frontend type
+  if (raw === "secondary_root") return "root";
+  return "class";
+}
+
 export function useELKLayout(): LayoutResult {
   const [nodes, setNodes] = useState<Node<OntologyNodeData>[]>([]);
   const [edges, setEdges] = useState<Edge<OntologyEdgeData>[]>([]);
@@ -77,7 +88,7 @@ export function useELKLayout(): LayoutResult {
               position: { x: elkNode.x ?? 0, y: elkNode.y ?? 0 },
               data: {
                 label: backendNode.label,
-                nodeType: (backendNode.node_type || "class") as GraphNodeType,
+                nodeType: normalizeNodeType(backendNode.node_type),
                 childCount: backendNode.child_count ?? undefined,
                 deprecated: false,
                 isExpanded: false,
