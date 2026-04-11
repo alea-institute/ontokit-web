@@ -31,6 +31,8 @@ export function useGraphData({
   const [showDescendants, setShowDescendants] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const expandedNodes = useRef(new Set<string>());
+  const graphEpoch = useRef(0);
+  const expandingNodes = useRef(new Set<string>());
 
   // Fetch graph from backend BFS endpoint
   useEffect(() => {
@@ -41,8 +43,10 @@ export function useGraphData({
     }
 
     let cancelled = false;
+    const epoch = ++graphEpoch.current;
     setIsLoading(true);
     expandedNodes.current = new Set([focusIri]);
+    expandingNodes.current = new Set();
 
     graphApi
       .getEntityGraph(projectId, focusIri, {
@@ -68,7 +72,10 @@ export function useGraphData({
   // Progressive expansion: fetch 1-hop neighborhood and merge
   const expandNode = useCallback(
     (iri: string) => {
-      if (!graphData || expandedNodes.current.has(iri)) return;
+      if (!graphData || expandedNodes.current.has(iri) || expandingNodes.current.has(iri)) return;
+
+      const epoch = graphEpoch.current;
+      expandingNodes.current.add(iri);
 
       graphApi
         .getEntityGraph(projectId, iri, {
@@ -78,6 +85,10 @@ export function useGraphData({
           maxNodes: 50,
         }, accessToken)
         .then((newData) => {
+          // Drop stale responses from a previous graph context
+          if (graphEpoch.current !== epoch || !expandingNodes.current.has(iri)) return;
+
+          expandingNodes.current.delete(iri);
           expandedNodes.current.add(iri);
           setGraphData((prev) => {
             if (!prev) return newData;
@@ -102,7 +113,7 @@ export function useGraphData({
           });
         })
         .catch(() => {
-          // Expansion failed — node stays retryable
+          expandingNodes.current.delete(iri);
         });
     },
     [graphData, projectId, branch, accessToken, showDescendants],
