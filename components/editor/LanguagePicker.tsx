@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useId } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Command } from "cmdk";
 import { ChevronDown } from "lucide-react";
 import { langToFlag } from "@/lib/utils";
@@ -40,7 +40,15 @@ function stripDiacritics(s: string): string {
 export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const listId = useId();
+  const [listboxId, setListboxId] = useState<string | undefined>();
+
+  // Capture the cmdk-generated listbox id via ref callback
+  const listRefCallback = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      const listbox = node.querySelector('[role="listbox"]');
+      setListboxId(listbox?.id || undefined);
+    }
+  }, []);
 
   // Close on outside click
   useEffect(() => {
@@ -82,7 +90,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
         aria-label="Language tag"
         aria-expanded={open}
         aria-haspopup="listbox"
-        aria-controls={open ? listId : undefined}
+        aria-controls={open ? listboxId : undefined}
         title={langInfo ? `${langInfo.name} (${langInfo.nativeName})` : value || "Select language"}
         className="flex w-14 items-center justify-center gap-0.5 rounded-md border border-slate-300 bg-white px-1 py-1.5 text-xs text-slate-700 hover:border-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
       >
@@ -92,7 +100,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-700">
+        <div ref={listRefCallback} className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-700">
           <Command
             filter={(value, search) => {
               const lang = ALL_LANGUAGES.find((l) => l.code === value);
@@ -111,7 +119,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
                 className="w-full bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden dark:text-white dark:placeholder:text-slate-500"
               />
             </div>
-            <Command.List id={listId} role="listbox" className="max-h-60 overflow-y-auto py-1">
+            <Command.List className="max-h-60 overflow-y-auto py-1">
               <Command.Empty className="py-3 text-center text-xs text-slate-500 dark:text-slate-400">
                 No matching languages
               </Command.Empty>

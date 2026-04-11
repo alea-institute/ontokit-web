@@ -17,8 +17,8 @@ describe("languageCodes", () => {
     }
   });
 
-  it("ALL_LANGUAGES has no duplicate codes", () => {
-    const codes = ALL_LANGUAGES.map((l) => l.code);
+  it("ALL_LANGUAGES has no duplicate codes (case-insensitive)", () => {
+    const codes = ALL_LANGUAGES.map((l) => l.code.toLowerCase());
     expect(new Set(codes).size).toBe(codes.length);
   });
 
