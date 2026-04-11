@@ -57,11 +57,12 @@ vi.mock("@/lib/hooks/useGraphData", () => ({
   useGraphData: (...args: unknown[]) => mockUseGraphData(...args),
 }));
 
+let mockIsLayouting = false;
 vi.mock("@/lib/graph/useELKLayout", () => ({
   useELKLayout: () => ({
     nodes: [],
     edges: [],
-    isLayouting: false,
+    get isLayouting() { return mockIsLayouting; },
     runLayout: mockRunLayout,
   }),
 }));
@@ -119,6 +120,7 @@ const defaultProps = {
 describe("OntologyGraph", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockIsLayouting = false;
     mockUseGraphData.mockReturnValue(defaultReturn);
   });
 
@@ -232,12 +234,13 @@ describe("OntologyGraph", () => {
   // --- Passes correct options to useGraphData ---
 
   it("passes correct options to useGraphData", () => {
-    render(<OntologyGraph {...defaultProps} />);
+    render(<OntologyGraph {...defaultProps} accessToken="test-token-123" />);
     expect(mockUseGraphData).toHaveBeenCalledWith(
       expect.objectContaining({
         focusIri: "iri:Class1",
         projectId: "proj-1",
         branch: "main",
+        accessToken: "test-token-123",
       })
     );
   });
@@ -277,9 +280,16 @@ describe("OntologyGraph", () => {
 
   // --- isLayouting spinner ---
 
-  // Note: isLayouting comes from useELKLayout which is statically mocked as false.
-  // The "Computing layout..." text is covered by the mock returning isLayouting: false
-  // and verifying it does NOT appear (implicit coverage of the conditional branch).
+  it("shows 'Computing layout...' when isLayouting is true", () => {
+    mockIsLayouting = true;
+    render(<OntologyGraph {...defaultProps} />);
+    expect(screen.getByText("Computing layout...")).toBeDefined();
+  });
+
+  it("does not show 'Computing layout...' when isLayouting is false", () => {
+    render(<OntologyGraph {...defaultProps} />);
+    expect(screen.queryByText("Computing layout...")).toBeNull();
+  });
 
   // --- Node click callback ---
 
