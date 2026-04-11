@@ -23,19 +23,19 @@ describe("graphApi", () => {
       await graphApi.getEntityGraph("proj-1", "urn:test:Class1");
 
       expect(mockGet).toHaveBeenCalledWith(
-        `/api/v1/projects/proj-1/ontology/classes/${encodeURIComponent("urn:test:Class1")}/graph`,
+        `/api/v1/projects/proj-1/ontology/classes/graph`,
         expect.any(Object),
       );
     });
 
-    it("encodes class IRI in the URL", async () => {
+    it("passes class IRI as query param", async () => {
       mockGet.mockResolvedValue({ nodes: [], edges: [] });
 
       const iri = "http://example.org/ontology#MyClass";
       await graphApi.getEntityGraph("proj-1", iri);
 
-      const url = mockGet.mock.calls[0][0];
-      expect(url).toContain(encodeURIComponent(iri));
+      const config = mockGet.mock.calls[0]?.[1] as { params: Record<string, unknown> };
+      expect(config.params.class_iri).toBe(iri);
     });
 
     it("passes branch as query param", async () => {

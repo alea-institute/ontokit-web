@@ -50,9 +50,10 @@ export const graphApi = {
     options: FetchGraphOptions = {},
   ) =>
     api.get<EntityGraphResponse>(
-      `/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}/graph`,
+      `/api/v1/projects/${projectId}/ontology/classes/graph`,
       {
         params: {
+          class_iri: classIri,
           branch: options.branch,
           ancestors_depth: options.ancestorsDepth,
           descendants_depth: options.descendantsDepth,
