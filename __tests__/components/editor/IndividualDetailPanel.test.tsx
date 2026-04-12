@@ -56,7 +56,7 @@ vi.mock("@/components/editor/LanguagePicker", () => ({
       data-testid="lang-picker"
       aria-label="Language tag"
       value={value}
-      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
+      onChange={(e) => onChange((e.target as HTMLSelectElement).value)}
     >
       <option value="en">en</option>
       <option value="de">de</option>
