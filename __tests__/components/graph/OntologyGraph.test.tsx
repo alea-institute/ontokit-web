@@ -48,6 +48,8 @@ vi.mock("@xyflow/react", () => ({
   BackgroundVariant: { Dots: "dots" },
   useNodesState: (initial: unknown[]) => [initial || [], vi.fn(), vi.fn()],
   useEdgesState: (initial: unknown[]) => [initial || [], vi.fn(), vi.fn()],
+  ReactFlowProvider: ({ children }: { children?: React.ReactNode }) => <>{children}</>,
+  useReactFlow: () => ({ setCenter: vi.fn() }),
 }));
 /* eslint-enable @typescript-eslint/no-explicit-any */
 

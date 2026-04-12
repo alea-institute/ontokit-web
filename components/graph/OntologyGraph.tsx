@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   MiniMap,
   Controls,
   Background,
   BackgroundVariant,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   type Node,
   type Edge,
   type ColorMode,
@@ -129,13 +131,22 @@ function LegendEdgeItem({
   );
 }
 
-export function OntologyGraph({
+export function OntologyGraph(props: OntologyGraphProps) {
+  return (
+    <ReactFlowProvider>
+      <OntologyGraphInner {...props} />
+    </ReactFlowProvider>
+  );
+}
+
+function OntologyGraphInner({
   focusIri,
   projectId,
   branch,
   accessToken,
   onNavigateToClass,
 }: OntologyGraphProps) {
+  const { setCenter } = useReactFlow();
   const {
     graphData,
     isLoading,
@@ -188,6 +199,19 @@ export function OntologyGraph({
     setEdges(layoutEdges);
   }, [layoutNodes, layoutEdges, setNodes, setEdges]);
 
+  // Track last expanded node to center viewport after layout
+  const lastExpandedIdRef = useRef<string | null>(null);
+
+  // Center viewport on the expanded node after layout completes
+  useEffect(() => {
+    if (!lastExpandedIdRef.current || layoutNodes.length === 0) return;
+    const target = layoutNodes.find((n) => n.id === lastExpandedIdRef.current);
+    if (target) {
+      setCenter(target.position.x + 90, target.position.y + 22, { duration: 300, zoom: 1 });
+    }
+    lastExpandedIdRef.current = null;
+  }, [layoutNodes, setCenter]);
+
   // Click-delay guard: distinguish single click (expand) from double click (navigate)
   const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -196,6 +220,7 @@ export function OntologyGraph({
       if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
       clickTimerRef.current = setTimeout(() => {
         clickTimerRef.current = null;
+        lastExpandedIdRef.current = node.id;
         expandNode(node.id);
       }, 200);
     },
