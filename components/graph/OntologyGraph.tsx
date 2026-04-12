@@ -193,11 +193,12 @@ function OntologyGraphInner({
     });
   }, [graphData, direction, runLayout, setNodes, setEdges]);
 
-  // Sync layout results to React Flow state
+  // Sync layout results to React Flow state (skip if graph was cleared)
   useEffect(() => {
+    if (!graphData || graphData.nodes.length === 0) return;
     setNodes(layoutNodes);
     setEdges(layoutEdges);
-  }, [layoutNodes, layoutEdges, setNodes, setEdges]);
+  }, [layoutNodes, layoutEdges, setNodes, setEdges, graphData]);
 
   // Track last expanded node to center viewport after layout
   const lastExpandedIdRef = useRef<string | null>(null);
