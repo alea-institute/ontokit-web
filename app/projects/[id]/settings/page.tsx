@@ -261,7 +261,7 @@ export default function ProjectSettingsPage() {
   }, [joinRequestsQuery.data]);
 
   const githubTokenStatusQuery = useQuery({
-    queryKey: ["githubTokenStatus"],
+    queryKey: ["githubTokenStatus", session?.user?.id],
     queryFn: () => userSettingsApi.getGitHubTokenStatus(session!.accessToken!),
     enabled: !!canManage && !!session?.accessToken,
     retry: false,
