@@ -60,8 +60,10 @@ const mockedListPending = suggestionsApi.listPending as ReturnType<typeof vi.fn>
 
 function createWrapper() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return ({ children }: { children: ReactNode }) =>
-    React.createElement(QueryClientProvider, { client: qc }, children);
+  function Wrapper({ children }: { children: ReactNode }) {
+    return React.createElement(QueryClientProvider, { client: qc }, children);
+  }
+  return Wrapper;
 }
 
 beforeEach(() => {
