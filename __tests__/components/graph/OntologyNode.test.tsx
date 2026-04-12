@@ -177,4 +177,16 @@ describe("OntologyNode", () => {
     const btn = screen.getByRole("button");
     expect(btn.getAttribute("aria-label")).toBe("TestClass");
   });
+
+  it("uses Top/Bottom handle positions for TB layout (default)", () => {
+    render(<OntologyNode {...makeProps()} />);
+    expect(screen.getByTestId("handle-target").getAttribute("data-position")).toBe("top");
+    expect(screen.getByTestId("handle-source").getAttribute("data-position")).toBe("bottom");
+  });
+
+  it("uses Left/Right handle positions for LR layout", () => {
+    render(<OntologyNode {...makeProps({ layoutDirection: "LR" })} />);
+    expect(screen.getByTestId("handle-target").getAttribute("data-position")).toBe("left");
+    expect(screen.getByTestId("handle-source").getAttribute("data-position")).toBe("right");
+  });
 });

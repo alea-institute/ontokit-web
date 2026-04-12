@@ -246,4 +246,41 @@ describe("useELKLayout", () => {
       expect(node.type).toBe("ontologyNode");
     }
   });
+
+  it("normalizes secondary_root node_type to root", async () => {
+    const data = makeGraphResponse(2);
+    data.nodes[1].node_type = "secondary_root";
+    const { result } = renderHook(() => useELKLayout());
+
+    await act(async () => {
+      await result.current.runLayout(data);
+    });
+
+    expect(result.current.nodes[1].data.nodeType).toBe("root");
+  });
+
+  it("falls back to class for unknown node_type", async () => {
+    const data = makeGraphResponse(2);
+    data.nodes[1].node_type = "bogus_type";
+    const { result } = renderHook(() => useELKLayout());
+
+    await act(async () => {
+      await result.current.runLayout(data);
+    });
+
+    expect(result.current.nodes[1].data.nodeType).toBe("class");
+  });
+
+  it("falls back to subClassOf for unknown edge_type", async () => {
+    const data = makeGraphResponse(2);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (data.edges[0] as any).edge_type = "unknownRelation";
+    const { result } = renderHook(() => useELKLayout());
+
+    await act(async () => {
+      await result.current.runLayout(data);
+    });
+
+    expect(result.current.edges[0].data!.edgeType).toBe("subClassOf");
+  });
 });

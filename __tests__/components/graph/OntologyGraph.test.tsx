@@ -349,6 +349,15 @@ describe("OntologyGraph", () => {
     expect(colors.external).toBe("#e2e8f0");
     expect(colors.other).toBe("#d1d5db");
   });
+
+  // --- Edge style toggle ---
+
+  it("calls setGraphEdgeStyle when edge style button is clicked", () => {
+    render(<OntologyGraph {...defaultProps} />);
+    const edgeStyleBtn = screen.getByLabelText("Switch to bezier edges");
+    fireEvent.click(edgeStyleBtn);
+    expect(mockSetGraphEdgeStyle).toHaveBeenCalledWith("bezier");
+  });
 });
 
 describe("GraphLegend", () => {
