@@ -17,9 +17,8 @@ import {
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { ArrowDown, ArrowRight, ChevronDown, ChevronUp, RotateCcw, Spline, CornerDownRight } from "lucide-react";
+import { ArrowDown, ArrowRight, ChevronDown, ChevronUp, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useGraphData } from "@/lib/hooks/useGraphData";
 import { useELKLayout, NODE_WIDTH, NODE_HEIGHT, type LayoutDirection } from "@/lib/graph/useELKLayout";
 import { OntologyNode } from "./OntologyNode";
@@ -58,7 +57,8 @@ function GraphLegend() {
             <div className="grid grid-cols-2 gap-x-3 gap-y-1">
               <LegendNodeItem color="border-2 border-primary-500 bg-primary-50 dark:bg-primary-950/40" label="Focus" />
               <LegendNodeItem color="border border-slate-300 bg-white dark:bg-slate-800" label="Class" />
-              <LegendNodeItem color="border-[3px] border-red-500 bg-red-50 dark:bg-red-950/30" label="Root ancestor" />
+              <LegendNodeItem color="border-[3px] border-red-500 bg-red-50 dark:bg-red-950/30" label="Primary root" />
+              <LegendNodeItem color="border-2 border-slate-500 bg-slate-100 dark:bg-slate-700" label="Branch root" />
               <LegendNodeItem color="border border-pink-300 bg-pink-50 dark:bg-pink-950/30" label="Individual" badge="I" badgeColor="bg-pink-200 text-pink-700 dark:bg-pink-900/50 dark:text-pink-300" />
               <LegendNodeItem color="border border-blue-300 bg-blue-50 dark:bg-blue-950/30" label="Property" badge="P" badgeColor="bg-blue-200 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300" />
               <LegendNodeItem color="border border-slate-200 bg-slate-50 dark:bg-slate-900" label="External" />
@@ -159,8 +159,6 @@ function OntologyGraphInner({
 
   const [direction, setDirection] = useState<LayoutDirection>("TB");
   const toggleDirection = useCallback(() => setDirection((d) => (d === "TB" ? "LR" : "TB")), []);
-  const graphEdgeStyle = useEditorModeStore((s) => s.graphEdgeStyle);
-  const setGraphEdgeStyle = useEditorModeStore((s) => s.setGraphEdgeStyle);
   const { nodes: layoutNodes, edges: layoutEdges, isLayouting, runLayout } = useELKLayout();
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -296,21 +294,6 @@ function OntologyGraphInner({
           <RotateCcw className="h-3.5 w-3.5" />
           Reset
         </button>
-        <button
-          onClick={() => setGraphEdgeStyle(graphEdgeStyle === "bezier" ? "smoothstep" : "bezier")}
-          className={cn(
-            "flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
-            "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700",
-          )}
-          aria-label={`Switch to ${graphEdgeStyle === "bezier" ? "smooth step" : "bezier"} edges`}
-        >
-          {graphEdgeStyle === "bezier" ? (
-            <Spline className="h-3.5 w-3.5" />
-          ) : (
-            <CornerDownRight className="h-3.5 w-3.5" />
-          )}
-          {graphEdgeStyle === "bezier" ? "Bezier" : "Smooth Step"}
-        </button>
         {isLayouting && (
           <span className="flex items-center gap-1 text-xs text-slate-400">
             <span className="inline-block h-3 w-3 animate-spin rounded-full border border-slate-300 border-t-blue-600" />
@@ -330,6 +313,21 @@ function OntologyGraphInner({
 
       {/* Graph */}
       <div className="relative flex-1">
+        <svg style={{ position: "absolute", width: 0, height: 0 }}>
+          <defs>
+            <marker
+              id="arrow-slate"
+              viewBox="0 0 10 10"
+              refX="10"
+              refY="5"
+              markerWidth="6"
+              markerHeight="6"
+              orient="auto-start-reverse"
+            >
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8" />
+            </marker>
+          </defs>
+        </svg>
         {isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-slate-900/60">
             <div className="flex items-center gap-2">
@@ -371,6 +369,7 @@ function OntologyGraphInner({
               const nodeType = node.data?.nodeType;
               if (nodeType === "focus") return "#3b82f6";
               if (nodeType === "root") return "#ef4444";
+              if (nodeType === "secondary_root") return "#64748b";
               if (nodeType === "property") return "#93c5fd";
               if (nodeType === "individual") return "#f9a8d4";
               if (nodeType === "external") return "#e2e8f0";
