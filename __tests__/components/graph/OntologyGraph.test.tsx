@@ -4,12 +4,6 @@ import type { EntityGraphResponse } from "@/lib/api/graph";
 
 // ── Mocks ──────────────────────────────────────────────────────────
 
-const mockSetGraphEdgeStyle = vi.fn();
-vi.mock("@/lib/stores/editorModeStore", () => ({
-  useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ graphEdgeStyle: "smoothstep", setGraphEdgeStyle: mockSetGraphEdgeStyle }),
-}));
-
 const mockUseGraphData = vi.fn();
 const mockRunLayout = vi.fn().mockResolvedValue(undefined);
 
@@ -33,6 +27,7 @@ vi.mock("@xyflow/react", () => ({
             {JSON.stringify({
               focus: nodeColorFn({ data: { nodeType: "focus" } }),
               root: nodeColorFn({ data: { nodeType: "root" } }),
+              secondary_root: nodeColorFn({ data: { nodeType: "secondary_root" } }),
               property: nodeColorFn({ data: { nodeType: "property" } }),
               individual: nodeColorFn({ data: { nodeType: "individual" } }),
               external: nodeColorFn({ data: { nodeType: "external" } }),
@@ -344,19 +339,18 @@ describe("OntologyGraph", () => {
     const colors = JSON.parse(colorsEl.textContent!);
     expect(colors.focus).toBe("#3b82f6");
     expect(colors.root).toBe("#ef4444");
+    expect(colors.secondary_root).toBe("#64748b");
     expect(colors.property).toBe("#93c5fd");
     expect(colors.individual).toBe("#f9a8d4");
     expect(colors.external).toBe("#e2e8f0");
     expect(colors.other).toBe("#d1d5db");
   });
 
-  // --- Edge style toggle ---
+  // --- Edge style (bezier only, no toggle) ---
 
-  it("calls setGraphEdgeStyle when edge style button is clicked", () => {
+  it("does not render an edge style toggle button", () => {
     render(<OntologyGraph {...defaultProps} />);
-    const edgeStyleBtn = screen.getByLabelText("Switch to bezier edges");
-    fireEvent.click(edgeStyleBtn);
-    expect(mockSetGraphEdgeStyle).toHaveBeenCalledWith("bezier");
+    expect(screen.queryByLabelText(/Switch to.*edges/)).toBeNull();
   });
 });
 
@@ -389,7 +383,8 @@ describe("GraphLegend", () => {
     fireEvent.click(screen.getByLabelText("Expand legend"));
     expect(screen.getByText("Focus")).toBeDefined();
     expect(screen.getByText("Class")).toBeDefined();
-    expect(screen.getByText("Root ancestor")).toBeDefined();
+    expect(screen.getByText("Primary root")).toBeDefined();
+    expect(screen.getByText("Branch root")).toBeDefined();
     expect(screen.getByText("Individual")).toBeDefined();
     expect(screen.getByText("Property")).toBeDefined();
     expect(screen.getByText("External")).toBeDefined();

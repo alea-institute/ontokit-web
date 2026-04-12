@@ -2,12 +2,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { Position } from "@xyflow/react";
 
-let mockGraphEdgeStyle = "smoothstep";
-vi.mock("@/lib/stores/editorModeStore", () => ({
-  useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ graphEdgeStyle: mockGraphEdgeStyle }),
-}));
-
 import { OntologyEdge } from "@/components/graph/OntologyEdge";
 
 vi.mock("@xyflow/react", () => ({
@@ -22,7 +16,6 @@ vi.mock("@xyflow/react", () => ({
   EdgeLabelRenderer: ({ children }: { children: React.ReactNode }) => (
     <div data-testid="edge-label-renderer">{children}</div>
   ),
-  getSmoothStepPath: (): [string, number, number] => ["M0,0 L10,10 L20,20 L30,30", 15, 15],
   getBezierPath: (): [string, number, number] => ["M0,0 C10,10 20,20 30,30", 15, 15],
   Position: { Top: "top", Bottom: "bottom", Left: "left", Right: "right" },
 }));
@@ -63,14 +56,24 @@ describe("OntologyEdge", () => {
     expect(edge.style.strokeDasharray).toBeFalsy();
   });
 
-  it("passes markerEnd prop through to BaseEdge", () => {
+  it("uses config-based markerEnd for subClassOf edges", () => {
     render(
       <svg>
-        <OntologyEdge {...baseProps} markerEnd="url(#test-marker)" />
+        <OntologyEdge {...baseProps} data={{ edgeType: "subClassOf" }} />
       </svg>
     );
     const edge = screen.getByTestId("base-edge-edge-1");
-    expect(edge.getAttribute("data-marker-end")).toBe("url(#test-marker)");
+    expect(edge.getAttribute("data-marker-end")).toBe("url(#arrow-slate)");
+  });
+
+  it("does not apply markerEnd for non-subClassOf edges", () => {
+    render(
+      <svg>
+        <OntologyEdge {...baseProps} data={{ edgeType: "seeAlso" }} />
+      </svg>
+    );
+    const edge = screen.getByTestId("base-edge-edge-1");
+    expect(edge.getAttribute("data-marker-end")).toBe("");
   });
 
   it("renders with equivalentClass edge type", () => {
@@ -187,8 +190,7 @@ describe("OntologyEdge", () => {
     expect(hoverPath?.getAttribute("stroke-width")).toBe("16");
   });
 
-  it("renders with bezier path when graphEdgeStyle is bezier", () => {
-    mockGraphEdgeStyle = "bezier";
+  it("always renders with bezier path", () => {
     render(
       <svg>
         <OntologyEdge {...baseProps} />
@@ -197,6 +199,5 @@ describe("OntologyEdge", () => {
     const edge = screen.getByTestId("base-edge-edge-1");
     // getBezierPath mock returns a cubic bezier path
     expect(edge.getAttribute("d")).toBe("M0,0 C10,10 20,20 30,30");
-    mockGraphEdgeStyle = "smoothstep";
   });
 });

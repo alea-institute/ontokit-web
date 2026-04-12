@@ -257,7 +257,7 @@ describe("useELKLayout", () => {
     }
   });
 
-  it("normalizes secondary_root node_type to root", async () => {
+  it("preserves secondary_root node_type as distinct type", async () => {
     const data = makeGraphResponse(2);
     data.nodes[1].node_type = "secondary_root";
     const { result } = renderHook(() => useELKLayout());
@@ -266,7 +266,28 @@ describe("useELKLayout", () => {
       await result.current.runLayout(data);
     });
 
-    expect(result.current.nodes[1].data.nodeType).toBe("root");
+    expect(result.current.nodes[1].data.nodeType).toBe("secondary_root");
+  });
+
+  it("pins root and secondary_root nodes to the first ELK layer", async () => {
+    const data = makeGraphResponse(3);
+    data.nodes[1].node_type = "root";
+    data.nodes[2].node_type = "secondary_root";
+    const { result } = renderHook(() => useELKLayout());
+
+    await act(async () => {
+      await result.current.runLayout(data);
+    });
+
+    // Check that the ELK layout call included layerConstraint for root nodes
+    const rootElkNode = lastElkLayoutCall.children.find((c: { id: string }) => c.id === "urn:node-1");
+    const secRootElkNode = lastElkLayoutCall.children.find((c: { id: string }) => c.id === "urn:node-2");
+    expect(rootElkNode.layoutOptions?.["elk.layered.layering.layerConstraint"]).toBe("FIRST");
+    expect(secRootElkNode.layoutOptions?.["elk.layered.layering.layerConstraint"]).toBe("FIRST");
+
+    // Non-root node should NOT have the constraint
+    const focusElkNode = lastElkLayoutCall.children.find((c: { id: string }) => c.id === "urn:node-0");
+    expect(focusElkNode.layoutOptions).toBeUndefined();
   });
 
   it("falls back to class for unknown node_type", async () => {

@@ -20,13 +20,11 @@ export const NODE_WIDTH = 180;
 export const NODE_HEIGHT = 44;
 
 const VALID_NODE_TYPES = new Set<GraphNodeType>([
-  "focus", "class", "root", "individual", "property", "external", "unexplored",
+  "focus", "class", "root", "secondary_root", "individual", "property", "external", "unexplored",
 ]);
 
 function normalizeNodeType(raw: string | undefined): GraphNodeType {
   if (raw && VALID_NODE_TYPES.has(raw as GraphNodeType)) return raw as GraphNodeType;
-  // Map backend-specific values to closest frontend type
-  if (raw === "secondary_root") return "root";
   return "class";
 }
 
@@ -58,6 +56,10 @@ export function useELKLayout(): LayoutResult {
           id: n.id,
           width: Math.max(NODE_WIDTH, n.label.length * 7.5 + 32),
           height: NODE_HEIGHT,
+          // Pin root nodes to the first layer so they align at the top
+          ...(n.node_type === "root" || n.node_type === "secondary_root"
+            ? { layoutOptions: { "elk.layered.layering.layerConstraint": "FIRST" } }
+            : {}),
         }));
 
         const elkEdges = data.edges.map((e) => ({
