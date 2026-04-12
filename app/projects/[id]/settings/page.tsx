@@ -159,6 +159,7 @@ export default function ProjectSettingsPage() {
   // Background job state
   const [normalizationJobId, setNormalizationJobId] = useState<string | null>(null);
   const [normalizationJobStatus, setNormalizationJobStatus] = useState<string | null>(null);
+  const normalizationPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Ontology index status via React Query
   const {
@@ -175,11 +176,14 @@ export default function ProjectSettingsPage() {
   const [isReindexing, setIsReindexing] = useState(false);
   const reindexPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Clean up reindex polling on unmount
+  // Clean up polling on unmount
   useEffect(() => {
     return () => {
       if (reindexPollRef.current) {
         clearInterval(reindexPollRef.current);
+      }
+      if (normalizationPollRef.current) {
+        clearInterval(normalizationPollRef.current);
       }
     };
   }, []);
@@ -744,8 +748,8 @@ export default function ProjectSettingsPage() {
         setNormalizationJobStatus("queued");
         setSuccessMessage("Normalization job queued - processing in background...");
 
-        // Poll for completion
-        const pollInterval = setInterval(async () => {
+        // Poll for completion (ref-based so useEffect cleanup can cancel)
+        normalizationPollRef.current = setInterval(async () => {
           try {
             const jobStatus = await normalizationApi.getJobStatus(
               project.id,
@@ -756,7 +760,8 @@ export default function ProjectSettingsPage() {
             setNormalizationJobStatus(jobStatus.status);
 
             if (jobStatus.status === "complete") {
-              clearInterval(pollInterval);
+              clearInterval(normalizationPollRef.current!);
+              normalizationPollRef.current = null;
               setNormalizationJobId(null);
               setNormalizationJobStatus(null);
               setIsRunningNormalization(false);
@@ -768,7 +773,8 @@ export default function ProjectSettingsPage() {
               setSuccessMessage("Normalization completed successfully");
               setTimeout(() => setSuccessMessage(null), 3000);
             } else if (jobStatus.status === "failed" || jobStatus.status === "not_found") {
-              clearInterval(pollInterval);
+              clearInterval(normalizationPollRef.current!);
+              normalizationPollRef.current = null;
               setNormalizationJobId(null);
               setNormalizationJobStatus(null);
               setIsRunningNormalization(false);
@@ -779,9 +785,6 @@ export default function ProjectSettingsPage() {
             console.error("Error polling job status:", pollErr);
           }
         }, 2000); // Poll every 2 seconds
-
-        // Cleanup on unmount
-        return () => clearInterval(pollInterval);
       }
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Failed to run normalization");
