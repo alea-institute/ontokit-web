@@ -72,7 +72,7 @@ export function useGraphData({
         ancestorsDepth: 5,
         descendantsDepth: showAllDescendants ? 2 : 1,
       }, accessToken),
-    enabled: !!focusIri,
+    enabled: !!focusIri && !!accessToken,
     staleTime: 30_000,
   });
 

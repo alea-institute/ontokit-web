@@ -76,7 +76,7 @@ describe("useGraphData", () => {
 
   it("returns null graphData when focusIri is null", () => {
     const { result } = renderHook(
-      () => useGraphData({ focusIri: null, projectId: "proj-1" }),
+      () => useGraphData({ focusIri: null, projectId: "proj-1", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
@@ -85,12 +85,22 @@ describe("useGraphData", () => {
     expect(mockGetEntityGraph).not.toHaveBeenCalled();
   });
 
-  it("fetches graph data when focusIri is provided", async () => {
+  it("does not fetch when accessToken is missing", () => {
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      { wrapper: createWrapper() },
+    );
+
+    expect(result.current.graphData).toBeNull();
+    expect(mockGetEntityGraph).not.toHaveBeenCalled();
+  });
+
+  it("fetches graph data when focusIri and accessToken are provided", async () => {
     const response = makeGraphResponse();
     mockGetEntityGraph.mockResolvedValue(response);
 
     const { result } = renderHook(
-      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", branch: "main" }),
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", branch: "main", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
@@ -102,7 +112,7 @@ describe("useGraphData", () => {
       branch: "main",
       ancestorsDepth: 5,
       descendantsDepth: 1,
-    }, undefined);
+    }, "tok");
   });
 
   it("passes descendantsDepth=2 when showAllDescendants is toggled", async () => {
@@ -110,7 +120,7 @@ describe("useGraphData", () => {
     mockGetEntityGraph.mockResolvedValue(response);
 
     const { result } = renderHook(
-      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
@@ -127,7 +137,7 @@ describe("useGraphData", () => {
         branch: undefined,
         ancestorsDepth: 5,
         descendantsDepth: 2,
-      }, undefined);
+      }, "tok");
     });
   });
 
@@ -135,7 +145,7 @@ describe("useGraphData", () => {
     mockGetEntityGraph.mockRejectedValue(new Error("Network error"));
 
     const { result } = renderHook(
-      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
@@ -192,7 +202,7 @@ describe("useGraphData", () => {
       .mockResolvedValueOnce(expansion);
 
     const { result } = renderHook(
-      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
@@ -220,7 +230,7 @@ describe("useGraphData", () => {
     mockGetEntityGraph.mockResolvedValue(response);
 
     const { result } = renderHook(
-      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
@@ -271,7 +281,7 @@ describe("useGraphData", () => {
       .mockResolvedValueOnce(expansion);
 
     const { result } = renderHook(
-      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
@@ -304,7 +314,7 @@ describe("useGraphData", () => {
       .mockResolvedValueOnce(expansion);
 
     const { result } = renderHook(
-      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
@@ -320,8 +330,7 @@ describe("useGraphData", () => {
       expect(mockGetEntityGraph.mock.calls.length).toBe(callsBefore + 1);
     });
 
-    // Second expand of same node — should be skipped because expandedNodes.current
-    // was updated in the .then() callback, which has resolved by the time waitFor above passed.
+    // Second expand of same node — should be skipped
     act(() => { result.current.expandNode("urn:parent"); });
     expect(mockGetEntityGraph.mock.calls.length).toBe(callsBefore + 1);
   });
@@ -330,7 +339,7 @@ describe("useGraphData", () => {
     mockGetEntityGraph.mockRejectedValue(new Error("fail"));
 
     const { result } = renderHook(
-      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
@@ -349,7 +358,7 @@ describe("useGraphData", () => {
     mockGetEntityGraph.mockResolvedValue(response);
 
     const { result } = renderHook(
-      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1" }),
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", accessToken: "tok" }),
       { wrapper: createWrapper() },
     );
 
