@@ -18,8 +18,10 @@ import {
 const JOB_POLL_INTERVAL = 2000; // 2 seconds
 
 export const remoteSyncQueryKeys = {
-  config: (projectId: string) => ["remoteSync", "config", projectId] as const,
-  history: (projectId: string) => ["remoteSync", "history", projectId] as const,
+  config: (projectId: string, accessToken?: string) =>
+    ["remoteSync", "config", projectId, accessToken] as const,
+  history: (projectId: string, accessToken?: string) =>
+    ["remoteSync", "history", projectId, accessToken] as const,
 };
 
 interface UseRemoteSyncOptions {
@@ -64,28 +66,28 @@ export function useRemoteSync({
 
   // Fetch config via React Query
   const configQuery = useQuery({
-    queryKey: remoteSyncQueryKeys.config(projectId),
+    queryKey: remoteSyncQueryKeys.config(projectId, accessToken),
     queryFn: () => remoteSyncApi.getConfig(projectId, accessToken),
-    enabled: !!projectId && enabled,
+    enabled: !!projectId && enabled && !!accessToken,
   });
 
-  // Fetch history via React Query (only when config exists)
+  // Fetch history via React Query (only when config exists and loaded)
   const historyQuery = useQuery({
-    queryKey: remoteSyncQueryKeys.history(projectId),
+    queryKey: remoteSyncQueryKeys.history(projectId, accessToken),
     queryFn: async () => {
       const data = await remoteSyncApi.getHistory(projectId, 20, accessToken);
       return data.items;
     },
-    enabled: !!projectId && enabled && !!configQuery.data,
+    enabled: !!projectId && enabled && !!accessToken && configQuery.isSuccess && !!configQuery.data,
   });
 
   // Invalidate both queries
   const refetchAll = useCallback(async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: remoteSyncQueryKeys.config(projectId) }),
-      queryClient.invalidateQueries({ queryKey: remoteSyncQueryKeys.history(projectId) }),
+      queryClient.invalidateQueries({ queryKey: remoteSyncQueryKeys.config(projectId, accessToken) }),
+      queryClient.invalidateQueries({ queryKey: remoteSyncQueryKeys.history(projectId, accessToken) }),
     ]);
-  }, [queryClient, projectId]);
+  }, [queryClient, projectId, accessToken]);
 
   // Poll for job status
   const startPolling = useCallback(
@@ -151,7 +153,7 @@ export function useRemoteSync({
     mutationFn: (data: RemoteSyncConfigCreate | RemoteSyncConfigUpdate) =>
       remoteSyncApi.saveConfig(projectId, data, accessToken!),
     onSuccess: (updated) => {
-      queryClient.setQueryData(remoteSyncQueryKeys.config(projectId), updated);
+      queryClient.setQueryData(remoteSyncQueryKeys.config(projectId, accessToken), updated);
     },
   });
 
@@ -174,8 +176,8 @@ export function useRemoteSync({
   const deleteConfigMutation = useMutation({
     mutationFn: () => remoteSyncApi.deleteConfig(projectId, accessToken!),
     onSuccess: () => {
-      queryClient.setQueryData(remoteSyncQueryKeys.config(projectId), null);
-      queryClient.setQueryData(remoteSyncQueryKeys.history(projectId), []);
+      queryClient.setQueryData(remoteSyncQueryKeys.config(projectId, accessToken), null);
+      queryClient.setQueryData(remoteSyncQueryKeys.history(projectId, accessToken), []);
     },
   });
 
@@ -191,15 +193,16 @@ export function useRemoteSync({
     }
   }, [accessToken, deleteConfigMutation]);
 
-  // Combine errors: prefer check/mutation errors, then fallback to query error
+  // Combine errors: prefer check/mutation errors, then history, then config
   const error =
     checkError ??
+    (historyQuery.error instanceof Error ? historyQuery.error.message : null) ??
     (configQuery.error instanceof Error ? configQuery.error.message : null);
 
   return {
     config: configQuery.data ?? null,
     history: historyQuery.data ?? [],
-    isLoading: configQuery.isLoading,
+    isLoading: configQuery.isLoading || historyQuery.isLoading,
     isChecking,
     error,
     triggerCheck,
