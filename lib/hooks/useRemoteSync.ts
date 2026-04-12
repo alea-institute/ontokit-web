@@ -158,7 +158,9 @@ export function useRemoteSync({
   });
 
   const saveConfigRef = useRef(saveConfigMutation.mutateAsync);
-  saveConfigRef.current = saveConfigMutation.mutateAsync;
+  useEffect(() => {
+    saveConfigRef.current = saveConfigMutation.mutateAsync;
+  }, [saveConfigMutation.mutateAsync]);
 
   const saveConfig = useCallback(
     async (data: RemoteSyncConfigCreate | RemoteSyncConfigUpdate) => {
@@ -185,7 +187,9 @@ export function useRemoteSync({
   });
 
   const deleteConfigRef = useRef(deleteConfigMutation.mutateAsync);
-  deleteConfigRef.current = deleteConfigMutation.mutateAsync;
+  useEffect(() => {
+    deleteConfigRef.current = deleteConfigMutation.mutateAsync;
+  }, [deleteConfigMutation.mutateAsync]);
 
   const deleteConfig = useCallback(async () => {
     if (!accessToken) return;
