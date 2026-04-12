@@ -33,12 +33,15 @@ jobs:
       - uses: ./.github/actions/setup-node
       - run: npm run test:coverage -- --run --reporter=junit --outputFile=test-report.junit.xml
       - uses: codecov/codecov-action@v6
+        if: ${{ !cancelled() }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: ${{ github.actor != 'dependabot[bot]' }}
       - uses: codecov/test-results-action@v1
         if: ${{ !cancelled() }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: ${{ github.actor != 'dependabot[bot]' }}
 
   build:
     runs-on: ubuntu-latest
