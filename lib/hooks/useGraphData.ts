@@ -27,28 +27,37 @@ function mergeExpansions(
 ): EntityGraphResponse {
   if (expansions.length === 0) return base;
 
-  let result = base;
+  const nodeIds = new Set(base.nodes.map((n) => n.id));
+  const edgeIds = new Set(base.edges.map((e) => e.id));
+  const mergedNodes = [...base.nodes];
+  const mergedEdges = [...base.edges];
+  let truncated = base.truncated;
+  let totalConceptCount = base.total_concept_count;
+
   for (const expansion of expansions) {
-    const existingNodeIds = new Set(result.nodes.map((n) => n.id));
-    const existingEdgeIds = new Set(result.edges.map((e) => e.id));
-    result = {
-      ...result,
-      nodes: [
-        ...result.nodes,
-        ...expansion.nodes.filter((n) => !existingNodeIds.has(n.id)),
-      ],
-      edges: [
-        ...result.edges,
-        ...expansion.edges.filter((e) => !existingEdgeIds.has(e.id)),
-      ],
-      truncated: result.truncated || expansion.truncated,
-      total_concept_count: Math.max(
-        result.total_concept_count,
-        expansion.total_concept_count,
-      ),
-    };
+    for (const node of expansion.nodes) {
+      if (!nodeIds.has(node.id)) {
+        nodeIds.add(node.id);
+        mergedNodes.push(node);
+      }
+    }
+    for (const edge of expansion.edges) {
+      if (!edgeIds.has(edge.id)) {
+        edgeIds.add(edge.id);
+        mergedEdges.push(edge);
+      }
+    }
+    truncated = truncated || expansion.truncated;
+    totalConceptCount = Math.max(totalConceptCount, expansion.total_concept_count);
   }
-  return result;
+
+  return {
+    ...base,
+    nodes: mergedNodes,
+    edges: mergedEdges,
+    truncated,
+    total_concept_count: totalConceptCount,
+  };
 }
 
 export function useGraphData({

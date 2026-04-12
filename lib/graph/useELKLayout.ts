@@ -16,8 +16,8 @@ interface LayoutResult {
   runLayout: (data: EntityGraphResponse, direction?: LayoutDirection) => Promise<void>;
 }
 
-const NODE_WIDTH = 180;
-const NODE_HEIGHT = 44;
+export const NODE_WIDTH = 180;
+export const NODE_HEIGHT = 44;
 
 const VALID_NODE_TYPES = new Set<GraphNodeType>([
   "focus", "class", "root", "individual", "property", "external", "unexplored",

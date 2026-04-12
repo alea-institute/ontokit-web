@@ -9,10 +9,15 @@ let deferredLayout: {
   promise: Promise<unknown>;
 } | null = null;
 
+// Capture the last ELK layout call for assertions
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let lastElkLayoutCall: any = null;
+
 // Mock elkjs to avoid loading the actual WASM module
 vi.mock("elkjs/lib/elk.bundled.js", () => ({
   default: class MockELK {
     async layout(graph: { children: Array<{ id: string; width: number; height: number }>; edges: Array<{ id: string }> }) {
+      lastElkLayoutCall = graph;
       const result = {
         children: graph.children.map((child, idx) => ({
           ...child,
@@ -61,6 +66,8 @@ function makeGraphResponse(nodeCount = 3): EntityGraphResponse {
 describe("useELKLayout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    deferredLayout = null;
+    lastElkLayoutCall = null;
   });
 
   it("starts with empty nodes and edges", () => {
@@ -125,15 +132,18 @@ describe("useELKLayout", () => {
 
   it("calculates dynamic node width from label length", async () => {
     const data = makeGraphResponse(1);
-    data.nodes[0].label = "A very long label for testing width";
+    const longLabel = "A very long label for testing width";
+    data.nodes[0].label = longLabel;
     const { result } = renderHook(() => useELKLayout());
 
     await act(async () => {
       await result.current.runLayout(data);
     });
 
-    // Node should exist and have been laid out
     expect(result.current.nodes).toHaveLength(1);
+    // Verify the formula: Math.max(180, label.length * 7.5 + 32)
+    const expectedWidth = Math.max(180, longLabel.length * 7.5 + 32);
+    expect(lastElkLayoutCall.children[0].width).toBe(expectedWidth);
   });
 
   it("adds arrowhead marker for subClassOf edges", async () => {

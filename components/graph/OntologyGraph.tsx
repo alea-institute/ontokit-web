@@ -21,7 +21,7 @@ import { ArrowDown, ArrowRight, ChevronDown, ChevronUp, RotateCcw, Spline, Corne
 import { cn } from "@/lib/utils";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useGraphData } from "@/lib/hooks/useGraphData";
-import { useELKLayout, type LayoutDirection } from "@/lib/graph/useELKLayout";
+import { useELKLayout, NODE_WIDTH, NODE_HEIGHT, type LayoutDirection } from "@/lib/graph/useELKLayout";
 import { OntologyNode } from "./OntologyNode";
 import { OntologyEdge } from "./OntologyEdge";
 
@@ -207,7 +207,7 @@ function OntologyGraphInner({
     if (!lastExpandedIdRef.current || layoutNodes.length === 0) return;
     const target = layoutNodes.find((n) => n.id === lastExpandedIdRef.current);
     if (target) {
-      setCenter(target.position.x + 90, target.position.y + 22, { duration: 300, zoom: 1 });
+      setCenter(target.position.x + NODE_WIDTH / 2, target.position.y + NODE_HEIGHT / 2, { duration: 300, zoom: 1 });
     }
     lastExpandedIdRef.current = null;
   }, [layoutNodes, setCenter]);
