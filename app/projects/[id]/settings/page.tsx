@@ -595,8 +595,8 @@ export default function ProjectSettingsPage() {
     setProcessingJoinRequest(requestId);
     try {
       await joinRequestApi.approve(project.id, requestId, session.accessToken);
-      setJoinRequests(joinRequests.filter((jr) => jr.id !== requestId));
-      setJoinRequestCount(Math.max(0, joinRequestCount - 1));
+      setJoinRequests(prev => prev.filter((jr) => jr.id !== requestId));
+      setJoinRequestCount(prev => Math.max(0, prev - 1));
       // Refresh member list + project via React Query (refetches in background)
       queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
       queryClient.invalidateQueries({ queryKey: projectKey });
@@ -616,8 +616,8 @@ export default function ProjectSettingsPage() {
     setProcessingJoinRequest(requestId);
     try {
       await joinRequestApi.decline(project.id, requestId, session.accessToken);
-      setJoinRequests(joinRequests.filter((jr) => jr.id !== requestId));
-      setJoinRequestCount(Math.max(0, joinRequestCount - 1));
+      setJoinRequests(prev => prev.filter((jr) => jr.id !== requestId));
+      setJoinRequestCount(prev => Math.max(0, prev - 1));
       setSuccessMessage("Join request declined");
       setTimeout(() => setSuccessMessage(null), 3000);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
