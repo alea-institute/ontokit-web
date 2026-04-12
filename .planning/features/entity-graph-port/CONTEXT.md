@@ -22,7 +22,7 @@ This is a standalone feature — separate from the v0.4.0 LLM-Assisted Ontology 
 
 ### Backend graph endpoint
 - **D-04:** Add a server-side BFS graph building endpoint to ontokit-api, ported from folio-mapper's `build_entity_graph()` in `folio_service.py`
-- **D-05:** Endpoint signature: `GET /api/v1/projects/{id}/ontology/graph/{class_iri}?ancestors_depth=5&descendants_depth=2&max_nodes=200&include_see_also=true` — client call: `graphApi.getEntityGraph(projectId, focusIri, { ancestorsDepth, descendantsDepth, maxNodes, includeSeeAlso })`
+- **D-05:** Endpoint signature: `GET /api/v1/projects/{projectId}/ontology/classes/graph?class_iri={iri}&ancestors_depth=5&descendants_depth=1&max_nodes=200&include_see_also=true` — client call: `graphApi.getEntityGraph(projectId, focusIri, { ancestorsDepth, descendantsDepth, maxNodes, includeSeeAlso }, accessToken)`
 - **D-06:** Returns `EntityGraphResponse` with nodes, edges, truncation flag, and total concept count
 - **D-07:** Full stack in one feature — backend endpoint + frontend components ship together
 
@@ -71,29 +71,31 @@ This is a standalone feature — separate from the v0.4.0 LLM-Assisted Ontology 
 **Downstream agents MUST read these before planning or implementing.**
 
 ### folio-mapper source (port from)
-- `/home/damienriehl/Coding Projects/folio-mapper/packages/ui/src/components/mapping/graph/EntityGraph.tsx` — Main graph component to port
-- `/home/damienriehl/Coding Projects/folio-mapper/packages/ui/src/components/mapping/graph/ConceptNode.tsx` — Custom node renderer to port
-- `/home/damienriehl/Coding Projects/folio-mapper/packages/ui/src/components/mapping/graph/HierarchyEdge.tsx` — Custom edge renderer to port
-- `/home/damienriehl/Coding Projects/folio-mapper/packages/ui/src/components/mapping/graph/useELKLayout.ts` — Layout hook to port
-- `/home/damienriehl/Coding Projects/folio-mapper/packages/ui/src/components/mapping/EntityGraphModal.tsx` — Full-screen modal to port
-- `/home/damienriehl/Coding Projects/folio-mapper/packages/core/src/folio/graph-types.ts` — Type definitions to adapt
-- `/home/damienriehl/Coding Projects/folio-mapper/packages/core/src/folio/api-client.ts` — `fetchEntityGraph()` function to adapt
-- `/home/damienriehl/Coding Projects/folio-mapper/backend/app/models/graph_models.py` — Backend data models to port
-- `/home/damienriehl/Coding Projects/folio-mapper/backend/app/services/folio_service.py` lines 861-1024 — `build_entity_graph()` BFS to port
-- `/home/damienriehl/Coding Projects/folio-mapper/backend/app/routers/mapping.py` — REST endpoint to port
+Repository: `alea-institute/folio-mapper` (private)
+- `packages/ui/src/components/mapping/graph/EntityGraph.tsx` — Main graph component (ported)
+- `packages/ui/src/components/mapping/graph/ConceptNode.tsx` — Custom node renderer (ported)
+- `packages/ui/src/components/mapping/graph/HierarchyEdge.tsx` — Custom edge renderer (ported)
+- `packages/ui/src/components/mapping/graph/useELKLayout.ts` — Layout hook (ported)
+- `packages/ui/src/components/mapping/EntityGraphModal.tsx` — Full-screen modal (ported)
+- `packages/core/src/folio/graph-types.ts` — Type definitions (adapted)
+- `packages/core/src/folio/api-client.ts` — `fetchEntityGraph()` function (adapted)
+- `backend/app/models/graph_models.py` — Backend data models (ported)
+- `backend/app/services/folio_service.py` lines 861-1024 — `build_entity_graph()` BFS (ported)
+- `backend/app/routers/mapping.py` — REST endpoint (ported)
 
 ### ontokit-web (replace/enhance)
-- `components/graph/OntologyGraph.tsx` — Current graph component (will be replaced)
-- `components/graph/OntologyNode.tsx` — Current node renderer (node types to preserve)
-- `components/graph/OntologyEdge.tsx` — Current edge renderer (edge types to preserve)
-- `lib/graph/types.ts` — Current type definitions (node/edge type unions to preserve)
-- `lib/graph/buildGraphData.ts` — Current client-side builder (will be replaced by backend endpoint)
-- `lib/graph/elkLayout.ts` — Current ELK layout (will be replaced by folio-mapper's useELKLayout)
-- `lib/hooks/useGraphData.ts` — Current data hook (will be replaced)
+- `components/graph/OntologyGraph.tsx` — Graph component (replaced with server-side BFS)
+- `components/graph/OntologyNode.tsx` — Node renderer (node types preserved)
+- `components/graph/OntologyEdge.tsx` — Edge renderer (edge types preserved)
+- `lib/graph/types.ts` — Type definitions (node/edge type unions preserved)
+- `lib/graph/useELKLayout.ts` — ELK layout hook (replaced elkLayout.ts)
+- `lib/hooks/useGraphData.ts` — Data hook (replaced with React Query)
+- `lib/api/graph.ts` — API client for server-side BFS endpoint (new)
+- `components/graph/EntityGraphModal.tsx` — Full-screen graph overlay (new)
 - `components/editor/standard/StandardEditorLayout.tsx` — Integration point for inline graph
 
 ### ontokit-api (backend target)
-- ontokit-api repo at `/home/damienriehl/Coding Projects/ontokit-api-folio/` or canonical CatholicOS repo — target for new BFS endpoint
+- Repository: `CatholicOS/ontokit-api` — see CatholicOS/ontokit-api#37 for BFS endpoint
 
 </canonical_refs>
 
