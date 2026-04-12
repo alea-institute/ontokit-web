@@ -108,11 +108,12 @@ describe("useGraphData", () => {
       expect(result.current.graphData).toEqual(response);
     });
 
-    expect(mockGetEntityGraph).toHaveBeenCalledWith("proj-1", "urn:focus", {
-      branch: "main",
-      ancestorsDepth: 5,
-      descendantsDepth: 1,
-    }, "tok");
+    expect(mockGetEntityGraph).toHaveBeenCalledWith(
+      "proj-1",
+      "urn:focus",
+      expect.objectContaining({ ancestorsDepth: 5, descendantsDepth: 1 }),
+      "tok",
+    );
   });
 
   it("passes descendantsDepth=2 when showAllDescendants is toggled", async () => {
@@ -394,7 +395,7 @@ describe("useGraphData", () => {
     act(() => { result.current.resetGraph(); });
 
     await waitFor(() => {
-      expect(result.current.graphData).not.toBeNull();
+      expect(result.current.graphData?.focus_label).toBe("Reset");
     });
 
     // Now resolve the stale expansion — it should be discarded

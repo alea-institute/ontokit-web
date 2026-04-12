@@ -33,6 +33,7 @@ const defaultProps = {
 describe("EntityGraphModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedOnNavigateToClass = undefined;
   });
 
   afterEach(() => {
@@ -155,8 +156,10 @@ describe("EntityGraphModal", () => {
     );
 
     expect(focusables.length).toBeGreaterThan(1);
-    // Focus the first element and press Tab (not at last) — should not prevent default
-    focusables[0].focus();
+    // Focus a non-first, non-last element — should not prevent default
+    // If only 2 elements, focus the first (Tab forward from first is not trapped)
+    const mid = focusables.length > 2 ? Math.floor(focusables.length / 2) : 0;
+    focusables[mid].focus();
     const event = new KeyboardEvent("keydown", { key: "Tab", bubbles: true });
     const preventSpy = vi.spyOn(event, "preventDefault");
     document.dispatchEvent(event);
