@@ -53,13 +53,17 @@ export function useRemoteSync({
   const [checkError, setCheckError] = useState<string | null>(null);
 
   const jobIdRef = useRef<string | null>(null);
-  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const accessTokenRef = useRef(accessToken);
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
 
   // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
+        clearTimeout(pollTimerRef.current);
       }
     };
   }, []);
@@ -89,31 +93,28 @@ export function useRemoteSync({
     ]);
   }, [queryClient, projectId, accessToken]);
 
-  // Poll for job status
+  // Poll for job status using recursive setTimeout to prevent overlapping calls
   const startPolling = useCallback(
     (jobId: string) => {
       if (pollTimerRef.current) {
-        clearInterval(pollTimerRef.current);
+        clearTimeout(pollTimerRef.current);
       }
 
       jobIdRef.current = jobId;
       setIsChecking(true);
 
-      pollTimerRef.current = setInterval(async () => {
+      const poll = async () => {
         if (!jobIdRef.current) return;
 
         try {
           const status = await remoteSyncApi.getJobStatus(
             projectId,
             jobIdRef.current,
-            accessToken,
+            accessTokenRef.current,
           );
 
           if (status.status === "complete" || status.status === "failed") {
-            if (pollTimerRef.current) {
-              clearInterval(pollTimerRef.current);
-              pollTimerRef.current = null;
-            }
+            pollTimerRef.current = null;
             jobIdRef.current = null;
             setIsChecking(false);
 
@@ -123,13 +124,19 @@ export function useRemoteSync({
 
             // Refresh data after job completes
             await refetchAll();
+            return;
           }
         } catch {
           // Polling error — keep trying
         }
-      }, JOB_POLL_INTERVAL);
+
+        // Schedule next tick only after the current one completes
+        pollTimerRef.current = setTimeout(poll, JOB_POLL_INTERVAL);
+      };
+
+      pollTimerRef.current = setTimeout(poll, JOB_POLL_INTERVAL);
     },
-    [projectId, accessToken, refetchAll],
+    [projectId, refetchAll],
   );
 
   // Trigger a manual check
