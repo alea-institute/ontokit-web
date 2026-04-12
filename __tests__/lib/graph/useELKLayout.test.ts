@@ -3,11 +3,17 @@ import { renderHook, act } from "@testing-library/react";
 import { useELKLayout } from "@/lib/graph/useELKLayout";
 import type { EntityGraphResponse } from "@/lib/api/graph";
 
+// Hook for deferred layout tests — when set, layout() returns this promise instead
+let deferredLayout: {
+  resolve: (v: unknown) => void;
+  promise: Promise<unknown>;
+} | null = null;
+
 // Mock elkjs to avoid loading the actual WASM module
 vi.mock("elkjs/lib/elk.bundled.js", () => ({
   default: class MockELK {
     async layout(graph: { children: Array<{ id: string; width: number; height: number }>; edges: Array<{ id: string }> }) {
-      return {
+      const result = {
         children: graph.children.map((child, idx) => ({
           ...child,
           x: idx * 200,
@@ -15,6 +21,8 @@ vi.mock("elkjs/lib/elk.bundled.js", () => ({
         })),
         edges: graph.edges,
       };
+      if (deferredLayout) return deferredLayout.promise.then(() => result);
+      return result;
     }
   },
 }));
@@ -183,16 +191,34 @@ describe("useELKLayout", () => {
   });
 
   it("sets isLayouting during layout computation", async () => {
+    let resolve!: (v: unknown) => void;
+    deferredLayout = {
+      promise: new Promise((r) => { resolve = r; }),
+      resolve: null!,
+    };
+    deferredLayout.resolve = resolve;
+
     const data = makeGraphResponse(2);
     const { result } = renderHook(() => useELKLayout());
 
     expect(result.current.isLayouting).toBe(false);
 
+    let layoutPromise: Promise<void>;
+    act(() => {
+      layoutPromise = result.current.runLayout(data);
+    });
+
+    // While the deferred promise is pending, isLayouting should be true
+    expect(result.current.isLayouting).toBe(true);
+
+    // Resolve the layout and wait for completion
     await act(async () => {
-      await result.current.runLayout(data);
+      deferredLayout!.resolve(undefined);
+      await layoutPromise!;
     });
 
     expect(result.current.isLayouting).toBe(false);
+    deferredLayout = null;
   });
 
   it("assigns ontologyEdge type to all edges", async () => {
