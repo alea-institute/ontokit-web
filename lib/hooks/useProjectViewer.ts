@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
-import { pullRequestsApi } from "@/lib/api/pullRequests";
-import { lintApi, type LintSummary } from "@/lib/api/lint";
-import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
+import { useOpenPRCount } from "@/lib/hooks/useOpenPRCount";
+import { useLintSummary } from "@/lib/hooks/useLintSummary";
+import { useNormalizationStatus } from "@/lib/hooks/useNormalizationStatus";
+import { usePendingSuggestionCount } from "@/lib/hooks/usePendingSuggestionCount";
 import { revisionsApi } from "@/lib/api/revisions";
-import { suggestionsApi } from "@/lib/api/suggestions";
 import type { TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import type { IriPosition } from "@/lib/editor/indexWorker";
 
@@ -35,11 +35,19 @@ export function useProjectViewer({
   // Override hasValidAccess to check session status (not just token presence)
   const hasValidAccess = sessionStatus === "authenticated" && !!accessToken;
 
-  // Secondary data state
-  const [openPRCount, setOpenPRCount] = useState(0);
-  const [pendingSuggestionCount, setPendingSuggestionCount] = useState(0);
-  const [lintSummary, setLintSummary] = useState<LintSummary | null>(null);
-  const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
+  // Secondary data via React Query hooks
+  const { data: openPRCount = 0 } = useOpenPRCount(projectId, accessToken);
+  const { data: lintSummary = null } = useLintSummary(projectId, accessToken);
+  const { data: normalizationStatus = null } = useNormalizationStatus(
+    projectId,
+    accessToken,
+    { enabled: !!project?.source_file_path },
+  );
+  const { data: pendingSuggestionCount = 0 } = usePendingSuggestionCount(
+    projectId,
+    accessToken,
+    { enabled: !!canEdit },
+  );
 
   // Source state
   const [sourceContent, setSourceContent] = useState<string>("");
@@ -64,31 +72,6 @@ export function useProjectViewer({
     projectId,
     enabled: !!projectId && sessionStatus !== "loading",
   });
-
-  // Fetch secondary data once project is loaded
-  useEffect(() => {
-    if (!project) return;
-    pullRequestsApi.list(projectId, accessToken, "open", undefined, 0, 1)
-      .then((res) => setOpenPRCount(res.total))
-      .catch(() => { /* ignore */ });
-    lintApi.getStatus(projectId, accessToken)
-      .then((summary) => setLintSummary(summary))
-      .catch(() => { /* ignore */ });
-    if (project.source_file_path) {
-      normalizationApi.getStatus(projectId, accessToken)
-        .then((status) => setNormalizationStatus(status))
-        .catch(() => { /* ignore */ });
-    }
-  }, [project, projectId, accessToken]);
-
-  // Fetch pending suggestion count for editors/admins
-  useEffect(() => {
-    if (!canEdit || !accessToken) return;
-    suggestionsApi
-      .listPending(projectId, accessToken)
-      .then((res) => setPendingSuggestionCount(res.items.length))
-      .catch(() => { /* ignore — endpoint may not exist yet */ });
-  }, [canEdit, projectId, accessToken]);
 
   // Derive fallback data for the selected node from the tree
   const { selectedIri, nodes } = tree;
