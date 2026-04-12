@@ -137,7 +137,7 @@ export default function ProjectSettingsPage() {
   const {
     data: normalizationQueryData,
   } = useNormalizationStatus(projectId, session?.accessToken, {
-    enabled: !!project?.source_file_path,
+    enabled: !!project?.source_file_path && !!session?.accessToken,
   });
   // Local normalization state (for optimistic updates during dry run / normalization)
   const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
@@ -164,7 +164,7 @@ export default function ProjectSettingsPage() {
   const {
     data: indexQueryData,
   } = useIndexStatus(projectId, session?.accessToken, {
-    enabled: !!project?.source_file_path,
+    enabled: !!project?.source_file_path && !!session?.accessToken,
   });
   // Local index state (for optimistic updates during reindex)
   const [indexStatus, setIndexStatus] = useState<IndexStatusResponse | null>(null);
