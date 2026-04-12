@@ -620,9 +620,10 @@ export default function ProjectSettingsPage() {
       await joinRequestApi.approve(project.id, requestId, session.accessToken);
       setJoinRequests(prev => prev.filter((jr) => jr.id !== requestId));
       setJoinRequestCount(prev => Math.max(0, prev - 1));
-      // Refresh member list + project via React Query (refetches in background)
+      // Refresh member list, project, and join requests via React Query
       queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
       queryClient.invalidateQueries({ queryKey: projectKey });
+      queryClient.invalidateQueries({ queryKey: ["joinRequests", projectId] });
       setSuccessMessage("Join request approved — user added as suggester");
       setTimeout(() => setSuccessMessage(null), 3000);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
@@ -641,6 +642,7 @@ export default function ProjectSettingsPage() {
       await joinRequestApi.decline(project.id, requestId, session.accessToken);
       setJoinRequests(prev => prev.filter((jr) => jr.id !== requestId));
       setJoinRequestCount(prev => Math.max(0, prev - 1));
+      queryClient.invalidateQueries({ queryKey: ["joinRequests", projectId] });
       setSuccessMessage("Join request declined");
       setTimeout(() => setSuccessMessage(null), 3000);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
@@ -2119,6 +2121,11 @@ function WebhookConfigPanel({
       onIntegrationUpdate(updated);
       // Clear state when disabling
       if (!updated.webhooks_enabled) {
+        // Cancel any pending auto-setup from a prior enable
+        if (webhookSetupTimerRef.current) {
+          clearTimeout(webhookSetupTimerRef.current);
+          webhookSetupTimerRef.current = null;
+        }
         setWebhookSecret(null);
         setWebhookUrl(null);
         setWebhookStatus("unknown");
