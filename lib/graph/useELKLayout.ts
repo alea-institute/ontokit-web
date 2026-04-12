@@ -92,6 +92,7 @@ export function useELKLayout(): LayoutResult {
                 childCount: backendNode.child_count ?? undefined,
                 deprecated: false,
                 isExpanded: false,
+                layoutDirection: direction,
               },
             };
           },

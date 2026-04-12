@@ -13,6 +13,7 @@ export interface OntologyNodeData {
   deprecated?: boolean;
   childCount?: number;
   isExpanded?: boolean;
+  layoutDirection?: "TB" | "LR";
   onNavigate?: (iri: string) => void;
   onExpandNode?: (iri: string) => void;
 }
@@ -53,7 +54,9 @@ export const OntologyNode = memo(function OntologyNode({
   data,
   id,
 }: OntologyNodeProps) {
-  const { label, nodeType, deprecated, childCount, isExpanded, onNavigate, onExpandNode } = data;
+  const { label, nodeType, deprecated, childCount, isExpanded, layoutDirection, onNavigate, onExpandNode } = data;
+  const targetPosition = layoutDirection === "LR" ? Position.Left : Position.Top;
+  const sourcePosition = layoutDirection === "LR" ? Position.Right : Position.Bottom;
 
   const handleClick = () => {
     if (nodeType === "external") return;
@@ -90,7 +93,7 @@ export const OntologyNode = memo(function OntologyNode({
       onKeyDown={handleKeyDown}
       aria-label={`${label}${nodeType === "unexplored" ? " (click to expand)" : ""}`}
     >
-      <Handle type="target" position={Position.Top} className="bg-slate-400! w-2! h-2! border-0!" />
+      <Handle type="target" position={targetPosition} className="bg-slate-400! w-2! h-2! border-0!" />
 
       <div className="flex items-center gap-1.5">
         {typeBadge[nodeType] && (
@@ -128,7 +131,7 @@ export const OntologyNode = memo(function OntologyNode({
         </span>
       )}
 
-      <Handle type="source" position={Position.Bottom} className="bg-slate-400! w-2! h-2! border-0!" />
+      <Handle type="source" position={sourcePosition} className="bg-slate-400! w-2! h-2! border-0!" />
     </div>
   );
 });
