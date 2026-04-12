@@ -682,7 +682,7 @@ export default function ProjectSettingsPage() {
     try {
       const status = await normalizationApi.getStatus(project.id, session.accessToken);
       setNormalizationStatus(status);
-      queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId) });
+      queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId, session.accessToken) });
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Failed to check normalization status");
     } finally {
@@ -764,7 +764,7 @@ export default function ProjectSettingsPage() {
               // Refresh status
               const newStatus = await normalizationApi.getStatus(project.id, session.accessToken);
               setNormalizationStatus(newStatus);
-              queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId) });
+              queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId, session.accessToken) });
               setSuccessMessage("Normalization completed successfully");
               setTimeout(() => setSuccessMessage(null), 3000);
             } else if (jobStatus.status === "failed" || jobStatus.status === "not_found") {
