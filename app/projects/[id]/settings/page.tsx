@@ -12,7 +12,7 @@ function isHttpUrl(url: string): boolean {
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, UserPlus, Trash2, Tag, Check, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff, Database, ExternalLink } from "lucide-react";
 import { GithubIcon as Github } from "@/components/icons/github";
@@ -224,36 +224,49 @@ export default function ProjectSettingsPage() {
     }
   }, [project]);
 
-  // Fetch admin-only data (PR settings, join requests, GitHub token status) when project loads
-  // Use derived booleans as deps to avoid re-firing on every query refetch
+  // Admin-only data via React Query (replaces manual useEffect fetch)
   const isPublic = project?.is_public;
+
+  const prSettingsQuery = useQuery({
+    queryKey: ["prSettings", projectId, session?.accessToken],
+    queryFn: () => prSettingsApi.get(projectId, session!.accessToken!),
+    enabled: !!canManage && !!session?.accessToken,
+    retry: false,
+  });
   useEffect(() => {
-    if (!canManage || !session?.accessToken) return;
-
-    // PR settings + GitHub integration
-    prSettingsApi.get(projectId, session.accessToken)
-      .then((prSettingsData) => {
-        setPrSettings(prSettingsData);
-        setGithubIntegration(prSettingsData.github_integration || null);
-        setPrApprovalRequired(prSettingsData.pr_approval_required);
-      })
-      .catch(() => { /* PR settings may not be available */ });
-
-    // Join requests for public projects
-    if (isPublic) {
-      joinRequestApi.list(projectId, session.accessToken)
-        .then((jrData) => {
-          setJoinRequests(jrData.items);
-          setJoinRequestCount(jrData.total);
-        })
-        .catch(() => { /* ignore */ });
+    if (prSettingsQuery.data) {
+      setPrSettings(prSettingsQuery.data);
+      setGithubIntegration(prSettingsQuery.data.github_integration || null);
+      setPrApprovalRequired(prSettingsQuery.data.pr_approval_required);
     }
+  }, [prSettingsQuery.data]);
 
-    // GitHub token status
-    userSettingsApi.getGitHubTokenStatus(session.accessToken)
-      .then((tokenStatus) => setHasGithubToken(tokenStatus.has_token))
-      .catch(() => setHasGithubToken(false));
-  }, [canManage, isPublic, projectId, session?.accessToken]);
+  const joinRequestsQuery = useQuery({
+    queryKey: ["joinRequests", projectId, session?.accessToken],
+    queryFn: () => joinRequestApi.list(projectId, session!.accessToken!),
+    enabled: !!isPublic && !!canManage && !!session?.accessToken,
+    retry: false,
+  });
+  useEffect(() => {
+    if (joinRequestsQuery.data) {
+      setJoinRequests(joinRequestsQuery.data.items);
+      setJoinRequestCount(joinRequestsQuery.data.total);
+    }
+  }, [joinRequestsQuery.data]);
+
+  const githubTokenStatusQuery = useQuery({
+    queryKey: ["githubTokenStatus", session?.accessToken],
+    queryFn: () => userSettingsApi.getGitHubTokenStatus(session!.accessToken!),
+    enabled: !!canManage && !!session?.accessToken,
+    retry: false,
+  });
+  useEffect(() => {
+    if (githubTokenStatusQuery.data) {
+      setHasGithubToken(githubTokenStatusQuery.data.has_token);
+    } else if (githubTokenStatusQuery.isError) {
+      setHasGithubToken(false);
+    }
+  }, [githubTokenStatusQuery.data, githubTokenStatusQuery.isError]);
 
   // Handle unauthenticated state
   useEffect(() => {
