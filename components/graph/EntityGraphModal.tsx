@@ -32,8 +32,15 @@ export function EntityGraphModal({
   useEffect(() => {
     previousFocusRef.current = document.activeElement;
 
-    // Focus the dialog container
-    dialogRef.current?.focus();
+    // Focus the first focusable element, or fall back to the dialog container
+    const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    );
+    if (firstFocusable) {
+      firstFocusable.focus();
+    } else {
+      dialogRef.current?.focus();
+    }
 
     return () => {
       // Restore focus on unmount
@@ -61,7 +68,7 @@ export function EntityGraphModal({
         const last = focusable[focusable.length - 1];
         // When length === 1, first === last — both branches below keep focus on the single element
 
-        if (e.shiftKey && document.activeElement === first) {
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === dialogRef.current)) {
           e.preventDefault();
           last.focus();
         } else if (!e.shiftKey && document.activeElement === last) {
