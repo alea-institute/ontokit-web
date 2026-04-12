@@ -659,7 +659,7 @@ export default function ProjectSettingsPage() {
             clearInterval(reindexPollRef.current!);
             reindexPollRef.current = null;
             setIsReindexing(false);
-            queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId) });
+            queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, session.accessToken) });
           }
         } catch {
           clearInterval(reindexPollRef.current!);
