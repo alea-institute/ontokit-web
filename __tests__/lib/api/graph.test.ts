@@ -101,6 +101,24 @@ describe("graphApi", () => {
       expect(result).toEqual(mockResponse);
     });
 
+    it("sends Authorization header when token is provided", async () => {
+      mockGet.mockResolvedValue({ nodes: [], edges: [] });
+
+      await graphApi.getEntityGraph("proj-1", "urn:c", {}, "my-token");
+
+      const config = mockGet.mock.calls[0]?.[1] as { headers?: Record<string, string> };
+      expect(config.headers?.Authorization).toBe("Bearer my-token");
+    });
+
+    it("omits Authorization header when no token is provided", async () => {
+      mockGet.mockResolvedValue({ nodes: [], edges: [] });
+
+      await graphApi.getEntityGraph("proj-1", "urn:c");
+
+      const config = mockGet.mock.calls[0]?.[1] as { headers?: Record<string, string> };
+      expect(config.headers).toBeUndefined();
+    });
+
     it("propagates API errors", async () => {
       mockGet.mockRejectedValue(new Error("Network error"));
 

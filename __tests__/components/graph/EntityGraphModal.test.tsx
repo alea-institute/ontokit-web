@@ -95,10 +95,11 @@ describe("EntityGraphModal", () => {
 
   // --- Focus management ---
 
-  it("focuses the dialog on mount", () => {
+  it("focuses the first focusable element on mount", () => {
     render(<EntityGraphModal {...defaultProps} />);
-    const dialog = screen.getByRole("dialog");
-    expect(document.activeElement).toBe(dialog);
+    // The close button is the first focusable element in the dialog
+    const closeBtn = screen.getByLabelText("Close graph modal");
+    expect(document.activeElement).toBe(closeBtn);
   });
 
   it("restores focus on unmount", () => {

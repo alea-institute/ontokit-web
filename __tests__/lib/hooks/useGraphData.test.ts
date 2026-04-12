@@ -366,4 +366,47 @@ describe("useGraphData", () => {
       expect(result.current.resolvedCount).toBe(2);
     });
   });
+
+  it("discards stale expandNode response after resetGraph", async () => {
+    const initial = makeGraphResponse();
+    let resolveExpansion!: (v: EntityGraphResponse) => void;
+    const expansionPromise = new Promise<EntityGraphResponse>((r) => { resolveExpansion = r; });
+
+    mockGetEntityGraph
+      .mockResolvedValueOnce(initial) // initial fetch
+      .mockReturnValueOnce(expansionPromise); // deferred expansion
+
+    const { result } = renderHook(
+      () => useGraphData({ focusIri: "urn:focus", projectId: "proj-1", accessToken: "tok" }),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => {
+      expect(result.current.graphData).not.toBeNull();
+    });
+
+    // Start expansion (returns deferred promise)
+    act(() => { result.current.expandNode("urn:parent"); });
+
+    // Reset graph before expansion resolves — this bumps the epoch
+    const resetResponse = makeGraphResponse({ focus_label: "Reset" });
+    mockGetEntityGraph.mockResolvedValueOnce(resetResponse);
+    act(() => { result.current.resetGraph(); });
+
+    await waitFor(() => {
+      expect(result.current.graphData).not.toBeNull();
+    });
+
+    // Now resolve the stale expansion — it should be discarded
+    const staleExpansion = makeGraphResponse({
+      nodes: [
+        { id: "urn:stale", label: "Stale", iri: "urn:stale", definition: null, is_focus: false, is_root: false, depth: 1, node_type: "class", child_count: 0 },
+      ],
+      edges: [],
+    });
+    await act(async () => { resolveExpansion(staleExpansion); });
+
+    // Stale node should NOT appear in the graph
+    expect(result.current.graphData!.nodes.some((n) => n.id === "urn:stale")).toBe(false);
+  });
 });
