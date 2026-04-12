@@ -9,6 +9,6 @@ export function useLintSummary(projectId: string, accessToken?: string) {
   return useQuery({
     queryKey: lintQueryKeys.summary(projectId),
     queryFn: () => lintApi.getStatus(projectId, accessToken),
-    enabled: !!projectId,
+    enabled: !!projectId && !!accessToken,
   });
 }

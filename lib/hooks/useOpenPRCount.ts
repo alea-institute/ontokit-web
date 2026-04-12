@@ -12,6 +12,6 @@ export function useOpenPRCount(projectId: string, accessToken?: string) {
       const res = await pullRequestsApi.list(projectId, accessToken, "open", undefined, 0, 1);
       return res.total;
     },
-    enabled: !!projectId,
+    enabled: !!projectId && !!accessToken,
   });
 }

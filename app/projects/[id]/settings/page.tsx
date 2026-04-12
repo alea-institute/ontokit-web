@@ -30,6 +30,7 @@ import {
   type ProjectUpdate,
   type MemberCreate,
   type MemberUpdate,
+  type MemberListResponse,
   type TransferOwnership,
 } from "@/lib/api/projects";
 import { TurtleOutputPicker } from "@/components/projects/turtle-output-picker";
@@ -96,35 +97,25 @@ export default function ProjectSettingsPage() {
 
   const queryClient = useQueryClient();
 
-  // React Query hooks for initial data
+  // React Query hooks for data (single source of truth — no local mirrors)
   const {
-    project: projectData,
+    project,
     isLoading: isProjectLoading,
     error: projectError,
   } = useProject(projectId, session?.accessToken);
   const { data: membersData } = useMembers(projectId, session?.accessToken);
+  const members = membersData?.items ?? [];
 
-  // Local state seeded from React Query (allows optimistic updates in mutation handlers)
-  const [project, setProject] = useState<Project | null>(null);
-  const [members, setMembers] = useState<ProjectMember[]>([]);
-
-  // Sync local state from query data
-  useEffect(() => {
-    if (projectData) setProject(projectData);
-  }, [projectData]);
-  useEffect(() => {
-    if (membersData?.items) setMembers(membersData.items);
-  }, [membersData]);
+  // Stable query key for optimistic updates via setQueryData
+  const projectKey = projectQueryKeys.detail(projectId, !!session?.accessToken);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(projectError);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Sync project-level error from query
-  useEffect(() => {
-    if (projectError) setError(projectError);
-  }, [projectError]);
+  // Derive displayed error: local mutation errors take priority, then query errors
+  const error = localError || projectError || null;
 
   // Add member form state
   const [showAddMember, setShowAddMember] = useState(false);
@@ -218,6 +209,10 @@ export default function ProjectSettingsPage() {
   const isAuthenticated = status === "authenticated";
   const isLoading = isProjectLoading || status === "loading";
 
+  const canManage =
+    project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
+  const isOwner = project?.user_role === "owner";
+
   // Sync label preferences from project data
   useEffect(() => {
     if (project) {
@@ -226,10 +221,10 @@ export default function ProjectSettingsPage() {
   }, [project]);
 
   // Fetch admin-only data (PR settings, join requests, GitHub token status) when project loads
+  // Use derived booleans as deps to avoid re-firing on every query refetch
+  const isPublic = project?.is_public;
   useEffect(() => {
-    if (!project || !session?.accessToken) return;
-    const isAdmin = project.user_role === "owner" || project.user_role === "admin" || project.is_superadmin;
-    if (!isAdmin) return;
+    if (!canManage || !session?.accessToken) return;
 
     // PR settings + GitHub integration
     prSettingsApi.get(projectId, session.accessToken)
@@ -241,7 +236,7 @@ export default function ProjectSettingsPage() {
       .catch(() => { /* PR settings may not be available */ });
 
     // Join requests for public projects
-    if (project.is_public) {
+    if (isPublic) {
       joinRequestApi.list(projectId, session.accessToken)
         .then((jrData) => {
           setJoinRequests(jrData.items);
@@ -254,12 +249,12 @@ export default function ProjectSettingsPage() {
     userSettingsApi.getGitHubTokenStatus(session.accessToken)
       .then((tokenStatus) => setHasGithubToken(tokenStatus.has_token))
       .catch(() => setHasGithubToken(false));
-  }, [project, projectId, session?.accessToken]);
+  }, [canManage, isPublic, projectId, session?.accessToken]);
 
   // Handle unauthenticated state
   useEffect(() => {
     if (status !== "loading" && !isAuthenticated) {
-      setError("You must be signed in to access project settings");
+      setLocalError("You must be signed in to access project settings");
     }
   }, [status, isAuthenticated]);
 
@@ -276,10 +271,6 @@ export default function ProjectSettingsPage() {
     }
   }, [isLoading]);
 
-  const canManage =
-    project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
-  const isOwner = project?.user_role === "owner";
-
   // Remote sync hook
   const remoteSync = useRemoteSync({
     projectId,
@@ -291,13 +282,12 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsSaving(true);
-    setError(null);
+    setLocalError(null);
     setSuccessMessage(null);
 
     try {
       const updated = await projectApi.update(project.id, data as ProjectUpdate, session.accessToken);
-      setProject(updated);
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
+      queryClient.setQueryData<Project>(projectKey, updated);
       setSuccessMessage("Project settings saved successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -324,10 +314,12 @@ export default function ProjectSettingsPage() {
         memberData,
         session.accessToken
       );
-      setMembers([...members, newMember]);
-      setProject({ ...project, member_count: project.member_count + 1 });
-      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
+      queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+        old ? { ...old, items: [...old.items, newMember], total: old.total + 1 } : { items: [newMember], total: 1 }
+      );
+      queryClient.setQueryData<Project>(projectKey, (old) =>
+        old ? { ...old, member_count: old.member_count + 1 } : undefined
+      );
       setShowAddMember(false);
       setNewMemberUserId("");
       setNewMemberRole("suggester");
@@ -352,10 +344,11 @@ export default function ProjectSettingsPage() {
         data,
         session.accessToken
       );
-      setMembers(members.map((m) => (m.user_id === userId ? updated : m)));
-      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
+      queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+        old ? { ...old, items: old.items.map((m: ProjectMember) => m.user_id === userId ? updated : m) } : undefined
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update member role");
+      setLocalError(err instanceof Error ? err.message : "Failed to update member role");
     }
   };
 
@@ -364,17 +357,19 @@ export default function ProjectSettingsPage() {
 
     try {
       await projectApi.removeMember(project.id, userId, session.accessToken);
-      setMembers(members.filter((m) => m.user_id !== userId));
-      setProject({ ...project, member_count: project.member_count - 1 });
-      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
+      queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+        old ? { ...old, items: old.items.filter((m: ProjectMember) => m.user_id !== userId), total: old.total - 1 } : undefined
+      );
+      queryClient.setQueryData<Project>(projectKey, (old) =>
+        old ? { ...old, member_count: old.member_count - 1 } : undefined
+      );
 
       // If user removed themselves, redirect to projects
       if (userId === session.user?.id) {
         router.push("/");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove member");
+      setLocalError(err instanceof Error ? err.message : "Failed to remove member");
     }
   };
 
@@ -397,12 +392,12 @@ export default function ProjectSettingsPage() {
         { new_owner_id: userId } as TransferOwnership,
         session.accessToken
       );
-      setMembers(result.items);
+      queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+        old ? { ...old, items: result.items } : { items: result.items, total: result.items.length }
+      );
       // Refresh the project to get updated owner_id and user_role
       const updatedProject = await projectApi.get(project.id, session.accessToken);
-      setProject(updatedProject);
-      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
+      queryClient.setQueryData<Project>(projectKey, updatedProject);
       setSuccessMessage("Ownership transferred successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -421,25 +416,25 @@ export default function ProjectSettingsPage() {
             session.accessToken,
             true
           );
-          setMembers(result.items);
+          queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+            old ? { ...old, items: result.items } : { items: result.items, total: result.items.length }
+          );
           const updatedProject = await projectApi.get(project.id, session.accessToken);
-          setProject(updatedProject);
+          queryClient.setQueryData<Project>(projectKey, updatedProject);
           setGithubIntegration(null);
-          queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
-          queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
           setSuccessMessage(
             "Ownership transferred. GitHub integration was disconnected because the new owner has no GitHub token."
           );
           setTimeout(() => setSuccessMessage(null), 5000);
         } catch (retryErr) {
-          setError(
+          setLocalError(
             retryErr instanceof Error ? retryErr.message : "Failed to transfer ownership"
           );
         }
         return;
       }
 
-      setError(
+      setLocalError(
         err instanceof Error ? err.message : "Failed to transfer ownership"
       );
     }
@@ -455,7 +450,7 @@ export default function ProjectSettingsPage() {
       await projectApi.delete(project.id, session.accessToken);
       router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete project");
+      setLocalError(err instanceof Error ? err.message : "Failed to delete project");
       setIsDeleting(false);
     }
   };
@@ -465,7 +460,7 @@ export default function ProjectSettingsPage() {
 
     setIsSavingPreferences(true);
     setPreferencesSaved(false);
-    setError(null);
+    setLocalError(null);
 
     try {
       const updated = await projectApi.update(
@@ -473,12 +468,11 @@ export default function ProjectSettingsPage() {
         { label_preferences: labelPreferences },
         session.accessToken
       );
-      setProject(updated);
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
+      queryClient.setQueryData<Project>(projectKey, updated);
       setPreferencesSaved(true);
       setTimeout(() => setPreferencesSaved(false), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save label preferences");
+      setLocalError(err instanceof Error ? err.message : "Failed to save label preferences");
     } finally {
       setIsSavingPreferences(false);
     }
@@ -488,7 +482,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project || !selectedRepo) return;
 
     setIsSetupGitHub(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       const integration = await githubIntegrationApi.create(
@@ -511,7 +505,7 @@ export default function ProjectSettingsPage() {
       setSuccessMessage("GitHub repository connected successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect repository");
+      setLocalError(err instanceof Error ? err.message : "Failed to connect repository");
     } finally {
       setIsSetupGitHub(false);
     }
@@ -569,7 +563,7 @@ export default function ProjectSettingsPage() {
       setSuccessMessage("GitHub integration removed");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove GitHub integration");
+      setLocalError(err instanceof Error ? err.message : "Failed to remove GitHub integration");
     }
   };
 
@@ -577,7 +571,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsSavingPrSettings(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       const updated = await prSettingsApi.update(
@@ -589,7 +583,7 @@ export default function ProjectSettingsPage() {
       setSuccessMessage("PR settings saved");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save PR settings");
+      setLocalError(err instanceof Error ? err.message : "Failed to save PR settings");
     } finally {
       setIsSavingPrSettings(false);
     }
@@ -603,17 +597,14 @@ export default function ProjectSettingsPage() {
       await joinRequestApi.approve(project.id, requestId, session.accessToken);
       setJoinRequests(joinRequests.filter((jr) => jr.id !== requestId));
       setJoinRequestCount(Math.max(0, joinRequestCount - 1));
-      // Refresh member list via React Query
+      // Refresh member list + project via React Query (refetches in background)
       queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
-      queryClient.invalidateQueries({ queryKey: projectQueryKeys.detail(projectId, true) });
-      const refreshedMembers = await projectApi.listMembers(project.id, session.accessToken);
-      setMembers(refreshedMembers.items);
-      setProject({ ...project, member_count: refreshedMembers.total });
+      queryClient.invalidateQueries({ queryKey: projectKey });
       setSuccessMessage("Join request approved — user added as suggester");
       setTimeout(() => setSuccessMessage(null), 3000);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve request");
+      setLocalError(err instanceof Error ? err.message : "Failed to approve request");
     } finally {
       setProcessingJoinRequest(null);
     }
@@ -631,7 +622,7 @@ export default function ProjectSettingsPage() {
       setTimeout(() => setSuccessMessage(null), 3000);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to decline request");
+      setLocalError(err instanceof Error ? err.message : "Failed to decline request");
     } finally {
       setProcessingJoinRequest(null);
     }
@@ -641,7 +632,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsReindexing(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       await projectOntologyApi.reindex(project.id, session.accessToken);
@@ -677,7 +668,7 @@ export default function ProjectSettingsPage() {
         }
       }, 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to trigger reindex");
+      setLocalError(err instanceof Error ? err.message : "Failed to trigger reindex");
       setIsReindexing(false);
     }
   };
@@ -686,14 +677,14 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsCheckingNormalization(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       const status = await normalizationApi.getStatus(project.id, session.accessToken);
       setNormalizationStatus(status);
       queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to check normalization status");
+      setLocalError(err instanceof Error ? err.message : "Failed to check normalization status");
     } finally {
       setIsCheckingNormalization(false);
     }
@@ -703,7 +694,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsRunningNormalization(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       if (dryRun) {
@@ -781,7 +772,7 @@ export default function ProjectSettingsPage() {
               setNormalizationJobId(null);
               setNormalizationJobStatus(null);
               setIsRunningNormalization(false);
-              setError(jobStatus.error || "Normalization job failed");
+              setLocalError(jobStatus.error || "Normalization job failed");
             }
           } catch (pollErr) {
             // Continue polling on error
@@ -793,7 +784,7 @@ export default function ProjectSettingsPage() {
         return () => clearInterval(pollInterval);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to run normalization");
+      setLocalError(err instanceof Error ? err.message : "Failed to run normalization");
       setIsRunningNormalization(false);
     }
   };
@@ -806,7 +797,7 @@ export default function ProjectSettingsPage() {
       setNormalizationHistory(history.items);
       setShowNormalizationHistory(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load normalization history");
+      setLocalError(err instanceof Error ? err.message : "Failed to load normalization history");
     }
   };
 
