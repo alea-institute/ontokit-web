@@ -97,6 +97,12 @@ export default function ProjectSettingsPage() {
 
   const queryClient = useQueryClient();
 
+  // Keep a ref to the latest accessToken so polling closures never go stale
+  const accessTokenRef = useRef(session?.accessToken);
+  useEffect(() => {
+    accessTokenRef.current = session?.accessToken;
+  }, [session?.accessToken]);
+
   // React Query hooks for data (single source of truth — no local mirrors)
   const {
     project,
@@ -228,7 +234,7 @@ export default function ProjectSettingsPage() {
   const isPublic = project?.is_public;
 
   const prSettingsQuery = useQuery({
-    queryKey: ["prSettings", projectId, session?.accessToken],
+    queryKey: ["prSettings", projectId],
     queryFn: () => prSettingsApi.get(projectId, session!.accessToken!),
     enabled: !!canManage && !!session?.accessToken,
     retry: false,
@@ -242,7 +248,7 @@ export default function ProjectSettingsPage() {
   }, [prSettingsQuery.data]);
 
   const joinRequestsQuery = useQuery({
-    queryKey: ["joinRequests", projectId, session?.accessToken],
+    queryKey: ["joinRequests", projectId],
     queryFn: () => joinRequestApi.list(projectId, session!.accessToken!),
     enabled: !!isPublic && !!canManage && !!session?.accessToken,
     retry: false,
@@ -255,7 +261,7 @@ export default function ProjectSettingsPage() {
   }, [joinRequestsQuery.data]);
 
   const githubTokenStatusQuery = useQuery({
-    queryKey: ["githubTokenStatus", session?.accessToken],
+    queryKey: ["githubTokenStatus"],
     queryFn: () => userSettingsApi.getGitHubTokenStatus(session!.accessToken!),
     enabled: !!canManage && !!session?.accessToken,
     retry: false,
@@ -664,19 +670,20 @@ export default function ProjectSettingsPage() {
         clearInterval(reindexPollRef.current);
       }
 
-      // Poll for completion
+      // Poll for completion (read token from ref to avoid stale closure)
       reindexPollRef.current = setInterval(async () => {
         try {
+          const token = accessTokenRef.current;
           const status = await projectOntologyApi.getIndexStatus(
             project.id,
-            session.accessToken
+            token
           );
           setIndexStatus(status);
           if (status.status === "ready" || status.status === "failed") {
             clearInterval(reindexPollRef.current!);
             reindexPollRef.current = null;
             setIsReindexing(false);
-            queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, session.accessToken) });
+            queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, token) });
           }
         } catch {
           clearInterval(reindexPollRef.current!);
@@ -761,13 +768,14 @@ export default function ProjectSettingsPage() {
         setNormalizationJobStatus("queued");
         setSuccessMessage("Normalization job queued - processing in background...");
 
-        // Poll for completion (ref-based so useEffect cleanup can cancel)
+        // Poll for completion (ref-based so useEffect cleanup can cancel, token from ref to avoid stale closure)
         normalizationPollRef.current = setInterval(async () => {
           try {
+            const token = accessTokenRef.current;
             const jobStatus = await normalizationApi.getJobStatus(
               project.id,
               queueResult.job_id,
-              session.accessToken
+              token
             );
 
             setNormalizationJobStatus(jobStatus.status);
@@ -780,9 +788,9 @@ export default function ProjectSettingsPage() {
               setIsRunningNormalization(false);
 
               // Refresh status
-              const newStatus = await normalizationApi.getStatus(project.id, session.accessToken);
+              const newStatus = await normalizationApi.getStatus(project.id, token);
               setNormalizationStatus(newStatus);
-              queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId, session.accessToken) });
+              queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId, token) });
               setSuccessMessage("Normalization completed successfully");
               setTimeout(() => setSuccessMessage(null), 3000);
             } else if (jobStatus.status === "failed" || jobStatus.status === "not_found") {
@@ -2049,6 +2057,7 @@ function WebhookConfigPanel({
   onIntegrationUpdate: (integration: GitHubIntegration) => void;
 }) {
   const [isToggling, setIsToggling] = useState(false);
+  const webhookSetupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [webhookSecret, setWebhookSecret] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
   const [showSecret, setShowSecret] = useState(false);
@@ -2067,6 +2076,15 @@ function WebhookConfigPanel({
       setWebhookStatus("unknown");
     }
   }, [githubIntegration.webhooks_enabled, githubIntegration.github_hook_id]);
+
+  // Clean up webhook setup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (webhookSetupTimerRef.current) {
+        clearTimeout(webhookSetupTimerRef.current);
+      }
+    };
+  }, []);
 
   const runWebhookSetup = async () => {
     if (!accessToken) return;
@@ -2108,8 +2126,8 @@ function WebhookConfigPanel({
       } else {
         // When enabling, attempt auto-setup
         setIsToggling(false);
-        // Small delay to let state settle
-        setTimeout(async () => {
+        // Small delay to let state settle (stored in ref for unmount cleanup)
+        webhookSetupTimerRef.current = setTimeout(async () => {
           try {
             const result = await githubIntegrationApi.setupWebhook(projectId, accessToken);
             setWebhookStatus(result.status as WebhookStatus);
@@ -2971,6 +2989,10 @@ function EmbeddingSettingsSection({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const accessTokenRef = useRef(accessToken);
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
 
   // Clean up polling on unmount
   useEffect(() => {
@@ -3014,7 +3036,7 @@ function EmbeddingSettingsSection({
             if (pollTimerRef.current) clearInterval(pollTimerRef.current);
             pollTimerRef.current = setInterval(async () => {
               try {
-                const updated = await embeddingsApi.getStatus(projectId, accessToken!);
+                const updated = await embeddingsApi.getStatus(projectId, accessTokenRef.current!);
                 setStatus(updated);
                 if (!updated.job_in_progress) {
                   if (pollTimerRef.current) {
@@ -3088,7 +3110,7 @@ function EmbeddingSettingsSection({
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       pollTimerRef.current = setInterval(async () => {
         try {
-          const updated = await embeddingsApi.getStatus(projectId, accessToken);
+          const updated = await embeddingsApi.getStatus(projectId, accessTokenRef.current!);
           setStatus(updated);
           if (!updated.job_in_progress) {
             if (pollTimerRef.current) {
