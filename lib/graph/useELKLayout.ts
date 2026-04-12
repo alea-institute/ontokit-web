@@ -30,6 +30,15 @@ function normalizeNodeType(raw: string | undefined): GraphNodeType {
   return "class";
 }
 
+const VALID_EDGE_TYPES = new Set<GraphEdgeType>([
+  "subClassOf", "equivalentClass", "disjointWith", "seeAlso",
+]);
+
+function normalizeEdgeType(raw: string | undefined): GraphEdgeType {
+  if (raw && VALID_EDGE_TYPES.has(raw as GraphEdgeType)) return raw as GraphEdgeType;
+  return "subClassOf";
+}
+
 export function useELKLayout(): LayoutResult {
   const [nodes, setNodes] = useState<Node<OntologyNodeData>[]>([]);
   const [edges, setEdges] = useState<Edge<OntologyEdgeData>[]>([]);
@@ -107,7 +116,7 @@ export function useELKLayout(): LayoutResult {
             markerEnd: { type: MarkerType.ArrowClosed, color: "#94a3b8", width: 16, height: 16 },
           }),
           data: {
-            edgeType: e.edge_type as GraphEdgeType,
+            edgeType: normalizeEdgeType(e.edge_type),
           },
         }));
 
