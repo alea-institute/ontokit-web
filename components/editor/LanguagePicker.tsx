@@ -25,21 +25,32 @@ const OTHER_LANGUAGES: LanguageOption[] = ALL_LANGUAGES.filter(
   (l) => !FREQUENT_CODES.has(l.code)
 );
 
-/** Strip diacritics for accent-insensitive search (e.g. "francais" matches "Français") */
+/** O(1) lookup map for the cmdk filter function */
+const LANG_BY_CODE = new Map(ALL_LANGUAGES.map((l) => [l.code, l]));
+
+/** Strip diacritics for accent-insensitive search (e.g. "francais" matches "Francais") */
 function stripDiacritics(s: string): string {
   return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
+
+/** Shared styles for cmdk group headings */
+const GROUP_HEADING_CLASS =
+  "[&>[cmdk-group-heading]]:px-2 [&>[cmdk-group-heading]]:py-0.5 [&>[cmdk-group-heading]]:text-[9px] [&>[cmdk-group-heading]]:font-semibold [&>[cmdk-group-heading]]:uppercase [&>[cmdk-group-heading]]:tracking-wider [&>[cmdk-group-heading]]:text-slate-400 dark:[&>[cmdk-group-heading]]:text-slate-500";
 
 /**
  * Compact searchable combobox for selecting a BCP 47 language tag.
  *
  * Uses `cmdk` for keyboard-accessible filtering. The trigger button shows
  * the country flag emoji + language code, matching the width of the previous
- * plain `<input>` it replaces.
+ * plain `<input>` it replaces. When the search text doesn't match any known
+ * language, a "Use custom code" option appears so users can enter arbitrary
+ * BCP 47 tags (e.g. `grc`, `cu`, `sga`).
  */
 export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProps) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const [listboxId, setListboxId] = useState<string | undefined>();
 
   // Capture the cmdk-generated listbox id via ref callback
@@ -50,27 +61,34 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
     }
   }, []);
 
+  const closeAndRestoreFocus = useCallback(() => {
+    setOpen(false);
+    setSearch("");
+    // Return focus to trigger after the dropdown unmounts
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
+
   // Close on outside click
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setOpen(false);
+        closeAndRestoreFocus();
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  }, [open, closeAndRestoreFocus]);
 
   // Close on Escape
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") closeAndRestoreFocus();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open]);
+  }, [open, closeAndRestoreFocus]);
 
   const flag = langToFlag(value);
   const langInfo = findLanguageByCode(value);
@@ -80,12 +98,20 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
 
   const handleSelect = (code: string) => {
     onChange(code);
+    setSearch("");
     setOpen(false);
+    requestAnimationFrame(() => triggerRef.current?.focus());
   };
+
+  // Show "Use custom code" when search text is non-empty and doesn't exactly match a known code
+  const trimmedSearch = search.trim();
+  const showCustomOption =
+    trimmedSearch.length > 0 && !findLanguageByCode(trimmedSearch);
 
   return (
     <div ref={containerRef} className="relative shrink-0">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => !disabled && setOpen((prev) => !prev)}
         disabled={disabled}
@@ -105,7 +131,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
         <div ref={listRefCallback} className="absolute right-0 top-full z-50 mt-1 w-64 rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-700">
           <Command
             filter={(value, search) => {
-              const lang = ALL_LANGUAGES.find((l) => l.code === value);
+              const lang = LANG_BY_CODE.get(value);
               if (!lang) return 0;
               const q = stripDiacritics(search.toLowerCase());
               if (stripDiacritics(lang.code.toLowerCase()).includes(q)) return 1;
@@ -118,18 +144,36 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
               <Command.Input
                 placeholder="Search languages..."
                 autoFocus
+                value={search}
+                onValueChange={setSearch}
                 className="w-full bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden dark:text-white dark:placeholder:text-slate-500"
               />
             </div>
             <Command.List className="max-h-60 overflow-y-auto py-1">
               <Command.Empty className="py-3 text-center text-xs text-slate-500 dark:text-slate-400">
-                No matching languages
+                {showCustomOption ? "" : "No matching languages"}
               </Command.Empty>
 
-              <Command.Group
-                heading="Frequently used"
-                className="[&>[cmdk-group-heading]]:px-2 [&>[cmdk-group-heading]]:py-0.5 [&>[cmdk-group-heading]]:text-[9px] [&>[cmdk-group-heading]]:font-semibold [&>[cmdk-group-heading]]:uppercase [&>[cmdk-group-heading]]:tracking-wider [&>[cmdk-group-heading]]:text-slate-400 dark:[&>[cmdk-group-heading]]:text-slate-500"
-              >
+              {showCustomOption && (
+                <Command.Group heading="Custom" className={GROUP_HEADING_CLASS}>
+                  <Command.Item
+                    value={`__custom__${trimmedSearch}`}
+                    onSelect={() => handleSelect(trimmedSearch)}
+                    className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs aria-selected:bg-slate-100 dark:aria-selected:bg-slate-600"
+                    forceMount
+                  >
+                    <span className="inline-flex w-5 shrink-0 items-center justify-center text-sm leading-none text-slate-400">
+                      +
+                    </span>
+                    <span className="text-slate-700 dark:text-slate-200">
+                      Use custom code{" "}
+                      <span className="font-medium">&ldquo;{trimmedSearch}&rdquo;</span>
+                    </span>
+                  </Command.Item>
+                </Command.Group>
+              )}
+
+              <Command.Group heading="Frequently used" className={GROUP_HEADING_CLASS}>
                 {FREQUENT_LANGUAGES.map((lang) => (
                   <LanguageItem
                     key={lang.code}
@@ -140,10 +184,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
                 ))}
               </Command.Group>
 
-              <Command.Group
-                heading="All languages"
-                className="[&>[cmdk-group-heading]]:px-2 [&>[cmdk-group-heading]]:py-0.5 [&>[cmdk-group-heading]]:text-[9px] [&>[cmdk-group-heading]]:font-semibold [&>[cmdk-group-heading]]:uppercase [&>[cmdk-group-heading]]:tracking-wider [&>[cmdk-group-heading]]:text-slate-400 dark:[&>[cmdk-group-heading]]:text-slate-500"
-              >
+              <Command.Group heading="All languages" className={GROUP_HEADING_CLASS}>
                 {OTHER_LANGUAGES.map((lang) => (
                   <LanguageItem
                     key={lang.code}

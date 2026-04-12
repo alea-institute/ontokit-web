@@ -129,8 +129,10 @@ export const ALL_LANGUAGES: LanguageOption[] = [
   ...ADDITIONAL_LANGUAGES.filter((l) => !FREQUENT_CODES.has(l.code)),
 ];
 
+/** O(1) lookup map keyed by lowercase BCP 47 code. */
+const LANG_BY_CODE = new Map(ALL_LANGUAGES.map((l) => [l.code.toLowerCase(), l]));
+
 /** Look up a language option by its BCP 47 code (case-insensitive). */
 export function findLanguageByCode(code: string): LanguageOption | undefined {
-  const lower = code.toLowerCase();
-  return ALL_LANGUAGES.find((l) => l.code.toLowerCase() === lower);
+  return LANG_BY_CODE.get(code.toLowerCase());
 }
