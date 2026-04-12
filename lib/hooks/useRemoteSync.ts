@@ -157,19 +157,22 @@ export function useRemoteSync({
     },
   });
 
+  const saveConfigRef = useRef(saveConfigMutation.mutateAsync);
+  saveConfigRef.current = saveConfigMutation.mutateAsync;
+
   const saveConfig = useCallback(
     async (data: RemoteSyncConfigCreate | RemoteSyncConfigUpdate) => {
       if (!accessToken) return;
       setCheckError(null);
       try {
-        await saveConfigMutation.mutateAsync(data);
+        await saveConfigRef.current(data);
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to save config";
         setCheckError(msg);
         throw err;
       }
     },
-    [accessToken, saveConfigMutation],
+    [accessToken],
   );
 
   // Delete config mutation
@@ -181,17 +184,20 @@ export function useRemoteSync({
     },
   });
 
+  const deleteConfigRef = useRef(deleteConfigMutation.mutateAsync);
+  deleteConfigRef.current = deleteConfigMutation.mutateAsync;
+
   const deleteConfig = useCallback(async () => {
     if (!accessToken) return;
     setCheckError(null);
     try {
-      await deleteConfigMutation.mutateAsync();
+      await deleteConfigRef.current();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to remove config";
       setCheckError(msg);
       throw err;
     }
-  }, [accessToken, deleteConfigMutation]);
+  }, [accessToken]);
 
   // Combine errors: prefer check/mutation errors, then history, then config
   const error =
