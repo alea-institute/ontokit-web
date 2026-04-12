@@ -14,7 +14,6 @@ import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar"
 import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
 import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
 import { Share2, ArrowLeft, Maximize2 } from "lucide-react";
-import { EntityGraphModal } from "@/components/graph/EntityGraphModal";
 import { DraggableTreeWrapper } from "@/components/editor/shared/DraggableTreeWrapper";
 import { useTreeDragDrop, type DragMode } from "@/lib/hooks/useTreeDragDrop";
 import { useToast } from "@/lib/context/ToastContext";
@@ -29,6 +28,11 @@ const OntologyGraph = dynamic(
       </div>
     ),
   }
+);
+
+const EntityGraphModal = dynamic(
+  () => import("@/components/graph/EntityGraphModal").then((mod) => mod.EntityGraphModal),
+  { ssr: false }
 );
 import type { ClassUpdatePayload } from "@/lib/api/client";
 import type { TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
