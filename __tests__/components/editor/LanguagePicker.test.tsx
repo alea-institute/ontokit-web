@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeAll, afterAll } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 // cmdk uses ResizeObserver and scrollIntoView which jsdom doesn't provide
 const _origResizeObserver = global.ResizeObserver;
@@ -25,7 +26,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
-    langToFlag: (lang: string) => (lang === "en" ? "🇺🇸" : lang === "fr" ? "🇫🇷" : null),
+    langToFlag: (lang: string) => (lang === "en" ? "\u{1F1FA}\u{1F1F8}" : lang === "fr" ? "\u{1F1EB}\u{1F1F7}" : null),
   };
 });
 
@@ -132,7 +133,7 @@ describe("LanguagePicker", () => {
   it("displays flag emoji for known language codes", () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
     const btn = screen.getByLabelText("Language tag");
-    expect(btn.textContent).toContain("🇺🇸");
+    expect(btn.textContent).toContain("\u{1F1FA}\u{1F1F8}");
   });
 
   it("shows 'lang' placeholder when value is empty", () => {
@@ -153,5 +154,99 @@ describe("LanguagePicker", () => {
     // Verify a listbox element with the matching id exists
     const list = screen.getByRole("listbox");
     expect(list.getAttribute("id")).toBe(controlsId);
+  });
+
+  it("restores focus to trigger button after selecting a language", async () => {
+    const onChange = vi.fn();
+    render(<LanguagePicker value="en" onChange={onChange} />);
+    const btn = screen.getByLabelText("Language tag");
+    fireEvent.click(btn);
+
+    await waitFor(() => {
+      expect(screen.getByText("French")).toBeDefined();
+    });
+
+    const frenchItem = screen.getByText("French").closest("[cmdk-item]");
+    if (frenchItem) fireEvent.click(frenchItem);
+
+    // Wait for requestAnimationFrame focus restore
+    await waitFor(() => {
+      expect(document.activeElement).toBe(btn);
+    });
+  });
+
+  it("restores focus to trigger button after Escape", async () => {
+    render(<LanguagePicker value="en" onChange={vi.fn()} />);
+    const btn = screen.getByLabelText("Language tag");
+    fireEvent.click(btn);
+    await waitFor(() => {
+      expect(btn.getAttribute("aria-expanded")).toBe("true");
+    });
+
+    fireEvent.keyDown(document, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(document.activeElement).toBe(btn);
+    });
+  });
+
+  it("shows 'Use custom code' option when search doesn't match a known language", async () => {
+    const user = userEvent.setup();
+    render(<LanguagePicker value="en" onChange={vi.fn()} />);
+    fireEvent.click(screen.getByLabelText("Language tag"));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Search languages...")).toBeDefined();
+    });
+
+    const input = screen.getByPlaceholderText("Search languages...");
+    await user.type(input, "grc");
+
+    await waitFor(() => {
+      expect(screen.getByText(/Use custom code/)).toBeDefined();
+      expect(screen.getByText(/grc/)).toBeDefined();
+    });
+  });
+
+  it("calls onChange with custom code when 'Use custom code' is selected", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<LanguagePicker value="en" onChange={onChange} />);
+    fireEvent.click(screen.getByLabelText("Language tag"));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Search languages...")).toBeDefined();
+    });
+
+    const input = screen.getByPlaceholderText("Search languages...");
+    await user.type(input, "cu");
+
+    await waitFor(() => {
+      expect(screen.getByText(/Use custom code/)).toBeDefined();
+    });
+
+    const customItem = screen.getByText(/Use custom code/).closest("[cmdk-item]");
+    if (customItem) fireEvent.click(customItem);
+
+    expect(onChange).toHaveBeenCalledWith("cu");
+  });
+
+  it("does not show custom code option when search matches a known language", async () => {
+    const user = userEvent.setup();
+    render(<LanguagePicker value="en" onChange={vi.fn()} />);
+    fireEvent.click(screen.getByLabelText("Language tag"));
+
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText("Search languages...")).toBeDefined();
+    });
+
+    const input = screen.getByPlaceholderText("Search languages...");
+    await user.type(input, "fr");
+
+    await waitFor(() => {
+      expect(screen.getByText("French")).toBeDefined();
+    });
+
+    expect(screen.queryByText(/Use custom code/)).toBeNull();
   });
 });
