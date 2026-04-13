@@ -32,11 +32,12 @@ vi.mock("@/lib/utils", () => ({
 
 import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { lintApi, createLintWebSocket } from "@/lib/api/lint";
-import { qualityApi } from "@/lib/api/quality";
+import { qualityApi, createQualityWebSocket } from "@/lib/api/quality";
 
 const mockLintApi = vi.mocked(lintApi);
 const mockQualityApi = vi.mocked(qualityApi);
 const mockCreateLintWebSocket = vi.mocked(createLintWebSocket);
+const mockCreateQualityWebSocket = vi.mocked(createQualityWebSocket);
 
 const baseSummary = {
   project_id: "p1",
@@ -402,5 +403,363 @@ describe("HealthCheckPanel", () => {
     expect(dismissBtns.length).toBeGreaterThan(0);
     await userEvent.click(dismissBtns[0]);
     expect(mockLintApi.dismissIssue).toHaveBeenCalledWith("p1", "i1", "tok");
+  });
+
+  it("shows error when duplicate detection trigger fails", async () => {
+    mockQualityApi.triggerDuplicateDetection.mockRejectedValue(
+      new Error("Backend unavailable")
+    );
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Find Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Find Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Backend unavailable")).toBeDefined();
+    });
+  });
+
+  it("loads cached duplicates when switching to duplicates tab", async () => {
+    const cachedResult = {
+      clusters: [
+        {
+          entities: [
+            { iri: "http://example.org/X", label: "CachedX", entity_type: "class" },
+            { iri: "http://example.org/Y", label: "CachedY", entity_type: "class" },
+          ],
+          similarity: 0.88,
+        },
+      ],
+      threshold: 0.85,
+      checked_at: "",
+    };
+    mockQualityApi.getLatestDuplicates.mockResolvedValue(cachedResult);
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("CachedX")).toBeDefined();
+    });
+    expect(screen.getByText("CachedY")).toBeDefined();
+    expect(screen.getByText("88% similar")).toBeDefined();
+  });
+
+  it("navigates to entity when duplicate entity is clicked", async () => {
+    const onNav = vi.fn();
+    const cachedResult = {
+      clusters: [
+        {
+          entities: [
+            { iri: "http://example.org/DupA", label: "DupA", entity_type: "class" },
+            { iri: "http://example.org/DupB", label: "DupB", entity_type: "property" },
+          ],
+          similarity: 0.95,
+        },
+      ],
+      threshold: 0.85,
+      checked_at: "",
+    };
+    mockQualityApi.getLatestDuplicates.mockResolvedValue(cachedResult);
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("DupA")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("DupA"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/DupA");
+  });
+
+  it("navigates to entity from consistency issue", async () => {
+    const onNav = vi.fn();
+    mockQualityApi.getConsistencyIssues.mockResolvedValue({
+      project_id: "p1",
+      branch: "main",
+      issues: [
+        {
+          rule_id: "orphan_class",
+          severity: "warning",
+          entity_iri: "http://example.org/ConsEntity",
+          entity_type: "class",
+          message: "Orphan detected",
+        },
+      ],
+      checked_at: "",
+      duration_ms: 50,
+    });
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("Consistency")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Consistency"));
+    await waitFor(() => {
+      expect(screen.getByText("ConsEntity")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("ConsEntity"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/ConsEntity");
+  });
+
+  it("handles quality WebSocket duplicates_complete message", async () => {
+    // Capture the onMessage callback from createQualityWebSocket
+    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    const duplicateResult = {
+      clusters: [
+        {
+          entities: [
+            { iri: "http://example.org/WsA", label: "WsEntityA", entity_type: "class" },
+            { iri: "http://example.org/WsB", label: "WsEntityB", entity_type: "class" },
+          ],
+          similarity: 0.91,
+        },
+      ],
+      threshold: 0.85,
+      checked_at: "",
+    };
+    mockQualityApi.getLatestDuplicates.mockResolvedValue(duplicateResult);
+
+    setup();
+
+    // Wait for the WS to connect (100ms timeout + execution)
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+
+    // Simulate duplicates_complete message
+    capturedOnMessage!({
+      type: "duplicates_complete",
+      project_id: "p1",
+      branch: "main",
+    });
+
+    // Switch to duplicates tab to see the results
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("WsEntityA")).toBeDefined();
+    });
+  });
+
+  it("handles quality WebSocket duplicates_failed message", async () => {
+    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    setup();
+
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+
+    capturedOnMessage!({
+      type: "duplicates_failed",
+      project_id: "p1",
+      branch: "main",
+      error: "Worker crashed",
+    });
+
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Worker crashed")).toBeDefined();
+    });
+  });
+
+  it("handles quality WebSocket consistency_started and consistency_complete messages", async () => {
+    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    setup();
+
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+
+    // Switch to consistency tab
+    await userEvent.click(screen.getByText("Consistency"));
+
+    // Simulate consistency_started
+    capturedOnMessage!({
+      type: "consistency_started",
+      project_id: "p1",
+      branch: "main",
+    });
+
+    // Now simulate consistency_complete with issues
+    mockQualityApi.getConsistencyIssues.mockResolvedValue({
+      project_id: "p1",
+      branch: "main",
+      issues: [
+        {
+          rule_id: "cycle_detect",
+          severity: "error",
+          entity_iri: "http://example.org/CycleEntity",
+          entity_type: "class",
+          message: "Cycle found",
+        },
+      ],
+      checked_at: "",
+      duration_ms: 200,
+    });
+
+    capturedOnMessage!({
+      type: "consistency_complete",
+      project_id: "p1",
+      branch: "main",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("Cycle found")).toBeDefined();
+    });
+  });
+
+  it("handles quality WebSocket consistency_failed message", async () => {
+    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    setup();
+
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+
+    capturedOnMessage!({
+      type: "consistency_failed",
+      project_id: "p1",
+      branch: "main",
+      error: "Graph load failed",
+    });
+
+    await userEvent.click(screen.getByText("Consistency"));
+    await waitFor(() => {
+      expect(screen.getByText("Graph load failed")).toBeDefined();
+    });
+  });
+
+  it("handles quality WebSocket duplicates_started message", async () => {
+    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    setup();
+
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+
+    capturedOnMessage!({
+      type: "duplicates_started",
+      project_id: "p1",
+      branch: "main",
+    });
+
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Detecting...")).toBeDefined();
+    });
+  });
+
+  it("does not open quality WebSocket when no access token", () => {
+    mockCreateQualityWebSocket.mockClear();
+    setup({ accessToken: undefined });
+    // The quality WS should not have been called since there's no token
+    // (100ms timeout hasn't fired, and the effect early-returns)
+    expect(mockCreateQualityWebSocket).not.toHaveBeenCalled();
+  });
+
+  it("shows timeout error when polling exhausts all attempts", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-slow" });
+    // Always reject (job never finishes)
+    mockQualityApi.getDuplicateJobResult.mockRejectedValue(new Error("Not found"));
+
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Duplicates")).toBeDefined();
+    });
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+      screen.getByText("Duplicates")
+    );
+    await waitFor(() => {
+      expect(screen.getByText("Find Duplicates")).toBeDefined();
+    });
+    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+      screen.getByText("Find Duplicates")
+    );
+
+    // Advance enough time for all polling attempts
+    for (let i = 0; i < 25; i++) {
+      await vi.advanceTimersByTimeAsync(6000);
+    }
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Duplicate detection timed out — try again later")
+      ).toBeDefined();
+    });
+    vi.useRealTimers();
+  });
+
+  it("shows generic error when trigger throws non-Error value", async () => {
+    mockQualityApi.triggerDuplicateDetection.mockRejectedValue("string-error");
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Find Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Find Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Duplicate detection failed")).toBeDefined();
+    });
+  });
+
+  it("cleans up quality WebSocket on unmount", async () => {
+    const closeFn = vi.fn();
+    mockCreateQualityWebSocket.mockImplementation(() => {
+      return { close: closeFn } as unknown as WebSocket;
+    });
+
+    const { unmount } = setup();
+
+    // Wait for the WS to connect (100ms timeout)
+    await waitFor(() => {
+      expect(mockCreateQualityWebSocket).toHaveBeenCalled();
+    });
+
+    unmount();
+    expect(closeFn).toHaveBeenCalled();
   });
 });
