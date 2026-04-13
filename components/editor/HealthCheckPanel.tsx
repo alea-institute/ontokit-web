@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   XCircle,
   AlertTriangle,
@@ -83,6 +83,9 @@ export function HealthCheckPanel({
   const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([]);
   const [isDetectingDuplicates, setIsDetectingDuplicates] = useState(false);
   const [duplicatesError, setDuplicatesError] = useState<string | null>(null);
+
+  // Track whether the quality WebSocket is connected
+  const qualityWsConnected = useRef(false);
 
   // Fetch lint status and issues
   const fetchData = useCallback(async (issueFilter?: IssueFilter) => {
@@ -217,7 +220,10 @@ export function HealthCheckPanel({
     }
   };
 
-  // Trigger duplicate detection as a background job, then poll for results
+  // Trigger duplicate detection as a background job.
+  // If the quality WebSocket is connected, it will deliver the result via
+  // duplicates_complete/duplicates_failed events. Otherwise, fall back to
+  // polling the job-result endpoint.
   const handleDetectDuplicates = async () => {
     if (!accessToken) return;
     setIsDetectingDuplicates(true);
@@ -228,8 +234,12 @@ export function HealthCheckPanel({
         accessToken,
         branch
       );
-      // Poll for job result with exponential backoff
-      let delay = 500;
+
+      // When WS is connected the effect handler updates state — nothing else to do
+      if (qualityWsConnected.current) return;
+
+      // Fallback: poll for job result with exponential backoff
+      let delay = 1000;
       const maxDelay = 5000;
       const maxAttempts = 20;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -241,6 +251,7 @@ export function HealthCheckPanel({
             accessToken
           );
           setDuplicateClusters(result.clusters);
+          setIsDetectingDuplicates(false);
           return;
         } catch {
           // 404 means job not done yet — keep polling
@@ -309,15 +320,19 @@ export function HealthCheckPanel({
         ws = createQualityWebSocket(
           projectId,
           handleQualityMessage,
-          undefined,
-          undefined,
+          () => { qualityWsConnected.current = false; },
+          (event) => {
+            if (event.code !== 1000) qualityWsConnected.current = false;
+          },
           accessToken
         );
+        qualityWsConnected.current = true;
       }
     }, 100);
 
     return () => {
       isActive = false;
+      qualityWsConnected.current = false;
       clearTimeout(timeoutId);
       if (ws) ws.close();
     };

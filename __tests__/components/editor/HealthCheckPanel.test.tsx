@@ -32,7 +32,7 @@ vi.mock("@/lib/utils", () => ({
 
 import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { lintApi, createLintWebSocket } from "@/lib/api/lint";
-import { qualityApi, createQualityWebSocket } from "@/lib/api/quality";
+import { qualityApi, createQualityWebSocket, type QualityWebSocketMessage } from "@/lib/api/quality";
 
 const mockLintApi = vi.mocked(lintApi);
 const mockQualityApi = vi.mocked(qualityApi);
@@ -346,7 +346,7 @@ describe("HealthCheckPanel", () => {
     });
   });
 
-  it("detects duplicates when Find Duplicates is clicked", async () => {
+  it("detects duplicates via polling fallback when WS is not connected", async () => {
     const duplicateResult = {
       clusters: [
         {
@@ -362,6 +362,7 @@ describe("HealthCheckPanel", () => {
     };
     mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-j1" });
     mockQualityApi.getDuplicateJobResult.mockResolvedValue(duplicateResult);
+    // Don't connect WS — default mock doesn't set qualityWsConnected
     setup();
     await waitFor(() => {
       expect(screen.getByText("Duplicates")).toBeDefined();
@@ -376,6 +377,65 @@ describe("HealthCheckPanel", () => {
     });
     expect(screen.getByText("EntityA")).toBeDefined();
     expect(screen.getByText("EntityB")).toBeDefined();
+  });
+
+  it("detects duplicates via WebSocket when WS is connected", async () => {
+    // Capture the onMessage callback so we can simulate WS messages
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    const duplicateResult = {
+      clusters: [
+        {
+          entities: [
+            { iri: "http://example.org/WsX", label: "WsX", entity_type: "class" },
+            { iri: "http://example.org/WsY", label: "WsY", entity_type: "class" },
+          ],
+          similarity: 0.89,
+        },
+      ],
+      threshold: 0.85,
+      checked_at: "",
+    };
+    mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-ws1" });
+    mockQualityApi.getLatestDuplicates.mockResolvedValue(duplicateResult);
+
+    setup();
+
+    // Wait for the WS to connect (marks qualityWsConnected = true)
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+
+    // Switch to duplicates tab and trigger
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Find Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Find Duplicates"));
+
+    // Trigger should fire but NOT poll — WS handles it
+    expect(mockQualityApi.triggerDuplicateDetection).toHaveBeenCalled();
+
+    // Simulate WS delivering the result
+    capturedOnMessage!({
+      type: "duplicates_complete",
+      project_id: "p1",
+      branch: "main",
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText("89% similar")).toBeDefined();
+    });
+    expect(screen.getByText("WsX")).toBeDefined();
+    expect(screen.getByText("WsY")).toBeDefined();
+    // Should NOT have polled the job result endpoint
+    expect(mockQualityApi.getDuplicateJobResult).not.toHaveBeenCalled();
   });
 
   it("shows Running status when lint is in progress", async () => {
@@ -509,7 +569,7 @@ describe("HealthCheckPanel", () => {
 
   it("handles quality WebSocket duplicates_complete message", async () => {
     // Capture the onMessage callback from createQualityWebSocket
-    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
     mockCreateQualityWebSocket.mockImplementation(
       (_projectId, onMessage) => {
         capturedOnMessage = onMessage;
@@ -554,7 +614,7 @@ describe("HealthCheckPanel", () => {
   });
 
   it("handles quality WebSocket duplicates_failed message", async () => {
-    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
     mockCreateQualityWebSocket.mockImplementation(
       (_projectId, onMessage) => {
         capturedOnMessage = onMessage;
@@ -582,7 +642,7 @@ describe("HealthCheckPanel", () => {
   });
 
   it("handles quality WebSocket consistency_started and consistency_complete messages", async () => {
-    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
     mockCreateQualityWebSocket.mockImplementation(
       (_projectId, onMessage) => {
         capturedOnMessage = onMessage;
@@ -635,7 +695,7 @@ describe("HealthCheckPanel", () => {
   });
 
   it("handles quality WebSocket consistency_failed message", async () => {
-    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
     mockCreateQualityWebSocket.mockImplementation(
       (_projectId, onMessage) => {
         capturedOnMessage = onMessage;
@@ -663,7 +723,7 @@ describe("HealthCheckPanel", () => {
   });
 
   it("handles quality WebSocket duplicates_started message", async () => {
-    let capturedOnMessage: ((msg: Record<string, unknown>) => void) | null = null;
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
     mockCreateQualityWebSocket.mockImplementation(
       (_projectId, onMessage) => {
         capturedOnMessage = onMessage;
