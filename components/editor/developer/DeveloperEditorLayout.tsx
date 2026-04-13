@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
-import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
 import { PropertyTree } from "@/components/editor/standard/PropertyTree";
@@ -108,10 +107,6 @@ export interface DeveloperEditorLayoutProps {
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   detailRefreshKey?: number;
 
-  // Side panels
-  showHealthCheck: boolean;
-  onCloseHealthCheck: () => void;
-
   // Property & Individual editing
   onUpdateProperty?: (propertyIri: string, data: TurtlePropertyUpdateData) => Promise<void>;
   onUpdateIndividual?: (individualIri: string, data: TurtleIndividualUpdateData) => Promise<void>;
@@ -164,8 +159,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     selectedNodeFallback,
     onUpdateClass,
     detailRefreshKey,
-    showHealthCheck,
-    onCloseHealthCheck,
     onUpdateProperty,
     onUpdateIndividual,
     onReparentClass,
@@ -548,20 +541,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               )}
             </div>
 
-            {/* Right Panel - Health Check */}
-            {showHealthCheck && (
-              <div className="w-96 flex-shrink-0">
-                <HealthCheckPanel
-                  projectId={projectId}
-                  accessToken={accessToken}
-                  branch={activeBranch}
-                  isOpen={showHealthCheck}
-                  onClose={onCloseHealthCheck}
-                  onNavigateToClass={(iri) => navigateToNode(iri)}
-                  canRunLint={canManage}
-                />
-              </div>
-            )}
           </>
         ) : (
           /* Source View */

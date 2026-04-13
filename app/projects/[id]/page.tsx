@@ -314,8 +314,6 @@ function ViewerContent({
                   onCopyIri={handleCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
                   detailRefreshKey={0}
-                  showHealthCheck={false}
-                  onCloseHealthCheck={noop}
                 />
               </div>
             ) : (

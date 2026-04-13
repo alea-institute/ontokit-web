@@ -16,6 +16,7 @@ import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingTo
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
+import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { useQueryClient } from "@tanstack/react-query";
 import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
@@ -1048,8 +1049,6 @@ export default function EditorPage() {
                   selectedNodeFallback={selectedNodeFallback}
                   onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
                   detailRefreshKey={detailRefreshKey}
-                  showHealthCheck={showHealthCheck}
-                  onCloseHealthCheck={() => setShowHealthCheck(false)}
                   onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
                   onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
                   onReparentClass={handleReparentClass}
@@ -1095,6 +1094,21 @@ export default function EditorPage() {
               />
             )}
           </div>
+
+          {/* Right Panel - Health Check (available in both modes) */}
+          {showHealthCheck && (
+            <div className="w-96 flex-shrink-0">
+              <HealthCheckPanel
+                projectId={projectId}
+                accessToken={session?.accessToken}
+                branch={activeBranch}
+                isOpen={showHealthCheck}
+                onClose={() => setShowHealthCheck(false)}
+                onNavigateToClass={(iri) => navigateToNode(iri)}
+                canRunLint={!!canManage}
+              />
+            </div>
+          )}
 
           {/* Right Panel - Revision History (available in both modes) */}
           <RevisionHistoryPanel

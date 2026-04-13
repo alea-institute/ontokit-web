@@ -316,8 +316,6 @@ function defaultProps(
     onSaveSource: vi.fn().mockResolvedValue(undefined),
     onAddEntity: vi.fn(),
     selectedNodeFallback: null,
-    showHealthCheck: false,
-    onCloseHealthCheck: vi.fn(),
     ...overrides,
   };
 }
@@ -470,16 +468,7 @@ describe("DeveloperEditorLayout", () => {
 
   // --- Health Check ---
 
-  it("shows health check panel when showHealthCheck is true", () => {
-    render(
-      <DeveloperEditorLayout
-        {...defaultProps({ showHealthCheck: true, nodes: [makeNode()] })}
-      />,
-    );
-    expect(screen.getByTestId("health-check-panel")).toBeDefined();
-  });
-
-  it("does not show health check panel by default", () => {
+  it("does not render health check panel (now rendered at page level)", () => {
     render(
       <DeveloperEditorLayout {...defaultProps({ nodes: [makeNode()] })} />,
     );
@@ -1237,22 +1226,7 @@ describe("DeveloperEditorLayout", () => {
     expect(navigateToNode).toHaveBeenCalledWith("http://example.org/IndivNav");
   });
 
-  it("calls navigateToNode via HealthCheckPanel onNavigateToClass", () => {
-    const navigateToNode = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <DeveloperEditorLayout
-        {...defaultProps({
-          nodes: [makeNode()],
-          showHealthCheck: true,
-          navigateToNode,
-        })}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId("health-navigate-class"));
-    expect(navigateToNode).toHaveBeenCalledWith("http://example.org/HealthTarget");
-  });
 
   it("navigates from graph view back to tree via OntologyGraph callback", () => {
     const navigateToNode = vi.fn().mockResolvedValue(undefined);
