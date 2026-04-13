@@ -283,7 +283,6 @@ function ViewerContent({
                   canEdit={false}
                   canSuggest={false}
                   isSuggestionMode={false}
-                  canManage={false}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
                   treeError={treeError}

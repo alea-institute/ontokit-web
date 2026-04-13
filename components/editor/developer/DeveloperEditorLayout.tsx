@@ -63,8 +63,6 @@ export interface DeveloperEditorLayoutProps {
   canEdit: boolean;
   canSuggest?: boolean;
   isSuggestionMode?: boolean;
-  canManage: boolean;
-
   // Tree state (from useOntologyTree)
   nodes: ClassTreeNode[];
   isTreeLoading: boolean;
@@ -126,7 +124,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     canSuggest = false,
     isSuggestionMode = false,
-    canManage,
     nodes,
     isTreeLoading,
     treeError,

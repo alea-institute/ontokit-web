@@ -287,7 +287,6 @@ function defaultProps(
     accessToken: "token-123",
     activeBranch: "main",
     canEdit: false,
-    canManage: false,
     nodes: [],
     isTreeLoading: false,
     treeError: null,

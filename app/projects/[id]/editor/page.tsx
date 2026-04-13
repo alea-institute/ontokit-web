@@ -1016,7 +1016,6 @@ export default function EditorPage() {
                   canEdit={!!canEdit}
                   canSuggest={!!canSuggest}
                   isSuggestionMode={isSuggestionMode}
-                  canManage={!!canManage}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
                   treeError={treeError}
