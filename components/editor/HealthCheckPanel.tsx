@@ -23,7 +23,11 @@ import {
   type LintSummary,
   type LintWebSocketMessage,
 } from "@/lib/api/lint";
-import { qualityApi } from "@/lib/api/quality";
+import {
+  qualityApi,
+  createQualityWebSocket,
+  type QualityWebSocketMessage,
+} from "@/lib/api/quality";
 import type { ConsistencyIssue, DuplicateCluster } from "@/lib/ontology/qualityTypes";
 import { cn, formatDateTime, getLocalName } from "@/lib/utils";
 
@@ -78,6 +82,7 @@ export function HealthCheckPanel({
   // Duplicate detection state
   const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([]);
   const [isDetectingDuplicates, setIsDetectingDuplicates] = useState(false);
+  const [duplicatesError, setDuplicatesError] = useState<string | null>(null);
 
   // Fetch lint status and issues
   const fetchData = useCallback(async (issueFilter?: IssueFilter) => {
@@ -212,28 +217,111 @@ export function HealthCheckPanel({
     }
   };
 
-  // Fetch duplicate candidates
+  // Trigger duplicate detection as a background job, then poll for results
   const handleDetectDuplicates = async () => {
     if (!accessToken) return;
     setIsDetectingDuplicates(true);
+    setDuplicatesError(null);
     try {
-      const result = await qualityApi.getDuplicateCandidates(projectId, accessToken, branch);
-      setDuplicateClusters(result.clusters);
-    } catch {
-      // Duplicates detection may not be available
+      const { job_id } = await qualityApi.triggerDuplicateDetection(
+        projectId,
+        accessToken,
+        branch
+      );
+      // Poll for job result with exponential backoff
+      let delay = 500;
+      const maxDelay = 5000;
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        await new Promise((r) => setTimeout(r, delay));
+        try {
+          const result = await qualityApi.getDuplicateJobResult(
+            projectId,
+            job_id,
+            accessToken
+          );
+          setDuplicateClusters(result.clusters);
+          return;
+        } catch {
+          // 404 means job not done yet — keep polling
+        }
+        delay = Math.min(delay * 1.5, maxDelay);
+      }
+      setDuplicatesError("Duplicate detection timed out — try again later");
+    } catch (err) {
+      setDuplicatesError(
+        err instanceof Error ? err.message : "Duplicate detection failed"
+      );
     } finally {
       setIsDetectingDuplicates(false);
     }
   };
 
-  // Load consistency data when tab changes
+  // Load cached data when tab changes
   useEffect(() => {
     if (activeTab === "consistency" && consistencyIssues.length === 0 && !isCheckingConsistency) {
       qualityApi.getConsistencyIssues(projectId, accessToken, branch)
         .then((r) => setConsistencyIssues(r.issues))
         .catch(() => {});
     }
+    if (activeTab === "duplicates" && duplicateClusters.length === 0 && !isDetectingDuplicates) {
+      qualityApi.getLatestDuplicates(projectId, accessToken, branch)
+        .then((r) => setDuplicateClusters(r.clusters))
+        .catch(() => {});
+    }
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Quality WebSocket for real-time consistency / duplicates updates
+  useEffect(() => {
+    if (!isOpen || !accessToken) return;
+
+    let isActive = true;
+    let ws: WebSocket | null = null;
+
+    const handleQualityMessage = (message: QualityWebSocketMessage) => {
+      if (!isActive) return;
+
+      if (message.type === "consistency_started") {
+        setIsCheckingConsistency(true);
+      } else if (message.type === "consistency_complete") {
+        setIsCheckingConsistency(false);
+        qualityApi.getConsistencyIssues(projectId, accessToken, branch)
+          .then((r) => { if (isActive) setConsistencyIssues(r.issues); })
+          .catch(() => {});
+      } else if (message.type === "consistency_failed") {
+        setIsCheckingConsistency(false);
+        setConsistencyError(message.error ?? "Consistency check failed");
+      } else if (message.type === "duplicates_started") {
+        setIsDetectingDuplicates(true);
+      } else if (message.type === "duplicates_complete") {
+        setIsDetectingDuplicates(false);
+        qualityApi.getLatestDuplicates(projectId, accessToken, branch)
+          .then((r) => { if (isActive) setDuplicateClusters(r.clusters); })
+          .catch(() => {});
+      } else if (message.type === "duplicates_failed") {
+        setIsDetectingDuplicates(false);
+        setDuplicatesError(message.error ?? "Duplicate detection failed");
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      if (isActive) {
+        ws = createQualityWebSocket(
+          projectId,
+          handleQualityMessage,
+          undefined,
+          undefined,
+          accessToken
+        );
+      }
+    }, 100);
+
+    return () => {
+      isActive = false;
+      clearTimeout(timeoutId);
+      if (ws) ws.close();
+    };
+  }, [isOpen, projectId, accessToken, branch]);
 
   // Dismiss an issue
   const handleDismissIssue = async (issueId: string) => {
@@ -534,6 +622,11 @@ export function HealthCheckPanel({
       {/* Duplicates Tab */}
       {activeTab === "duplicates" && (
         <div className="flex-1 overflow-y-auto p-4">
+          {duplicatesError && (
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+              {duplicatesError}
+            </div>
+          )}
           {isDetectingDuplicates && (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />

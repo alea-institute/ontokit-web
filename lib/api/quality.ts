@@ -9,6 +9,22 @@ import type {
   DuplicateDetectionResult,
 } from "@/lib/ontology/qualityTypes";
 
+export interface QualityWebSocketMessage {
+  type:
+    | "consistency_started"
+    | "consistency_complete"
+    | "consistency_failed"
+    | "duplicates_started"
+    | "duplicates_complete"
+    | "duplicates_failed";
+  project_id: string;
+  branch: string;
+  job_id?: string;
+  issues_found?: number;
+  clusters_found?: number;
+  error?: string;
+}
+
 export const qualityApi = {
   getCrossReferences: (
     projectId: string,
@@ -51,13 +67,13 @@ export const qualityApi = {
       }
     ),
 
-  getDuplicateCandidates: (
+  triggerDuplicateDetection: (
     projectId: string,
     token: string,
     branch?: string,
     threshold = 0.85
   ) =>
-    api.post<DuplicateDetectionResult>(
+    api.post<{ job_id: string }>(
       `/api/v1/projects/${projectId}/quality/duplicates`,
       undefined,
       {
@@ -65,4 +81,68 @@ export const qualityApi = {
         params: { branch, threshold },
       }
     ),
+
+  getDuplicateJobResult: (
+    projectId: string,
+    jobId: string,
+    token?: string
+  ) =>
+    api.get<DuplicateDetectionResult>(
+      `/api/v1/projects/${projectId}/quality/duplicates/jobs/${jobId}`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      }
+    ),
+
+  getLatestDuplicates: (
+    projectId: string,
+    token?: string,
+    branch?: string
+  ) =>
+    api.get<DuplicateDetectionResult>(
+      `/api/v1/projects/${projectId}/quality/duplicates/latest`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        params: { branch },
+      }
+    ),
 };
+
+/**
+ * Create a WebSocket connection for quality check updates
+ */
+export function createQualityWebSocket(
+  projectId: string,
+  onMessage: (message: QualityWebSocketMessage) => void,
+  onError?: (error: Event) => void,
+  onClose?: (event: CloseEvent) => void,
+  token?: string
+): WebSocket {
+  const wsUrl =
+    process.env.NEXT_PUBLIC_WS_URL ||
+    process.env.NEXT_PUBLIC_API_URL?.replace(/^http/, "ws") ||
+    "ws://localhost:8000";
+
+  const params = token ? `?token=${encodeURIComponent(token)}` : "";
+  const ws = new WebSocket(`${wsUrl}/api/v1/projects/${projectId}/quality/ws${params}`);
+
+  ws.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data) as QualityWebSocketMessage;
+      onMessage(data);
+    } catch (e) {
+      console.error("Failed to parse quality WebSocket message:", e);
+    }
+  };
+
+  ws.onerror = (error) => {
+    console.error("Quality WebSocket error:", error);
+    onError?.(error);
+  };
+
+  ws.onclose = (event) => {
+    onClose?.(event);
+  };
+
+  return ws;
+}

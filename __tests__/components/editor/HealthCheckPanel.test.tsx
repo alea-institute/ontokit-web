@@ -17,8 +17,11 @@ vi.mock("@/lib/api/quality", () => ({
   qualityApi: {
     triggerConsistencyCheck: vi.fn(),
     getConsistencyIssues: vi.fn(),
-    getDuplicateCandidates: vi.fn(),
+    triggerDuplicateDetection: vi.fn(),
+    getDuplicateJobResult: vi.fn(),
+    getLatestDuplicates: vi.fn(),
   },
+  createQualityWebSocket: vi.fn(() => ({ close: vi.fn() })),
 }));
 
 vi.mock("@/lib/utils", () => ({
@@ -109,6 +112,11 @@ describe("HealthCheckPanel", () => {
       duration_ms: 0,
     });
     mockCreateLintWebSocket.mockReturnValue({ close: vi.fn() } as unknown as WebSocket);
+    mockQualityApi.getLatestDuplicates.mockResolvedValue({
+      clusters: [],
+      threshold: 0.85,
+      checked_at: "",
+    });
   });
 
   it("renders nothing when isOpen is false", () => {
@@ -338,7 +346,7 @@ describe("HealthCheckPanel", () => {
   });
 
   it("detects duplicates when Find Duplicates is clicked", async () => {
-    mockQualityApi.getDuplicateCandidates.mockResolvedValue({
+    const duplicateResult = {
       clusters: [
         {
           entities: [
@@ -350,7 +358,9 @@ describe("HealthCheckPanel", () => {
       ],
       threshold: 0.85,
       checked_at: "",
-    });
+    };
+    mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-j1" });
+    mockQualityApi.getDuplicateJobResult.mockResolvedValue(duplicateResult);
     setup();
     await waitFor(() => {
       expect(screen.getByText("Duplicates")).toBeDefined();

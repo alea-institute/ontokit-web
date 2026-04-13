@@ -94,12 +94,12 @@ describe("qualityApi", () => {
     });
   });
 
-  describe("getDuplicateCandidates", () => {
-    it("triggers duplicate detection", async () => {
-      const data = { duplicates: [], total: 0 };
+  describe("triggerDuplicateDetection", () => {
+    it("triggers duplicate detection and returns job_id", async () => {
+      const data = { job_id: "dup-job-1" };
       mockOk(data);
 
-      const result = await qualityApi.getDuplicateCandidates("proj-1", "tok");
+      const result = await qualityApi.triggerDuplicateDetection("proj-1", "tok");
       expect(result).toEqual(data);
 
       const [url, options] = mockFetch.mock.calls[0];
@@ -109,12 +109,40 @@ describe("qualityApi", () => {
     });
 
     it("passes custom threshold and branch", async () => {
-      mockOk({ duplicates: [] });
+      mockOk({ job_id: "dup-job-2" });
 
-      await qualityApi.getDuplicateCandidates("proj-1", "tok", "dev", 0.9);
+      await qualityApi.triggerDuplicateDetection("proj-1", "tok", "dev", 0.9);
 
       const [url] = mockFetch.mock.calls[0];
       expect(url).toContain("threshold=0.9");
+      expect(url).toContain("branch=dev");
+    });
+  });
+
+  describe("getDuplicateJobResult", () => {
+    it("fetches duplicate detection result by job ID", async () => {
+      const data = { clusters: [], threshold: 0.85, checked_at: "" };
+      mockOk(data);
+
+      const result = await qualityApi.getDuplicateJobResult("proj-1", "job-1", "tok");
+      expect(result).toEqual(data);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/proj-1/quality/duplicates/jobs/job-1");
+      expect(options.method).toBe("GET");
+    });
+  });
+
+  describe("getLatestDuplicates", () => {
+    it("fetches latest cached duplicate results", async () => {
+      const data = { clusters: [], threshold: 0.85, checked_at: "" };
+      mockOk(data);
+
+      const result = await qualityApi.getLatestDuplicates("proj-1", "tok", "dev");
+      expect(result).toEqual(data);
+
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/proj-1/quality/duplicates/latest");
       expect(url).toContain("branch=dev");
     });
   });
