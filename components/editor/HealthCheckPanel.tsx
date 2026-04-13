@@ -148,7 +148,7 @@ export function HealthCheckPanel({
     // Small delay to avoid spurious connections during Strict Mode remounts
     const timeoutId = setTimeout(() => {
       if (isActive) {
-        ws = createLintWebSocket(projectId, handleMessage);
+        ws = createLintWebSocket(projectId, handleMessage, undefined, undefined, accessToken);
       }
     }, 100);
 
