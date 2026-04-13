@@ -19,15 +19,17 @@ export function createIndexWebSocket(
   projectId: string,
   onMessage: (message: IndexWebSocketMessage) => void,
   onError?: (error: Event) => void,
-  onClose?: (event: CloseEvent) => void
+  onClose?: (event: CloseEvent) => void,
+  token?: string
 ): WebSocket {
   const wsUrl =
     process.env.NEXT_PUBLIC_WS_URL ||
     process.env.NEXT_PUBLIC_API_URL?.replace(/^http/, "ws") ||
     "ws://localhost:8000";
 
+  const params = token ? `?token=${encodeURIComponent(token)}` : "";
   const ws = new WebSocket(
-    `${wsUrl}/api/v1/projects/${projectId}/ontology/index-ws`
+    `${wsUrl}/api/v1/projects/${projectId}/ontology/index-ws${params}`
   );
 
   ws.onmessage = (event) => {
@@ -58,6 +60,7 @@ export class IndexWebSocketManager {
   private ws: WebSocket | null = null;
   private projectId: string;
   private onMessage: (message: IndexWebSocketMessage) => void;
+  private token?: string;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
@@ -65,10 +68,12 @@ export class IndexWebSocketManager {
 
   constructor(
     projectId: string,
-    onMessage: (message: IndexWebSocketMessage) => void
+    onMessage: (message: IndexWebSocketMessage) => void,
+    token?: string
   ) {
     this.projectId = projectId;
     this.onMessage = onMessage;
+    this.token = token;
   }
 
   connect(): void {
@@ -85,7 +90,8 @@ export class IndexWebSocketManager {
         if (!this.isClosing && event.code !== 1000) {
           this.handleReconnect();
         }
-      }
+      },
+      this.token
     );
   }
 

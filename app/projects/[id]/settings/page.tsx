@@ -206,7 +206,13 @@ export default function ProjectSettingsPage() {
 
     const timeoutId = setTimeout(() => {
       if (isActive) {
-        ws = createIndexWebSocket(project.id, handleMessage);
+        ws = createIndexWebSocket(
+          project.id,
+          handleMessage,
+          undefined,
+          undefined,
+          accessTokenRef.current
+        );
       }
     }, 100);
 
