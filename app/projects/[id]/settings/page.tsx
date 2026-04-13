@@ -2004,6 +2004,18 @@ export default function ProjectSettingsPage() {
 
 type WebhookStatus = "unknown" | "checking" | "configured" | "created" | "manual_required" | "no_scope" | "no_token" | "error";
 
+function extractErrorDetail(err: unknown): string {
+  if (err instanceof ApiError) {
+    try {
+      const parsed = JSON.parse(err.message);
+      if (parsed?.detail) return String(parsed.detail);
+    } catch {
+      if (err.message) return err.message;
+    }
+  }
+  return "An unexpected error occurred.";
+}
+
 function WebhookConfigPanel({
   projectId,
   githubIntegration,
@@ -2023,6 +2035,7 @@ function WebhookConfigPanel({
   const [error, setError] = useState<string | null>(null);
   const [webhookStatus, setWebhookStatus] = useState<WebhookStatus>("unknown");
   const [webhookMessage, setWebhookMessage] = useState<string | null>(null);
+  const [showManualFallback, setShowManualFallback] = useState(false);
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -2049,9 +2062,9 @@ function WebhookConfigPanel({
           github_hook_id: result.github_hook_id,
         });
       }
-    } catch {
+    } catch (err) {
       setWebhookStatus("error");
-      setWebhookMessage("Failed to setup webhook.");
+      setWebhookMessage(extractErrorDetail(err));
     }
   };
 
@@ -2087,14 +2100,16 @@ function WebhookConfigPanel({
                 github_hook_id: result.github_hook_id,
               });
             }
-          } catch {
-            setWebhookStatus("unknown");
+          } catch (err) {
+            setWebhookStatus("error");
+            setWebhookMessage(extractErrorDetail(err));
           }
         }, 100);
         return;
       }
-    } catch {
-      setError("Failed to update webhook settings");
+    } catch (err) {
+      setError(extractErrorDetail(err));
+      setShowManualFallback(true);
     } finally {
       setIsToggling(false);
     }
@@ -2121,8 +2136,9 @@ function WebhookConfigPanel({
 
   const fullWebhookUrl = webhookUrl ? `${apiBaseUrl}${webhookUrl}` : null;
 
-  const showManualSetup = githubIntegration.webhooks_enabled &&
-    !["configured", "created", "checking"].includes(webhookStatus);
+  const showManualSetup = showManualFallback ||
+    (githubIntegration.webhooks_enabled &&
+      !["configured", "created", "checking"].includes(webhookStatus));
 
   return (
     <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-600">
