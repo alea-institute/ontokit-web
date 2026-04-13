@@ -175,19 +175,15 @@ export function createLintWebSocket(
   onMessage: (message: LintWebSocketMessage) => void,
   onError?: (error: Event) => void,
   onClose?: (event: CloseEvent) => void,
-  accessToken?: string
+  token?: string
 ): WebSocket {
   const wsUrl =
     process.env.NEXT_PUBLIC_WS_URL ||
     process.env.NEXT_PUBLIC_API_URL?.replace(/^http/, "ws") ||
     "ws://localhost:8000";
 
-  const url = new URL(`${wsUrl}/api/v1/projects/${projectId}/lint/ws`);
-  if (accessToken) {
-    url.searchParams.set("token", accessToken);
-  }
-
-  const ws = new WebSocket(url.toString());
+  const params = token ? `?token=${encodeURIComponent(token)}` : "";
+  const ws = new WebSocket(`${wsUrl}/api/v1/projects/${projectId}/lint/ws${params}`);
 
   ws.onmessage = (event) => {
     try {
@@ -217,6 +213,7 @@ export class LintWebSocketManager {
   private ws: WebSocket | null = null;
   private projectId: string;
   private onMessage: (message: LintWebSocketMessage) => void;
+  private token?: string;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
@@ -224,10 +221,12 @@ export class LintWebSocketManager {
 
   constructor(
     projectId: string,
-    onMessage: (message: LintWebSocketMessage) => void
+    onMessage: (message: LintWebSocketMessage) => void,
+    token?: string
   ) {
     this.projectId = projectId;
     this.onMessage = onMessage;
+    this.token = token;
   }
 
   connect(): void {
@@ -244,7 +243,8 @@ export class LintWebSocketManager {
         if (!this.isClosing && event.code !== 1000) {
           this.handleReconnect();
         }
-      }
+      },
+      this.token
     );
   }
 

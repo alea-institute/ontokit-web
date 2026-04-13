@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   XCircle,
   AlertTriangle,
@@ -126,12 +126,6 @@ export function HealthCheckPanel({
     }
   }, [isOpen, fetchData]);
 
-  // Keep a ref to the latest accessToken to avoid stale closures inside the effect
-  const accessTokenRef = useRef(accessToken);
-  useEffect(() => {
-    accessTokenRef.current = accessToken;
-  }, [accessToken]);
-
   // WebSocket for real-time updates
   useEffect(() => {
     if (!isOpen || !accessToken) return;
@@ -151,9 +145,26 @@ export function HealthCheckPanel({
     };
 
     // Small delay to avoid spurious connections during Strict Mode remounts
+    if (!accessToken) return;
+
     const timeoutId = setTimeout(() => {
       if (isActive) {
-        ws = createLintWebSocket(projectId, handleMessage, undefined, undefined, accessTokenRef.current);
+        ws = createLintWebSocket(
+          projectId,
+          handleMessage,
+          () => {
+            if (isActive) {
+              setIsRunning(false);
+              setError("Lint WebSocket connection failed");
+            }
+          },
+          (event) => {
+            if (isActive && event.code !== 1000) {
+              setIsRunning(false);
+            }
+          },
+          accessToken
+        );
       }
     }, 100);
 

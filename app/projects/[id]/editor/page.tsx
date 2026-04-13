@@ -68,6 +68,7 @@ export default function EditorPage() {
     accessToken: session?.accessToken,
     sessionStatus: status,
     activeBranch,
+    enableWebSocket: true,
   });
 
   const {
