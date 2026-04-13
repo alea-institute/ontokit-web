@@ -146,6 +146,8 @@ export function HealthCheckPanel({
     };
 
     // Small delay to avoid spurious connections during Strict Mode remounts
+    if (!accessToken) return;
+
     const timeoutId = setTimeout(() => {
       if (isActive) {
         ws = createLintWebSocket(projectId, handleMessage, undefined, undefined, accessToken);
@@ -159,7 +161,7 @@ export function HealthCheckPanel({
         ws.close();
       }
     };
-  }, [isOpen, projectId, fetchData]);
+  }, [isOpen, projectId, accessToken, fetchData]);
 
   // Trigger a new lint run
   const handleRunLint = async () => {
