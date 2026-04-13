@@ -106,6 +106,7 @@ export function debounce<T extends (...args: unknown[]) => unknown>(
 /** Map bare language codes to their default country code for flag rendering */
 const LANG_TO_COUNTRY: Record<string, string> = {
   en: "US",
+  la: "VA",
   ja: "JP",
   ko: "KR",
   zh: "CN",
