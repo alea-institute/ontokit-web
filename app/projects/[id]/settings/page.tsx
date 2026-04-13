@@ -2079,6 +2079,7 @@ function WebhookConfigPanel({
         accessToken
       );
       onIntegrationUpdate(updated);
+      setShowManualFallback(false);
       // Clear state when disabling
       if (!updated.webhooks_enabled) {
         setWebhookSecret(null);
