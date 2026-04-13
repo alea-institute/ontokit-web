@@ -150,7 +150,22 @@ export function HealthCheckPanel({
 
     const timeoutId = setTimeout(() => {
       if (isActive) {
-        ws = createLintWebSocket(projectId, handleMessage, undefined, undefined, accessToken);
+        ws = createLintWebSocket(
+          projectId,
+          handleMessage,
+          () => {
+            if (isActive) {
+              setIsRunning(false);
+              setError("Lint WebSocket connection failed");
+            }
+          },
+          (event) => {
+            if (isActive && event.code !== 1000) {
+              setIsRunning(false);
+            }
+          },
+          accessToken
+        );
       }
     }, 100);
 

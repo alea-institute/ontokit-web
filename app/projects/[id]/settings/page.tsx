@@ -23,7 +23,7 @@ import { MemberList } from "@/components/projects/member-list";
 import { UserSearchInput } from "@/components/projects/user-search-input";
 import { LabelPreferences } from "@/components/projects/label-preferences";
 import { ApiError, projectOntologyApi, type IndexStatusResponse, type IndexStatus } from "@/lib/api/client";
-import { createIndexWebSocket, type IndexWebSocketMessage } from "@/lib/api/indexStatus";
+import { IndexWebSocketManager, type IndexWebSocketMessage } from "@/lib/api/indexStatus";
 import {
   projectApi,
   type Project,
@@ -184,46 +184,33 @@ export default function ProjectSettingsPage() {
 
   // WebSocket for real-time index status updates
   useEffect(() => {
-    if (!project?.id) return;
+    if (!project?.id || !session?.accessToken) return;
 
-    let isActive = true;
-    let ws: WebSocket | null = null;
+    const manager = new IndexWebSocketManager(
+      project.id,
+      (message: IndexWebSocketMessage) => {
+        if (message.type === "index_started") {
+          setIsReindexing(true);
+          setIndexStatus((prev) =>
+            prev ? { ...prev, status: "indexing" as IndexStatus } : prev
+          );
+        } else if (message.type === "index_complete" || message.type === "index_failed") {
+          setIsReindexing(false);
+          const token = accessTokenRef.current;
+          queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, token) });
+        }
+      },
+      session.accessToken
+    );
 
-    const handleMessage = (message: IndexWebSocketMessage) => {
-      if (!isActive) return;
-      if (message.type === "index_started") {
-        setIsReindexing(true);
-        setIndexStatus((prev) =>
-          prev ? { ...prev, status: "indexing" as IndexStatus } : prev
-        );
-      } else if (message.type === "index_complete" || message.type === "index_failed") {
-        setIsReindexing(false);
-        // Refresh from server to get the full status record
-        const token = accessTokenRef.current;
-        queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, token) });
-      }
-    };
-
-    const timeoutId = setTimeout(() => {
-      if (isActive) {
-        ws = createIndexWebSocket(
-          project.id,
-          handleMessage,
-          undefined,
-          undefined,
-          accessTokenRef.current
-        );
-      }
-    }, 100);
+    // Small delay to avoid spurious connections during Strict Mode remounts
+    const timeoutId = setTimeout(() => manager.connect(), 100);
 
     return () => {
-      isActive = false;
       clearTimeout(timeoutId);
-      if (ws) {
-        ws.close();
-      }
+      manager.disconnect();
     };
-  }, [project?.id, projectId, queryClient]);
+  }, [project?.id, session?.accessToken, projectId, queryClient]);
 
   // Clean up normalization polling on unmount
   useEffect(() => {

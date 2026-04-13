@@ -12,16 +12,34 @@ class MockWebSocket {
   static CLOSING = 2;
   static CLOSED = 3;
 
-  readyState = MockWebSocket.OPEN;
+  readyState = MockWebSocket.CONNECTING;
   onopen: (() => void) | null = null;
   onclose: ((ev: { code: number }) => void) | null = null;
   onerror: ((ev: Event) => void) | null = null;
   onmessage: ((ev: { data: string }) => void) | null = null;
 
+  private listeners: Record<string, ((...args: unknown[]) => void)[]> = {};
+
   close = vi.fn();
   send = vi.fn();
 
   constructor(public url: string) {}
+
+  addEventListener(event: string, cb: (...args: unknown[]) => void) {
+    (this.listeners[event] ??= []).push(cb);
+  }
+
+  dispatchEvent(event: Event) {
+    for (const cb of this.listeners[event.type] ?? []) cb(event);
+    return true;
+  }
+
+  /** Test helper: simulate successful open */
+  simulateOpen() {
+    this.readyState = MockWebSocket.OPEN;
+    this.onopen?.();
+    this.dispatchEvent(new Event("open"));
+  }
 }
 
 // --- createIndexWebSocket ---
@@ -63,6 +81,32 @@ describe("createIndexWebSocket", () => {
     const ws = createIndexWebSocket("p1", onMessage);
 
     expect(ws.url).toBe("ws://localhost:8000/api/v1/projects/p1/ontology/index-ws");
+  });
+
+  it("appends encoded token query param when token is provided", () => {
+    const onMessage = vi.fn();
+
+    const ws = createIndexWebSocket("p1", onMessage, undefined, undefined, "my-secret-token");
+
+    expect(ws.url).toBe(
+      "ws://localhost:8000/api/v1/projects/p1/ontology/index-ws?token=my-secret-token"
+    );
+  });
+
+  it("encodes special characters in token", () => {
+    const onMessage = vi.fn();
+
+    const ws = createIndexWebSocket("p1", onMessage, undefined, undefined, "tok en+foo=bar");
+
+    expect(ws.url).toContain(`?token=${encodeURIComponent("tok en+foo=bar")}`);
+  });
+
+  it("omits token query param when token is undefined", () => {
+    const onMessage = vi.fn();
+
+    const ws = createIndexWebSocket("p1", onMessage);
+
+    expect(ws.url).not.toContain("?token=");
   });
 
   it("calls onMessage with parsed JSON data on ws.onmessage", () => {
@@ -156,11 +200,28 @@ describe("IndexWebSocketManager", () => {
     );
   });
 
+  it("connect() passes token to the WebSocket URL", () => {
+    const mgr = new IndexWebSocketManager("p1", vi.fn(), "my-token");
+    mgr.connect();
+
+    expect(constructedInstances[0].url).toContain("?token=my-token");
+  });
+
   it("connect() does not create duplicate if already OPEN", () => {
     const mgr = new IndexWebSocketManager("p1", vi.fn());
     mgr.connect();
 
-    // First WebSocket is OPEN by default (MockWebSocket.readyState = OPEN)
+    constructedInstances[0].simulateOpen();
+    mgr.connect();
+
+    expect(constructedInstances).toHaveLength(1);
+  });
+
+  it("connect() does not create duplicate if still CONNECTING", () => {
+    const mgr = new IndexWebSocketManager("p1", vi.fn());
+    mgr.connect();
+
+    // readyState is CONNECTING by default, second connect should be a no-op
     mgr.connect();
 
     expect(constructedInstances).toHaveLength(1);
@@ -179,6 +240,7 @@ describe("IndexWebSocketManager", () => {
   it("reconnects on error with exponential backoff up to 5 attempts", () => {
     const mgr = new IndexWebSocketManager("p1", vi.fn());
     mgr.connect();
+    constructedInstances[0].simulateOpen();
 
     for (let attempt = 1; attempt <= 5; attempt++) {
       const ws = constructedInstances[constructedInstances.length - 1];
@@ -197,6 +259,7 @@ describe("IndexWebSocketManager", () => {
   it("does not exceed maxReconnectAttempts (5)", () => {
     const mgr = new IndexWebSocketManager("p1", vi.fn());
     mgr.connect();
+    constructedInstances[0].simulateOpen();
 
     for (let attempt = 1; attempt <= 5; attempt++) {
       const ws = constructedInstances[constructedInstances.length - 1];
@@ -215,9 +278,41 @@ describe("IndexWebSocketManager", () => {
     expect(constructedInstances).toHaveLength(6);
   });
 
+  it("resets retry budget on successful reconnection", () => {
+    const mgr = new IndexWebSocketManager("p1", vi.fn());
+    mgr.connect();
+    constructedInstances[0].simulateOpen();
+
+    // Use 3 reconnect attempts
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const ws = constructedInstances[constructedInstances.length - 1];
+      ws.readyState = MockWebSocket.CLOSED;
+      ws.onerror!(new Event("error"));
+      vi.advanceTimersByTime(1000 * Math.pow(2, attempt - 1));
+    }
+
+    // 1 initial + 3 reconnects = 4
+    expect(constructedInstances).toHaveLength(4);
+
+    // Simulate successful open on the last reconnect
+    constructedInstances[constructedInstances.length - 1].simulateOpen();
+
+    // Now fail again — should get another full 5 attempts
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      const ws = constructedInstances[constructedInstances.length - 1];
+      ws.readyState = MockWebSocket.CLOSED;
+      ws.onerror!(new Event("error"));
+      vi.advanceTimersByTime(1000 * Math.pow(2, attempt - 1));
+    }
+
+    // 4 from before + 5 new reconnects = 9
+    expect(constructedInstances).toHaveLength(9);
+  });
+
   it("does NOT reconnect after disconnect() is called", () => {
     const mgr = new IndexWebSocketManager("p1", vi.fn());
     mgr.connect();
+    constructedInstances[0].simulateOpen();
 
     mgr.disconnect();
 
@@ -229,9 +324,46 @@ describe("IndexWebSocketManager", () => {
     expect(constructedInstances).toHaveLength(1);
   });
 
+  it("disconnect() cancels a pending reconnect timer", () => {
+    const mgr = new IndexWebSocketManager("p1", vi.fn());
+    mgr.connect();
+    constructedInstances[0].simulateOpen();
+
+    // Trigger reconnect scheduling
+    const ws = constructedInstances[0];
+    ws.readyState = MockWebSocket.CLOSED;
+    ws.onerror!(new Event("error"));
+
+    // Disconnect before the timer fires
+    mgr.disconnect();
+    vi.advanceTimersByTime(10000);
+
+    // Only the initial connection, no reconnect
+    expect(constructedInstances).toHaveLength(1);
+  });
+
+  it("does not double-reconnect when both onerror and onclose fire", () => {
+    const mgr = new IndexWebSocketManager("p1", vi.fn());
+    mgr.connect();
+    constructedInstances[0].simulateOpen();
+
+    const ws = constructedInstances[0];
+    ws.readyState = MockWebSocket.CLOSED;
+
+    // Both onerror and onclose fire (typical browser behavior)
+    ws.onerror!(new Event("error"));
+    ws.onclose!({ code: 1006 } as CloseEvent);
+
+    vi.advanceTimersByTime(1000);
+
+    // Only one reconnect, not two
+    expect(constructedInstances).toHaveLength(2);
+  });
+
   it("does NOT reconnect on normal close (code 1000)", () => {
     const mgr = new IndexWebSocketManager("p1", vi.fn());
     mgr.connect();
+    constructedInstances[0].simulateOpen();
 
     const ws = constructedInstances[0];
     ws.readyState = MockWebSocket.CLOSED;
@@ -245,6 +377,7 @@ describe("IndexWebSocketManager", () => {
   it("reconnects on abnormal close (code !== 1000)", () => {
     const mgr = new IndexWebSocketManager("p1", vi.fn());
     mgr.connect();
+    constructedInstances[0].simulateOpen();
 
     const ws = constructedInstances[0];
     ws.readyState = MockWebSocket.CLOSED;

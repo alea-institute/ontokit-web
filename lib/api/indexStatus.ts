@@ -65,6 +65,7 @@ export class IndexWebSocketManager {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private isClosing = false;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     projectId: string,
@@ -77,7 +78,10 @@ export class IndexWebSocketManager {
   }
 
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (
+      this.ws?.readyState === WebSocket.OPEN ||
+      this.ws?.readyState === WebSocket.CONNECTING
+    ) {
       return;
     }
 
@@ -93,11 +97,20 @@ export class IndexWebSocketManager {
       },
       this.token
     );
+
+    // Reset retry budget on successful open
+    this.ws.addEventListener("open", () => {
+      this.reconnectAttempts = 0;
+    });
   }
 
   disconnect(): void {
     this.isClosing = true;
     this.reconnectAttempts = 0;
+    if (this.reconnectTimer !== null) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.ws) {
       this.ws.close(1000, "Client closing connection");
       this.ws = null;
@@ -105,13 +118,16 @@ export class IndexWebSocketManager {
   }
 
   private handleReconnect(): void {
-    if (this.isClosing) return;
+    if (this.isClosing || this.reconnectTimer !== null) return;
 
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
       const delay =
         this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-      setTimeout(() => this.connect(), delay);
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectTimer = null;
+        this.connect();
+      }, delay);
     }
   }
 }
