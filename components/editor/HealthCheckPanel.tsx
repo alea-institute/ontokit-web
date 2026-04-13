@@ -145,8 +145,6 @@ export function HealthCheckPanel({
     };
 
     // Small delay to avoid spurious connections during Strict Mode remounts
-    if (!accessToken) return;
-
     const timeoutId = setTimeout(() => {
       if (isActive) {
         ws = createLintWebSocket(
