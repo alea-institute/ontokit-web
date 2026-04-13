@@ -13,7 +13,6 @@ import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEd
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchProvider, useBranch } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
-import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
@@ -183,7 +182,6 @@ function ViewerContent({
     selectedNodeFallback,
     sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
     loadSourceContent, sourceIriIndex,
-    connectionStatus, wsEndpoint, wsPurpose,
   } = viewer;
 
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
@@ -228,20 +226,6 @@ function ViewerContent({
               <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2">
-              {/* WebSocket Connection Status */}
-              <div className="flex items-center gap-1">
-                <ConnectionStatus
-                  state="disabled"
-                  purpose="Real-time collaboration (coming soon)"
-                  endpoint="/api/v1/collab/ws"
-                />
-                <ConnectionStatus
-                  state={connectionStatus}
-                  purpose={wsPurpose}
-                  endpoint={wsEndpoint}
-                />
-              </div>
-
               {/* Share */}
               <ShareButton
                 projectId={projectId}

@@ -6,6 +6,7 @@ import type { ConnectionState } from "@/components/ui/ConnectionStatus";
 interface UseCollaborationStatusOptions {
   projectId: string;
   enabled?: boolean;
+  token?: string;
 }
 
 /**
@@ -15,6 +16,7 @@ interface UseCollaborationStatusOptions {
 export function useCollaborationStatus({
   projectId,
   enabled = true,
+  token,
 }: UseCollaborationStatusOptions) {
   const [status, setStatus] = useState<ConnectionState>("disconnected");
   const wsRef = useRef<WebSocket | null>(null);
@@ -27,8 +29,9 @@ export function useCollaborationStatus({
   const getWsUrl = useCallback(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     const wsUrl = apiUrl.replace(/^http/, "ws");
-    return `${wsUrl}/api/v1/projects/${projectId}/lint/ws`;
-  }, [projectId]);
+    const params = token ? `?token=${encodeURIComponent(token)}` : "";
+    return `${wsUrl}/api/v1/projects/${projectId}/lint/ws${params}`;
+  }, [projectId, token]);
 
   const connect = useCallback(() => {
     if (!enabled || !projectId || isClosingRef.current) return;

@@ -146,9 +146,26 @@ export function HealthCheckPanel({
     };
 
     // Small delay to avoid spurious connections during Strict Mode remounts
+    if (!accessToken) return;
+
     const timeoutId = setTimeout(() => {
       if (isActive) {
-        ws = createLintWebSocket(projectId, handleMessage);
+        ws = createLintWebSocket(
+          projectId,
+          handleMessage,
+          () => {
+            if (isActive) {
+              setIsRunning(false);
+              setError("Lint WebSocket connection failed");
+            }
+          },
+          (event) => {
+            if (isActive && event.code !== 1000) {
+              setIsRunning(false);
+            }
+          },
+          accessToken
+        );
       }
     }, 100);
 
@@ -159,7 +176,7 @@ export function HealthCheckPanel({
         ws.close();
       }
     };
-  }, [isOpen, projectId, fetchData]);
+  }, [isOpen, projectId, accessToken, fetchData]);
 
   // Trigger a new lint run
   const handleRunLint = async () => {

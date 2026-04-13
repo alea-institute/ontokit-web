@@ -23,6 +23,7 @@ import { MemberList } from "@/components/projects/member-list";
 import { UserSearchInput } from "@/components/projects/user-search-input";
 import { LabelPreferences } from "@/components/projects/label-preferences";
 import { ApiError, projectOntologyApi, type IndexStatusResponse, type IndexStatus } from "@/lib/api/client";
+import { IndexWebSocketManager, type IndexWebSocketMessage } from "@/lib/api/indexStatus";
 import {
   projectApi,
   type Project,
@@ -180,14 +181,40 @@ export default function ProjectSettingsPage() {
   }, [indexQueryData]);
 
   const [isReindexing, setIsReindexing] = useState(false);
-  const reindexPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Clean up polling on unmount
+  // WebSocket for real-time index status updates
+  useEffect(() => {
+    if (!project?.id || !session?.accessToken) return;
+
+    const manager = new IndexWebSocketManager(
+      project.id,
+      (message: IndexWebSocketMessage) => {
+        if (message.type === "index_started") {
+          setIsReindexing(true);
+          setIndexStatus((prev) =>
+            prev ? { ...prev, status: "indexing" as IndexStatus } : prev
+          );
+        } else if (message.type === "index_complete" || message.type === "index_failed") {
+          setIsReindexing(false);
+          const token = accessTokenRef.current;
+          queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, token) });
+        }
+      },
+      session.accessToken
+    );
+
+    // Small delay to avoid spurious connections during Strict Mode remounts
+    const timeoutId = setTimeout(() => manager.connect(), 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      manager.disconnect();
+    };
+  }, [project?.id, session?.accessToken, projectId, queryClient]);
+
+  // Clean up normalization polling on unmount
   useEffect(() => {
     return () => {
-      if (reindexPollRef.current) {
-        clearInterval(reindexPollRef.current);
-      }
       if (normalizationPollRef.current) {
         clearInterval(normalizationPollRef.current);
       }
@@ -666,33 +693,7 @@ export default function ProjectSettingsPage() {
       );
       setSuccessMessage("Reindex job queued. The index will update in the background.");
       setTimeout(() => setSuccessMessage(null), 5000);
-
-      // Clear any existing poll before starting a new one
-      if (reindexPollRef.current) {
-        clearInterval(reindexPollRef.current);
-      }
-
-      // Poll for completion (read token from ref to avoid stale closure)
-      reindexPollRef.current = setInterval(async () => {
-        try {
-          const token = accessTokenRef.current;
-          const status = await projectOntologyApi.getIndexStatus(
-            project.id,
-            token
-          );
-          setIndexStatus(status);
-          if (status.status === "ready" || status.status === "failed") {
-            clearInterval(reindexPollRef.current!);
-            reindexPollRef.current = null;
-            setIsReindexing(false);
-            queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, token) });
-          }
-        } catch {
-          clearInterval(reindexPollRef.current!);
-          reindexPollRef.current = null;
-          setIsReindexing(false);
-        }
-      }, 3000);
+      // WebSocket will handle status updates automatically
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Failed to trigger reindex");
       setIsReindexing(false);
