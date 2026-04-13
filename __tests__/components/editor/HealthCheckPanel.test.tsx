@@ -483,6 +483,27 @@ describe("HealthCheckPanel", () => {
     });
   });
 
+  it("surfaces non-404 errors from polling instead of swallowing them", async () => {
+    mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-500" });
+    // Simulate a 500 server error (not a 404)
+    const serverError = Object.assign(new Error("Internal server error"), { status: 500 });
+    mockQualityApi.getDuplicateJobResult.mockRejectedValue(serverError);
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Find Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Find Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Internal server error")).toBeDefined();
+    });
+    // Should stop after first non-404, not keep polling
+    expect(mockQualityApi.getDuplicateJobResult).toHaveBeenCalledTimes(1);
+  });
+
   it("loads cached duplicates when switching to duplicates tab", async () => {
     const cachedResult = {
       clusters: [
@@ -761,7 +782,9 @@ describe("HealthCheckPanel", () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-slow" });
     // Always reject (job never finishes)
-    mockQualityApi.getDuplicateJobResult.mockRejectedValue(new Error("Not found"));
+    // Simulate 404 (job not ready) so the loop keeps polling until timeout
+    const notFoundErr = Object.assign(new Error("Not found"), { status: 404 });
+    mockQualityApi.getDuplicateJobResult.mockRejectedValue(notFoundErr);
 
     setup();
     await waitFor(() => {

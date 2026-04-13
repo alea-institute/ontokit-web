@@ -131,6 +131,16 @@ describe("qualityApi", () => {
       expect(url).toContain("/api/v1/projects/proj-1/quality/duplicates/jobs/job-1");
       expect(options.method).toBe("GET");
     });
+
+    it("omits auth header when no token", async () => {
+      mockOk({ clusters: [], threshold: 0.85, checked_at: "" });
+
+      await qualityApi.getDuplicateJobResult("proj-1", "job-1");
+
+      const [, options] = mockFetch.mock.calls[0];
+      const headers = new Headers(options.headers);
+      expect(headers.get("Authorization")).toBeNull();
+    });
   });
 
   describe("getLatestDuplicates", () => {
@@ -155,17 +165,14 @@ describe("qualityApi", () => {
       const headers = new Headers(options.headers);
       expect(headers.get("Authorization")).toBeNull();
     });
-  });
 
-  describe("getDuplicateJobResult", () => {
-    it("omits auth header when no token", async () => {
+    it("omits branch param when not provided", async () => {
       mockOk({ clusters: [], threshold: 0.85, checked_at: "" });
 
-      await qualityApi.getDuplicateJobResult("proj-1", "job-1");
+      await qualityApi.getLatestDuplicates("proj-1", "tok");
 
-      const [, options] = mockFetch.mock.calls[0];
-      const headers = new Headers(options.headers);
-      expect(headers.get("Authorization")).toBeNull();
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).not.toContain("branch=");
     });
   });
 });
@@ -209,6 +216,23 @@ describe("createQualityWebSocket", () => {
     mockWsInstance.onmessage!(new MessageEvent("message", { data: JSON.stringify(payload) }));
 
     expect(onMessage).toHaveBeenCalledWith(payload);
+  });
+
+  it("ignores messages that fail the type guard", () => {
+    const onMessage = vi.fn();
+    const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    createQualityWebSocket("proj-1", onMessage);
+
+    // Valid JSON but missing required fields
+    const bad = { type: "unknown_event", project_id: "proj-1" };
+    mockWsInstance.onmessage!(new MessageEvent("message", { data: JSON.stringify(bad) }));
+
+    expect(onMessage).not.toHaveBeenCalled();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "Unexpected quality WebSocket payload:",
+      JSON.stringify(bad)
+    );
+    consoleSpy.mockRestore();
   });
 
   it("handles JSON parse errors in onmessage gracefully", () => {

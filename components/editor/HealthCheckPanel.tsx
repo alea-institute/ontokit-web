@@ -253,8 +253,13 @@ export function HealthCheckPanel({
           setDuplicateClusters(result.clusters);
           setIsDetectingDuplicates(false);
           return;
-        } catch {
+        } catch (pollErr) {
           // 404 means job not done yet — keep polling
+          const isNotFound =
+            pollErr instanceof Error &&
+            "status" in pollErr &&
+            (pollErr as { status: number }).status === 404;
+          if (!isNotFound) throw pollErr;
         }
         delay = Math.min(delay * 1.5, maxDelay);
       }

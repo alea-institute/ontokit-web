@@ -25,6 +25,31 @@ export interface QualityWebSocketMessage {
   error?: string;
 }
 
+const QUALITY_WS_TYPES = new Set([
+  "consistency_started",
+  "consistency_complete",
+  "consistency_failed",
+  "duplicates_started",
+  "duplicates_complete",
+  "duplicates_failed",
+]);
+
+function isQualityWebSocketMessage(
+  data: unknown
+): data is QualityWebSocketMessage {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    "type" in data &&
+    typeof (data as Record<string, unknown>).type === "string" &&
+    QUALITY_WS_TYPES.has((data as Record<string, unknown>).type as string) &&
+    "project_id" in data &&
+    typeof (data as Record<string, unknown>).project_id === "string" &&
+    "branch" in data &&
+    typeof (data as Record<string, unknown>).branch === "string"
+  );
+}
+
 export const qualityApi = {
   getCrossReferences: (
     projectId: string,
@@ -128,8 +153,12 @@ export function createQualityWebSocket(
 
   ws.onmessage = (event) => {
     try {
-      const data = JSON.parse(event.data) as QualityWebSocketMessage;
-      onMessage(data);
+      const data: unknown = JSON.parse(event.data);
+      if (isQualityWebSocketMessage(data)) {
+        onMessage(data);
+      } else {
+        console.warn("Unexpected quality WebSocket payload:", event.data);
+      }
     } catch (e) {
       console.error("Failed to parse quality WebSocket message:", e);
     }
