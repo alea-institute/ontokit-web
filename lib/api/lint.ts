@@ -174,14 +174,20 @@ export function createLintWebSocket(
   projectId: string,
   onMessage: (message: LintWebSocketMessage) => void,
   onError?: (error: Event) => void,
-  onClose?: (event: CloseEvent) => void
+  onClose?: (event: CloseEvent) => void,
+  accessToken?: string
 ): WebSocket {
   const wsUrl =
     process.env.NEXT_PUBLIC_WS_URL ||
     process.env.NEXT_PUBLIC_API_URL?.replace(/^http/, "ws") ||
     "ws://localhost:8000";
 
-  const ws = new WebSocket(`${wsUrl}/api/v1/projects/${projectId}/lint/ws`);
+  const url = new URL(`${wsUrl}/api/v1/projects/${projectId}/lint/ws`);
+  if (accessToken) {
+    url.searchParams.set("token", accessToken);
+  }
+
+  const ws = new WebSocket(url.toString());
 
   ws.onmessage = (event) => {
     try {

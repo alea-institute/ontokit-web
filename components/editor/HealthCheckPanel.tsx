@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   XCircle,
   AlertTriangle,
@@ -126,9 +126,15 @@ export function HealthCheckPanel({
     }
   }, [isOpen, fetchData]);
 
+  // Keep a ref to the latest accessToken to avoid stale closures inside the effect
+  const accessTokenRef = useRef(accessToken);
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
+
   // WebSocket for real-time updates
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !accessToken) return;
 
     // Track if this effect is still active (handles React Strict Mode double-invoke)
     let isActive = true;
@@ -140,7 +146,6 @@ export function HealthCheckPanel({
         setIsRunning(true);
       } else if (message.type === "lint_complete" || message.type === "lint_failed") {
         setIsRunning(false);
-        // Refresh data
         fetchData();
       }
     };
@@ -148,7 +153,7 @@ export function HealthCheckPanel({
     // Small delay to avoid spurious connections during Strict Mode remounts
     const timeoutId = setTimeout(() => {
       if (isActive) {
-        ws = createLintWebSocket(projectId, handleMessage);
+        ws = createLintWebSocket(projectId, handleMessage, undefined, undefined, accessTokenRef.current);
       }
     }, 100);
 
@@ -159,7 +164,7 @@ export function HealthCheckPanel({
         ws.close();
       }
     };
-  }, [isOpen, projectId, fetchData]);
+  }, [isOpen, projectId, accessToken, fetchData]);
 
   // Trigger a new lint run
   const handleRunLint = async () => {
