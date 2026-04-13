@@ -2,6 +2,12 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { generationApi, type GeneratedSuggestion, type SuggestionType } from "@/lib/api/generation";
 import { useSuggestionStore, type StoredSuggestion } from "@/lib/stores/suggestionStore";
 
+/** Stable empty array used as selector fallback to prevent Zustand re-render loops.
+ *  Never use an inline `[]` literal in a Zustand selector — Object.is([], []) is false,
+ *  which causes the selector to report a change on every render and triggers infinite loops.
+ */
+const EMPTY_SUGGESTIONS: StoredSuggestion[] = [];
+
 export interface UseSuggestionsOptions {
   projectId: string;
   entityIri: string | null;
@@ -36,7 +42,7 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
 
   const store = useSuggestionStore;
   const items = useSuggestionStore((s) =>
-    entityIri ? (s.suggestions[`${entityIri}::${suggestionType}`] || []) : []
+    entityIri ? (s.suggestions[`${entityIri}::${suggestionType}`] ?? EMPTY_SUGGESTIONS) : EMPTY_SUGGESTIONS
   );
 
   // Abort in-flight request when entityIri changes (Pitfall 6 defense)
