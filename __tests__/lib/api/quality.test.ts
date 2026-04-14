@@ -4,7 +4,7 @@ import {
   mockOk,
   resetFetch,
 } from "@/__tests__/helpers/mockFetch";
-import { qualityApi, createQualityWebSocket } from "@/lib/api/quality";
+import { qualityApi, createQualityWebSocket, isQualityWebSocketMessage } from "@/lib/api/quality";
 
 describe("qualityApi", () => {
   beforeEach(() => {
@@ -280,5 +280,106 @@ describe("createQualityWebSocket", () => {
     mockWsInstance.onopen!();
 
     expect(onOpen).toHaveBeenCalled();
+  });
+});
+
+describe("isQualityWebSocketMessage", () => {
+  it("accepts a valid message with all required fields", () => {
+    expect(
+      isQualityWebSocketMessage({
+        type: "duplicates_complete",
+        project_id: "p1",
+        branch: "main",
+      })
+    ).toBe(true);
+  });
+
+  it("accepts all known event types", () => {
+    const types = [
+      "consistency_started",
+      "consistency_complete",
+      "consistency_failed",
+      "duplicates_started",
+      "duplicates_complete",
+      "duplicates_failed",
+    ];
+    for (const type of types) {
+      expect(
+        isQualityWebSocketMessage({ type, project_id: "p1", branch: "main" })
+      ).toBe(true);
+    }
+  });
+
+  it("accepts messages with optional fields", () => {
+    expect(
+      isQualityWebSocketMessage({
+        type: "duplicates_complete",
+        project_id: "p1",
+        branch: "main",
+        job_id: "j1",
+        clusters_found: 3,
+      })
+    ).toBe(true);
+  });
+
+  it("rejects null", () => {
+    expect(isQualityWebSocketMessage(null)).toBe(false);
+  });
+
+  it("rejects non-object primitives", () => {
+    expect(isQualityWebSocketMessage("string")).toBe(false);
+    expect(isQualityWebSocketMessage(42)).toBe(false);
+    expect(isQualityWebSocketMessage(undefined)).toBe(false);
+  });
+
+  it("rejects unknown event type", () => {
+    expect(
+      isQualityWebSocketMessage({
+        type: "unknown_event",
+        project_id: "p1",
+        branch: "main",
+      })
+    ).toBe(false);
+  });
+
+  it("rejects numeric type", () => {
+    expect(
+      isQualityWebSocketMessage({
+        type: 123,
+        project_id: "p1",
+        branch: "main",
+      })
+    ).toBe(false);
+  });
+
+  it("rejects missing branch field", () => {
+    expect(
+      isQualityWebSocketMessage({
+        type: "duplicates_complete",
+        project_id: "p1",
+      })
+    ).toBe(false);
+  });
+
+  it("rejects missing project_id field", () => {
+    expect(
+      isQualityWebSocketMessage({
+        type: "duplicates_complete",
+        branch: "main",
+      })
+    ).toBe(false);
+  });
+
+  it("rejects missing type field", () => {
+    expect(
+      isQualityWebSocketMessage({
+        project_id: "p1",
+        branch: "main",
+      })
+    ).toBe(false);
+  });
+
+  it("rejects empty object", () => {
+    expect(isQualityWebSocketMessage({})).toBe(false);
   });
 });

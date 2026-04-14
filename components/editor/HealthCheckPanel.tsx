@@ -86,6 +86,8 @@ export function HealthCheckPanel({
 
   // Track whether the quality WebSocket is connected
   const qualityWsConnected = useRef(false);
+  // Cancellation flag for the polling fallback loop
+  const pollCancelled = useRef(false);
 
   // Fetch lint status and issues
   const fetchData = useCallback(async (issueFilter?: IssueFilter) => {
@@ -228,6 +230,7 @@ export function HealthCheckPanel({
     if (!accessToken) return;
     setIsDetectingDuplicates(true);
     setDuplicatesError(null);
+    pollCancelled.current = false;
 
     let jobId: string;
     try {
@@ -244,8 +247,20 @@ export function HealthCheckPanel({
       return;
     }
 
-    // When WS is connected the effect handler manages loading state
-    if (qualityWsConnected.current) return;
+    // When WS is connected the effect handler manages loading state.
+    // Add a safety timeout so the spinner doesn't stay forever if the
+    // WS message is lost (network hiccup, Redis pubsub gap, etc.).
+    if (qualityWsConnected.current) {
+      const WS_TIMEOUT_MS = 60_000;
+      setTimeout(() => {
+        // Only clear if still detecting (WS handler hasn't already resolved it)
+        setIsDetectingDuplicates((prev) => {
+          if (prev) setDuplicatesError("Duplicate detection timed out — try again later");
+          return false;
+        });
+      }, WS_TIMEOUT_MS);
+      return;
+    }
 
     // Fallback: poll for job result with exponential backoff
     try {
@@ -253,7 +268,9 @@ export function HealthCheckPanel({
       const maxDelay = 5000;
       const maxAttempts = 20;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (pollCancelled.current) return;
         await new Promise((r) => setTimeout(r, delay));
+        if (pollCancelled.current) return;
         const result = await qualityApi.getDuplicateJobResult(
           projectId,
           jobId,
@@ -267,16 +284,19 @@ export function HealthCheckPanel({
         // 200 OK: job complete — narrow to DuplicateDetectionResult
         const completed = result as DuplicateDetectionResult;
         setDuplicateClusters(completed.clusters);
-        setIsDetectingDuplicates(false);
         return;
       }
       setDuplicatesError("Duplicate detection timed out — try again later");
     } catch (err) {
-      setDuplicatesError(
-        err instanceof Error ? err.message : "Duplicate detection failed"
-      );
+      if (!pollCancelled.current) {
+        setDuplicatesError(
+          err instanceof Error ? err.message : "Duplicate detection failed"
+        );
+      }
     } finally {
-      setIsDetectingDuplicates(false);
+      if (!pollCancelled.current) {
+        setIsDetectingDuplicates(false);
+      }
     }
   };
 
@@ -337,9 +357,7 @@ export function HealthCheckPanel({
           projectId,
           handleQualityMessage,
           () => { qualityWsConnected.current = false; },
-          (event) => {
-            if (event.code !== 1000) qualityWsConnected.current = false;
-          },
+          () => { qualityWsConnected.current = false; },
           accessToken,
           () => { qualityWsConnected.current = true; }
         );
@@ -349,6 +367,7 @@ export function HealthCheckPanel({
     return () => {
       isActive = false;
       qualityWsConnected.current = false;
+      pollCancelled.current = true;
       clearTimeout(timeoutId);
       if (ws) ws.close();
     };

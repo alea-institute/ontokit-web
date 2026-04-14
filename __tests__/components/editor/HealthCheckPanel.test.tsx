@@ -485,7 +485,7 @@ describe("HealthCheckPanel", () => {
     });
   });
 
-  it("surfaces non-404 errors from polling instead of swallowing them", async () => {
+  it("surfaces polling errors in the UI", async () => {
     mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-500" });
     // Simulate a 500 server error (not a 404)
     const serverError = Object.assign(new Error("Internal server error"), { status: 500 });
