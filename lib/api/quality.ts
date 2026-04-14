@@ -7,6 +7,7 @@ import type {
   CrossReferencesResponse,
   ConsistencyCheckResult,
   DuplicateDetectionResult,
+  QualityJobPendingResponse,
 } from "@/lib/ontology/qualityTypes";
 
 export interface QualityWebSocketMessage {
@@ -112,7 +113,7 @@ export const qualityApi = {
     jobId: string,
     token?: string
   ) =>
-    api.get<DuplicateDetectionResult>(
+    api.get<DuplicateDetectionResult | QualityJobPendingResponse>(
       `/api/v1/projects/${projectId}/quality/duplicates/jobs/${jobId}`,
       {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,

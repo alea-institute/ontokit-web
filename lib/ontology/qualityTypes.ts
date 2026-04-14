@@ -89,3 +89,8 @@ export interface DuplicateDetectionResult {
   threshold: number;
   checked_at: string;
 }
+
+export interface QualityJobPendingResponse {
+  job_id: string;
+  status: "pending";
+}

@@ -28,7 +28,7 @@ import {
   createQualityWebSocket,
   type QualityWebSocketMessage,
 } from "@/lib/api/quality";
-import type { ConsistencyIssue, DuplicateCluster } from "@/lib/ontology/qualityTypes";
+import type { ConsistencyIssue, DuplicateCluster, DuplicateDetectionResult } from "@/lib/ontology/qualityTypes";
 import { cn, formatDateTime, getLocalName } from "@/lib/utils";
 
 interface HealthCheckPanelProps {
@@ -244,24 +244,21 @@ export function HealthCheckPanel({
       const maxAttempts = 20;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         await new Promise((r) => setTimeout(r, delay));
-        try {
-          const result = await qualityApi.getDuplicateJobResult(
-            projectId,
-            job_id,
-            accessToken
-          );
-          setDuplicateClusters(result.clusters);
-          setIsDetectingDuplicates(false);
-          return;
-        } catch (pollErr) {
-          // 404 means job not done yet — keep polling
-          const isNotFound =
-            pollErr instanceof Error &&
-            "status" in pollErr &&
-            (pollErr as { status: number }).status === 404;
-          if (!isNotFound) throw pollErr;
+        const result = await qualityApi.getDuplicateJobResult(
+          projectId,
+          job_id,
+          accessToken
+        );
+        // 202 Accepted: job still pending — keep polling
+        if ("status" in result && result.status === "pending") {
+          delay = Math.min(delay * 1.5, maxDelay);
+          continue;
         }
-        delay = Math.min(delay * 1.5, maxDelay);
+        // 200 OK: job complete — narrow to DuplicateDetectionResult
+        const completed = result as DuplicateDetectionResult;
+        setDuplicateClusters(completed.clusters);
+        setIsDetectingDuplicates(false);
+        return;
       }
       setDuplicatesError("Duplicate detection timed out — try again later");
     } catch (err) {
