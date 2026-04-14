@@ -8,7 +8,6 @@ import {
   remoteSyncApi,
   type RemoteSyncConfig,
 } from "@/lib/api/remoteSync";
-import { ApiError } from "@/lib/api/client";
 
 interface RemoteSyncIndicatorProps {
   projectId: string;
@@ -27,10 +26,8 @@ export function RemoteSyncIndicator({
     remoteSyncApi
       .getConfig(projectId, accessToken)
       .then(setConfig)
-      .catch((err) => {
-        if (err instanceof ApiError && err.status === 404) {
-          setConfig(null);
-        }
+      .catch(() => {
+        setConfig(null);
       });
   }, [projectId, accessToken]);
 
