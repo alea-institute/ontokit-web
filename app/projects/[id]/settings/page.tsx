@@ -2009,11 +2009,13 @@ function extractErrorDetail(err: unknown): string {
     try {
       const parsed = JSON.parse(err.message);
       if (parsed?.detail) return String(parsed.detail);
+      return err.message;
     } catch {
-      if (err.message) return err.message;
+      return err.message || "An unexpected error occurred.";
     }
   }
-  return "An unexpected error occurred.";
+  if (err instanceof Error) return err.message;
+  return String(err) || "An unexpected error occurred.";
 }
 
 function WebhookConfigPanel({
@@ -2110,7 +2112,10 @@ function WebhookConfigPanel({
       }
     } catch (err) {
       setError(extractErrorDetail(err));
-      setShowManualFallback(true);
+      // Show manual setup only when attempting to enable webhooks
+      if (!githubIntegration.webhooks_enabled) {
+        setShowManualFallback(true);
+      }
     } finally {
       setIsToggling(false);
     }
