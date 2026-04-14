@@ -2169,7 +2169,7 @@ function WebhookConfigPanel({
         </label>
       </div>
 
-      {githubIntegration.webhooks_enabled && (
+      {(githubIntegration.webhooks_enabled || showManualFallback) && (
         <div className="mt-3 space-y-3">
           {/* Webhook auto-setup status */}
           {webhookStatus === "checking" && (
