@@ -291,8 +291,12 @@ export function HealthCheckPanel({
     let isActive = true;
     let ws: WebSocket | null = null;
 
+    const resolvedBranch = branch ?? "main";
+
     const handleQualityMessage = (message: QualityWebSocketMessage) => {
       if (!isActive) return;
+      // Ignore events for other branches (backend filters by project, not branch)
+      if (message.branch !== resolvedBranch) return;
 
       if (message.type === "consistency_started") {
         setIsCheckingConsistency(true);
@@ -326,9 +330,9 @@ export function HealthCheckPanel({
           (event) => {
             if (event.code !== 1000) qualityWsConnected.current = false;
           },
-          accessToken
+          accessToken,
+          () => { qualityWsConnected.current = true; }
         );
-        qualityWsConnected.current = true;
       }
     }, 100);
 

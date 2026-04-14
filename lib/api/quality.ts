@@ -35,7 +35,7 @@ const QUALITY_WS_TYPES = new Set([
   "duplicates_failed",
 ]);
 
-function isQualityWebSocketMessage(
+export function isQualityWebSocketMessage(
   data: unknown
 ): data is QualityWebSocketMessage {
   return (
@@ -142,7 +142,8 @@ export function createQualityWebSocket(
   onMessage: (message: QualityWebSocketMessage) => void,
   onError?: (error: Event) => void,
   onClose?: (event: CloseEvent) => void,
-  token?: string
+  token?: string,
+  onOpen?: () => void
 ): WebSocket {
   const wsUrl =
     process.env.NEXT_PUBLIC_WS_URL ||
@@ -168,6 +169,10 @@ export function createQualityWebSocket(
   ws.onerror = (error) => {
     console.error("Quality WebSocket error:", error);
     onError?.(error);
+  };
+
+  ws.onopen = () => {
+    onOpen?.();
   };
 
   ws.onclose = (event) => {

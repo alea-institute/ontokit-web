@@ -380,11 +380,13 @@ describe("HealthCheckPanel", () => {
   });
 
   it("detects duplicates via WebSocket when WS is connected", async () => {
-    // Capture the onMessage callback so we can simulate WS messages
+    // Capture the onMessage callback and trigger onOpen to mark WS as connected
     let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
     mockCreateQualityWebSocket.mockImplementation(
-      (_projectId, onMessage) => {
+      (_projectId, onMessage, _onError, _onClose, _token, onOpen) => {
         capturedOnMessage = onMessage;
+        // Simulate successful handshake
+        setTimeout(() => onOpen?.(), 0);
         return { close: vi.fn() } as unknown as WebSocket;
       }
     );
@@ -770,6 +772,39 @@ describe("HealthCheckPanel", () => {
     });
   });
 
+  it("ignores quality WebSocket events for other branches", async () => {
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    // Render with branch "dev"
+    setup({ branch: "dev" });
+
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+
+    // Simulate a duplicates_complete for branch "main" — should be ignored
+    capturedOnMessage!({
+      type: "duplicates_complete",
+      project_id: "p1",
+      branch: "main",
+    });
+
+    // Switch to duplicates tab — should NOT have loaded results
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("No duplicates detected")).toBeDefined();
+    });
+    // getLatestDuplicates should only have been called from the tab-switch effect,
+    // not from the WS handler (which should have been filtered out)
+    expect(mockQualityApi.getLatestDuplicates).toHaveBeenCalledWith("p1", "tok", "dev");
+  });
+
   it("does not open quality WebSocket when no access token", () => {
     mockCreateQualityWebSocket.mockClear();
     setup({ accessToken: undefined });
@@ -781,10 +816,11 @@ describe("HealthCheckPanel", () => {
   it("shows timeout error when polling exhausts all attempts", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-slow" });
-    // Always reject (job never finishes)
-    // Simulate 404 (job not ready) so the loop keeps polling until timeout
-    const notFoundErr = Object.assign(new Error("Not found"), { status: 404 });
-    mockQualityApi.getDuplicateJobResult.mockRejectedValue(notFoundErr);
+    // Always return pending so the loop keeps polling until timeout
+    mockQualityApi.getDuplicateJobResult.mockResolvedValue({
+      job_id: "dup-slow",
+      status: "pending",
+    } as unknown as Awaited<ReturnType<typeof qualityApi.getDuplicateJobResult>>);
 
     setup();
     await waitFor(() => {

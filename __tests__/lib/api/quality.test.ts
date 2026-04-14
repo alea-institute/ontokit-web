@@ -179,6 +179,7 @@ describe("qualityApi", () => {
 
 describe("createQualityWebSocket", () => {
   let mockWsInstance: {
+    onopen: (() => void) | null;
     onmessage: ((event: MessageEvent) => void) | null;
     onerror: ((event: Event) => void) | null;
     onclose: ((event: CloseEvent) => void) | null;
@@ -186,7 +187,7 @@ describe("createQualityWebSocket", () => {
   let WsMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    mockWsInstance = { onmessage: null, onerror: null, onclose: null };
+    mockWsInstance = { onopen: null, onmessage: null, onerror: null, onclose: null };
     // Use a class-style mock so `new WebSocket(...)` works
     WsMock = vi.fn().mockImplementation(function () { return mockWsInstance; });
     vi.stubGlobal("WebSocket", WsMock);
@@ -270,5 +271,14 @@ describe("createQualityWebSocket", () => {
     mockWsInstance.onclose!(closeEvent);
 
     expect(onClose).toHaveBeenCalledWith(closeEvent);
+  });
+
+  it("calls onOpen callback when connection opens", () => {
+    const onOpen = vi.fn();
+    createQualityWebSocket("proj-1", vi.fn(), undefined, undefined, undefined, onOpen);
+
+    mockWsInstance.onopen!();
+
+    expect(onOpen).toHaveBeenCalled();
   });
 });
