@@ -228,17 +228,27 @@ export function HealthCheckPanel({
     if (!accessToken) return;
     setIsDetectingDuplicates(true);
     setDuplicatesError(null);
+
+    let jobId: string;
     try {
-      const { job_id } = await qualityApi.triggerDuplicateDetection(
+      ({ job_id: jobId } = await qualityApi.triggerDuplicateDetection(
         projectId,
         accessToken,
         branch
+      ));
+    } catch (err) {
+      setDuplicatesError(
+        err instanceof Error ? err.message : "Duplicate detection failed"
       );
+      setIsDetectingDuplicates(false);
+      return;
+    }
 
-      // When WS is connected the effect handler updates state — nothing else to do
-      if (qualityWsConnected.current) return;
+    // When WS is connected the effect handler manages loading state
+    if (qualityWsConnected.current) return;
 
-      // Fallback: poll for job result with exponential backoff
+    // Fallback: poll for job result with exponential backoff
+    try {
       let delay = 1000;
       const maxDelay = 5000;
       const maxAttempts = 20;
@@ -246,7 +256,7 @@ export function HealthCheckPanel({
         await new Promise((r) => setTimeout(r, delay));
         const result = await qualityApi.getDuplicateJobResult(
           projectId,
-          job_id,
+          jobId,
           accessToken
         );
         // 202 Accepted: job still pending — keep polling

@@ -815,38 +815,41 @@ describe("HealthCheckPanel", () => {
 
   it("shows timeout error when polling exhausts all attempts", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-slow" });
-    // Always return pending so the loop keeps polling until timeout
-    mockQualityApi.getDuplicateJobResult.mockResolvedValue({
-      job_id: "dup-slow",
-      status: "pending",
-    } as unknown as Awaited<ReturnType<typeof qualityApi.getDuplicateJobResult>>);
+    try {
+      mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-slow" });
+      // Always return pending so the loop keeps polling until timeout
+      mockQualityApi.getDuplicateJobResult.mockResolvedValue({
+        job_id: "dup-slow",
+        status: "pending",
+      } as unknown as Awaited<ReturnType<typeof qualityApi.getDuplicateJobResult>>);
 
-    setup();
-    await waitFor(() => {
-      expect(screen.getByText("Duplicates")).toBeDefined();
-    });
-    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
-      screen.getByText("Duplicates")
-    );
-    await waitFor(() => {
-      expect(screen.getByText("Find Duplicates")).toBeDefined();
-    });
-    await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
-      screen.getByText("Find Duplicates")
-    );
+      setup();
+      await waitFor(() => {
+        expect(screen.getByText("Duplicates")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Duplicates")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Find Duplicates")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Find Duplicates")
+      );
 
-    // Advance enough time for all polling attempts
-    for (let i = 0; i < 25; i++) {
-      await vi.advanceTimersByTimeAsync(6000);
+      // Advance enough time for all polling attempts
+      for (let i = 0; i < 25; i++) {
+        await vi.advanceTimersByTimeAsync(6000);
+      }
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Duplicate detection timed out — try again later")
+        ).toBeDefined();
+      });
+    } finally {
+      vi.useRealTimers();
     }
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("Duplicate detection timed out — try again later")
-      ).toBeDefined();
-    });
-    vi.useRealTimers();
   });
 
   it("shows generic error when trigger throws non-Error value", async () => {

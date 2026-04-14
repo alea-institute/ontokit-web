@@ -230,8 +230,8 @@ describe("createQualityWebSocket", () => {
 
     expect(onMessage).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Unexpected quality WebSocket payload:",
-      JSON.stringify(bad)
+      "Unexpected quality WebSocket payload, type:",
+      "unknown_event"
     );
     consoleSpy.mockRestore();
   });
