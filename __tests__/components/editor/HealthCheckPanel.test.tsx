@@ -868,6 +868,89 @@ describe("HealthCheckPanel", () => {
     });
   });
 
+  it("shows timeout error on WS path when WS message is lost", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      // Connect WS and trigger onOpen so qualityWsConnected = true
+      mockCreateQualityWebSocket.mockImplementation(
+        (_projectId, _onMessage, _onError, _onClose, _token, onOpen) => {
+          setTimeout(() => onOpen?.(), 0);
+          return { close: vi.fn() } as unknown as WebSocket;
+        }
+      );
+      mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-ws-lost" });
+
+      setup();
+
+      // Wait for WS to connect
+      await waitFor(() => {
+        expect(mockCreateQualityWebSocket).toHaveBeenCalled();
+      });
+      // Tick for onOpen setTimeout
+      await vi.advanceTimersByTimeAsync(10);
+
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Duplicates")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Find Duplicates")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Find Duplicates")
+      );
+
+      // WS message never arrives — advance past the 60s safety timeout
+      await vi.advanceTimersByTimeAsync(61_000);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Duplicate detection timed out — try again later")
+        ).toBeDefined();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("cancels polling loop on unmount", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-cancel" });
+      mockQualityApi.getDuplicateJobResult.mockResolvedValue({
+        job_id: "dup-cancel",
+        status: "pending",
+      } as unknown as Awaited<ReturnType<typeof qualityApi.getDuplicateJobResult>>);
+
+      const { unmount } = setup();
+
+      await waitFor(() => {
+        expect(screen.getByText("Duplicates")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Duplicates")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Find Duplicates")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Find Duplicates")
+      );
+
+      // Let one poll iteration start
+      await vi.advanceTimersByTimeAsync(1500);
+      const callsBefore = mockQualityApi.getDuplicateJobResult.mock.calls.length;
+
+      // Unmount mid-poll — should cancel further iterations
+      unmount();
+
+      // Advance more time — should NOT produce more API calls
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(mockQualityApi.getDuplicateJobResult.mock.calls.length).toBe(callsBefore);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("cleans up quality WebSocket on unmount", async () => {
     const closeFn = vi.fn();
     mockCreateQualityWebSocket.mockImplementation(() => {
