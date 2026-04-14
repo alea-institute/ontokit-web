@@ -128,7 +128,7 @@ export function HealthCheckPanel({
 
   // WebSocket for real-time updates
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !accessToken) return;
 
     // Track if this effect is still active (handles React Strict Mode double-invoke)
     let isActive = true;
@@ -140,14 +140,11 @@ export function HealthCheckPanel({
         setIsRunning(true);
       } else if (message.type === "lint_complete" || message.type === "lint_failed") {
         setIsRunning(false);
-        // Refresh data
         fetchData();
       }
     };
 
     // Small delay to avoid spurious connections during Strict Mode remounts
-    if (!accessToken) return;
-
     const timeoutId = setTimeout(() => {
       if (isActive) {
         ws = createLintWebSocket(

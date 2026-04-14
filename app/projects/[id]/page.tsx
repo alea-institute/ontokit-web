@@ -283,7 +283,6 @@ function ViewerContent({
                   canEdit={false}
                   canSuggest={false}
                   isSuggestionMode={false}
-                  canManage={false}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
                   treeError={treeError}
@@ -314,8 +313,6 @@ function ViewerContent({
                   onCopyIri={handleCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
                   detailRefreshKey={0}
-                  showHealthCheck={false}
-                  onCloseHealthCheck={noop}
                 />
               </div>
             ) : (
