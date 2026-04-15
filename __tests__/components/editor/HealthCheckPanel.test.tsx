@@ -636,6 +636,40 @@ describe("HealthCheckPanel", () => {
     expect(screen.getByText("87% similar")).toBeDefined();
   });
 
+  it("logs error when cached consistency fetch fails on tab switch", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockQualityApi.getConsistencyIssues.mockRejectedValue(new Error("Network fail"));
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Consistency")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Consistency"));
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to load cached consistency issues"),
+        expect.any(Error)
+      );
+    });
+    consoleSpy.mockRestore();
+  });
+
+  it("logs error when cached duplicates fetch fails on tab switch", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockQualityApi.getLatestDuplicates.mockRejectedValue(new Error("Network fail"));
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Duplicates")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("Failed to load cached duplicates"),
+        expect.any(Error)
+      );
+    });
+    consoleSpy.mockRestore();
+  });
+
   it("detects duplicates via polling fallback when WS is not connected", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
