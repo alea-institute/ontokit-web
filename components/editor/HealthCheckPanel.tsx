@@ -357,14 +357,18 @@ export function HealthCheckPanel({
   // Load cached data when tab changes
   useEffect(() => {
     if (activeTab === "consistency" && consistencyIssues.length === 0 && !isCheckingConsistency) {
+      setIsCheckingConsistency(true);
       qualityApi.getConsistencyIssues(projectId, accessToken, branch)
         .then((r) => setConsistencyIssues(r.issues))
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setIsCheckingConsistency(false));
     }
     if (activeTab === "duplicates" && duplicateClusters.length === 0 && !isDetectingDuplicates) {
+      setIsDetectingDuplicates(true);
       qualityApi.getLatestDuplicates(projectId, accessToken, branch)
         .then((r) => setDuplicateClusters(r.clusters))
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setIsDetectingDuplicates(false));
     }
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
