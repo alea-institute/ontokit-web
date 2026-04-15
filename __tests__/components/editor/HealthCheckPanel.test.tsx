@@ -32,7 +32,7 @@ vi.mock("@/lib/utils", () => ({
 }));
 
 import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
-import { lintApi, createLintWebSocket } from "@/lib/api/lint";
+import { lintApi, createLintWebSocket, type LintWebSocketMessage } from "@/lib/api/lint";
 import { qualityApi, createQualityWebSocket, type QualityWebSocketMessage } from "@/lib/api/quality";
 
 const mockLintApi = vi.mocked(lintApi);
@@ -1349,6 +1349,144 @@ describe("HealthCheckPanel", () => {
     }
   });
 
+  it("shows error when WS consistency fetch fails after completion", async () => {
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+    mockQualityApi.getConsistencyIssues.mockRejectedValue(new Error("Fetch failed"));
+    setup();
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+    capturedOnMessage!({
+      type: "consistency_complete",
+      project_id: "p1",
+      branch: "main",
+    });
+    await userEvent.click(screen.getByText("Consistency"));
+    await waitFor(() => {
+      expect(screen.getByText("Fetch failed")).toBeDefined();
+    });
+  });
+
+  it("shows error when WS duplicates fetch fails after completion", async () => {
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+    mockQualityApi.getLatestDuplicates.mockRejectedValue(new Error("Dup fetch failed"));
+    setup();
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+    capturedOnMessage!({
+      type: "duplicates_complete",
+      project_id: "p1",
+      branch: "main",
+    });
+    await userEvent.click(screen.getByText("Duplicates"));
+    await waitFor(() => {
+      expect(screen.getByText("Dup fetch failed")).toBeDefined();
+    });
+  });
+
+  it("clears timeout refs on WS consistency_complete", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+      mockCreateQualityWebSocket.mockImplementation(
+        (_projectId, onMessage, _onError, _onClose, _token, onOpen) => {
+          capturedOnMessage = onMessage;
+          setTimeout(() => onOpen?.(), 0);
+          return { close: vi.fn() } as unknown as WebSocket;
+        }
+      );
+      mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-to" });
+      mockQualityApi.getConsistencyIssues.mockResolvedValue({
+        project_id: "p1", branch: "main", issues: [], checked_at: "", duration_ms: 0,
+      });
+
+      setup();
+      await vi.advanceTimersByTimeAsync(10);
+      await waitFor(() => { expect(capturedOnMessage).not.toBeNull(); });
+
+      // Switch to consistency tab and trigger — sets the timeout ref
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Consistency")
+      );
+      await waitFor(() => { expect(screen.getByText("Run Check")).toBeDefined(); });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+
+      // WS delivers result before timeout — should clear the ref
+      capturedOnMessage!({
+        type: "consistency_complete",
+        project_id: "p1",
+        branch: "main",
+      });
+
+      // Advance past the 60s timeout — should NOT show timeout error
+      await vi.advanceTimersByTimeAsync(65_000);
+      expect(screen.queryByText("Consistency check timed out")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears timeout refs on WS duplicates_failed", async () => {
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage, _onError, _onClose, _token, onOpen) => {
+        capturedOnMessage = onMessage;
+        setTimeout(() => onOpen?.(), 0);
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-fail-to" });
+
+      setup();
+      await vi.advanceTimersByTimeAsync(10);
+      await waitFor(() => { expect(capturedOnMessage).not.toBeNull(); });
+
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Duplicates")
+      );
+      await waitFor(() => { expect(screen.getByText("Find Duplicates")).toBeDefined(); });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Find Duplicates")
+      );
+
+      // WS reports failure — should clear the timeout ref
+      capturedOnMessage!({
+        type: "duplicates_failed",
+        project_id: "p1",
+        branch: "main",
+        error: "Worker crashed",
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText("Worker crashed")).toBeDefined();
+      });
+
+      // Advance past timeout — should NOT show timeout error
+      await vi.advanceTimersByTimeAsync(65_000);
+      expect(screen.queryByText("Duplicate detection timed out")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("cleans up quality WebSocket on unmount", async () => {
     const closeFn = vi.fn();
     mockCreateQualityWebSocket.mockImplementation(() => {
@@ -1364,5 +1502,78 @@ describe("HealthCheckPanel", () => {
 
     unmount();
     expect(closeFn).toHaveBeenCalled();
+  });
+
+  it("handles lint WS lint_started and lint_complete messages", async () => {
+    let capturedLintOnMessage: ((msg: LintWebSocketMessage) => void) | null = null;
+    mockCreateLintWebSocket.mockImplementation(
+      (_projectId: string, onMessage: (msg: LintWebSocketMessage) => void) => {
+        capturedLintOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    setup();
+    await waitFor(() => {
+      expect(capturedLintOnMessage).not.toBeNull();
+    });
+
+    // Simulate lint_started
+    capturedLintOnMessage!({ type: "lint_started", project_id: "p1", run_id: "r1" });
+    await waitFor(() => {
+      expect(screen.getByText("Running")).toBeDefined();
+    });
+
+    // Simulate lint_complete — should refresh data
+    capturedLintOnMessage!({ type: "lint_complete", project_id: "p1", run_id: "r1" });
+    await waitFor(() => {
+      expect(mockLintApi.getStatus).toHaveBeenCalledTimes(2); // initial + refresh
+    });
+  });
+
+  it("clears pending safety timeouts on unmount", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+      mockCreateQualityWebSocket.mockImplementation(
+        (_projectId, onMessage, _onError, _onClose, _token, onOpen) => {
+          capturedOnMessage = onMessage;
+          setTimeout(() => onOpen?.(), 0);
+          return { close: vi.fn() } as unknown as WebSocket;
+        }
+      );
+      mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-unmount" });
+      mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-unmount" });
+
+      const { unmount } = setup();
+      await vi.advanceTimersByTimeAsync(10);
+      await waitFor(() => { expect(capturedOnMessage).not.toBeNull(); });
+
+      // Trigger consistency check (sets consistencyTimeoutRef)
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Consistency")
+      );
+      await waitFor(() => { expect(screen.getByText("Run Check")).toBeDefined(); });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+
+      // Trigger duplicate detection (sets duplicatesTimeoutRef)
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Duplicates")
+      );
+      await waitFor(() => { expect(screen.getByText("Find Duplicates")).toBeDefined(); });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Find Duplicates")
+      );
+
+      // Unmount with both timeout refs set — cleanup should clear them
+      unmount();
+
+      // Advance past timeouts — no errors should be thrown (no state updates after unmount)
+      await vi.advanceTimersByTimeAsync(65_000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
