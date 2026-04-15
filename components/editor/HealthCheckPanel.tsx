@@ -359,22 +359,32 @@ export function HealthCheckPanel({
     }
   };
 
-  // Load cached data when tab changes
+  // Load cached data when tab changes.
+  // Use requestAnimationFrame so the tab switch paints before the loading
+  // state is set, preventing the UI from appearing frozen.
   useEffect(() => {
+    let cancelled = false;
     if (activeTab === "consistency" && consistencyIssues.length === 0 && !isCheckingConsistency) {
-      setIsLoadingCachedConsistency(true);
-      qualityApi.getConsistencyIssues(projectId, accessToken, branch)
-        .then((r) => setConsistencyIssues(r.issues))
-        .catch(() => {})
-        .finally(() => setIsLoadingCachedConsistency(false));
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setIsLoadingCachedConsistency(true);
+        qualityApi.getConsistencyIssues(projectId, accessToken, branch)
+          .then((r) => { if (!cancelled) setConsistencyIssues(r.issues); })
+          .catch(() => {})
+          .finally(() => { if (!cancelled) setIsLoadingCachedConsistency(false); });
+      });
     }
     if (activeTab === "duplicates" && duplicateClusters.length === 0 && !isDetectingDuplicates) {
-      setIsLoadingCachedDuplicates(true);
-      qualityApi.getLatestDuplicates(projectId, accessToken, branch)
-        .then((r) => setDuplicateClusters(r.clusters))
-        .catch(() => {})
-        .finally(() => setIsLoadingCachedDuplicates(false));
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setIsLoadingCachedDuplicates(true);
+        qualityApi.getLatestDuplicates(projectId, accessToken, branch)
+          .then((r) => { if (!cancelled) setDuplicateClusters(r.clusters); })
+          .catch(() => {})
+          .finally(() => { if (!cancelled) setIsLoadingCachedDuplicates(false); });
+      });
     }
+    return () => { cancelled = true; };
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Quality WebSocket for real-time consistency / duplicates updates

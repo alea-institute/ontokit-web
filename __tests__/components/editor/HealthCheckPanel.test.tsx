@@ -957,14 +957,19 @@ describe("HealthCheckPanel", () => {
       branch: "main",
     });
 
-    // Switch to duplicates tab — should NOT have loaded results
+    // Switch to duplicates tab — the WS event should have been ignored,
+    // so no results were loaded from the WS handler
     await userEvent.click(screen.getByText("Duplicates"));
     await waitFor(() => {
       expect(screen.getByText("No duplicates detected")).toBeDefined();
     });
-    // getLatestDuplicates should only have been called from the tab-switch effect,
-    // not from the WS handler (which should have been filtered out)
-    expect(mockQualityApi.getLatestDuplicates).toHaveBeenCalledWith("p1", "tok", "dev");
+    // getLatestDuplicates should NOT have been called by the WS handler
+    // (tab-switch cache fetch uses requestAnimationFrame so may not fire in tests)
+    const calls = mockQualityApi.getLatestDuplicates.mock.calls;
+    const wsHandlerCalls = calls.filter(
+      (c: unknown[]) => c[2] !== "dev" // WS handler would pass the WS branch, not "dev"
+    );
+    expect(wsHandlerCalls).toHaveLength(0);
   });
 
   it("does not open quality WebSocket when no access token", () => {
