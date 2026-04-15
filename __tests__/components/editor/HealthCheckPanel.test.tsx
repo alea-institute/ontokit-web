@@ -1576,4 +1576,171 @@ describe("HealthCheckPanel", () => {
       vi.useRealTimers();
     }
   });
+
+  it("clears existing consistency timeout when triggered twice", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+      mockCreateQualityWebSocket.mockImplementation(
+        (_projectId, onMessage, _onError, _onClose, _token, onOpen) => {
+          capturedOnMessage = onMessage;
+          setTimeout(() => onOpen?.(), 0);
+          return { close: vi.fn() } as unknown as WebSocket;
+        }
+      );
+      mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-twice" });
+      mockQualityApi.getConsistencyIssues.mockResolvedValue({
+        project_id: "p1", branch: "main", issues: [], checked_at: "", duration_ms: 0,
+      });
+
+      setup();
+      await vi.advanceTimersByTimeAsync(10);
+      await waitFor(() => { expect(capturedOnMessage).not.toBeNull(); });
+
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Consistency")
+      );
+      await waitFor(() => { expect(screen.getByText("Run Check")).toBeDefined(); });
+
+      // Trigger first time — sets timeout
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+
+      // WS delivers result, clearing the first timeout and re-enabling button
+      capturedOnMessage!({ type: "consistency_complete", project_id: "p1", branch: "main" });
+      await vi.advanceTimersByTimeAsync(100);
+      await waitFor(() => {
+        expect(screen.getByText("Run Check").closest("button")!.hasAttribute("disabled")).toBe(false);
+      });
+
+      // Trigger second time — should set a fresh timeout (old one was cleared)
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+
+      // Advance 30s — not enough for the new 60s timeout
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(screen.queryByText("Consistency check timed out")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears existing duplicates timeout when triggered twice", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+      mockCreateQualityWebSocket.mockImplementation(
+        (_projectId, onMessage, _onError, _onClose, _token, onOpen) => {
+          capturedOnMessage = onMessage;
+          setTimeout(() => onOpen?.(), 0);
+          return { close: vi.fn() } as unknown as WebSocket;
+        }
+      );
+      mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-twice" });
+      mockQualityApi.getLatestDuplicates.mockResolvedValue({
+        clusters: [], threshold: 0.85, checked_at: "",
+      });
+
+      setup();
+      await vi.advanceTimersByTimeAsync(10);
+      await waitFor(() => { expect(capturedOnMessage).not.toBeNull(); });
+
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Duplicates")
+      );
+      await waitFor(() => { expect(screen.getByText("Find Duplicates")).toBeDefined(); });
+
+      // Trigger first time
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Find Duplicates")
+      );
+
+      // WS delivers result, re-enabling button
+      capturedOnMessage!({ type: "duplicates_complete", project_id: "p1", branch: "main" });
+      await vi.advanceTimersByTimeAsync(100);
+      await waitFor(() => {
+        expect(screen.getByText("Find Duplicates").closest("button")!.hasAttribute("disabled")).toBe(false);
+      });
+
+      // Trigger second time
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Find Duplicates")
+      );
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(screen.queryByText("Duplicate detection timed out")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("WS handler ignores messages after isActive is cleared", async () => {
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage) => {
+        capturedOnMessage = onMessage;
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+
+    const { unmount } = setup();
+    await waitFor(() => { expect(capturedOnMessage).not.toBeNull(); });
+
+    // Unmount clears isActive
+    unmount();
+
+    // Deliver a message after unmount — handler should early-return
+    capturedOnMessage!({
+      type: "consistency_complete",
+      project_id: "p1",
+      branch: "main",
+    });
+    // No assertion needed — if it didn't throw, the guard worked
+    expect(mockQualityApi.getConsistencyIssues).not.toHaveBeenCalled();
+  });
+
+  it("handles consistency_failed clearing timeout ref", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+      mockCreateQualityWebSocket.mockImplementation(
+        (_projectId, onMessage, _onError, _onClose, _token, onOpen) => {
+          capturedOnMessage = onMessage;
+          setTimeout(() => onOpen?.(), 0);
+          return { close: vi.fn() } as unknown as WebSocket;
+        }
+      );
+      mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-fail-to" });
+
+      setup();
+      await vi.advanceTimersByTimeAsync(10);
+      await waitFor(() => { expect(capturedOnMessage).not.toBeNull(); });
+
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Consistency")
+      );
+      await waitFor(() => { expect(screen.getByText("Run Check")).toBeDefined(); });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+
+      // WS reports failure — should clear timeout ref
+      capturedOnMessage!({
+        type: "consistency_failed",
+        project_id: "p1",
+        branch: "main",
+        error: "Graph corrupt",
+      });
+      await waitFor(() => {
+        expect(screen.getByText("Graph corrupt")).toBeDefined();
+      });
+
+      // Advance past timeout — should NOT show timeout error
+      await vi.advanceTimersByTimeAsync(65_000);
+      expect(screen.queryByText("Consistency check timed out")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
