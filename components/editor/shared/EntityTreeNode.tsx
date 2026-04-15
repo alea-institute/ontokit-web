@@ -206,6 +206,7 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
         <span
           role="presentation"
           onClick={handleToggle}
+          data-testid="toggle-chevron"
           className="w-4 h-4 flex items-center justify-center flex-shrink-0 cursor-pointer"
         >
           {node.isLoading ? (
