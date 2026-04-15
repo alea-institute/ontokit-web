@@ -104,6 +104,11 @@ function setup(overrides: Partial<React.ComponentProps<typeof HealthCheckPanel>>
 describe("HealthCheckPanel", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Mock requestAnimationFrame so deferred cached-data fetches fire synchronously
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    });
     mockLintApi.getStatus.mockResolvedValue(baseSummary);
     mockLintApi.getIssues.mockResolvedValue(baseIssues);
     mockQualityApi.getConsistencyIssues.mockResolvedValue({
@@ -317,34 +322,44 @@ describe("HealthCheckPanel", () => {
   });
 
   it("runs consistency check via polling fallback when Run Check is clicked", async () => {
-    mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-j1" });
-    mockQualityApi.getConsistencyJobResult.mockResolvedValue({
-      project_id: "p1",
-      branch: "main",
-      issues: [
-        {
-          rule_id: "orphan_class",
-          severity: "warning",
-          entity_iri: "http://example.org/Bar",
-          entity_type: "class",
-          message: "Orphan class detected",
-        },
-      ],
-      checked_at: "",
-      duration_ms: 100,
-    });
-    setup();
-    await waitFor(() => {
-      expect(screen.getByText("Consistency")).toBeDefined();
-    });
-    await userEvent.click(screen.getByText("Consistency"));
-    await waitFor(() => {
-      expect(screen.getByText("Run Check")).toBeDefined();
-    });
-    await userEvent.click(screen.getByText("Run Check"));
-    await waitFor(() => {
-      expect(screen.getByText("Orphan class detected")).toBeDefined();
-    });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-j1" });
+      mockQualityApi.getConsistencyJobResult.mockResolvedValue({
+        project_id: "p1",
+        branch: "main",
+        issues: [
+          {
+            rule_id: "orphan_class",
+            severity: "warning",
+            entity_iri: "http://example.org/Bar",
+            entity_type: "class",
+            message: "Orphan class detected",
+          },
+        ],
+        checked_at: "",
+        duration_ms: 100,
+      });
+      setup();
+      await waitFor(() => {
+        expect(screen.getByText("Consistency")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Consistency")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Run Check")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+      await vi.advanceTimersByTimeAsync(2000);
+      await waitFor(() => {
+        expect(screen.getByText("Orphan class detected")).toBeDefined();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("runs consistency check via WebSocket when WS is connected", async () => {
@@ -414,22 +429,32 @@ describe("HealthCheckPanel", () => {
   });
 
   it("surfaces consistency polling errors in the UI", async () => {
-    mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-500" });
-    const serverError = Object.assign(new Error("Server error"), { status: 500 });
-    mockQualityApi.getConsistencyJobResult.mockRejectedValue(serverError);
-    setup();
-    await waitFor(() => {
-      expect(screen.getByText("Consistency")).toBeDefined();
-    });
-    await userEvent.click(screen.getByText("Consistency"));
-    await waitFor(() => {
-      expect(screen.getByText("Run Check")).toBeDefined();
-    });
-    await userEvent.click(screen.getByText("Run Check"));
-    await waitFor(() => {
-      expect(screen.getByText("Server error")).toBeDefined();
-    });
-    expect(mockQualityApi.getConsistencyJobResult).toHaveBeenCalledTimes(1);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-500" });
+      const serverError = Object.assign(new Error("Server error"), { status: 500 });
+      mockQualityApi.getConsistencyJobResult.mockRejectedValue(serverError);
+      setup();
+      await waitFor(() => {
+        expect(screen.getByText("Consistency")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Consistency")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Run Check")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+      await vi.advanceTimersByTimeAsync(2000);
+      await waitFor(() => {
+        expect(screen.getByText("Server error")).toBeDefined();
+      });
+      expect(mockQualityApi.getConsistencyJobResult).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("shows consistency timeout on WS path when WS message is lost", async () => {
@@ -508,37 +533,149 @@ describe("HealthCheckPanel", () => {
     }
   });
 
-  it("detects duplicates via polling fallback when WS is not connected", async () => {
-    const duplicateResult = {
+  it("consistency poll handles pending then complete response", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-pend" });
+      let callCount = 0;
+      mockQualityApi.getConsistencyJobResult.mockImplementation(() => {
+        callCount++;
+        if (callCount <= 2) {
+          return Promise.resolve({ job_id: "cons-pend", status: "pending" } as never);
+        }
+        return Promise.resolve({
+          project_id: "p1",
+          branch: "main",
+          issues: [
+            {
+              rule_id: "missing_label",
+              severity: "info",
+              entity_iri: "http://example.org/PendEntity",
+              entity_type: "class",
+              message: "Pending then complete",
+            },
+          ],
+          checked_at: "",
+          duration_ms: 50,
+        });
+      });
+      setup();
+      await waitFor(() => {
+        expect(screen.getByText("Consistency")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Consistency")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Run Check")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+      // Advance through polling delays
+      for (let i = 0; i < 5; i++) {
+        await vi.advanceTimersByTimeAsync(2000);
+      }
+      await waitFor(() => {
+        expect(screen.getByText("Pending then complete")).toBeDefined();
+      });
+      expect(mockQualityApi.getConsistencyJobResult).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("loads cached consistency results on tab switch", async () => {
+    mockQualityApi.getConsistencyIssues.mockResolvedValue({
+      project_id: "p1",
+      branch: "main",
+      issues: [
+        {
+          rule_id: "orphan_class",
+          severity: "warning",
+          entity_iri: "http://example.org/CachedCons",
+          entity_type: "class",
+          message: "Cached consistency issue",
+        },
+      ],
+      checked_at: "",
+      duration_ms: 50,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Consistency")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Consistency"));
+    await waitFor(() => {
+      expect(screen.getByText("Cached consistency issue")).toBeDefined();
+    });
+  });
+
+  it("loads cached duplicates results on tab switch", async () => {
+    mockQualityApi.getLatestDuplicates.mockResolvedValue({
       clusters: [
         {
           entities: [
-            { iri: "http://example.org/A", label: "EntityA", entity_type: "class" },
-            { iri: "http://example.org/B", label: "EntityB", entity_type: "class" },
+            { iri: "http://example.org/CachedA", label: "CachedA", entity_type: "class" },
+            { iri: "http://example.org/CachedB", label: "CachedB", entity_type: "class" },
           ],
-          similarity: 0.92,
+          similarity: 0.87,
         },
       ],
       threshold: 0.85,
       checked_at: "",
-    };
-    mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-j1" });
-    mockQualityApi.getDuplicateJobResult.mockResolvedValue(duplicateResult);
-    // Don't connect WS — default mock doesn't set qualityWsConnected
+    });
     setup();
     await waitFor(() => {
       expect(screen.getByText("Duplicates")).toBeDefined();
     });
     await userEvent.click(screen.getByText("Duplicates"));
     await waitFor(() => {
-      expect(screen.getByText("Find Duplicates")).toBeDefined();
+      expect(screen.getByText("CachedA")).toBeDefined();
     });
-    await userEvent.click(screen.getByText("Find Duplicates"));
-    await waitFor(() => {
-      expect(screen.getByText("92% similar")).toBeDefined();
-    });
-    expect(screen.getByText("EntityA")).toBeDefined();
-    expect(screen.getByText("EntityB")).toBeDefined();
+    expect(screen.getByText("87% similar")).toBeDefined();
+  });
+
+  it("detects duplicates via polling fallback when WS is not connected", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const duplicateResult = {
+        clusters: [
+          {
+            entities: [
+              { iri: "http://example.org/A", label: "EntityA", entity_type: "class" },
+              { iri: "http://example.org/B", label: "EntityB", entity_type: "class" },
+            ],
+            similarity: 0.92,
+          },
+        ],
+        threshold: 0.85,
+        checked_at: "",
+      };
+      mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-j1" });
+      mockQualityApi.getDuplicateJobResult.mockResolvedValue(duplicateResult);
+      setup();
+      await waitFor(() => {
+        expect(screen.getByText("Duplicates")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Duplicates")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Find Duplicates")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Find Duplicates")
+      );
+      await vi.advanceTimersByTimeAsync(2000);
+      await waitFor(() => {
+        expect(screen.getByText("92% similar")).toBeDefined();
+      });
+      expect(screen.getByText("EntityA")).toBeDefined();
+      expect(screen.getByText("EntityB")).toBeDefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("detects duplicates via WebSocket when WS is connected", async () => {
@@ -648,24 +785,32 @@ describe("HealthCheckPanel", () => {
   });
 
   it("surfaces polling errors in the UI", async () => {
-    mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-500" });
-    // Simulate a 500 server error (not a 404)
-    const serverError = Object.assign(new Error("Internal server error"), { status: 500 });
-    mockQualityApi.getDuplicateJobResult.mockRejectedValue(serverError);
-    setup();
-    await waitFor(() => {
-      expect(screen.getByText("Duplicates")).toBeDefined();
-    });
-    await userEvent.click(screen.getByText("Duplicates"));
-    await waitFor(() => {
-      expect(screen.getByText("Find Duplicates")).toBeDefined();
-    });
-    await userEvent.click(screen.getByText("Find Duplicates"));
-    await waitFor(() => {
-      expect(screen.getByText("Internal server error")).toBeDefined();
-    });
-    // Should stop after first non-404, not keep polling
-    expect(mockQualityApi.getDuplicateJobResult).toHaveBeenCalledTimes(1);
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-500" });
+      const serverError = Object.assign(new Error("Internal server error"), { status: 500 });
+      mockQualityApi.getDuplicateJobResult.mockRejectedValue(serverError);
+      setup();
+      await waitFor(() => {
+        expect(screen.getByText("Duplicates")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Duplicates")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Find Duplicates")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Find Duplicates")
+      );
+      await vi.advanceTimersByTimeAsync(2000);
+      await waitFor(() => {
+        expect(screen.getByText("Internal server error")).toBeDefined();
+      });
+      expect(mockQualityApi.getDuplicateJobResult).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("loads cached duplicates when switching to duplicates tab", async () => {
