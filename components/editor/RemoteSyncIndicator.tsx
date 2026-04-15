@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { RefreshCw, Download, AlertCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import {
-  remoteSyncApi,
-  type RemoteSyncConfig,
-} from "@/lib/api/remoteSync";
+import { remoteSyncApi } from "@/lib/api/remoteSync";
 
 interface RemoteSyncIndicatorProps {
   projectId: string;
@@ -18,18 +15,12 @@ export function RemoteSyncIndicator({
   projectId,
   accessToken,
 }: RemoteSyncIndicatorProps) {
-  const [config, setConfig] = useState<RemoteSyncConfig | null>(null);
-
-  useEffect(() => {
-    if (!projectId) return;
-
-    remoteSyncApi
-      .getConfig(projectId, accessToken)
-      .then(setConfig)
-      .catch(() => {
-        setConfig(null);
-      });
-  }, [projectId, accessToken]);
+  const { data: config } = useQuery({
+    queryKey: ["remoteSync", "config", projectId],
+    queryFn: () => remoteSyncApi.getConfig(projectId, accessToken),
+    enabled: !!projectId,
+    retry: false,
+  });
 
   // Don't render if no config or disabled
   if (!config || !config.enabled) return null;
