@@ -385,20 +385,20 @@ export function HealthCheckPanel({
       if (message.type === "consistency_started") {
         setIsCheckingConsistency(true);
       } else if (message.type === "consistency_complete") {
-        setIsCheckingConsistency(false);
         qualityApi.getConsistencyIssues(projectId, accessToken, branch)
           .then((r) => { if (isActive) setConsistencyIssues(r.issues); })
-          .catch(() => {});
+          .catch(() => {})
+          .finally(() => { if (isActive) setIsCheckingConsistency(false); });
       } else if (message.type === "consistency_failed") {
         setIsCheckingConsistency(false);
         setConsistencyError(message.error ?? "Consistency check failed");
       } else if (message.type === "duplicates_started") {
         setIsDetectingDuplicates(true);
       } else if (message.type === "duplicates_complete") {
-        setIsDetectingDuplicates(false);
         qualityApi.getLatestDuplicates(projectId, accessToken, branch)
           .then((r) => { if (isActive) setDuplicateClusters(r.clusters); })
-          .catch(() => {});
+          .catch(() => {})
+          .finally(() => { if (isActive) setIsDetectingDuplicates(false); });
       } else if (message.type === "duplicates_failed") {
         setIsDetectingDuplicates(false);
         setDuplicatesError(message.error ?? "Duplicate detection failed");
