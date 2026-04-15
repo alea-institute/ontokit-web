@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   XCircle,
   AlertTriangle,
@@ -23,8 +23,12 @@ import {
   type LintSummary,
   type LintWebSocketMessage,
 } from "@/lib/api/lint";
-import { qualityApi } from "@/lib/api/quality";
-import type { ConsistencyIssue, DuplicateCluster } from "@/lib/ontology/qualityTypes";
+import {
+  qualityApi,
+  createQualityWebSocket,
+  type QualityWebSocketMessage,
+} from "@/lib/api/quality";
+import type { ConsistencyCheckResult, ConsistencyIssue, DuplicateCluster, DuplicateDetectionResult } from "@/lib/ontology/qualityTypes";
 import { cn, formatDateTime, getLocalName } from "@/lib/utils";
 
 interface HealthCheckPanelProps {
@@ -78,6 +82,20 @@ export function HealthCheckPanel({
   // Duplicate detection state
   const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([]);
   const [isDetectingDuplicates, setIsDetectingDuplicates] = useState(false);
+  const [duplicatesError, setDuplicatesError] = useState<string | null>(null);
+
+  // Loading flags for cached data fetches (distinct from the check/detect flags
+  // so the tab switches immediately and the button stays enabled)
+  const [isLoadingCachedConsistency, setIsLoadingCachedConsistency] = useState(false);
+  const [isLoadingCachedDuplicates, setIsLoadingCachedDuplicates] = useState(false);
+
+  // Track whether the quality WebSocket is connected
+  const qualityWsConnected = useRef(false);
+  // Cancellation flag for the polling fallback loop
+  const pollCancelled = useRef(false);
+  // Safety timeout refs for WS path (so they can be cleared on completion/unmount)
+  const consistencyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const duplicatesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch lint status and issues
   const fetchData = useCallback(async (issueFilter?: IssueFilter) => {
@@ -195,45 +213,278 @@ export function HealthCheckPanel({
     }
   };
 
-  // Fetch consistency issues
+  // Trigger consistency check as a background job.
+  // Same WS-first / polling-fallback pattern as duplicate detection.
   const handleRunConsistencyCheck = async () => {
     if (!accessToken) return;
     setIsCheckingConsistency(true);
     setConsistencyError(null);
+    pollCancelled.current = false;
+
+    let jobId: string;
     try {
-      await qualityApi.triggerConsistencyCheck(projectId, accessToken, branch);
-      // Fetch results after triggering
-      const result = await qualityApi.getConsistencyIssues(projectId, accessToken, branch);
-      setConsistencyIssues(result.issues);
+      ({ job_id: jobId } = await qualityApi.triggerConsistencyCheck(
+        projectId,
+        accessToken,
+        branch
+      ));
     } catch (err) {
-      setConsistencyError(err instanceof Error ? err.message : "Consistency check failed");
-    } finally {
+      setConsistencyError(
+        err instanceof Error ? err.message : "Consistency check failed"
+      );
       setIsCheckingConsistency(false);
+      return;
+    }
+
+    // When WS is connected the effect handler manages loading state
+    if (qualityWsConnected.current) {
+      if (consistencyTimeoutRef.current) clearTimeout(consistencyTimeoutRef.current);
+      consistencyTimeoutRef.current = setTimeout(() => {
+        consistencyTimeoutRef.current = null;
+        setIsCheckingConsistency((prev) => {
+          if (prev) setConsistencyError("Consistency check timed out — try again later");
+          return false;
+        });
+      }, 60_000);
+      return;
+    }
+
+    // Fallback: poll for job result with exponential backoff
+    try {
+      let delay = 1000;
+      const maxDelay = 5000;
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (pollCancelled.current) return;
+        await new Promise((r) => setTimeout(r, delay));
+        if (pollCancelled.current) return;
+        const result = await qualityApi.getConsistencyJobResult(
+          projectId,
+          jobId,
+          accessToken
+        );
+        if ("status" in result && result.status === "pending") {
+          delay = Math.min(delay * 1.5, maxDelay);
+          continue;
+        }
+        const completed = result as ConsistencyCheckResult;
+        setConsistencyIssues(completed.issues);
+        return;
+      }
+      setConsistencyError("Consistency check timed out — try again later");
+    } catch (err) {
+      if (!pollCancelled.current) {
+        setConsistencyError(
+          err instanceof Error ? err.message : "Consistency check failed"
+        );
+      }
+    } finally {
+      if (!pollCancelled.current) {
+        setIsCheckingConsistency(false);
+      }
     }
   };
 
-  // Fetch duplicate candidates
+  // Trigger duplicate detection as a background job.
+  // If the quality WebSocket is connected, it will deliver the result via
+  // duplicates_complete/duplicates_failed events. Otherwise, fall back to
+  // polling the job-result endpoint.
   const handleDetectDuplicates = async () => {
     if (!accessToken) return;
     setIsDetectingDuplicates(true);
+    setDuplicatesError(null);
+    pollCancelled.current = false;
+
+    let jobId: string;
     try {
-      const result = await qualityApi.getDuplicateCandidates(projectId, accessToken, branch);
-      setDuplicateClusters(result.clusters);
-    } catch {
-      // Duplicates detection may not be available
-    } finally {
+      ({ job_id: jobId } = await qualityApi.triggerDuplicateDetection(
+        projectId,
+        accessToken,
+        branch
+      ));
+    } catch (err) {
+      setDuplicatesError(
+        err instanceof Error ? err.message : "Duplicate detection failed"
+      );
       setIsDetectingDuplicates(false);
+      return;
+    }
+
+    // When WS is connected the effect handler manages loading state.
+    // Add a safety timeout so the spinner doesn't stay forever if the
+    // WS message is lost (network hiccup, Redis pubsub gap, etc.).
+    if (qualityWsConnected.current) {
+      if (duplicatesTimeoutRef.current) clearTimeout(duplicatesTimeoutRef.current);
+      duplicatesTimeoutRef.current = setTimeout(() => {
+        duplicatesTimeoutRef.current = null;
+        setIsDetectingDuplicates((prev) => {
+          if (prev) setDuplicatesError("Duplicate detection timed out — try again later");
+          return false;
+        });
+      }, 60_000);
+      return;
+    }
+
+    // Fallback: poll for job result with exponential backoff
+    try {
+      let delay = 1000;
+      const maxDelay = 5000;
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (pollCancelled.current) return;
+        await new Promise((r) => setTimeout(r, delay));
+        if (pollCancelled.current) return;
+        const result = await qualityApi.getDuplicateJobResult(
+          projectId,
+          jobId,
+          accessToken
+        );
+        // 202 Accepted: job still pending — keep polling
+        if ("status" in result && result.status === "pending") {
+          delay = Math.min(delay * 1.5, maxDelay);
+          continue;
+        }
+        // 200 OK: job complete — narrow to DuplicateDetectionResult
+        const completed = result as DuplicateDetectionResult;
+        setDuplicateClusters(completed.clusters);
+        return;
+      }
+      setDuplicatesError("Duplicate detection timed out — try again later");
+    } catch (err) {
+      if (!pollCancelled.current) {
+        setDuplicatesError(
+          err instanceof Error ? err.message : "Duplicate detection failed"
+        );
+      }
+    } finally {
+      if (!pollCancelled.current) {
+        setIsDetectingDuplicates(false);
+      }
     }
   };
 
-  // Load consistency data when tab changes
+  // Load cached data when tab changes.
+  // Use requestAnimationFrame so the tab switch paints before the loading
+  // state is set, preventing the UI from appearing frozen.
   useEffect(() => {
+    let cancelled = false;
     if (activeTab === "consistency" && consistencyIssues.length === 0 && !isCheckingConsistency) {
-      qualityApi.getConsistencyIssues(projectId, accessToken, branch)
-        .then((r) => setConsistencyIssues(r.issues))
-        .catch(() => {});
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setIsLoadingCachedConsistency(true);
+        qualityApi.getConsistencyIssues(projectId, accessToken, branch)
+          .then((r) => { if (!cancelled) setConsistencyIssues(r.issues); })
+          .catch((err) => { console.error(`Failed to load cached consistency issues for project ${projectId}:`, err); })
+          .finally(() => { if (!cancelled) setIsLoadingCachedConsistency(false); });
+      });
     }
+    if (activeTab === "duplicates" && duplicateClusters.length === 0 && !isDetectingDuplicates) {
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setIsLoadingCachedDuplicates(true);
+        qualityApi.getLatestDuplicates(projectId, accessToken, branch)
+          .then((r) => { if (!cancelled) setDuplicateClusters(r.clusters); })
+          .catch((err) => { console.error(`Failed to load cached duplicates for project ${projectId}:`, err); })
+          .finally(() => { if (!cancelled) setIsLoadingCachedDuplicates(false); });
+      });
+    }
+    return () => { cancelled = true; };
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear stale quality data when project or branch changes
+  useEffect(() => {
+    setConsistencyIssues([]);
+    setConsistencyError(null);
+    setDuplicateClusters([]);
+    setDuplicatesError(null);
+  }, [projectId, branch]);
+
+  // Quality WebSocket for real-time consistency / duplicates updates
+  useEffect(() => {
+    if (!isOpen || !accessToken) return;
+
+    let isActive = true;
+    let ws: WebSocket | null = null;
+
+    const resolvedBranch = branch ?? "main";
+
+    const handleQualityMessage = (message: QualityWebSocketMessage) => {
+      if (!isActive) return;
+      // Ignore events for other branches (backend filters by project, not branch)
+      if (message.branch !== resolvedBranch) return;
+
+      if (message.type === "consistency_started") {
+        setIsCheckingConsistency(true);
+      } else if (message.type === "consistency_complete") {
+        if (consistencyTimeoutRef.current) {
+          clearTimeout(consistencyTimeoutRef.current);
+          consistencyTimeoutRef.current = null;
+        }
+        qualityApi.getConsistencyIssues(projectId, accessToken, branch)
+          .then((r) => { if (isActive) setConsistencyIssues(r.issues); })
+          .catch((err) => {
+            if (isActive) setConsistencyError(err instanceof Error ? err.message : "Failed to load consistency results");
+          })
+          .finally(() => { if (isActive) setIsCheckingConsistency(false); });
+      } else if (message.type === "consistency_failed") {
+        if (consistencyTimeoutRef.current) {
+          clearTimeout(consistencyTimeoutRef.current);
+          consistencyTimeoutRef.current = null;
+        }
+        setIsCheckingConsistency(false);
+        setConsistencyError(message.error ?? "Consistency check failed");
+      } else if (message.type === "duplicates_started") {
+        setIsDetectingDuplicates(true);
+      } else if (message.type === "duplicates_complete") {
+        if (duplicatesTimeoutRef.current) {
+          clearTimeout(duplicatesTimeoutRef.current);
+          duplicatesTimeoutRef.current = null;
+        }
+        qualityApi.getLatestDuplicates(projectId, accessToken, branch)
+          .then((r) => { if (isActive) setDuplicateClusters(r.clusters); })
+          .catch((err) => {
+            if (isActive) setDuplicatesError(err instanceof Error ? err.message : "Failed to load duplicate results");
+          })
+          .finally(() => { if (isActive) setIsDetectingDuplicates(false); });
+      } else if (message.type === "duplicates_failed") {
+        if (duplicatesTimeoutRef.current) {
+          clearTimeout(duplicatesTimeoutRef.current);
+          duplicatesTimeoutRef.current = null;
+        }
+        setIsDetectingDuplicates(false);
+        setDuplicatesError(message.error ?? "Duplicate detection failed");
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      if (isActive) {
+        ws = createQualityWebSocket(
+          projectId,
+          handleQualityMessage,
+          () => { qualityWsConnected.current = false; },
+          () => { qualityWsConnected.current = false; },
+          accessToken,
+          () => { qualityWsConnected.current = true; }
+        );
+      }
+    }, 100);
+
+    return () => {
+      isActive = false;
+      qualityWsConnected.current = false;
+      pollCancelled.current = true;
+      if (consistencyTimeoutRef.current) {
+        clearTimeout(consistencyTimeoutRef.current);
+        consistencyTimeoutRef.current = null;
+      }
+      if (duplicatesTimeoutRef.current) {
+        clearTimeout(duplicatesTimeoutRef.current);
+        duplicatesTimeoutRef.current = null;
+      }
+      clearTimeout(timeoutId);
+      if (ws) ws.close();
+    };
+  }, [isOpen, projectId, accessToken, branch]);
 
   // Dismiss an issue
   const handleDismissIssue = async (issueId: string) => {
@@ -475,12 +726,12 @@ export function HealthCheckPanel({
               {consistencyError}
             </div>
           )}
-          {isCheckingConsistency && (
+          {(isCheckingConsistency || isLoadingCachedConsistency) && (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
             </div>
           )}
-          {!isCheckingConsistency && consistencyIssues.length === 0 && (
+          {!isCheckingConsistency && !isLoadingCachedConsistency && consistencyIssues.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <ShieldCheck className="h-12 w-12 text-green-500" />
               <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -534,12 +785,17 @@ export function HealthCheckPanel({
       {/* Duplicates Tab */}
       {activeTab === "duplicates" && (
         <div className="flex-1 overflow-y-auto p-4">
-          {isDetectingDuplicates && (
+          {duplicatesError && (
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+              {duplicatesError}
+            </div>
+          )}
+          {(isDetectingDuplicates || isLoadingCachedDuplicates) && (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
             </div>
           )}
-          {!isDetectingDuplicates && duplicateClusters.length === 0 && (
+          {!isDetectingDuplicates && !isLoadingCachedDuplicates && duplicateClusters.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <CheckCircle2 className="h-12 w-12 text-green-500" />
               <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
