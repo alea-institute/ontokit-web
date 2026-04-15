@@ -81,6 +81,30 @@ describe("qualityApi", () => {
     });
   });
 
+  describe("getConsistencyJobResult", () => {
+    it("fetches consistency result by job ID", async () => {
+      const data = { project_id: "proj-1", branch: "main", issues: [], checked_at: "", duration_ms: 50 };
+      mockOk(data);
+
+      const result = await qualityApi.getConsistencyJobResult("proj-1", "job-1", "tok");
+      expect(result).toEqual(data);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/proj-1/quality/jobs/job-1");
+      expect(options.method).toBe("GET");
+    });
+
+    it("omits auth header when no token", async () => {
+      mockOk({ issues: [] });
+
+      await qualityApi.getConsistencyJobResult("proj-1", "job-1");
+
+      const [, options] = mockFetch.mock.calls[0];
+      const headers = new Headers(options.headers);
+      expect(headers.get("Authorization")).toBeNull();
+    });
+  });
+
   describe("getConsistencyIssues", () => {
     it("fetches consistency issues", async () => {
       const data = { issues: [], total: 0 };

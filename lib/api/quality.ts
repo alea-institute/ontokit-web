@@ -80,6 +80,18 @@ export const qualityApi = {
       }
     ),
 
+  getConsistencyJobResult: (
+    projectId: string,
+    jobId: string,
+    token?: string
+  ) =>
+    api.get<ConsistencyCheckResult | QualityJobPendingResponse>(
+      `/api/v1/projects/${projectId}/quality/jobs/${jobId}`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      }
+    ),
+
   getConsistencyIssues: (
     projectId: string,
     token?: string,

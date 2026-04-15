@@ -16,6 +16,7 @@ vi.mock("@/lib/api/lint", () => ({
 vi.mock("@/lib/api/quality", () => ({
   qualityApi: {
     triggerConsistencyCheck: vi.fn(),
+    getConsistencyJobResult: vi.fn(),
     getConsistencyIssues: vi.fn(),
     triggerDuplicateDetection: vi.fn(),
     getDuplicateJobResult: vi.fn(),
@@ -315,9 +316,9 @@ describe("HealthCheckPanel", () => {
     });
   });
 
-  it("runs consistency check when Run Check is clicked", async () => {
-    mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "j1" });
-    mockQualityApi.getConsistencyIssues.mockResolvedValue({
+  it("runs consistency check via polling fallback when Run Check is clicked", async () => {
+    mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-j1" });
+    mockQualityApi.getConsistencyJobResult.mockResolvedValue({
       project_id: "p1",
       branch: "main",
       issues: [

@@ -28,7 +28,7 @@ import {
   createQualityWebSocket,
   type QualityWebSocketMessage,
 } from "@/lib/api/quality";
-import type { ConsistencyIssue, DuplicateCluster, DuplicateDetectionResult } from "@/lib/ontology/qualityTypes";
+import type { ConsistencyCheckResult, ConsistencyIssue, DuplicateCluster, DuplicateDetectionResult } from "@/lib/ontology/qualityTypes";
 import { cn, formatDateTime, getLocalName } from "@/lib/utils";
 
 interface HealthCheckPanelProps {
@@ -205,20 +205,74 @@ export function HealthCheckPanel({
     }
   };
 
-  // Fetch consistency issues
+  // Trigger consistency check as a background job.
+  // Same WS-first / polling-fallback pattern as duplicate detection.
   const handleRunConsistencyCheck = async () => {
     if (!accessToken) return;
     setIsCheckingConsistency(true);
     setConsistencyError(null);
+    pollCancelled.current = false;
+
+    let jobId: string;
     try {
-      await qualityApi.triggerConsistencyCheck(projectId, accessToken, branch);
-      // Fetch results after triggering
-      const result = await qualityApi.getConsistencyIssues(projectId, accessToken, branch);
-      setConsistencyIssues(result.issues);
+      ({ job_id: jobId } = await qualityApi.triggerConsistencyCheck(
+        projectId,
+        accessToken,
+        branch
+      ));
     } catch (err) {
-      setConsistencyError(err instanceof Error ? err.message : "Consistency check failed");
-    } finally {
+      setConsistencyError(
+        err instanceof Error ? err.message : "Consistency check failed"
+      );
       setIsCheckingConsistency(false);
+      return;
+    }
+
+    // When WS is connected the effect handler manages loading state
+    if (qualityWsConnected.current) {
+      const WS_TIMEOUT_MS = 60_000;
+      setTimeout(() => {
+        setIsCheckingConsistency((prev) => {
+          if (prev) setConsistencyError("Consistency check timed out — try again later");
+          return false;
+        });
+      }, WS_TIMEOUT_MS);
+      return;
+    }
+
+    // Fallback: poll for job result with exponential backoff
+    try {
+      let delay = 1000;
+      const maxDelay = 5000;
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (pollCancelled.current) return;
+        await new Promise((r) => setTimeout(r, delay));
+        if (pollCancelled.current) return;
+        const result = await qualityApi.getConsistencyJobResult(
+          projectId,
+          jobId,
+          accessToken
+        );
+        if ("status" in result && result.status === "pending") {
+          delay = Math.min(delay * 1.5, maxDelay);
+          continue;
+        }
+        const completed = result as ConsistencyCheckResult;
+        setConsistencyIssues(completed.issues);
+        return;
+      }
+      setConsistencyError("Consistency check timed out — try again later");
+    } catch (err) {
+      if (!pollCancelled.current) {
+        setConsistencyError(
+          err instanceof Error ? err.message : "Consistency check failed"
+        );
+      }
+    } finally {
+      if (!pollCancelled.current) {
+        setIsCheckingConsistency(false);
+      }
     }
   };
 
