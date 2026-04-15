@@ -84,6 +84,11 @@ export function HealthCheckPanel({
   const [isDetectingDuplicates, setIsDetectingDuplicates] = useState(false);
   const [duplicatesError, setDuplicatesError] = useState<string | null>(null);
 
+  // Loading flags for cached data fetches (distinct from the check/detect flags
+  // so the tab switches immediately and the button stays enabled)
+  const [isLoadingCachedConsistency, setIsLoadingCachedConsistency] = useState(false);
+  const [isLoadingCachedDuplicates, setIsLoadingCachedDuplicates] = useState(false);
+
   // Track whether the quality WebSocket is connected
   const qualityWsConnected = useRef(false);
   // Cancellation flag for the polling fallback loop
@@ -357,18 +362,18 @@ export function HealthCheckPanel({
   // Load cached data when tab changes
   useEffect(() => {
     if (activeTab === "consistency" && consistencyIssues.length === 0 && !isCheckingConsistency) {
-      setIsCheckingConsistency(true);
+      setIsLoadingCachedConsistency(true);
       qualityApi.getConsistencyIssues(projectId, accessToken, branch)
         .then((r) => setConsistencyIssues(r.issues))
         .catch(() => {})
-        .finally(() => setIsCheckingConsistency(false));
+        .finally(() => setIsLoadingCachedConsistency(false));
     }
     if (activeTab === "duplicates" && duplicateClusters.length === 0 && !isDetectingDuplicates) {
-      setIsDetectingDuplicates(true);
+      setIsLoadingCachedDuplicates(true);
       qualityApi.getLatestDuplicates(projectId, accessToken, branch)
         .then((r) => setDuplicateClusters(r.clusters))
         .catch(() => {})
-        .finally(() => setIsDetectingDuplicates(false));
+        .finally(() => setIsLoadingCachedDuplicates(false));
     }
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -671,12 +676,12 @@ export function HealthCheckPanel({
               {consistencyError}
             </div>
           )}
-          {isCheckingConsistency && (
+          {(isCheckingConsistency || isLoadingCachedConsistency) && (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
             </div>
           )}
-          {!isCheckingConsistency && consistencyIssues.length === 0 && (
+          {!isCheckingConsistency && !isLoadingCachedConsistency && consistencyIssues.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <ShieldCheck className="h-12 w-12 text-green-500" />
               <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -735,12 +740,12 @@ export function HealthCheckPanel({
               {duplicatesError}
             </div>
           )}
-          {isDetectingDuplicates && (
+          {(isDetectingDuplicates || isLoadingCachedDuplicates) && (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
             </div>
           )}
-          {!isDetectingDuplicates && duplicateClusters.length === 0 && (
+          {!isDetectingDuplicates && !isLoadingCachedDuplicates && duplicateClusters.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <CheckCircle2 className="h-12 w-12 text-green-500" />
               <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
