@@ -347,6 +347,167 @@ describe("HealthCheckPanel", () => {
     });
   });
 
+  it("runs consistency check via WebSocket when WS is connected", async () => {
+    let capturedOnMessage: ((msg: QualityWebSocketMessage) => void) | null = null;
+    mockCreateQualityWebSocket.mockImplementation(
+      (_projectId, onMessage, _onError, _onClose, _token, onOpen) => {
+        capturedOnMessage = onMessage;
+        setTimeout(() => onOpen?.(), 0);
+        return { close: vi.fn() } as unknown as WebSocket;
+      }
+    );
+    mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-ws1" });
+    mockQualityApi.getConsistencyIssues.mockResolvedValue({
+      project_id: "p1",
+      branch: "main",
+      issues: [
+        {
+          rule_id: "missing_label",
+          severity: "info",
+          entity_iri: "http://example.org/WsC",
+          entity_type: "class",
+          message: "Missing label via WS",
+        },
+      ],
+      checked_at: "",
+      duration_ms: 80,
+    });
+
+    setup();
+    await waitFor(() => {
+      expect(capturedOnMessage).not.toBeNull();
+    });
+    await userEvent.click(screen.getByText("Consistency"));
+    await waitFor(() => {
+      expect(screen.getByText("Run Check")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Run Check"));
+    expect(mockQualityApi.triggerConsistencyCheck).toHaveBeenCalled();
+
+    capturedOnMessage!({
+      type: "consistency_complete",
+      project_id: "p1",
+      branch: "main",
+    });
+    await waitFor(() => {
+      expect(screen.getByText("Missing label via WS")).toBeDefined();
+    });
+    expect(mockQualityApi.getConsistencyJobResult).not.toHaveBeenCalled();
+  });
+
+  it("shows error when consistency check trigger fails", async () => {
+    mockQualityApi.triggerConsistencyCheck.mockRejectedValue(
+      new Error("Consistency backend down")
+    );
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Consistency")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Consistency"));
+    await waitFor(() => {
+      expect(screen.getByText("Run Check")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Run Check"));
+    await waitFor(() => {
+      expect(screen.getByText("Consistency backend down")).toBeDefined();
+    });
+  });
+
+  it("surfaces consistency polling errors in the UI", async () => {
+    mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-500" });
+    const serverError = Object.assign(new Error("Server error"), { status: 500 });
+    mockQualityApi.getConsistencyJobResult.mockRejectedValue(serverError);
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Consistency")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Consistency"));
+    await waitFor(() => {
+      expect(screen.getByText("Run Check")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Run Check"));
+    await waitFor(() => {
+      expect(screen.getByText("Server error")).toBeDefined();
+    });
+    expect(mockQualityApi.getConsistencyJobResult).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows consistency timeout on WS path when WS message is lost", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockCreateQualityWebSocket.mockImplementation(
+        (_projectId, _onMessage, _onError, _onClose, _token, onOpen) => {
+          setTimeout(() => onOpen?.(), 0);
+          return { close: vi.fn() } as unknown as WebSocket;
+        }
+      );
+      mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-ws-lost" });
+
+      setup();
+      await waitFor(() => {
+        expect(mockCreateQualityWebSocket).toHaveBeenCalled();
+      });
+      await vi.advanceTimersByTimeAsync(10);
+
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Consistency")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Run Check")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+
+      await vi.advanceTimersByTimeAsync(61_000);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Consistency check timed out — try again later")
+        ).toBeDefined();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows consistency polling timeout when all attempts exhausted", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-slow" });
+      mockQualityApi.getConsistencyJobResult.mockResolvedValue({
+        job_id: "cons-slow",
+        status: "pending",
+      } as unknown as Awaited<ReturnType<typeof qualityApi.getConsistencyJobResult>>);
+
+      setup();
+      await waitFor(() => {
+        expect(screen.getByText("Consistency")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Consistency")
+      );
+      await waitFor(() => {
+        expect(screen.getByText("Run Check")).toBeDefined();
+      });
+      await userEvent.setup({ advanceTimers: vi.advanceTimersByTime }).click(
+        screen.getByText("Run Check")
+      );
+
+      for (let i = 0; i < 25; i++) {
+        await vi.advanceTimersByTimeAsync(6000);
+      }
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Consistency check timed out — try again later")
+        ).toBeDefined();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("detects duplicates via polling fallback when WS is not connected", async () => {
     const duplicateResult = {
       clusters: [
