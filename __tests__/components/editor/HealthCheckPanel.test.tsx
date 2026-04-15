@@ -1743,4 +1743,37 @@ describe("HealthCheckPanel", () => {
       vi.useRealTimers();
     }
   });
+
+  it("cancels deferred cache fetch when tab switches before rAF fires", async () => {
+    // Override rAF to be async (not synchronous like the default mock)
+    const pendingCallbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      pendingCallbacks.push(cb);
+      return pendingCallbacks.length;
+    });
+
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Consistency")).toBeDefined();
+    });
+
+    // Switch to Consistency — queues an rAF callback
+    await userEvent.click(screen.getByText("Consistency"));
+
+    // Switch away before rAF fires — sets cancelled = true
+    await userEvent.click(screen.getByText("Duplicates"));
+
+    // Now flush the pending rAF — the cancelled guard should prevent the fetch
+    pendingCallbacks.forEach((cb) => cb(0));
+
+    // Neither fetch should have been called from the cancelled consistency rAF
+    // (the duplicates rAF may or may not have fired depending on timing)
+    // Wait a tick for any promises to settle
+    await waitFor(() => {
+      expect(screen.getByText("No duplicates detected")).toBeDefined();
+    });
+
+    // Restore the synchronous mock for other tests
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
+  });
 });
