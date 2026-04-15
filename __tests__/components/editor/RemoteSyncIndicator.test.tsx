@@ -35,19 +35,19 @@ describe("RemoteSyncIndicator", () => {
     vi.clearAllMocks();
   });
 
-  it("renders nothing when config is not loaded yet", () => {
-    mockGetConfig.mockReturnValue(new Promise(() => {})); // never resolves
+  it("renders nothing and skips fetch when accessToken is missing", () => {
     const { container } = render(
       <RemoteSyncIndicator projectId="proj-1" />,
       { wrapper: createWrapper() },
     );
     expect(container.innerHTML).toBe("");
+    expect(mockGetConfig).not.toHaveBeenCalled();
   });
 
   it("renders nothing when config is disabled", async () => {
     mockGetConfig.mockResolvedValue({ enabled: false, status: "idle" });
     const { container } = render(
-      <RemoteSyncIndicator projectId="proj-1" />,
+      <RemoteSyncIndicator projectId="proj-1" accessToken="tok-123" />,
       { wrapper: createWrapper() },
     );
     await waitFor(() => {
@@ -58,7 +58,10 @@ describe("RemoteSyncIndicator", () => {
 
   it("renders synced button for up_to_date status", async () => {
     mockGetConfig.mockResolvedValue({ enabled: true, status: "up_to_date" });
-    render(<RemoteSyncIndicator projectId="proj-1" />, { wrapper: createWrapper() });
+    render(
+      <RemoteSyncIndicator projectId="proj-1" accessToken="tok-123" />,
+      { wrapper: createWrapper() },
+    );
     await waitFor(() => {
       expect(screen.getByLabelText("In sync with remote")).toBeDefined();
     });
@@ -66,7 +69,10 @@ describe("RemoteSyncIndicator", () => {
 
   it("renders synced button for idle status", async () => {
     mockGetConfig.mockResolvedValue({ enabled: true, status: "idle" });
-    render(<RemoteSyncIndicator projectId="proj-1" />, { wrapper: createWrapper() });
+    render(
+      <RemoteSyncIndicator projectId="proj-1" accessToken="tok-123" />,
+      { wrapper: createWrapper() },
+    );
     await waitFor(() => {
       expect(screen.getByLabelText("In sync with remote")).toBeDefined();
     });
@@ -74,7 +80,10 @@ describe("RemoteSyncIndicator", () => {
 
   it("links to settings for synced state", async () => {
     mockGetConfig.mockResolvedValue({ enabled: true, status: "up_to_date" });
-    render(<RemoteSyncIndicator projectId="proj-1" />, { wrapper: createWrapper() });
+    render(
+      <RemoteSyncIndicator projectId="proj-1" accessToken="tok-123" />,
+      { wrapper: createWrapper() },
+    );
     await waitFor(() => {
       const link = screen.getByLabelText("In sync with remote").closest("a");
       expect(link?.getAttribute("href")).toBe("/projects/proj-1/settings#remote-sync");
@@ -83,7 +92,10 @@ describe("RemoteSyncIndicator", () => {
 
   it("renders checking state as disabled button", async () => {
     mockGetConfig.mockResolvedValue({ enabled: true, status: "checking" });
-    render(<RemoteSyncIndicator projectId="proj-1" />, { wrapper: createWrapper() });
+    render(
+      <RemoteSyncIndicator projectId="proj-1" accessToken="tok-123" />,
+      { wrapper: createWrapper() },
+    );
     await waitFor(() => {
       expect(screen.getByLabelText("Checking for updates from remote")).toBeDefined();
     });
@@ -95,7 +107,10 @@ describe("RemoteSyncIndicator", () => {
       status: "update_available",
       pending_pr_id: "pr-42",
     });
-    render(<RemoteSyncIndicator projectId="proj-1" />, { wrapper: createWrapper() });
+    render(
+      <RemoteSyncIndicator projectId="proj-1" accessToken="tok-123" />,
+      { wrapper: createWrapper() },
+    );
     await waitFor(() => {
       const link = screen.getByLabelText("Update available from remote").closest("a");
       expect(link?.getAttribute("href")).toBe("/projects/proj-1/pull-requests/pr-42");
@@ -108,7 +123,10 @@ describe("RemoteSyncIndicator", () => {
       status: "update_available",
       pending_pr_id: null,
     });
-    render(<RemoteSyncIndicator projectId="proj-1" />, { wrapper: createWrapper() });
+    render(
+      <RemoteSyncIndicator projectId="proj-1" accessToken="tok-123" />,
+      { wrapper: createWrapper() },
+    );
     await waitFor(() => {
       const link = screen.getByLabelText("Update available from remote").closest("a");
       expect(link?.getAttribute("href")).toBe("/projects/proj-1/settings#remote-sync");
@@ -117,7 +135,10 @@ describe("RemoteSyncIndicator", () => {
 
   it("renders error state", async () => {
     mockGetConfig.mockResolvedValue({ enabled: true, status: "error" });
-    render(<RemoteSyncIndicator projectId="proj-1" />, { wrapper: createWrapper() });
+    render(
+      <RemoteSyncIndicator projectId="proj-1" accessToken="tok-123" />,
+      { wrapper: createWrapper() },
+    );
     await waitFor(() => {
       expect(screen.getByLabelText("Sync from remote error")).toBeDefined();
     });
@@ -126,13 +147,15 @@ describe("RemoteSyncIndicator", () => {
   it("renders nothing when API returns error", async () => {
     mockGetConfig.mockRejectedValue(new Error("Not found"));
     const { container } = render(
-      <RemoteSyncIndicator projectId="proj-1" />,
+      <RemoteSyncIndicator projectId="proj-1" accessToken="tok-123" />,
       { wrapper: createWrapper() },
     );
     await waitFor(() => {
       expect(mockGetConfig).toHaveBeenCalled();
     });
-    expect(container.innerHTML).toBe("");
+    await waitFor(() => {
+      expect(container.innerHTML).toBe("");
+    });
   });
 
   it("passes accessToken to API call", async () => {

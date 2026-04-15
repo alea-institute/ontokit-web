@@ -16,9 +16,9 @@ export function RemoteSyncIndicator({
   accessToken,
 }: RemoteSyncIndicatorProps) {
   const { data: config } = useQuery({
-    queryKey: ["remoteSync", "config", projectId],
+    queryKey: ["remoteSync", "config", projectId, accessToken],
     queryFn: () => remoteSyncApi.getConfig(projectId, accessToken),
-    enabled: !!projectId,
+    enabled: !!projectId && !!accessToken,
     retry: false,
   });
 
