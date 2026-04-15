@@ -93,6 +93,9 @@ export function HealthCheckPanel({
   const qualityWsConnected = useRef(false);
   // Cancellation flag for the polling fallback loop
   const pollCancelled = useRef(false);
+  // Safety timeout refs for WS path (so they can be cleared on completion/unmount)
+  const consistencyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const duplicatesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch lint status and issues
   const fetchData = useCallback(async (issueFilter?: IssueFilter) => {
@@ -235,13 +238,14 @@ export function HealthCheckPanel({
 
     // When WS is connected the effect handler manages loading state
     if (qualityWsConnected.current) {
-      const WS_TIMEOUT_MS = 60_000;
-      setTimeout(() => {
+      if (consistencyTimeoutRef.current) clearTimeout(consistencyTimeoutRef.current);
+      consistencyTimeoutRef.current = setTimeout(() => {
+        consistencyTimeoutRef.current = null;
         setIsCheckingConsistency((prev) => {
           if (prev) setConsistencyError("Consistency check timed out — try again later");
           return false;
         });
-      }, WS_TIMEOUT_MS);
+      }, 60_000);
       return;
     }
 
@@ -310,14 +314,14 @@ export function HealthCheckPanel({
     // Add a safety timeout so the spinner doesn't stay forever if the
     // WS message is lost (network hiccup, Redis pubsub gap, etc.).
     if (qualityWsConnected.current) {
-      const WS_TIMEOUT_MS = 60_000;
-      setTimeout(() => {
-        // Only clear if still detecting (WS handler hasn't already resolved it)
+      if (duplicatesTimeoutRef.current) clearTimeout(duplicatesTimeoutRef.current);
+      duplicatesTimeoutRef.current = setTimeout(() => {
+        duplicatesTimeoutRef.current = null;
         setIsDetectingDuplicates((prev) => {
           if (prev) setDuplicatesError("Duplicate detection timed out — try again later");
           return false;
         });
-      }, WS_TIMEOUT_MS);
+      }, 60_000);
       return;
     }
 
@@ -387,6 +391,14 @@ export function HealthCheckPanel({
     return () => { cancelled = true; };
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Clear stale quality data when project or branch changes
+  useEffect(() => {
+    setConsistencyIssues([]);
+    setConsistencyError(null);
+    setDuplicateClusters([]);
+    setDuplicatesError(null);
+  }, [projectId, branch]);
+
   // Quality WebSocket for real-time consistency / duplicates updates
   useEffect(() => {
     if (!isOpen || !accessToken) return;
@@ -404,21 +416,41 @@ export function HealthCheckPanel({
       if (message.type === "consistency_started") {
         setIsCheckingConsistency(true);
       } else if (message.type === "consistency_complete") {
+        if (consistencyTimeoutRef.current) {
+          clearTimeout(consistencyTimeoutRef.current);
+          consistencyTimeoutRef.current = null;
+        }
         qualityApi.getConsistencyIssues(projectId, accessToken, branch)
           .then((r) => { if (isActive) setConsistencyIssues(r.issues); })
-          .catch(() => {})
+          .catch((err) => {
+            if (isActive) setConsistencyError(err instanceof Error ? err.message : "Failed to load consistency results");
+          })
           .finally(() => { if (isActive) setIsCheckingConsistency(false); });
       } else if (message.type === "consistency_failed") {
+        if (consistencyTimeoutRef.current) {
+          clearTimeout(consistencyTimeoutRef.current);
+          consistencyTimeoutRef.current = null;
+        }
         setIsCheckingConsistency(false);
         setConsistencyError(message.error ?? "Consistency check failed");
       } else if (message.type === "duplicates_started") {
         setIsDetectingDuplicates(true);
       } else if (message.type === "duplicates_complete") {
+        if (duplicatesTimeoutRef.current) {
+          clearTimeout(duplicatesTimeoutRef.current);
+          duplicatesTimeoutRef.current = null;
+        }
         qualityApi.getLatestDuplicates(projectId, accessToken, branch)
           .then((r) => { if (isActive) setDuplicateClusters(r.clusters); })
-          .catch(() => {})
+          .catch((err) => {
+            if (isActive) setDuplicatesError(err instanceof Error ? err.message : "Failed to load duplicate results");
+          })
           .finally(() => { if (isActive) setIsDetectingDuplicates(false); });
       } else if (message.type === "duplicates_failed") {
+        if (duplicatesTimeoutRef.current) {
+          clearTimeout(duplicatesTimeoutRef.current);
+          duplicatesTimeoutRef.current = null;
+        }
         setIsDetectingDuplicates(false);
         setDuplicatesError(message.error ?? "Duplicate detection failed");
       }
@@ -441,6 +473,14 @@ export function HealthCheckPanel({
       isActive = false;
       qualityWsConnected.current = false;
       pollCancelled.current = true;
+      if (consistencyTimeoutRef.current) {
+        clearTimeout(consistencyTimeoutRef.current);
+        consistencyTimeoutRef.current = null;
+      }
+      if (duplicatesTimeoutRef.current) {
+        clearTimeout(duplicatesTimeoutRef.current);
+        duplicatesTimeoutRef.current = null;
+      }
       clearTimeout(timeoutId);
       if (ws) ws.close();
     };
