@@ -33,6 +33,7 @@ import type { LocalizedString } from "@/lib/api/client";
 import { lintApi, type LintIssue } from "@/lib/api/lint";
 import { cn, getLocalName, getPreferredLabel } from "@/lib/utils";
 import { LanguageFlag } from "@/components/editor/LanguageFlag";
+import { LanguagePicker } from "@/components/editor/LanguagePicker";
 import { ParentClassPicker } from "@/components/editor/ParentClassPicker";
 import { AnnotationRow } from "@/components/editor/standard/AnnotationRow";
 import { InlineAnnotationAdder } from "@/components/editor/standard/InlineAnnotationAdder";
@@ -679,14 +680,12 @@ export function ClassDetailPanel({
                       placeholder="Label text"
                       className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                     />
-                    <LanguageFlag lang={label.lang} />
-                    <input
-                      type="text"
+                    <LanguagePicker
                       value={label.lang}
-                      onChange={(e) => updateLabel(index, "lang", e.target.value)}
-                      onBlur={() => triggerSave()}
-                      className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-                      title="Language tag (e.g. en, de, fr)"
+                      onChange={(code) => {
+                        updateLabel(index, "lang", code);
+                        triggerSave();
+                      }}
                     />
                     {editLabels.length > 1 ? (
                       <button
@@ -785,16 +784,14 @@ export function ClassDetailPanel({
                         className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                       />
                       <div className="mt-1 shrink-0">
-                        <LanguageFlag lang={comment.lang} />
+                        <LanguagePicker
+                          value={comment.lang}
+                          onChange={(code) => {
+                            updateComment(index, "lang", code);
+                            triggerSave();
+                          }}
+                        />
                       </div>
-                      <input
-                        type="text"
-                        value={comment.lang}
-                        onChange={(e) => updateComment(index, "lang", e.target.value)}
-                        onBlur={() => triggerSave()}
-                        className="w-14 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-                        title="Language tag"
-                      />
                       {!isGhost ? (
                         <button
                           onClick={() => removeComment(index)}

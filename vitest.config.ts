@@ -16,7 +16,6 @@ export default defineConfig({
       exclude: [
         // Type-only files (no runtime code)
         "lib/ontology/types.ts",
-        "lib/ontology/qualityTypes.ts",
         "lib/graph/types.ts",
         "lib/git-graph/types.ts",
         // Barrel re-exports

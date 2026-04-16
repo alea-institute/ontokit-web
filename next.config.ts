@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { codecovWebpackPlugin } from "@codecov/webpack-plugin";
 import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin("./lib/i18n/request.ts");
@@ -27,11 +28,18 @@ const nextConfig: NextConfig = {
   },
 
   // WSL2: use polling for file watching since inotify doesn't work across the VM boundary
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.watchOptions = {
       poll: 1000,
       aggregateTimeout: 300,
     };
+    config.plugins.push(
+      codecovWebpackPlugin({
+        enableBundleAnalysis: process.env.CODECOV_TOKEN !== undefined,
+        bundleName: isServer ? "ontokit-web-server" : "ontokit-web-client",
+        uploadToken: process.env.CODECOV_TOKEN,
+      }),
+    );
     return config;
   },
 };

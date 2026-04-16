@@ -57,6 +57,20 @@ vi.mock("@/lib/stores/editorModeStore", () => ({
 vi.mock("@/components/editor/LanguageFlag", () => ({
   LanguageFlag: () => null,
 }));
+vi.mock("@/components/editor/LanguagePicker", () => ({
+  LanguagePicker: ({ value, onChange }: { value: string; onChange: (code: string) => void }) => (
+    <select
+      data-testid="lang-picker"
+      aria-label="Language tag"
+      value={value}
+      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
+    >
+      <option value="en">en</option>
+      <option value="de">de</option>
+      <option value="fr">fr</option>
+    </select>
+  ),
+}));
 vi.mock("@/components/editor/ParentClassPicker", () => ({
   ParentClassPicker: () => null,
 }));
@@ -638,16 +652,14 @@ describe("ClassDetailPanel", () => {
     await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
-      expect(screen.getAllByTitle("Language tag (e.g. en, de, fr)").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByLabelText("Language tag").length).toBeGreaterThanOrEqual(1);
     });
 
-    // Find the language input (has title "Language tag")
-    const langInputs = screen.getAllByTitle("Language tag (e.g. en, de, fr)");
+    // Find the language picker (mocked as <select>)
+    const langPickers = screen.getAllByLabelText("Language tag");
+    await user.selectOptions(langPickers[0], "de");
 
-    await user.clear(langInputs[0]);
-    await user.type(langInputs[0], "de");
-
-    expect(screen.getByDisplayValue("de")).not.toBeNull();
+    expect((langPickers[0] as HTMLSelectElement).value).toBe("de");
   });
 
   // ── Comment editing ──
@@ -1568,14 +1580,15 @@ describe("ClassDetailPanel", () => {
       expect(screen.getByDisplayValue("A human being")).not.toBeNull();
     });
 
-    // Find language input for comment (title "Language tag")
-    const langInputs = screen.getAllByTitle("Language tag");
-    expect(langInputs.length).toBeGreaterThanOrEqual(1);
+    // Find language pickers (mocked as <select>) — labels come first, then comments
+    const langPickers = screen.getAllByLabelText("Language tag");
+    expect(langPickers.length).toBeGreaterThanOrEqual(2);
 
-    await user.clear(langInputs[0]);
-    await user.type(langInputs[0], "fr");
+    // The comment lang picker is after the label ones
+    const commentLangPicker = langPickers[langPickers.length - 1];
+    await user.selectOptions(commentLangPicker, "fr");
 
-    expect(screen.getByDisplayValue("fr")).not.toBeNull();
+    expect((commentLangPicker as HTMLSelectElement).value).toBe("fr");
   });
 
   // ── Edit mode: definition section with existing values shows annotation rows ──

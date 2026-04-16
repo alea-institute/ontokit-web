@@ -2,7 +2,7 @@
 
 import { Trash2 } from "lucide-react";
 import { getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
-import { LanguageFlag } from "@/components/editor/LanguageFlag";
+import { LanguagePicker } from "@/components/editor/LanguagePicker";
 
 interface AnnotationRowProps {
   propertyIri: string;
@@ -64,17 +64,12 @@ export function AnnotationRow({
           className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
         />
       )}
-      <div className="mt-1 shrink-0">
-        <LanguageFlag lang={lang} />
-      </div>
-      <input
-        type="text"
+      <LanguagePicker
         value={lang}
-        onChange={(e) => onLangChange(e.target.value)}
-        onBlur={onBlur}
-        className="w-14 shrink-0 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-        aria-label="Language tag"
-        placeholder="lang"
+        onChange={(code) => {
+          onLangChange(code);
+          onBlur?.();
+        }}
       />
       {onRemove ? (
         <button

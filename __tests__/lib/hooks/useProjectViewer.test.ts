@@ -47,37 +47,26 @@ vi.mock("@/lib/hooks/useCollaborationStatus", () => ({
   }),
 }));
 
-vi.mock("@/lib/api/pullRequests", () => ({
-  pullRequestsApi: {
-    list: vi.fn().mockResolvedValue({ total: 3, items: [] }),
-  },
+// Mock the new React Query hooks used by useProjectViewer
+const mockUseOpenPRCount = vi.fn();
+const mockUseLintSummary = vi.fn();
+const mockUseNormalizationStatus = vi.fn();
+const mockUsePendingSuggestionCount = vi.fn();
+
+vi.mock("@/lib/hooks/useOpenPRCount", () => ({
+  useOpenPRCount: (...args: unknown[]) => mockUseOpenPRCount(...args),
 }));
 
-vi.mock("@/lib/api/lint", () => ({
-  lintApi: {
-    getStatus: vi.fn().mockResolvedValue({
-      project_id: "p1",
-      last_run: null,
-      error_count: 1,
-      warning_count: 2,
-      info_count: 0,
-      total_issues: 3,
-    }),
-  },
+vi.mock("@/lib/hooks/useLintSummary", () => ({
+  useLintSummary: (...args: unknown[]) => mockUseLintSummary(...args),
 }));
 
-vi.mock("@/lib/api/normalization", () => ({
-  normalizationApi: {
-    getStatus: vi.fn().mockResolvedValue({
-      needs_normalization: false,
-      last_run: null,
-      last_run_id: null,
-      last_check: null,
-      preview_report: null,
-      checking: false,
-      error: null,
-    }),
-  },
+vi.mock("@/lib/hooks/useNormalizationStatus", () => ({
+  useNormalizationStatus: (...args: unknown[]) => mockUseNormalizationStatus(...args),
+}));
+
+vi.mock("@/lib/hooks/usePendingSuggestionCount", () => ({
+  usePendingSuggestionCount: (...args: unknown[]) => mockUsePendingSuggestionCount(...args),
 }));
 
 vi.mock("@/lib/api/revisions", () => ({
@@ -86,17 +75,7 @@ vi.mock("@/lib/api/revisions", () => ({
   },
 }));
 
-vi.mock("@/lib/api/suggestions", () => ({
-  suggestionsApi: {
-    listPending: vi.fn().mockResolvedValue({ items: [{ id: "s1" }] }),
-  },
-}));
-
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
-import { pullRequestsApi } from "@/lib/api/pullRequests";
-import { lintApi } from "@/lib/api/lint";
-import { normalizationApi } from "@/lib/api/normalization";
-import { suggestionsApi } from "@/lib/api/suggestions";
 import { revisionsApi, type RevisionFileResponse } from "@/lib/api/revisions";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 
@@ -140,6 +119,31 @@ describe("useProjectViewer", () => {
       errorKind: null,
     });
     mockDerivePermissions.mockReturnValue(defaultPermissions());
+
+    // Default mock return values for React Query hooks
+    mockUseOpenPRCount.mockReturnValue({ data: 3 });
+    mockUseLintSummary.mockReturnValue({
+      data: {
+        project_id: "p1",
+        last_run: null,
+        error_count: 1,
+        warning_count: 2,
+        info_count: 0,
+        total_issues: 3,
+      },
+    });
+    mockUseNormalizationStatus.mockReturnValue({
+      data: {
+        needs_normalization: false,
+        last_run: null,
+        last_run_id: null,
+        last_check: null,
+        preview_report: null,
+        checking: false,
+        error: null,
+      },
+    });
+    mockUsePendingSuggestionCount.mockReturnValue({ data: 1 });
   });
 
   it("returns loading state initially", () => {
@@ -251,7 +255,7 @@ describe("useProjectViewer", () => {
     expect(result.current.hasValidAccess).toBe(false);
   });
 
-  it("fetches secondary data (openPRCount, lintSummary) when project loads", async () => {
+  it("returns secondary data (openPRCount, lintSummary) from React Query hooks", () => {
     const project = makeProject();
     mockUseProject.mockReturnValue({
       project,
@@ -269,20 +273,16 @@ describe("useProjectViewer", () => {
       })
     );
 
-    await waitFor(() => {
-      expect(result.current.openPRCount).toBe(3);
-    });
+    expect(result.current.openPRCount).toBe(3);
+    expect(result.current.lintSummary).not.toBeNull();
+    expect(result.current.lintSummary?.total_issues).toBe(3);
 
-    await waitFor(() => {
-      expect(result.current.lintSummary).not.toBeNull();
-      expect(result.current.lintSummary?.total_issues).toBe(3);
-    });
-
-    expect(pullRequestsApi.list).toHaveBeenCalledWith("p1", "tok", "open", undefined, 0, 1);
-    expect(lintApi.getStatus).toHaveBeenCalledWith("p1", "tok");
+    // Verify hooks were called with correct args
+    expect(mockUseOpenPRCount).toHaveBeenCalledWith("p1", "tok");
+    expect(mockUseLintSummary).toHaveBeenCalledWith("p1", "tok");
   });
 
-  it("fetches normalization status when project has source_file_path", async () => {
+  it("passes normalization status from React Query hook", () => {
     const project = makeProject({ source_file_path: "ont.ttl" });
     mockUseProject.mockReturnValue({
       project,
@@ -300,14 +300,16 @@ describe("useProjectViewer", () => {
       })
     );
 
-    await waitFor(() => {
-      expect(result.current.normalizationStatus).not.toBeNull();
-    });
-
-    expect(normalizationApi.getStatus).toHaveBeenCalledWith("p1", "tok");
+    expect(result.current.normalizationStatus).not.toBeNull();
+    // Verify the hook was called with enabled based on source_file_path
+    expect(mockUseNormalizationStatus).toHaveBeenCalledWith(
+      "p1",
+      "tok",
+      { enabled: true },
+    );
   });
 
-  it("does not fetch normalization status when no source_file_path", async () => {
+  it("disables normalization status hook when no source_file_path", () => {
     const project = makeProject({ source_file_path: undefined });
     mockUseProject.mockReturnValue({
       project,
@@ -315,6 +317,8 @@ describe("useProjectViewer", () => {
       error: null,
       errorKind: null,
     });
+    mockDerivePermissions.mockReturnValue(defaultPermissions({ hasOntology: false }));
+    mockUseNormalizationStatus.mockReturnValue({ data: undefined });
 
     renderHook(() =>
       useProjectViewer({
@@ -325,15 +329,15 @@ describe("useProjectViewer", () => {
       })
     );
 
-    // Wait for secondary effects to complete
-    await waitFor(() => {
-      expect(pullRequestsApi.list).toHaveBeenCalled();
-    });
-
-    expect(normalizationApi.getStatus).not.toHaveBeenCalled();
+    // Hook should be called with enabled: false (no source_file_path)
+    expect(mockUseNormalizationStatus).toHaveBeenCalledWith(
+      "p1",
+      "tok",
+      { enabled: false },
+    );
   });
 
-  it("fetches pending suggestions when canEdit and has accessToken", async () => {
+  it("returns pending suggestion count from React Query hook when canEdit", () => {
     const project = makeProject();
     mockUseProject.mockReturnValue({
       project,
@@ -352,14 +356,15 @@ describe("useProjectViewer", () => {
       })
     );
 
-    await waitFor(() => {
-      expect(result.current.pendingSuggestionCount).toBe(1);
-    });
-
-    expect(suggestionsApi.listPending).toHaveBeenCalledWith("p1", "tok");
+    expect(result.current.pendingSuggestionCount).toBe(1);
+    expect(mockUsePendingSuggestionCount).toHaveBeenCalledWith(
+      "p1",
+      "tok",
+      { enabled: true },
+    );
   });
 
-  it("does not fetch suggestions when canEdit is false", async () => {
+  it("disables suggestion count hook when canEdit is false", () => {
     const project = makeProject();
     mockUseProject.mockReturnValue({
       project,
@@ -368,6 +373,7 @@ describe("useProjectViewer", () => {
       errorKind: null,
     });
     mockDerivePermissions.mockReturnValue(defaultPermissions({ canEdit: false }));
+    mockUsePendingSuggestionCount.mockReturnValue({ data: undefined });
 
     renderHook(() =>
       useProjectViewer({
@@ -378,39 +384,11 @@ describe("useProjectViewer", () => {
       })
     );
 
-    // Wait for other effects
-    await waitFor(() => {
-      expect(pullRequestsApi.list).toHaveBeenCalled();
-    });
-
-    expect(suggestionsApi.listPending).not.toHaveBeenCalled();
-  });
-
-  it("does not fetch suggestions when canEdit is true but accessToken is missing", async () => {
-    const project = makeProject();
-    mockUseProject.mockReturnValue({
-      project,
-      isLoading: false,
-      error: null,
-      errorKind: null,
-    });
-    mockDerivePermissions.mockReturnValue(defaultPermissions({ canEdit: true }));
-
-    renderHook(() =>
-      useProjectViewer({
-        projectId: "p1",
-        accessToken: undefined,
-        sessionStatus: "unauthenticated",
-        activeBranch: "main",
-      })
+    expect(mockUsePendingSuggestionCount).toHaveBeenCalledWith(
+      "p1",
+      "tok",
+      { enabled: false },
     );
-
-    // Wait for other effects
-    await waitFor(() => {
-      expect(pullRequestsApi.list).toHaveBeenCalled();
-    });
-
-    expect(suggestionsApi.listPending).not.toHaveBeenCalled();
   });
 
   it("exposes tree properties from useOntologyTree", () => {
@@ -483,15 +461,20 @@ describe("useProjectViewer", () => {
     expect(typeof result.current.resetSourceState).toBe("function");
   });
 
-  it("does not fetch secondary data when project is null", async () => {
+  it("returns default values when project is null", () => {
     mockUseProject.mockReturnValue({
       project: null,
       isLoading: false,
       error: "Not found",
       errorKind: "not-found",
     });
+    // Hooks return undefined data when project is null
+    mockUseOpenPRCount.mockReturnValue({ data: undefined });
+    mockUseLintSummary.mockReturnValue({ data: undefined });
+    mockUseNormalizationStatus.mockReturnValue({ data: undefined });
+    mockUsePendingSuggestionCount.mockReturnValue({ data: undefined });
 
-    renderHook(() =>
+    const { result } = renderHook(() =>
       useProjectViewer({
         projectId: "p1",
         accessToken: "tok",
@@ -500,13 +483,10 @@ describe("useProjectViewer", () => {
       })
     );
 
-    // Give effects time to fire (they shouldn't)
-    await act(async () => {
-      await new Promise((r) => setTimeout(r, 50));
-    });
-
-    expect(pullRequestsApi.list).not.toHaveBeenCalled();
-    expect(lintApi.getStatus).not.toHaveBeenCalled();
+    expect(result.current.openPRCount).toBe(0);
+    expect(result.current.lintSummary).toBeNull();
+    expect(result.current.normalizationStatus).toBeNull();
+    expect(result.current.pendingSuggestionCount).toBe(0);
   });
 
   // --- loadSourceContent ---

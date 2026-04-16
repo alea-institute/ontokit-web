@@ -66,15 +66,6 @@ export interface CrossReferencesResponse {
   groups: CrossReferenceGroup[];
 }
 
-export interface DuplicateCandidate {
-  entity_a_iri: string;
-  entity_a_label: string;
-  entity_b_iri: string;
-  entity_b_label: string;
-  entity_type: string;
-  similarity: number;
-}
-
 export interface DuplicateCluster {
   entities: Array<{
     iri: string;
@@ -88,4 +79,9 @@ export interface DuplicateDetectionResult {
   clusters: DuplicateCluster[];
   threshold: number;
   checked_at: string;
+}
+
+export interface QualityJobPendingResponse {
+  job_id: string;
+  status: "pending";
 }
