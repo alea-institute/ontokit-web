@@ -2250,9 +2250,24 @@ function WebhookConfigPanel({
           )}
 
           {webhookMessage && !["configured", "created"].includes(webhookStatus) && webhookStatus !== "checking" && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {webhookMessage}
-            </p>
+            <div className={cn(
+              "flex items-start gap-2 rounded-lg border p-2.5 text-sm",
+              webhookStatus === "error"
+                ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+                : ["no_scope", "no_token", "manual_required"].includes(webhookStatus)
+                  ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300"
+                  : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400",
+            )}>
+              <AlertCircle className={cn(
+                "mt-0.5 h-4 w-4 flex-shrink-0",
+                webhookStatus === "error"
+                  ? "text-red-600 dark:text-red-400"
+                  : ["no_scope", "no_token", "manual_required"].includes(webhookStatus)
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-slate-500 dark:text-slate-400",
+              )} />
+              <p className="text-xs">{webhookMessage}</p>
+            </div>
           )}
 
           {/* Manual setup UI */}
@@ -2355,7 +2370,24 @@ function WebhookConfigPanel({
       )}
 
       {error && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2.5 dark:border-red-900/50 dark:bg-red-900/20">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600 dark:text-red-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-red-700 dark:text-red-300">
+                Failed to update webhook settings
+              </p>
+              <details className="mt-1">
+                <summary className="cursor-pointer text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
+                  Show details
+                </summary>
+                <p className="mt-1 break-words text-xs text-red-600 dark:text-red-400">
+                  {error}
+                </p>
+              </details>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
