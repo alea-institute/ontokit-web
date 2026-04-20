@@ -207,14 +207,18 @@ export default function HomePage() {
                 <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
                   {debouncedSearch
                     ? "No projects found"
-                    : (filter === "mine" || filter === "private")
+                    : filter === "private"
+                    ? "No private projects yet"
+                    : filter === "mine"
                     ? "No projects yet"
                     : "No projects available"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                   {debouncedSearch
                     ? "Try a different search term"
-                    : (filter === "mine" || filter === "private") && isAuthenticated
+                    : filter === "private" && isAuthenticated
+                    ? "You are not a member of any private projects, and do not own any private projects. Create your first private project to get started."
+                    : filter === "mine" && isAuthenticated
                     ? "Create your first project to get started"
                     : "Check back later for public projects"}
                 </p>
@@ -222,7 +226,7 @@ export default function HomePage() {
                   <Link href="/projects/new" className="mt-4 inline-block">
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
-                      Create Project
+                      {filter === "private" ? "Create Private Project" : "Create Project"}
                     </Button>
                   </Link>
                 )}
