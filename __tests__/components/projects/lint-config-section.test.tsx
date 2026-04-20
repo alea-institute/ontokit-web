@@ -343,4 +343,52 @@ describe("LintConfigSection", () => {
       expect(screen.getByText("Failed to load lint rules")).toBeDefined();
     });
   });
+
+  it("shows error to read-only users when rules fail to load", async () => {
+    mockLintApi.getRules.mockRejectedValue(new Error("Network error"));
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={false} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to load lint rules")).toBeDefined();
+    });
+  });
+
+  it("sets aria-pressed on the active lint level button", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      config: { lint_level: 2, enabled_rules: [] },
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      const standardBtn = screen.getByText(/Level 2 — Standard/).closest("button")!;
+      expect(standardBtn.getAttribute("aria-pressed")).toBe("true");
+
+      const criticalBtn = screen.getByText(/Level 1 — Critical/).closest("button")!;
+      expect(criticalBtn.getAttribute("aria-pressed")).toBe("false");
+    });
+  });
+
+  it("uses role=switch and aria-checked on rule toggles", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      config: { lint_level: 2, enabled_rules: [] },
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      const switches = screen.getAllByRole("switch");
+      expect(switches.length).toBe(sampleRules.length);
+    });
+
+    // Level 2 enables error + warning rules (R001, R002, R003), not info (R004)
+    const toggleR001 = screen.getByLabelText("Toggle Missing label");
+    expect(toggleR001.getAttribute("aria-checked")).toBe("true");
+
+    const toggleR004 = screen.getByLabelText("Toggle Style hint");
+    expect(toggleR004.getAttribute("aria-checked")).toBe("false");
+  });
 });

@@ -3607,6 +3607,7 @@ export function LintConfigSection({
                   key={opt.value}
                   onClick={() => canManage && handleLevelChange(opt.value)}
                   disabled={!canManage}
+                  aria-pressed={lintLevel === opt.value}
                   className={cn(
                     "rounded-lg border p-3 text-left transition-all",
                     lintLevel === opt.value
@@ -3665,6 +3666,8 @@ export function LintConfigSection({
                   >
                     {/* Toggle */}
                     <button
+                      role="switch"
+                      aria-checked={enabled}
                       onClick={() => handleRuleToggle(rule.rule_id)}
                       disabled={!canManage || !isCustom}
                       className={cn(
@@ -3713,14 +3716,16 @@ export function LintConfigSection({
             </div>
           </div>
 
+          {/* Error/success messages — visible to all users */}
+          {error && (
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          )}
+
           {/* Save button */}
           {canManage && (
             <div className="flex items-center justify-end gap-3">
               {success && (
                 <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
-              )}
-              {error && (
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
               )}
               <Button
                 onClick={handleSave}
