@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { renderWithQueryClient } from "@/__tests__/helpers/renderWithProviders";
 
 // ---- matchMedia polyfill (must be before any import that touches the store) ----
 if (typeof window !== "undefined" && !window.matchMedia) {
@@ -31,11 +32,6 @@ vi.mock("next-auth/react", () => ({
 vi.mock("next/navigation", () => ({
   useRouter: vi.fn(() => ({ push: vi.fn(), back: vi.fn() })),
   useParams: vi.fn(() => ({ id: "p1" })),
-}));
-
-vi.mock("@tanstack/react-query", () => ({
-  useQuery: vi.fn(() => ({ data: null, isLoading: false })),
-  useQueryClient: vi.fn(() => ({ invalidateQueries: vi.fn() })),
 }));
 
 vi.mock("next/dynamic", () => ({
@@ -161,7 +157,7 @@ describe("LintConfigSection", () => {
 
   it("shows loading spinner initially", () => {
     mockLintApi.getRules.mockReturnValue(new Promise(() => {})); // never resolves
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     expect(screen.getByText("Lint Rule Configuration")).toBeDefined();
     // Loading spinner is present (the animate-spin div)
@@ -173,7 +169,7 @@ describe("LintConfigSection", () => {
       config: { lint_level: 2, enabled_rules: [] },
     });
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       expect(screen.getByText("Missing label")).toBeDefined();
@@ -185,7 +181,7 @@ describe("LintConfigSection", () => {
   it("shows error message when rules fail to load", async () => {
     mockLintApi.getRules.mockRejectedValue(new Error("Network error"));
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       expect(screen.getByText("Failed to load lint rules")).toBeDefined();
@@ -198,7 +194,7 @@ describe("LintConfigSection", () => {
       config: { lint_level: 2, enabled_rules: [] },
     });
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Level 1 — Critical/)).toBeDefined();
@@ -214,7 +210,7 @@ describe("LintConfigSection", () => {
       config: { lint_level: 2, enabled_rules: [] },
     });
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       // Level 2 enables error + warning rules = 3 of 4
@@ -229,7 +225,7 @@ describe("LintConfigSection", () => {
       config: { lint_level: 2, enabled_rules: [] },
     });
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       expect(screen.getByText("Custom")).toBeDefined();
@@ -249,7 +245,7 @@ describe("LintConfigSection", () => {
       config: { lint_level: 2, enabled_rules: [] },
     });
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       const saveBtn = screen.getByText("Save Lint Configuration");
@@ -264,7 +260,7 @@ describe("LintConfigSection", () => {
       config: { lint_level: 2, enabled_rules: [] },
     });
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Level 3 — Thorough/)).toBeDefined();
@@ -288,7 +284,7 @@ describe("LintConfigSection", () => {
       config: { lint_level: 3, enabled_rules: ["R001", "R002", "R003", "R004"] },
     });
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       expect(screen.getByText(/Level 3 — Thorough/)).toBeDefined();
@@ -313,7 +309,7 @@ describe("LintConfigSection", () => {
       config: { lint_level: 2, enabled_rules: [] },
     });
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={false} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={false} />);
 
     await waitFor(() => {
       expect(
@@ -329,7 +325,7 @@ describe("LintConfigSection", () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockRejectedValue(new MockApiError(404, "Not Found", "Not found"));
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       // Should default to level 2 (Standard) with error + warning rules enabled
@@ -341,7 +337,7 @@ describe("LintConfigSection", () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockRejectedValue(new MockApiError(500, "Internal Server Error", "Server error"));
 
-    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       expect(screen.getByText("Failed to load lint rules")).toBeDefined();

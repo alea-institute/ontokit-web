@@ -9,7 +9,7 @@ function isHttpUrl(url: string): boolean {
   }
 }
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -3429,8 +3429,7 @@ export function LintConfigSection({
   accessToken?: string;
   canManage: boolean;
 }) {
-  const [rules, setRules] = useState<LintRuleInfo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -3444,52 +3443,66 @@ export function LintConfigSection({
   const [savedLevel, setSavedLevel] = useState<number>(2);
   const [savedRules, setSavedRules] = useState<Set<string>>(new Set());
 
-  useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        // Always fetch available rules
-        const rulesRes = await lintApi.getRules();
-        const sortedRules = [...rulesRes.rules].sort(
-          (a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3)
-        );
-        setRules(sortedRules);
+  // Fetch available lint rules
+  const rulesQuery = useQuery({
+    queryKey: ["lintRules"],
+    queryFn: () => lintApi.getRules(),
+    retry: false,
+  });
 
-        // Try to fetch existing config
-        if (accessToken) {
-          try {
-            const configRes = await lintApi.getLintConfig(projectId, accessToken);
-            const cfg = configRes.config;
-            setLintLevel(cfg.lint_level);
-            setSavedLevel(cfg.lint_level);
-            if (cfg.lint_level === 0) {
-              const ruleSet = new Set(cfg.enabled_rules);
-              setEnabledRules(ruleSet);
-              setSavedRules(ruleSet);
-            } else {
-              const presetRules = new Set(getRulesForLevel(sortedRules, cfg.lint_level));
-              setEnabledRules(presetRules);
-              setSavedRules(presetRules);
-            }
-          } catch (err) {
-            // Only fall back to defaults when config endpoint is missing (404/501)
-            if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
-              const defaultRules = new Set(getRulesForLevel(sortedRules, 2));
-              setEnabledRules(defaultRules);
-              setSavedRules(defaultRules);
-            } else {
-              throw err;
-            }
-          }
-        }
-      } catch {
-        setError("Failed to load lint rules");
-      } finally {
-        setIsLoading(false);
+  const rules = useMemo(() => {
+    if (!rulesQuery.data) return [];
+    return [...rulesQuery.data.rules].sort(
+      (a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3)
+    );
+  }, [rulesQuery.data]);
+
+  // Fetch project lint config (depends on rules being loaded)
+  const configQuery = useQuery({
+    queryKey: ["lintConfig", projectId, accessToken],
+    queryFn: () => lintApi.getLintConfig(projectId, accessToken),
+    enabled: !!accessToken && rules.length > 0,
+    retry: false,
+  });
+
+  // Sync rules query error
+  useEffect(() => {
+    if (rulesQuery.isError) {
+      setError("Failed to load lint rules");
+    }
+  }, [rulesQuery.isError]);
+
+  // Sync config data into local editable state
+  useEffect(() => {
+    if (!configQuery.data && !configQuery.isError) return;
+
+    if (configQuery.data) {
+      const cfg = configQuery.data.config;
+      setLintLevel(cfg.lint_level);
+      setSavedLevel(cfg.lint_level);
+      if (cfg.lint_level === 0) {
+        const ruleSet = new Set(cfg.enabled_rules);
+        setEnabledRules(ruleSet);
+        setSavedRules(ruleSet);
+      } else {
+        const presetRules = new Set(getRulesForLevel(rules, cfg.lint_level));
+        setEnabledRules(presetRules);
+        setSavedRules(presetRules);
       }
-    };
-    load();
-  }, [projectId, accessToken]);
+    } else if (configQuery.isError) {
+      const err = configQuery.error;
+      // Fall back to defaults only when config endpoint is missing (404/501)
+      if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
+        const defaultRules = new Set(getRulesForLevel(rules, 2));
+        setEnabledRules(defaultRules);
+        setSavedRules(defaultRules);
+      } else {
+        setError("Failed to load lint rules");
+      }
+    }
+  }, [configQuery.data, configQuery.isError, configQuery.error, rules]);
+
+  const isLoading = rulesQuery.isLoading || (!!accessToken && rules.length > 0 && configQuery.isLoading);
 
   // Detect changes
   useEffect(() => {
@@ -3546,6 +3559,8 @@ export function LintConfigSection({
       setSavedRules(new Set(enabledRules));
       setHasChanges(false);
       setSuccess("Lint configuration saved");
+      // Invalidate queries so cache stays fresh
+      queryClient.invalidateQueries({ queryKey: ["lintConfig", projectId] });
     } catch (err) {
       if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
         setError("Backend lint config endpoint is not yet available");
