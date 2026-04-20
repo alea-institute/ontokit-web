@@ -58,14 +58,21 @@ vi.mock("@/lib/api/lint", () => ({
   },
 }));
 
-vi.mock("@/lib/api/client", () => ({
-  ApiError: class ApiError extends Error {
+const { MockApiError } = vi.hoisted(() => {
+  class MockApiError extends Error {
     status: number;
-    constructor(message: string, status: number) {
+    statusText: string;
+    constructor(status: number, statusText: string, message: string) {
       super(message);
       this.status = status;
+      this.statusText = statusText;
     }
-  },
+  }
+  return { MockApiError };
+});
+
+vi.mock("@/lib/api/client", () => ({
+  ApiError: MockApiError,
 }));
 
 vi.mock("@/lib/utils", () => ({
@@ -318,15 +325,26 @@ describe("LintConfigSection", () => {
     expect(screen.queryByText("Save Lint Configuration")).toBeNull();
   });
 
-  it("falls back to defaults when config endpoint returns error", async () => {
+  it("falls back to defaults when config endpoint returns 404", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
-    mockLintApi.getLintConfig.mockRejectedValue(new Error("404"));
+    mockLintApi.getLintConfig.mockRejectedValue(new MockApiError(404, "Not Found", "Not found"));
 
     render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
       // Should default to level 2 (Standard) with error + warning rules enabled
       expect(screen.getByText("Rules (3 of 4 enabled)")).toBeDefined();
+    });
+  });
+
+  it("shows error when config endpoint returns non-404 error", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockRejectedValue(new MockApiError(500, "Internal Server Error", "Server error"));
+
+    render(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Failed to load lint rules")).toBeDefined();
     });
   });
 });

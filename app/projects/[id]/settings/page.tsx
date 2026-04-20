@@ -876,7 +876,7 @@ export default function ProjectSettingsPage() {
     );
   }
 
-  if (!project || !canManage) {
+  if (!project) {
     return (
       <>
         <Header />
@@ -893,6 +893,40 @@ export default function ProjectSettingsPage() {
                 <Button variant="outline">Back to Project</Button>
               </Link>
             </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  if (!canManage) {
+    return (
+      <>
+        <Header />
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+          <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+            <Link
+              href={`/projects/${projectId}`}
+              className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to project
+            </Link>
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                Project Settings
+              </h1>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                View project configuration (read-only)
+              </p>
+            </div>
+            {project.source_file_path && (
+              <LintConfigSection
+                projectId={projectId}
+                accessToken={session?.accessToken}
+                canManage={false}
+              />
+            )}
           </div>
         </main>
       </>
@@ -3357,21 +3391,20 @@ const LINT_LEVEL_OPTIONS = [
 const SEVERITY_ORDER: Record<string, number> = { error: 0, warning: 1, info: 2 };
 
 export function getRulesForLevel(allRules: LintRuleInfo[], level: number): string[] {
-  switch (level) {
-    case 1:
-      return allRules.filter((r) => r.severity === "error").map((r) => r.rule_id);
-    case 2:
-      return allRules
-        .filter((r) => r.severity === "error" || r.severity === "warning")
-        .map((r) => r.rule_id);
-    case 3:
-      return allRules.map((r) => r.rule_id); // error + warning + info = all
-    case 4:
-    case 5:
-      return allRules.map((r) => r.rule_id);
-    default:
-      return [];
-  }
+  const maxOrder: Record<number, number> = {
+    1: 0,                                                              // error only
+    2: 1,                                                              // error + warning
+    3: 2,                                                              // error + warning + info
+    4: Math.max(...allRules.map((r) => SEVERITY_ORDER[r.severity] ?? 0), 0), // all known
+    5: Number.POSITIVE_INFINITY,                                       // everything (future-proof)
+  };
+
+  const threshold = maxOrder[level];
+  if (threshold === undefined) return [];
+
+  return allRules
+    .filter((r) => (SEVERITY_ORDER[r.severity] ?? Number.POSITIVE_INFINITY) <= threshold)
+    .map((r) => r.rule_id);
 }
 
 export function getSeverityColor(severity: string) {
@@ -3438,11 +3471,15 @@ export function LintConfigSection({
               setEnabledRules(presetRules);
               setSavedRules(presetRules);
             }
-          } catch {
-            // Backend config endpoint may not exist yet — use defaults
-            const defaultRules = new Set(getRulesForLevel(sortedRules, 2));
-            setEnabledRules(defaultRules);
-            setSavedRules(defaultRules);
+          } catch (err) {
+            // Only fall back to defaults when config endpoint is missing (404/501)
+            if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
+              const defaultRules = new Set(getRulesForLevel(sortedRules, 2));
+              setEnabledRules(defaultRules);
+              setSavedRules(defaultRules);
+            } else {
+              throw err;
+            }
           }
         }
       } catch {
