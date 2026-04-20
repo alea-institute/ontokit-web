@@ -2048,6 +2048,20 @@ export default function ProjectSettingsPage() {
 
 type WebhookStatus = "unknown" | "checking" | "configured" | "created" | "manual_required" | "no_scope" | "no_token" | "error";
 
+function extractErrorDetail(err: unknown): string {
+  if (err instanceof ApiError) {
+    try {
+      const parsed = JSON.parse(err.message);
+      if (parsed?.detail) return String(parsed.detail);
+      return err.message;
+    } catch {
+      return err.message || "An unexpected error occurred.";
+    }
+  }
+  if (err instanceof Error) return err.message;
+  return String(err) || "An unexpected error occurred.";
+}
+
 function WebhookConfigPanel({
   projectId,
   githubIntegration,
@@ -2068,6 +2082,7 @@ function WebhookConfigPanel({
   const [error, setError] = useState<string | null>(null);
   const [webhookStatus, setWebhookStatus] = useState<WebhookStatus>("unknown");
   const [webhookMessage, setWebhookMessage] = useState<string | null>(null);
+  const [showManualFallback, setShowManualFallback] = useState(false);
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -2103,9 +2118,9 @@ function WebhookConfigPanel({
           github_hook_id: result.github_hook_id,
         });
       }
-    } catch {
+    } catch (err) {
       setWebhookStatus("error");
-      setWebhookMessage("Failed to setup webhook.");
+      setWebhookMessage(extractErrorDetail(err));
     }
   };
 
@@ -2120,6 +2135,7 @@ function WebhookConfigPanel({
         accessToken
       );
       onIntegrationUpdate(updated);
+      setShowManualFallback(false);
       // Clear state when disabling
       if (!updated.webhooks_enabled) {
         // Cancel any pending auto-setup from a prior enable
@@ -2146,14 +2162,19 @@ function WebhookConfigPanel({
                 github_hook_id: result.github_hook_id,
               });
             }
-          } catch {
-            setWebhookStatus("unknown");
+          } catch (err) {
+            setWebhookStatus("error");
+            setWebhookMessage(extractErrorDetail(err));
           }
         }, 100);
         return;
       }
-    } catch {
-      setError("Failed to update webhook settings");
+    } catch (err) {
+      setError(extractErrorDetail(err));
+      // Show manual setup only when attempting to enable webhooks
+      if (!githubIntegration.webhooks_enabled) {
+        setShowManualFallback(true);
+      }
     } finally {
       setIsToggling(false);
     }
@@ -2180,8 +2201,9 @@ function WebhookConfigPanel({
 
   const fullWebhookUrl = webhookUrl ? `${apiBaseUrl}${webhookUrl}` : null;
 
-  const showManualSetup = githubIntegration.webhooks_enabled &&
-    !["configured", "created", "checking"].includes(webhookStatus);
+  const showManualSetup = showManualFallback ||
+    (githubIntegration.webhooks_enabled &&
+      !["configured", "created", "checking"].includes(webhookStatus));
 
   return (
     <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-600">
@@ -2206,7 +2228,7 @@ function WebhookConfigPanel({
         </label>
       </div>
 
-      {githubIntegration.webhooks_enabled && (
+      {(githubIntegration.webhooks_enabled || showManualFallback) && (
         <div className="mt-3 space-y-3">
           {/* Webhook auto-setup status */}
           {webhookStatus === "checking" && (
@@ -2228,9 +2250,24 @@ function WebhookConfigPanel({
           )}
 
           {webhookMessage && !["configured", "created"].includes(webhookStatus) && webhookStatus !== "checking" && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {webhookMessage}
-            </p>
+            <div className={cn(
+              "flex items-start gap-2 rounded-lg border p-2.5 text-sm",
+              webhookStatus === "error"
+                ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+                : ["no_scope", "no_token", "manual_required"].includes(webhookStatus)
+                  ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300"
+                  : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400",
+            )}>
+              <AlertCircle className={cn(
+                "mt-0.5 h-4 w-4 flex-shrink-0",
+                webhookStatus === "error"
+                  ? "text-red-600 dark:text-red-400"
+                  : ["no_scope", "no_token", "manual_required"].includes(webhookStatus)
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-slate-500 dark:text-slate-400",
+              )} />
+              <p className="text-xs">{webhookMessage}</p>
+            </div>
           )}
 
           {/* Manual setup UI */}
@@ -2333,7 +2370,24 @@ function WebhookConfigPanel({
       )}
 
       {error && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2.5 dark:border-red-900/50 dark:bg-red-900/20">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600 dark:text-red-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-red-700 dark:text-red-300">
+                Failed to update webhook settings
+              </p>
+              <details className="mt-1">
+                <summary className="cursor-pointer text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
+                  Show details
+                </summary>
+                <p className="mt-1 break-words text-xs text-red-600 dark:text-red-400">
+                  {error}
+                </p>
+              </details>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
