@@ -264,7 +264,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
 
     // Create Web Worker for indexing
     const worker = new Worker(
-      new URL('@/lib/editor/indexWorker.ts', import.meta.url)
+      new URL('../../lib/editor/indexWorker.ts', import.meta.url)
     );
     workerRef.current = worker;
 

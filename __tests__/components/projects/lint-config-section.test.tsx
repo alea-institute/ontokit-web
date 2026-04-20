@@ -166,7 +166,7 @@ describe("LintConfigSection", () => {
   it("renders rules after loading", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -191,7 +191,7 @@ describe("LintConfigSection", () => {
   it("displays lint level options", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -207,7 +207,7 @@ describe("LintConfigSection", () => {
   it("shows enabled rule count", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -222,7 +222,7 @@ describe("LintConfigSection", () => {
     const user = userEvent.setup();
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -242,7 +242,7 @@ describe("LintConfigSection", () => {
   it("save button is disabled when no changes", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -257,7 +257,7 @@ describe("LintConfigSection", () => {
     const user = userEvent.setup();
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -278,10 +278,10 @@ describe("LintConfigSection", () => {
     const user = userEvent.setup();
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
     mockLintApi.updateLintConfig.mockResolvedValue({
-      config: { lint_level: 3, enabled_rules: ["R001", "R002", "R003", "R004"] },
+      project_id: "p1", lint_level: 3, enabled_rules: ["R001", "R002", "R003", "R004"], effective_rules: ["R001", "R002", "R003", "R004"], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -306,7 +306,7 @@ describe("LintConfigSection", () => {
   it("shows read-only message when canManage is false", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={false} />);
@@ -357,7 +357,7 @@ describe("LintConfigSection", () => {
   it("sets aria-pressed on the active lint level button", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -374,7 +374,7 @@ describe("LintConfigSection", () => {
   it("uses role=switch and aria-checked on rule toggles", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
-      config: { lint_level: 2, enabled_rules: [] },
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);

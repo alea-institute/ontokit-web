@@ -78,6 +78,7 @@ import {
   lintApi,
   type LintConfig,
   type LintRuleInfo,
+  type LintSummary,
 } from "@/lib/api/lint";
 
 // Dynamically import the diff viewer to avoid SSR issues with Monaco
@@ -3379,15 +3380,6 @@ function EmbeddingSettingsSection({
 
 // --- Lint Level Presets ---
 
-const LINT_LEVEL_OPTIONS = [
-  { value: 1, label: "Critical", description: "Only error-severity rules" },
-  { value: 2, label: "Standard", description: "Error and warning rules" },
-  { value: 3, label: "Thorough", description: "Error, warning, and info rules" },
-  { value: 4, label: "Strict", description: "All available rules" },
-  { value: 5, label: "Maximum", description: "All rules (future-proof)" },
-  { value: 0, label: "Custom", description: "Choose rules individually" },
-] as const;
-
 const SEVERITY_ORDER: Record<string, number> = { error: 0, warning: 1, info: 2 };
 
 export function getRulesForLevel(allRules: LintRuleInfo[], level: number): string[] {
@@ -3431,6 +3423,7 @@ export function LintConfigSection({
 }) {
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -3450,6 +3443,23 @@ export function LintConfigSection({
     retry: false,
   });
 
+  // Fetch lint level definitions from backend
+  const levelsQuery = useQuery({
+    queryKey: ["lintLevels"],
+    queryFn: () => lintApi.getLevels(),
+    retry: false,
+  });
+
+  // Build a map of level -> rule_ids from backend definitions
+  const levelRuleMap = useMemo(() => {
+    if (!levelsQuery.data) return new Map<number, Set<string>>();
+    const map = new Map<number, Set<string>>();
+    for (const level of levelsQuery.data.levels) {
+      map.set(level.level, new Set(level.rule_ids));
+    }
+    return map;
+  }, [levelsQuery.data]);
+
   const rules = useMemo(() => {
     if (!rulesQuery.data) return [];
     return [...rulesQuery.data.rules].sort(
@@ -3465,6 +3475,13 @@ export function LintConfigSection({
     retry: false,
   });
 
+  // Fetch lint status summary
+  const statusQuery = useQuery<LintSummary>({
+    queryKey: ["lintSummary", projectId, accessToken],
+    queryFn: () => lintApi.getStatus(projectId, accessToken),
+    enabled: !!accessToken,
+  });
+
   // Sync rules query error
   useEffect(() => {
     if (rulesQuery.isError) {
@@ -3477,15 +3494,16 @@ export function LintConfigSection({
     if (!configQuery.data && !configQuery.isError) return;
 
     if (configQuery.data) {
-      const cfg = configQuery.data.config;
-      setLintLevel(cfg.lint_level);
-      setSavedLevel(cfg.lint_level);
-      if (cfg.lint_level === 0) {
-        const ruleSet = new Set(cfg.enabled_rules);
+      const cfg = configQuery.data;
+      const level = cfg.lint_level ?? 0; // null means custom
+      setLintLevel(level);
+      setSavedLevel(level);
+      if (level === 0) {
+        const ruleSet = new Set(cfg.enabled_rules ?? []);
         setEnabledRules(ruleSet);
         setSavedRules(ruleSet);
       } else {
-        const presetRules = new Set(getRulesForLevel(rules, cfg.lint_level));
+        const presetRules = levelRuleMap.get(level) ?? new Set<string>();
         setEnabledRules(presetRules);
         setSavedRules(presetRules);
       }
@@ -3493,14 +3511,14 @@ export function LintConfigSection({
       const err = configQuery.error;
       // Fall back to defaults only when config endpoint is missing (404/501)
       if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
-        const defaultRules = new Set(getRulesForLevel(rules, 2));
+        const defaultRules = levelRuleMap.get(2) ?? new Set<string>();
         setEnabledRules(defaultRules);
         setSavedRules(defaultRules);
       } else {
         setError("Failed to load lint rules");
       }
     }
-  }, [configQuery.data, configQuery.isError, configQuery.error, rules]);
+  }, [configQuery.data, configQuery.isError, configQuery.error, rules, levelRuleMap]);
 
   const isLoading = rulesQuery.isLoading || (!!accessToken && rules.length > 0 && configQuery.isLoading);
 
@@ -3525,7 +3543,7 @@ export function LintConfigSection({
     setError(null);
     setSuccess(null);
     if (level !== 0) {
-      setEnabledRules(new Set(getRulesForLevel(rules, level)));
+      setEnabledRules(levelRuleMap.get(level) ?? new Set<string>());
     }
   };
 
@@ -3551,8 +3569,8 @@ export function LintConfigSection({
     setSuccess(null);
     try {
       const config: LintConfig = {
-        lint_level: lintLevel,
-        enabled_rules: lintLevel === 0 ? [...enabledRules] : getRulesForLevel(rules, lintLevel),
+        lint_level: lintLevel === 0 ? null : lintLevel,
+        enabled_rules: lintLevel === 0 ? [...enabledRules] : [...(levelRuleMap.get(lintLevel) ?? [])],
       };
       await lintApi.updateLintConfig(projectId, config, accessToken);
       setSavedLevel(lintLevel);
@@ -3569,6 +3587,24 @@ export function LintConfigSection({
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleClearResults = async () => {
+    if (!accessToken) return;
+    setIsClearing(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await lintApi.clearResults(projectId, accessToken);
+      setSuccess("Lint results cleared");
+      queryClient.invalidateQueries({ queryKey: ["lintSummary", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["lintIssues", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["lintRuns", projectId] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear lint results");
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -3590,6 +3626,44 @@ export function LintConfigSection({
         Choose a preset level or customize individual rules.
       </p>
 
+      {/* Last run summary */}
+      {statusQuery.data?.last_run && (
+        <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-700/50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Last run: {new Date(statusQuery.data.last_run.completed_at || statusQuery.data.last_run.started_at).toLocaleString()}
+              {statusQuery.data.last_run.status !== "completed" && (
+                <span className="ml-2 text-amber-600 dark:text-amber-400">
+                  ({statusQuery.data.last_run.status})
+                </span>
+              )}
+            </span>
+            <div className="flex items-center gap-3 text-xs">
+              {statusQuery.data.error_count > 0 && (
+                <span className="font-medium text-red-600 dark:text-red-400">
+                  {statusQuery.data.error_count} error{statusQuery.data.error_count !== 1 && "s"}
+                </span>
+              )}
+              {statusQuery.data.warning_count > 0 && (
+                <span className="font-medium text-amber-600 dark:text-amber-400">
+                  {statusQuery.data.warning_count} warning{statusQuery.data.warning_count !== 1 && "s"}
+                </span>
+              )}
+              {statusQuery.data.info_count > 0 && (
+                <span className="font-medium text-blue-600 dark:text-blue-400">
+                  {statusQuery.data.info_count} info
+                </span>
+              )}
+              {statusQuery.data.total_issues === 0 && (
+                <span className="font-medium text-green-600 dark:text-green-400">
+                  No issues
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex h-16 items-center justify-center">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
@@ -3602,28 +3676,47 @@ export function LintConfigSection({
               Lint Level
             </label>
             <div className="grid gap-2 sm:grid-cols-3">
-              {LINT_LEVEL_OPTIONS.map((opt) => (
+              {(levelsQuery.data?.levels ?? []).map((lvl) => (
                 <button
-                  key={opt.value}
-                  onClick={() => canManage && handleLevelChange(opt.value)}
+                  key={lvl.level}
+                  onClick={() => canManage && handleLevelChange(lvl.level)}
                   disabled={!canManage}
-                  aria-pressed={lintLevel === opt.value}
+                  aria-pressed={lintLevel === lvl.level}
                   className={cn(
                     "rounded-lg border p-3 text-left transition-all",
-                    lintLevel === opt.value
+                    lintLevel === lvl.level
                       ? "border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:border-primary-400 dark:bg-primary-900/20"
                       : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
                     !canManage && "cursor-not-allowed opacity-60"
                   )}
                 >
                   <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {opt.value === 0 ? opt.label : `Level ${opt.value} — ${opt.label}`}
+                    Level {lvl.level} — {lvl.name}
                   </p>
                   <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {opt.description}
+                    {lvl.description} ({lvl.rule_ids.length} rules)
                   </p>
                 </button>
               ))}
+              <button
+                onClick={() => canManage && handleLevelChange(0)}
+                disabled={!canManage}
+                aria-pressed={lintLevel === 0}
+                className={cn(
+                  "rounded-lg border p-3 text-left transition-all",
+                  lintLevel === 0
+                    ? "border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:border-primary-400 dark:bg-primary-900/20"
+                    : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
+                  !canManage && "cursor-not-allowed opacity-60"
+                )}
+              >
+                <p className="text-sm font-medium text-slate-900 dark:text-white">
+                  Custom
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Choose rules individually
+                </p>
+              </button>
             </div>
           </div>
 
@@ -3721,12 +3814,20 @@ export function LintConfigSection({
             <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
           )}
 
-          {/* Save button */}
+          {/* Action buttons */}
           {canManage && (
             <div className="flex items-center justify-end gap-3">
               {success && (
                 <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
               )}
+              <Button
+                onClick={handleClearResults}
+                disabled={isClearing}
+                size="sm"
+                variant="outline"
+              >
+                {isClearing ? "Clearing..." : "Clear Results"}
+              </Button>
               <Button
                 onClick={handleSave}
                 disabled={isSaving || !hasChanges}

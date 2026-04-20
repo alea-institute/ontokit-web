@@ -75,13 +75,28 @@ export interface LintRulesResponse {
   rules: LintRuleInfo[];
 }
 
+export interface LintLevelInfo {
+  level: number;
+  name: string;
+  description: string;
+  rule_ids: string[];
+}
+
+export interface LintLevelsResponse {
+  levels: LintLevelInfo[];
+}
+
 export interface LintConfig {
-  lint_level: number; // 1-5 for presets, 0 for custom
-  enabled_rules: string[]; // rule_id list (used when lint_level is 0/custom)
+  lint_level: number | null; // 1-5 for presets, null for custom
+  enabled_rules: string[]; // rule_id list (used when lint_level is null/custom)
 }
 
 export interface LintConfigResponse {
-  config: LintConfig;
+  project_id: string;
+  lint_level: number | null;
+  enabled_rules: string[] | null;
+  effective_rules: string[];
+  updated_at: string | null;
 }
 
 // WebSocket message types
@@ -176,6 +191,11 @@ export const lintApi = {
   getRules: () => api.get<LintRulesResponse>("/api/v1/projects/lint/rules"),
 
   /**
+   * Get lint level definitions (which rules are in each level)
+   */
+  getLevels: () => api.get<LintLevelsResponse>("/api/v1/projects/lint/levels"),
+
+  /**
    * Get lint configuration for a project
    */
   getLintConfig: (projectId: string, token?: string) =>
@@ -194,6 +214,14 @@ export const lintApi = {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       }
     ),
+
+  /**
+   * Clear all lint results (runs and issues) for a project
+   */
+  clearResults: (projectId: string, token: string) =>
+    api.delete(`/api/v1/projects/${projectId}/lint/results`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
 };
 
 /**
