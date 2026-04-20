@@ -3356,7 +3356,7 @@ const LINT_LEVEL_OPTIONS = [
 
 const SEVERITY_ORDER: Record<string, number> = { error: 0, warning: 1, info: 2 };
 
-function getRulesForLevel(allRules: LintRuleInfo[], level: number): string[] {
+export function getRulesForLevel(allRules: LintRuleInfo[], level: number): string[] {
   switch (level) {
     case 1:
       return allRules.filter((r) => r.severity === "error").map((r) => r.rule_id);
@@ -3374,7 +3374,7 @@ function getRulesForLevel(allRules: LintRuleInfo[], level: number): string[] {
   }
 }
 
-function getSeverityColor(severity: string) {
+export function getSeverityColor(severity: string) {
   switch (severity) {
     case "error":
       return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
@@ -3387,7 +3387,7 @@ function getSeverityColor(severity: string) {
   }
 }
 
-function LintConfigSection({
+export function LintConfigSection({
   projectId,
   accessToken,
   canManage,

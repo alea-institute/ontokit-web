@@ -220,6 +220,75 @@ describe("lintApi", () => {
       expect(options.method).toBe("GET");
     });
   });
+
+  // --- getLintConfig ---
+
+  describe("getLintConfig", () => {
+    it("calls GET /api/v1/projects/:id/lint/config with auth", async () => {
+      const config = { config: { lint_level: 2, enabled_rules: ["R001", "R002"] } };
+      mockOk(config);
+
+      const result = await lintApi.getLintConfig("p1", "tok");
+      expect(result).toEqual(config);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/lint/config");
+      expect(options.method).toBe("GET");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+    });
+
+    it("omits auth header when no token", async () => {
+      mockOk({ config: { lint_level: 2, enabled_rules: [] } });
+
+      await lintApi.getLintConfig("p1");
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers.has("Authorization")).toBe(false);
+    });
+  });
+
+  // --- updateLintConfig ---
+
+  describe("updateLintConfig", () => {
+    it("calls PUT /api/v1/projects/:id/lint/config with config body", async () => {
+      const config = { lint_level: 0, enabled_rules: ["R001"] };
+      const response = { config };
+      mockOk(response);
+
+      const result = await lintApi.updateLintConfig("p1", config, "tok");
+      expect(result).toEqual(response);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/lint/config");
+      expect(options.method).toBe("PUT");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+
+      const body = JSON.parse(options.body);
+      expect(body).toEqual(config);
+    });
+
+    it("omits auth header when no token", async () => {
+      const config = { lint_level: 2, enabled_rules: [] };
+      mockOk({ config });
+
+      await lintApi.updateLintConfig("p1", config);
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers.has("Authorization")).toBe(false);
+    });
+
+    it("throws ApiError on 404", async () => {
+      mockError(404, "Not Found", "Endpoint not available");
+
+      try {
+        await lintApi.updateLintConfig("p1", { lint_level: 2, enabled_rules: [] }, "tok");
+        expect.unreachable("should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect((err as ApiError).status).toBe(404);
+      }
+    });
+  });
 });
 
 // --- WebSocket mock ---
