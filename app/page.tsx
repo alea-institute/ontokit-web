@@ -160,12 +160,20 @@ export default function HomePage() {
             {/* Private tab login prompt for unauthenticated users */}
             {(filter === "mine" || filter === "private") && !isAuthenticated ? (
               <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
-                <User className="mx-auto h-12 w-12 text-slate-400" />
+                {filter === "private" ? (
+                  <Lock className="mx-auto h-12 w-12 text-slate-400" />
+                ) : (
+                  <User className="mx-auto h-12 w-12 text-slate-400" />
+                )}
                 <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
-                  Sign in to see your projects
+                  {filter === "private"
+                    ? "Sign in to see private projects"
+                    : "Sign in to see your projects"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  View all projects you own or are a member of
+                  {filter === "private"
+                    ? "View all private projects you own or are a member of"
+                    : "View all projects you own or are a member of"}
                 </p>
                 <Button className="mt-6" onClick={() => signIn()}>
                   <LogIn className="mr-2 h-4 w-4" />
