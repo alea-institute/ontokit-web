@@ -224,7 +224,7 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/is not an OWL Class/)
+        screen.getByText(/Could not load .* as an OWL Class/)
       ).toBeDefined();
     });
   });
@@ -498,7 +498,7 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       // Should show error since fallback IRI doesn't match
-      expect(screen.getByText(/is not an OWL Class/)).toBeDefined();
+      expect(screen.getByText(/Could not load .* as an OWL Class/)).toBeDefined();
     });
   });
 
@@ -1273,7 +1273,7 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Animal/)).not.toBeNull();
-      expect(screen.getByText(/is not an OWL Class/)).not.toBeNull();
+      expect(screen.getByText(/Could not load .* as an OWL Class/)).not.toBeNull();
     });
   });
 
@@ -1707,7 +1707,7 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/is not an OWL Class/)).not.toBeNull();
+      expect(screen.getByText(/Could not load .* as an OWL Class/)).not.toBeNull();
     });
     // Error state should be visible
     expect(container.querySelector(".border-red-200")).not.toBeNull();

@@ -318,7 +318,7 @@ describe("LintConfigSection", () => {
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Failed to load lint rules")).toBeDefined();
+      expect(screen.getByText("Failed to load lint configuration")).toBeDefined();
     });
   });
 

@@ -965,7 +965,7 @@ describe("HealthCheckPanel", () => {
       expect(screen.getByText("DupA")).toBeDefined();
     });
     await userEvent.click(screen.getByText("DupA"));
-    expect(onNav).toHaveBeenCalledWith("http://example.org/DupA");
+    expect(onNav).toHaveBeenCalledWith("http://example.org/DupA", "class");
   });
 
   it("navigates to entity from consistency issue", async () => {
@@ -994,7 +994,7 @@ describe("HealthCheckPanel", () => {
       expect(screen.getByText("ConsEntity")).toBeDefined();
     });
     await userEvent.click(screen.getByText("ConsEntity"));
-    expect(onNav).toHaveBeenCalledWith("http://example.org/ConsEntity");
+    expect(onNav).toHaveBeenCalledWith("http://example.org/ConsEntity", "class");
   });
 
   it("handles quality WebSocket duplicates_complete message", async () => {

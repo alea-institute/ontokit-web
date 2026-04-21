@@ -300,7 +300,7 @@ export function ClassDetailPanel({
           setError(null);
         } else if (is404) {
           const localName = getLocalName(classIri);
-          setError(`Could not load "${localName}" as an OWL Class. Enable Developer mode to see the entity in the source view.`);
+          setError(`Could not load "${localName}" as an OWL Class, or a Property, or an Individual. Enable Developer mode to see the entity in the source view.`);
         } else {
           setError(err instanceof Error ? err.message : "Failed to load class details");
         }

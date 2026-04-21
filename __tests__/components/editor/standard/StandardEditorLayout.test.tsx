@@ -1023,12 +1023,11 @@ describe("StandardEditorLayout", () => {
       expect(navigateToNode).toHaveBeenCalledWith("http://example.org/ClassA");
     });
 
-    it("falls back to class navigation for 'other' type", () => {
+    it("navigates to class tree for 'other' type (triggers 404 error message)", () => {
       const navigateToNode = vi.fn().mockResolvedValue(undefined);
       const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
       render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
       ref.current!("http://example.org/Unknown", "other");
-      // StandardEditorLayout has no source view, so "other" falls through to class nav
       expect(navigateToNode).toHaveBeenCalledWith("http://example.org/Unknown");
     });
   });
