@@ -232,6 +232,22 @@ export function HealthCheckPanel({
     };
   }, [isOpen, projectId, accessToken]);
 
+  // Clear lint results
+  const [isClearing, setIsClearing] = useState(false);
+  const handleClearResults = async () => {
+    if (!accessToken) return;
+    setIsClearing(true);
+    try {
+      await lintApi.clearResults(projectId, accessToken);
+      setSummary(null);
+      setIssues([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear results");
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
   // Trigger a new lint run
   const handleRunLint = async () => {
     if (!accessToken) {
@@ -589,16 +605,29 @@ export function HealthCheckPanel({
           </div>
           <div className="flex items-center gap-2">
             {activeTab === "lint" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRunLint}
-                disabled={isRunning || !accessToken || !canRunLint}
-                className="gap-1"
-              >
-                <RefreshCw className={cn("h-4 w-4", isRunning && "animate-spin")} />
-                {isRunning ? "Running..." : "Run Lint"}
-              </Button>
+              summary?.last_run?.status === "completed" && !isRunning ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearResults}
+                  disabled={isClearing || !accessToken || !canRunLint}
+                  className="gap-1"
+                >
+                  <X className="h-4 w-4" />
+                  {isClearing ? "Clearing..." : "Clear"}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunLint}
+                  disabled={isRunning || !accessToken || !canRunLint}
+                  className="gap-1"
+                >
+                  <RefreshCw className={cn("h-4 w-4", isRunning && "animate-spin")} />
+                  {isRunning ? "Running..." : "Run Lint"}
+                </Button>
+              )
             )}
             {activeTab === "consistency" && (
               <Button

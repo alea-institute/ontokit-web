@@ -9,6 +9,7 @@ vi.mock("@/lib/api/lint", () => ({
     getIssues: vi.fn(),
     triggerLint: vi.fn(),
     dismissIssue: vi.fn(),
+    clearResults: vi.fn(),
     getLintConfig: vi.fn(),
     getLevels: vi.fn(),
   },
@@ -175,7 +176,8 @@ describe("HealthCheckPanel", () => {
     expect(screen.getByText("R001")).toBeDefined();
   });
 
-  it("shows Run Lint button and triggers lint", async () => {
+  it("shows Run Lint button when no completed run exists", async () => {
+    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
     mockLintApi.triggerLint.mockResolvedValue({
       job_id: "j1",
       status: "pending",
@@ -190,7 +192,22 @@ describe("HealthCheckPanel", () => {
     expect(mockLintApi.triggerLint).toHaveBeenCalledWith("p1", "tok");
   });
 
+  it("shows Clear button after completed run", async () => {
+    mockLintApi.clearResults.mockResolvedValue(undefined);
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Clear")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Clear"));
+    expect(mockLintApi.clearResults).toHaveBeenCalledWith("p1", "tok");
+    // After clearing, should switch to Run Lint
+    await waitFor(() => {
+      expect(screen.getByText("Run Lint")).toBeDefined();
+    });
+  });
+
   it("shows error when triggerLint fails", async () => {
+    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
     mockLintApi.triggerLint.mockRejectedValue(new Error("Nope"));
     setup();
     await waitFor(() => {
@@ -203,6 +220,7 @@ describe("HealthCheckPanel", () => {
   });
 
   it("disables Run Lint when canRunLint is false", async () => {
+    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
     setup({ canRunLint: false });
     await waitFor(() => {
       expect(screen.getByText("Run Lint")).toBeDefined();
@@ -212,6 +230,7 @@ describe("HealthCheckPanel", () => {
   });
 
   it("shows error when lint requires auth but none provided", async () => {
+    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
     setup({ accessToken: undefined, canRunLint: true });
     await waitFor(() => {
       expect(screen.getByText("Run Lint")).toBeDefined();
