@@ -3783,6 +3783,19 @@ export function LintConfigSection({
                         >
                           {rule.severity}
                         </span>
+                        {rule.scope && (
+                          <span className="inline-flex gap-0.5">
+                            {rule.scope.map((s) => (
+                              <span
+                                key={s}
+                                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 text-[8px] font-bold text-slate-500 dark:border-slate-500 dark:text-slate-400"
+                                title={s}
+                              >
+                                {s[0].toUpperCase()}
+                              </span>
+                            ))}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         {rule.description}

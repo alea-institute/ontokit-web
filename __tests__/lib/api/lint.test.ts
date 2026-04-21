@@ -207,7 +207,7 @@ describe("lintApi", () => {
     it("calls GET /api/v1/projects/lint/rules without auth", async () => {
       const rules = {
         rules: [
-          { rule_id: "R001", name: "Missing label", description: "Class has no label", severity: "warning" },
+          { rule_id: "R001", name: "Missing label", description: "Class has no label", severity: "warning", scope: ["class", "property", "individual"] },
         ],
       };
       mockOk(rules);

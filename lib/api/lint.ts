@@ -71,6 +71,7 @@ export interface LintRuleInfo {
   name: string;
   description: string;
   severity: LintIssueType;
+  scope: string[];
 }
 
 export interface LintRulesResponse {

@@ -88,10 +88,10 @@ import type { LintRuleInfo } from "@/lib/api/lint";
 const mockLintApi = vi.mocked(lintApi);
 
 const sampleRules: LintRuleInfo[] = [
-  { rule_id: "R001", name: "Missing label", description: "Class has no rdfs:label", severity: "error" },
-  { rule_id: "R002", name: "Missing comment", description: "Class has no rdfs:comment", severity: "warning" },
-  { rule_id: "R003", name: "Unused import", description: "Prefix declared but unused", severity: "warning" },
-  { rule_id: "R004", name: "Style hint", description: "Consider using camelCase", severity: "info" },
+  { rule_id: "R001", name: "Missing label", description: "Class has no rdfs:label", severity: "error", scope: ["class", "property", "individual"] },
+  { rule_id: "R002", name: "Missing comment", description: "Class has no rdfs:comment", severity: "warning", scope: ["class", "property", "individual"] },
+  { rule_id: "R003", name: "Unused import", description: "Prefix declared but unused", severity: "warning", scope: ["class"] },
+  { rule_id: "R004", name: "Style hint", description: "Consider using camelCase", severity: "info", scope: ["class", "property", "individual"] },
 ];
 
 // --- Pure function tests ---
