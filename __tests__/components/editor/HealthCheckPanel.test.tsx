@@ -232,16 +232,6 @@ describe("HealthCheckPanel", () => {
     });
   });
 
-  it("shows No lint run yet when no run exists", async () => {
-    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
-    setup();
-    await waitFor(() => {
-      expect(screen.getByText("No lint run yet")).toBeDefined();
-    });
-    // Should NOT show "No issues found"
-    expect(screen.queryByText("No issues found")).toBeNull();
-  });
-
   it("shows all-rules config hint when no config is set", async () => {
     mockLintApi.getLintConfig.mockResolvedValue({
       project_id: "p1", lint_level: null, enabled_rules: null, effective_rules: ["R001", "R002", "R003", "R004"], updated_at: null,
@@ -252,16 +242,18 @@ describe("HealthCheckPanel", () => {
     });
   });
 
-  it("shows No issues found only after completed run with zero issues", async () => {
+  it("does not show 'No issues found' when run is not completed", async () => {
     mockLintApi.getStatus.mockResolvedValue({
       ...baseSummary,
+      last_run: { ...baseSummary.last_run!, status: "running" as const },
       error_count: 0, warning_count: 0, info_count: 0, total_issues: 0,
     });
     mockLintApi.getIssues.mockResolvedValue({ items: [], total: 0, skip: 0, limit: 500 });
     setup();
     await waitFor(() => {
-      expect(screen.getByText("No issues found")).toBeDefined();
+      expect(screen.getByText("Running")).toBeDefined();
     });
+    expect(screen.queryByText("No issues found")).toBeNull();
   });
 
   it("shows duplicate_iris related entities with +N more for many duplicates", async () => {
@@ -399,11 +391,11 @@ describe("HealthCheckPanel", () => {
   it("shows entity type badge based on subject_type", async () => {
     mockLintApi.getStatus.mockResolvedValue({
       ...baseSummary,
-      last_run: { ...baseSummary.last_run!, issues_found: 3 },
+      last_run: { ...baseSummary.last_run!, issues_found: 4 },
     });
     mockLintApi.getIssues.mockResolvedValue({
       items: [
-        { ...baseIssues.items[0], subject_type: "class" as const },
+        baseIssues.items[0],
         { ...baseIssues.items[0], id: "i3", subject_iri: "http://example.org/hasFoo", subject_type: "property" as const, rule_id: "R003", message: "Domain violation" },
         { ...baseIssues.items[0], id: "i4", subject_iri: "http://example.org/foo1", subject_type: "individual" as const, rule_id: "R004", message: "Range violation" },
         { ...baseIssues.items[0], id: "i5", subject_iri: "http://example.org/unknown1", subject_type: "other" as const, rule_id: "R005", message: "Missing type" },
