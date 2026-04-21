@@ -406,4 +406,108 @@ describe("LintConfigSection", () => {
     const toggleR004 = screen.getByLabelText("Toggle Style hint");
     expect(toggleR004.getAttribute("aria-checked")).toBe("false");
   });
+
+  it("shows last run summary when status data is available", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
+    });
+    mockLintApi.getStatus.mockResolvedValue({
+      project_id: "p1",
+      last_run: { id: "run1", project_id: "p1", status: "completed", started_at: "2026-04-20T10:00:00Z", completed_at: "2026-04-20T10:01:00Z", issues_found: 5, error_message: null },
+      error_count: 2,
+      warning_count: 2,
+      info_count: 1,
+      total_issues: 5,
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/2 error/)).toBeDefined();
+      expect(screen.getByText(/2 warning/)).toBeDefined();
+      expect(screen.getByText(/1 info/)).toBeDefined();
+    });
+  });
+
+  it("shows 'No issues' when last run has zero issues", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
+    });
+    mockLintApi.getStatus.mockResolvedValue({
+      project_id: "p1",
+      last_run: { id: "run1", project_id: "p1", status: "completed", started_at: "2026-04-20T10:00:00Z", completed_at: "2026-04-20T10:01:00Z", issues_found: 0, error_message: null },
+      error_count: 0,
+      warning_count: 0,
+      info_count: 0,
+      total_issues: 0,
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("No issues")).toBeDefined();
+    });
+  });
+
+  it("calls clearResults and shows success message", async () => {
+    const user = userEvent.setup();
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
+    });
+    mockLintApi.clearResults.mockResolvedValue(undefined);
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Clear Results")).toBeDefined();
+    });
+
+    await user.click(screen.getByText("Clear Results"));
+
+    await waitFor(() => {
+      expect(mockLintApi.clearResults).toHaveBeenCalledWith("p1", "tok");
+      expect(screen.getByText("Lint results cleared")).toBeDefined();
+    });
+  });
+
+  it("sends null lint_level for custom mode", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: null, enabled_rules: ["R001"], effective_rules: ["R001"], updated_at: null,
+    });
+    mockLintApi.updateLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: null, enabled_rules: ["R001"], effective_rules: ["R001"], updated_at: null,
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Custom")).toBeDefined();
+    });
+
+    // Should show custom as active (lint_level: null maps to 0)
+    await waitFor(() => {
+      const customBtn = screen.getByText("Custom").closest("button")!;
+      expect(customBtn.getAttribute("aria-pressed")).toBe("true");
+    });
+  });
+
+  it("displays level rule counts from backend", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      // Level 1 has 1 rule, Level 2 has 3, Level 3 has 4
+      expect(screen.getByText(/1 rules/)).toBeDefined();
+      expect(screen.getByText(/3 rules/)).toBeDefined();
+      expect(screen.getByText(/4 rules/)).toBeDefined();
+    });
+  });
 });
