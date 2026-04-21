@@ -49,8 +49,11 @@ vi.mock("next/link", () => ({
 vi.mock("@/lib/api/lint", () => ({
   lintApi: {
     getRules: vi.fn(),
+    getLevels: vi.fn(),
     getLintConfig: vi.fn(),
     updateLintConfig: vi.fn(),
+    getStatus: vi.fn(),
+    clearResults: vi.fn(),
   },
 }));
 
@@ -150,9 +153,21 @@ describe("getSeverityColor", () => {
 
 // --- Component tests ---
 
+const sampleLevels = {
+  levels: [
+    { level: 1, name: "Critical", description: "Undefined parents, circular hierarchies", rule_ids: ["R001"] },
+    { level: 2, name: "Consistency", description: "Orphan classes, duplicates", rule_ids: ["R001", "R002", "R003"] },
+    { level: 3, name: "Labels", description: "Label checks", rule_ids: ["R001", "R002", "R003", "R004"] },
+  ],
+};
+
 describe("LintConfigSection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLintApi.getLevels.mockResolvedValue(sampleLevels);
+    mockLintApi.getStatus.mockResolvedValue({
+      project_id: "p1", last_run: null, error_count: 0, warning_count: 0, info_count: 0, total_issues: 0,
+    });
   });
 
   it("shows loading spinner initially", () => {
@@ -198,8 +213,8 @@ describe("LintConfigSection", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Level 1 — Critical/)).toBeDefined();
-      expect(screen.getByText(/Level 2 — Standard/)).toBeDefined();
-      expect(screen.getByText(/Level 3 — Thorough/)).toBeDefined();
+      expect(screen.getByText(/Level 2 — Consistency/)).toBeDefined();
+      expect(screen.getByText(/Level 3 — Labels/)).toBeDefined();
       expect(screen.getByText("Custom")).toBeDefined();
     });
   });
@@ -263,10 +278,10 @@ describe("LintConfigSection", () => {
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Level 3 — Thorough/)).toBeDefined();
+      expect(screen.getByText(/Level 3 — Labels/)).toBeDefined();
     });
 
-    await user.click(screen.getByText(/Level 3 — Thorough/));
+    await user.click(screen.getByText(/Level 3 — Labels/));
 
     await waitFor(() => {
       const saveBtn = screen.getByText("Save Lint Configuration");
@@ -287,10 +302,10 @@ describe("LintConfigSection", () => {
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Level 3 — Thorough/)).toBeDefined();
+      expect(screen.getByText(/Level 3 — Labels/)).toBeDefined();
     });
 
-    await user.click(screen.getByText(/Level 3 — Thorough/));
+    await user.click(screen.getByText(/Level 3 — Labels/));
     await user.click(screen.getByText("Save Lint Configuration"));
 
     await waitFor(() => {
@@ -363,8 +378,8 @@ describe("LintConfigSection", () => {
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
-      const standardBtn = screen.getByText(/Level 2 — Standard/).closest("button")!;
-      expect(standardBtn.getAttribute("aria-pressed")).toBe("true");
+      const consistencyBtn = screen.getByText(/Level 2 — Consistency/).closest("button")!;
+      expect(consistencyBtn.getAttribute("aria-pressed")).toBe("true");
 
       const criticalBtn = screen.getByText(/Level 1 — Critical/).closest("button")!;
       expect(criticalBtn.getAttribute("aria-pressed")).toBe("false");
