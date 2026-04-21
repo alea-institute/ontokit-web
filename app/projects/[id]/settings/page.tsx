@@ -921,12 +921,18 @@ export default function ProjectSettingsPage() {
                 View project configuration (read-only)
               </p>
             </div>
-            {project.source_file_path && (
+            {project.source_file_path ? (
               <LintConfigSection
                 projectId={projectId}
                 accessToken={session?.accessToken}
                 canManage={false}
               />
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  No ontology source file has been configured for this project.
+                </p>
+              </div>
             )}
           </div>
         </main>
@@ -3382,6 +3388,7 @@ function EmbeddingSettingsSection({
 
 const SEVERITY_ORDER: Record<string, number> = { error: 0, warning: 1, info: 2 };
 
+/** @deprecated Superseded by backend-driven levelRuleMap. Kept for test compatibility. */
 export function getRulesForLevel(allRules: LintRuleInfo[], level: number): string[] {
   const maxOrder: Record<number, number> = {
     1: 0,                                                              // error only
@@ -3492,6 +3499,8 @@ export function LintConfigSection({
   // Sync config data into local editable state
   useEffect(() => {
     if (!configQuery.data && !configQuery.isError) return;
+    // Don't overwrite in-progress edits from background refetches
+    if (hasChanges) return;
 
     if (configQuery.data) {
       const cfg = configQuery.data;
@@ -3520,7 +3529,7 @@ export function LintConfigSection({
     }
   }, [configQuery.data, configQuery.isError, configQuery.error, rules, levelRuleMap]);
 
-  const isLoading = rulesQuery.isLoading || (!!accessToken && rules.length > 0 && configQuery.isLoading);
+  const isLoading = rulesQuery.isLoading || levelsQuery.isLoading || (!!accessToken && rules.length > 0 && configQuery.isLoading);
 
   // Detect changes
   useEffect(() => {
@@ -3570,7 +3579,7 @@ export function LintConfigSection({
     try {
       const config: LintConfig = {
         lint_level: lintLevel === 0 ? null : lintLevel,
-        enabled_rules: lintLevel === 0 ? [...enabledRules] : [...(levelRuleMap.get(lintLevel) ?? [])],
+        enabled_rules: [...enabledRules],
       };
       await lintApi.updateLintConfig(projectId, config, accessToken);
       setSavedLevel(lintLevel);
