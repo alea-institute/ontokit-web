@@ -913,7 +913,8 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
             {issue.message}
           </p>
           {issue.subject_iri && (() => {
-            const badge = SUBJECT_TYPE_BADGE[issue.subject_type ?? "class"];
+            const key = issue.subject_type ?? "class";
+            const badge = SUBJECT_TYPE_BADGE[key] ?? SUBJECT_TYPE_BADGE["other"];
             return (
               <button
                 onClick={() => onNavigate?.(issue.subject_iri!, issue.subject_type ?? "class")}
