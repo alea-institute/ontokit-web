@@ -29,6 +29,7 @@ import {
   type QualityWebSocketMessage,
 } from "@/lib/api/quality";
 import type { ConsistencyCheckResult, ConsistencyIssue, DuplicateCluster, DuplicateDetectionResult } from "@/lib/ontology/qualityTypes";
+import Link from "next/link";
 import { cn, formatDateTime, getLocalName } from "@/lib/utils";
 
 interface HealthCheckPanelProps {
@@ -89,6 +90,9 @@ export function HealthCheckPanel({
   const [isLoadingCachedConsistency, setIsLoadingCachedConsistency] = useState(false);
   const [isLoadingCachedDuplicates, setIsLoadingCachedDuplicates] = useState(false);
 
+  // Lint config hint (level name + rule count)
+  const [lintConfigHint, setLintConfigHint] = useState<string | null>(null);
+
   // Track whether the quality WebSocket is connected
   const qualityWsConnected = useRef(false);
   // Cancellation flag for the polling fallback loop
@@ -140,6 +144,37 @@ export function HealthCheckPanel({
   // Stable ref for fetchData so the WebSocket effect can call it without re-running
   const fetchDataRef = useRef(fetchData);
   useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+
+  // Fetch lint config hint (level name + rule count)
+  useEffect(() => {
+    if (!isOpen || !accessToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [config, levels] = await Promise.all([
+          lintApi.getLintConfig(projectId, accessToken),
+          lintApi.getLevels(),
+        ]);
+        if (cancelled) return;
+        if (config.lint_level != null) {
+          const level = levels.levels.find((l) => l.level === config.lint_level);
+          if (level) {
+            setLintConfigHint(`Level ${level.level} — ${level.name} (${level.rule_ids.length} rules)`);
+          } else {
+            setLintConfigHint(`Level ${config.lint_level} (${config.effective_rules.length} rules)`);
+          }
+        } else if (config.enabled_rules) {
+          setLintConfigHint(`Custom (${config.enabled_rules.length} rules)`);
+        } else {
+          const allRulesCount = levels.levels.at(-1)?.rule_ids.length ?? 0;
+          setLintConfigHint(`All rules (${allRulesCount})`);
+        }
+      } catch {
+        // Silently ignore — hint is non-critical
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, projectId, accessToken]);
 
   // Initial load
   useEffect(() => {
@@ -649,18 +684,33 @@ export function HealthCheckPanel({
               onClick={() => handleFilterChange("all")}
             />
           </div>
-          {summary.last_run && (
-            <div className="mt-2 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-              <Clock className="h-3 w-3" />
-              Last run: {formatDateTime(summary.last_run.started_at)}
-              {summary.last_run.status === "completed" && (
-                <CheckCircle2 className="ml-1 h-3 w-3 text-green-500" />
-              )}
-              {summary.last_run.status === "failed" && (
-                <XCircle className="ml-1 h-3 w-3 text-red-500" />
-              )}
-            </div>
-          )}
+          <div className="mt-2 space-y-0.5">
+            {summary.last_run && (
+              <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <Clock className="h-3 w-3" />
+                Last run: {formatDateTime(summary.last_run.started_at)}
+                {summary.last_run.status === "completed" && (
+                  <CheckCircle2 className="ml-1 h-3 w-3 text-green-500" />
+                )}
+                {summary.last_run.status === "failed" && (
+                  <XCircle className="ml-1 h-3 w-3 text-red-500" />
+                )}
+              </div>
+            )}
+            {lintConfigHint && (
+              <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                <Info className="h-3 w-3" />
+                {lintConfigHint}
+                <span className="mx-0.5">&mdash;</span>
+                <Link
+                  href={`/projects/${projectId}/settings#lint-config`}
+                  className="text-primary-600 hover:underline dark:text-primary-400"
+                >
+                  configure
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

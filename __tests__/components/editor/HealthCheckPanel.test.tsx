@@ -9,6 +9,8 @@ vi.mock("@/lib/api/lint", () => ({
     getIssues: vi.fn(),
     triggerLint: vi.fn(),
     dismissIssue: vi.fn(),
+    getLintConfig: vi.fn(),
+    getLevels: vi.fn(),
   },
   createLintWebSocket: vi.fn(() => ({ close: vi.fn() })),
 }));
@@ -113,6 +115,16 @@ describe("HealthCheckPanel", () => {
     });
     mockLintApi.getStatus.mockResolvedValue(baseSummary);
     mockLintApi.getIssues.mockResolvedValue(baseIssues);
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: null, effective_rules: ["R001", "R002", "R003"], updated_at: null,
+    });
+    mockLintApi.getLevels.mockResolvedValue({
+      levels: [
+        { level: 1, name: "Critical", description: "Structural errors", rule_ids: ["R001"] },
+        { level: 2, name: "Consistency", description: "Consistency checks", rule_ids: ["R001", "R002", "R003"] },
+        { level: 3, name: "Labels", description: "Label checks", rule_ids: ["R001", "R002", "R003", "R004"] },
+      ],
+    });
     mockQualityApi.getConsistencyIssues.mockResolvedValue({
       project_id: "p1",
       branch: "main",
@@ -341,6 +353,23 @@ describe("HealthCheckPanel", () => {
     });
     await userEvent.click(screen.getByText("Foo"));
     expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "class");
+  });
+
+  it("shows lint configuration hint near Run Lint button", async () => {
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Level 2 — Consistency (3 rules)")).toBeDefined();
+    });
+  });
+
+  it("shows custom config hint when lint_level is null", async () => {
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: null, enabled_rules: ["R001", "R002"], effective_rules: ["R001", "R002"], updated_at: null,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Custom (2 rules)")).toBeDefined();
+    });
   });
 
   it("shows related entities for duplicate-label issues", async () => {
