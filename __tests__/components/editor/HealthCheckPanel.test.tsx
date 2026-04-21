@@ -279,6 +279,66 @@ describe("HealthCheckPanel", () => {
     expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "class");
   });
 
+  it("shows entity type badge based on subject_type", async () => {
+    mockLintApi.getStatus.mockResolvedValue({
+      ...baseSummary,
+      last_run: { ...baseSummary.last_run!, issues_found: 3 },
+    });
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        { ...baseIssues.items[0], subject_type: "class" as const },
+        { ...baseIssues.items[0], id: "i3", subject_iri: "http://example.org/hasFoo", subject_type: "property" as const, rule_id: "R003", message: "Domain violation" },
+        { ...baseIssues.items[0], id: "i4", subject_iri: "http://example.org/foo1", subject_type: "individual" as const, rule_id: "R004", message: "Range violation" },
+      ],
+      total: 3, skip: 0, limit: 500,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Foo")).toBeDefined();
+    });
+    // Class badge: "C"
+    const classBadge = screen.getByText("C");
+    expect(classBadge).toBeDefined();
+    // Property badge: "P"
+    const propBadge = screen.getByText("P");
+    expect(propBadge).toBeDefined();
+    // Individual badge: "I"
+    const indBadge = screen.getByText("I");
+    expect(indBadge).toBeDefined();
+  });
+
+  it("passes subject_type when navigating to property", async () => {
+    const onNav = vi.fn();
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        { ...baseIssues.items[0], subject_iri: "http://example.org/hasFoo", subject_type: "property" as const },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("hasFoo")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("hasFoo"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/hasFoo", "property");
+  });
+
+  it("defaults to class when subject_type is null", async () => {
+    const onNav = vi.fn();
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        { ...baseIssues.items[0], subject_type: null },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("Foo")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Foo"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "class");
+  });
+
   it("switches to consistency tab", async () => {
     setup();
     await waitFor(() => {

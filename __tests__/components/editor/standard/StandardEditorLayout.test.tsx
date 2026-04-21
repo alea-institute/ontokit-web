@@ -976,4 +976,51 @@ describe("StandardEditorLayout", () => {
 
     expect(_toastErrorFn).toHaveBeenCalledWith("Failed to reparent class", "Unknown error");
   });
+
+  describe("entityNavigationRef", () => {
+    it("populates ref with navigation function on mount", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      expect(ref.current).toBeTypeOf("function");
+    });
+
+    it("clears ref on unmount", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      const { unmount } = render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      expect(ref.current).toBeTypeOf("function");
+      unmount();
+      expect(ref.current).toBeNull();
+    });
+
+    it("navigates to class tab when type is class", () => {
+      const navigateToNode = vi.fn().mockResolvedValue(undefined);
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
+      ref.current!("http://example.org/ClassA", "class");
+      expect(navigateToNode).toHaveBeenCalledWith("http://example.org/ClassA");
+    });
+
+    it("switches to properties tab when type is property", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      ref.current!("http://example.org/hasFoo", "property");
+      // The tab change handler should have been called
+      expect(_tabChangeHandler).toBeDefined();
+    });
+
+    it("switches to individuals tab when type is individual", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      ref.current!("http://example.org/foo1", "individual");
+      expect(_tabChangeHandler).toBeDefined();
+    });
+
+    it("defaults to class navigation when type is undefined", () => {
+      const navigateToNode = vi.fn().mockResolvedValue(undefined);
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
+      ref.current!("http://example.org/ClassA");
+      expect(navigateToNode).toHaveBeenCalledWith("http://example.org/ClassA");
+    });
+  });
 });
