@@ -289,8 +289,9 @@ describe("HealthCheckPanel", () => {
         { ...baseIssues.items[0], subject_type: "class" as const },
         { ...baseIssues.items[0], id: "i3", subject_iri: "http://example.org/hasFoo", subject_type: "property" as const, rule_id: "R003", message: "Domain violation" },
         { ...baseIssues.items[0], id: "i4", subject_iri: "http://example.org/foo1", subject_type: "individual" as const, rule_id: "R004", message: "Range violation" },
+        { ...baseIssues.items[0], id: "i5", subject_iri: "http://example.org/unknown1", subject_type: "other" as const, rule_id: "R005", message: "Missing type" },
       ],
-      total: 3, skip: 0, limit: 500,
+      total: 4, skip: 0, limit: 500,
     });
     setup();
     await waitFor(() => {
@@ -305,6 +306,9 @@ describe("HealthCheckPanel", () => {
     // Individual badge: "I"
     const indBadge = screen.getByText("I");
     expect(indBadge).toBeDefined();
+    // Other badge: "?"
+    const otherBadge = screen.getByText("?");
+    expect(otherBadge).toBeDefined();
   });
 
   it("passes subject_type when navigating to property", async () => {
