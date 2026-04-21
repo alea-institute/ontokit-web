@@ -80,7 +80,6 @@ vi.mock("@/lib/utils", () => ({
 
 import {
   LintConfigSection,
-  getRulesForLevel,
   getSeverityColor,
 } from "@/app/projects/[id]/settings/page";
 import { lintApi } from "@/lib/api/lint";
@@ -96,42 +95,6 @@ const sampleRules: LintRuleInfo[] = [
 ];
 
 // --- Pure function tests ---
-
-describe("getRulesForLevel", () => {
-  it("level 1 returns only error-severity rules", () => {
-    const result = getRulesForLevel(sampleRules, 1);
-    expect(result).toEqual(["R001"]);
-  });
-
-  it("level 2 returns error and warning rules", () => {
-    const result = getRulesForLevel(sampleRules, 2);
-    expect(result).toEqual(["R001", "R002", "R003"]);
-  });
-
-  it("level 3 returns all rules", () => {
-    const result = getRulesForLevel(sampleRules, 3);
-    expect(result).toEqual(["R001", "R002", "R003", "R004"]);
-  });
-
-  it("level 4 returns all rules", () => {
-    const result = getRulesForLevel(sampleRules, 4);
-    expect(result).toEqual(["R001", "R002", "R003", "R004"]);
-  });
-
-  it("level 5 returns all rules", () => {
-    const result = getRulesForLevel(sampleRules, 5);
-    expect(result).toEqual(["R001", "R002", "R003", "R004"]);
-  });
-
-  it("level 0 (custom) returns empty array", () => {
-    const result = getRulesForLevel(sampleRules, 0);
-    expect(result).toEqual([]);
-  });
-
-  it("handles empty rules array", () => {
-    expect(getRulesForLevel([], 2)).toEqual([]);
-  });
-});
 
 describe("getSeverityColor", () => {
   it("returns red classes for error", () => {

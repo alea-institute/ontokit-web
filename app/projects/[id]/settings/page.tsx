@@ -77,7 +77,6 @@ import {
 import {
   lintApi,
   type LintConfig,
-  type LintRuleInfo,
   type LintSummary,
 } from "@/lib/api/lint";
 
@@ -3387,24 +3386,6 @@ function EmbeddingSettingsSection({
 // --- Lint Level Presets ---
 
 const SEVERITY_ORDER: Record<string, number> = { error: 0, warning: 1, info: 2 };
-
-/** @deprecated Superseded by backend-driven levelRuleMap. Kept for test compatibility. */
-export function getRulesForLevel(allRules: LintRuleInfo[], level: number): string[] {
-  const maxOrder: Record<number, number> = {
-    1: 0,                                                              // error only
-    2: 1,                                                              // error + warning
-    3: 2,                                                              // error + warning + info
-    4: Math.max(...allRules.map((r) => SEVERITY_ORDER[r.severity] ?? 0), 0), // all known
-    5: Number.POSITIVE_INFINITY,                                       // everything (future-proof)
-  };
-
-  const threshold = maxOrder[level];
-  if (threshold === undefined) return [];
-
-  return allRules
-    .filter((r) => (SEVERITY_ORDER[r.severity] ?? Number.POSITIVE_INFINITY) <= threshold)
-    .map((r) => r.rule_id);
-}
 
 export function getSeverityColor(severity: string) {
   switch (severity) {
