@@ -230,6 +230,10 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         } else if (type === "individual") {
           setActiveTab("individuals");
           setSelectedIndividualIri(iri);
+        } else if (type === "other") {
+          // Untyped entities can't be shown in Standard mode — navigating
+          // to the class tree would show a misleading error. Do nothing;
+          // the ClassDetailPanel already shows a helpful message.
         } else {
           setActiveTab("classes");
           props.navigateToNode(iri);
