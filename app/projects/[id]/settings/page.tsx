@@ -3675,6 +3675,7 @@ export function LintConfigSection({
               {(levelsQuery.data?.levels ?? []).map((lvl) => (
                 <button
                   key={lvl.level}
+                  type="button"
                   onClick={() => canManage && handleLevelChange(lvl.level)}
                   disabled={!canManage}
                   aria-pressed={lintLevel === lvl.level}
@@ -3695,6 +3696,7 @@ export function LintConfigSection({
                 </button>
               ))}
               <button
+                type="button"
                 onClick={() => canManage && handleLevelChange(0)}
                 disabled={!canManage}
                 aria-pressed={lintLevel === 0}
@@ -3755,6 +3757,7 @@ export function LintConfigSection({
                   >
                     {/* Toggle */}
                     <button
+                      type="button"
                       role="switch"
                       aria-checked={enabled}
                       onClick={() => handleRuleToggle(rule.rule_id)}
