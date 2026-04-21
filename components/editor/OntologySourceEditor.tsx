@@ -7,6 +7,7 @@ import { TurtleEditor, type TurtleDiagnostic } from "./TurtleEditor";
 import { Button } from "@/components/ui/button";
 import { lintApi, type LintIssue } from "@/lib/api/lint";
 import type { IndexWorkerResult, IriPosition } from "@/lib/editor/indexWorker";
+import { getLocalName } from "@/lib/utils";
 
 export interface OntologySourceEditorProps {
   /** Project ID for lint integration */
@@ -573,12 +574,28 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                     )}
                   </div>
                   {issue.details && Array.isArray(issue.details.duplicate_iris) && (issue.details.duplicate_iris as string[]).length > 0 && (
-                    <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">
-                      Also: {(issue.details.duplicate_iris as string[]).slice(0, 3).map((iri: string) =>
-                        iri.includes("#") ? iri.split("#").pop() : iri.split("/").pop()
-                      ).join(", ")}
-                      {(issue.details.duplicate_iris as string[]).length > 3 && ` +${(issue.details.duplicate_iris as string[]).length - 3} more`}
-                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1 text-xs text-slate-400 dark:text-slate-500">
+                      <span>Also:</span>
+                      {(issue.details.duplicate_iris as string[]).slice(0, 3).map((iri: string) => {
+                        const pos = iriIndex.get(iri);
+                        return pos ? (
+                          <button
+                            key={iri}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); scrollToLine(pos.line, pos.col); }}
+                            className="text-primary-600 hover:underline dark:text-primary-400"
+                            title={iri}
+                          >
+                            {getLocalName(iri)}
+                          </button>
+                        ) : (
+                          <span key={iri} title={iri}>{getLocalName(iri)}</span>
+                        );
+                      })}
+                      {(issue.details.duplicate_iris as string[]).length > 3 && (
+                        <span>+{(issue.details.duplicate_iris as string[]).length - 3} more</span>
+                      )}
+                    </div>
                   )}
                 </div>
                 <span className="flex-shrink-0 rounded-sm bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
