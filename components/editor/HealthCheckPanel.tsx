@@ -137,6 +137,10 @@ export function HealthCheckPanel({
     }
   }, [projectId, accessToken, isOpen, filter]);
 
+  // Stable ref for fetchData so the WebSocket effect can call it without re-running
+  const fetchDataRef = useRef(fetchData);
+  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+
   // Initial load
   useEffect(() => {
     if (isOpen) {
@@ -158,7 +162,7 @@ export function HealthCheckPanel({
         setIsRunning(true);
       } else if (message.type === "lint_complete" || message.type === "lint_failed") {
         setIsRunning(false);
-        fetchData();
+        fetchDataRef.current();
       }
     };
 
@@ -191,7 +195,7 @@ export function HealthCheckPanel({
         ws.close();
       }
     };
-  }, [isOpen, projectId, accessToken, fetchData]);
+  }, [isOpen, projectId, accessToken]);
 
   // Trigger a new lint run
   const handleRunLint = async () => {
