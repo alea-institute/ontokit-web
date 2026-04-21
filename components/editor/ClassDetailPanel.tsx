@@ -299,10 +299,8 @@ export function ClassDetailPanel({
         if (is404 && selectedNodeFallback?.iri === classIri) {
           setError(null);
         } else if (is404) {
-          const localName = classIri.includes('#')
-            ? classIri.split('#').pop()
-            : classIri.split('/').pop();
-          setError(`"${localName}" is not an OWL Class, or an individual, or a property. Enable Developer mode to see the entity in the source view.`);
+          const localName = getLocalName(classIri);
+          setError(`Could not load "${localName}" as an OWL Class. Enable Developer mode to see the entity in the source view.`);
         } else {
           setError(err instanceof Error ? err.message : "Failed to load class details");
         }
