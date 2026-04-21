@@ -289,6 +289,42 @@ describe("lintApi", () => {
       }
     });
   });
+
+  // --- getLevels ---
+
+  describe("getLevels", () => {
+    it("calls GET /api/v1/projects/lint/levels", async () => {
+      const levels = {
+        levels: [
+          { level: 1, name: "Critical", description: "Structural errors", rule_ids: ["R001"] },
+          { level: 2, name: "Consistency", description: "Orphan classes", rule_ids: ["R001", "R002"] },
+        ],
+      };
+      mockOk(levels);
+
+      const result = await lintApi.getLevels();
+      expect(result).toEqual(levels);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/lint/levels");
+      expect(options.method).toBe("GET");
+    });
+  });
+
+  // --- clearResults ---
+
+  describe("clearResults", () => {
+    it("calls DELETE /api/v1/projects/:id/lint/results with auth", async () => {
+      mockEmpty();
+
+      await lintApi.clearResults("p1", "tok");
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/lint/results");
+      expect(options.method).toBe("DELETE");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+    });
+  });
 });
 
 // --- WebSocket mock ---
