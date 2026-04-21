@@ -206,6 +206,92 @@ describe("HealthCheckPanel", () => {
     });
   });
 
+  it("shows error when clear results fails", async () => {
+    mockLintApi.clearResults.mockRejectedValue(new Error("Clear failed"));
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Clear")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Clear"));
+    await waitFor(() => {
+      expect(screen.getByText("Clear failed")).toBeDefined();
+    });
+  });
+
+  it("keeps summary counters at zero after clearing", async () => {
+    mockLintApi.clearResults.mockResolvedValue(undefined);
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Clear")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Clear"));
+    await waitFor(() => {
+      // Summary section still visible with zeroed counters
+      expect(screen.getByText("Errors")).toBeDefined();
+      expect(screen.getByText("Warnings")).toBeDefined();
+    });
+  });
+
+  it("shows No lint run yet when no run exists", async () => {
+    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("No lint run yet")).toBeDefined();
+    });
+    // Should NOT show "No issues found"
+    expect(screen.queryByText("No issues found")).toBeNull();
+  });
+
+  it("shows all-rules config hint when no config is set", async () => {
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: null, enabled_rules: null, effective_rules: ["R001", "R002", "R003", "R004"], updated_at: null,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText(/All rules/)).toBeDefined();
+    });
+  });
+
+  it("shows No issues found only after completed run with zero issues", async () => {
+    mockLintApi.getStatus.mockResolvedValue({
+      ...baseSummary,
+      error_count: 0, warning_count: 0, info_count: 0, total_issues: 0,
+    });
+    mockLintApi.getIssues.mockResolvedValue({ items: [], total: 0, skip: 0, limit: 500 });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("No issues found")).toBeDefined();
+    });
+  });
+
+  it("shows duplicate_iris related entities with +N more for many duplicates", async () => {
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        {
+          ...baseIssues.items[0],
+          rule_id: "duplicate-label",
+          message: "Label shared",
+          details: {
+            duplicate_iris: [
+              "http://example.org/A",
+              "http://example.org/B",
+              "http://example.org/C",
+              "http://example.org/D",
+            ],
+            label: "Foo",
+            local_name: "Foo",
+            total_duplicates: 4,
+          },
+        },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("+1 more")).toBeDefined();
+    });
+  });
+
   it("shows error when triggerLint fails", async () => {
     mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
     mockLintApi.triggerLint.mockRejectedValue(new Error("Nope"));
