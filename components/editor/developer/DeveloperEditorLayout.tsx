@@ -265,6 +265,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
         } else if (type === "individual") {
           setActiveTab("individuals");
           setSelectedIndividualIri(iri);
+        } else if (type === "other") {
+          // Untyped entities: scroll to them in the source view
+          props.setPendingScrollIri(iri);
         } else {
           setActiveTab("classes");
           props.navigateToNode(iri);
@@ -274,7 +277,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     return () => {
       if (props.entityNavigationRef) props.entityNavigationRef.current = null;
     };
-  }, [props.entityNavigationRef, props.navigateToNode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [props.entityNavigationRef, props.navigateToNode, props.setPendingScrollIri]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Shared search state
   const {

@@ -302,7 +302,7 @@ export function ClassDetailPanel({
           const localName = classIri.includes('#')
             ? classIri.split('#').pop()
             : classIri.split('/').pop();
-          setError(`"${localName}" is not an OWL Class. It may be an individual, property, or other entity type.`);
+          setError(`"${localName}" is not an OWL Class, or an individual, or a property. Enable Developer mode to see the entity in the source view.`);
         } else {
           setError(err instanceof Error ? err.message : "Failed to load class details");
         }
