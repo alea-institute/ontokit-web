@@ -1274,4 +1274,51 @@ describe("DeveloperEditorLayout", () => {
       expect(navigateToNode).toHaveBeenCalledWith("http://example.org/DynTarget");
     });
   });
+
+  describe("entityNavigationRef", () => {
+    it("populates ref on mount and clears on unmount", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      const { unmount } = render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      expect(ref.current).toBeTypeOf("function");
+      unmount();
+      expect(ref.current).toBeNull();
+    });
+
+    it("navigates to class tab for class type", () => {
+      const navigateToNode = vi.fn().mockResolvedValue(undefined);
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
+      ref.current!("http://example.org/MyClass", "class");
+      expect(navigateToNode).toHaveBeenCalledWith("http://example.org/MyClass");
+    });
+
+    it("handles property type without error", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      // Should not throw when navigating to a property
+      expect(() => ref.current!("http://example.org/hasFoo", "property")).not.toThrow();
+    });
+
+    it("handles individual type without error", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      expect(() => ref.current!("http://example.org/foo1", "individual")).not.toThrow();
+    });
+
+    it("switches to source view for other type", () => {
+      const setPendingScrollIri = vi.fn();
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref, setPendingScrollIri })} />);
+      ref.current!("http://example.org/Unknown", "other");
+      expect(setPendingScrollIri).toHaveBeenCalledWith("http://example.org/Unknown");
+    });
+
+    it("defaults to class navigation when type is undefined", () => {
+      const navigateToNode = vi.fn().mockResolvedValue(undefined);
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
+      ref.current!("http://example.org/ClassA");
+      expect(navigateToNode).toHaveBeenCalledWith("http://example.org/ClassA");
+    });
+  });
 });

@@ -473,4 +473,48 @@ describe("LintConfigSection", () => {
       expect(screen.getByText(/4 rules/)).toBeDefined();
     });
   });
+
+  it("displays scope badges for rules", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: null, enabled_rules: ["R001", "R003"], effective_rules: ["R001", "R003"], updated_at: null,
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      // R001 has scope ["class", "property", "individual"] → 3 badges (C, P, I)
+      // R003 has scope ["class"] → 1 badge (C)
+      // All rules together: C appears in all 4 rules
+      const allBadges = screen.getAllByTitle("class");
+      expect(allBadges.length).toBe(4); // all 4 rules have "class" scope
+
+      const propBadges = screen.getAllByTitle("property");
+      expect(propBadges.length).toBe(3); // R001, R002, R004 have "property" scope
+
+      const indBadges = screen.getAllByTitle("individual");
+      expect(indBadges.length).toBe(3); // R001, R002, R004 have "individual" scope
+    });
+  });
+
+  it("shows error when clearing results fails", async () => {
+    const user = userEvent.setup();
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
+    });
+    mockLintApi.clearResults.mockRejectedValue(new Error("Server error"));
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Clear Results")).toBeDefined();
+    });
+
+    await user.click(screen.getByText("Clear Results"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Server error")).toBeDefined();
+    });
+  });
 });
