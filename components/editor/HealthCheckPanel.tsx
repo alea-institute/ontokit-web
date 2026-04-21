@@ -767,7 +767,7 @@ export function HealthCheckPanel({
                       </p>
                       {issue.entity_iri && (
                         <button
-                          onClick={() => onNavigateToClass?.(issue.entity_iri)}
+                          onClick={() => onNavigateToClass?.(issue.entity_iri, issue.entity_type)}
                           className="mt-1 text-xs text-primary-600 hover:underline dark:text-primary-400"
                         >
                           {getLocalName(issue.entity_iri)}
@@ -820,7 +820,7 @@ export function HealthCheckPanel({
                     {cluster.entities.map((entity) => (
                       <button
                         key={entity.iri}
-                        onClick={() => onNavigateToClass?.(entity.iri)}
+                        onClick={() => onNavigateToClass?.(entity.iri, entity.entity_type)}
                         className="flex w-full items-center gap-2 text-left text-sm text-primary-600 hover:underline dark:text-primary-400"
                       >
                         <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-owl-class/10 border border-owl-class/50">
