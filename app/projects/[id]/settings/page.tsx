@@ -3477,11 +3477,15 @@ export function LintConfigSection({
     }
   }, [rulesQuery.isError]);
 
+  // Stable ref for hasChanges so the sync effect can read it without re-running
+  const hasChangesRef = useRef(hasChanges);
+  hasChangesRef.current = hasChanges;
+
   // Sync config data into local editable state
   useEffect(() => {
     if (!configQuery.data && !configQuery.isError) return;
     // Don't overwrite in-progress edits from background refetches
-    if (hasChanges) return;
+    if (hasChangesRef.current) return;
 
     if (configQuery.data) {
       const cfg = configQuery.data;
@@ -3502,13 +3506,15 @@ export function LintConfigSection({
       // Fall back to defaults only when config endpoint is missing (404/501)
       if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
         const defaultRules = levelRuleMap.get(2) ?? new Set<string>();
+        setLintLevel(2);
+        setSavedLevel(2);
         setEnabledRules(defaultRules);
         setSavedRules(defaultRules);
       } else {
-        setError("Failed to load lint rules");
+        setError("Failed to load lint configuration");
       }
     }
-  }, [configQuery.data, configQuery.isError, configQuery.error, rules, levelRuleMap]);
+  }, [configQuery.data, configQuery.isError, configQuery.error, levelRuleMap]);
 
   const isLoading = rulesQuery.isLoading || levelsQuery.isLoading || (!!accessToken && rules.length > 0 && configQuery.isLoading);
 
