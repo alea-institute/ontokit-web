@@ -266,7 +266,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
           setActiveTab("individuals");
           setSelectedIndividualIri(iri);
         } else if (type === "other") {
-          // Untyped entities: scroll to them in the source view
+          // Untyped entities: switch to source view and scroll to IRI
+          setViewMode("source");
           props.setPendingScrollIri(iri);
         } else {
           setActiveTab("classes");
