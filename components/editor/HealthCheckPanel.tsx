@@ -239,7 +239,14 @@ export function HealthCheckPanel({
     setIsClearing(true);
     try {
       await lintApi.clearResults(projectId, accessToken);
-      setSummary(null);
+      setSummary((prev) => prev ? {
+        ...prev,
+        last_run: null,
+        error_count: 0,
+        warning_count: 0,
+        info_count: 0,
+        total_issues: 0,
+      } : null);
       setIssues([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to clear results");
@@ -757,8 +764,8 @@ export function HealthCheckPanel({
         </div>
       )}
 
-      {/* No issues */}
-      {!isLoading && summary && summary.total_issues === 0 && (
+      {/* No issues (only after a completed run) */}
+      {!isLoading && summary?.last_run?.status === "completed" && summary.total_issues === 0 && (
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
           <CheckCircle2 className="h-12 w-12 text-green-500" />
           <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
