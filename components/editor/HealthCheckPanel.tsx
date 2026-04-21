@@ -929,6 +929,37 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
               </button>
             );
           })()}
+          {/* Related entities from issue details */}
+          {issue.details && Array.isArray(issue.details.duplicate_iris) && (issue.details.duplicate_iris as string[]).length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+              <span>Also:</span>
+              {(issue.details.duplicate_iris as string[]).slice(0, 3).map((iri) => (
+                <button
+                  key={iri}
+                  onClick={() => onNavigate?.(iri, "class")}
+                  className="text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
+                  title={iri}
+                >
+                  {getLocalName(iri)}
+                </button>
+              ))}
+              {(issue.details.duplicate_iris as string[]).length > 3 && (
+                <span>+{(issue.details.duplicate_iris as string[]).length - 3} more</span>
+              )}
+            </div>
+          )}
+          {/* Conflicting values from label-per-language */}
+          {issue.details && Array.isArray(issue.details.labels) && (issue.details.labels as string[]).length > 1 && (
+            <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <span>Values: </span>
+              {(issue.details.labels as string[]).map((label, i) => (
+                <span key={i}>
+                  {i > 0 && ", "}
+                  <span className="font-mono text-slate-600 dark:text-slate-300">&ldquo;{label}&rdquo;</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         {onDismiss && (
           <button

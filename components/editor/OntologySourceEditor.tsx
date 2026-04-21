@@ -572,6 +572,14 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                       </span>
                     )}
                   </div>
+                  {issue.details && Array.isArray(issue.details.duplicate_iris) && (issue.details.duplicate_iris as string[]).length > 0 && (
+                    <p className="mt-0.5 truncate text-xs text-slate-400 dark:text-slate-500">
+                      Also: {(issue.details.duplicate_iris as string[]).slice(0, 3).map((iri: string) =>
+                        iri.includes("#") ? iri.split("#").pop() : iri.split("/").pop()
+                      ).join(", ")}
+                      {(issue.details.duplicate_iris as string[]).length > 3 && ` +${(issue.details.duplicate_iris as string[]).length - 3} more`}
+                    </p>
+                  )}
                 </div>
                 <span className="flex-shrink-0 rounded-sm bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                   {issue.rule_id}

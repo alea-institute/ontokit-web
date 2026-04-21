@@ -343,6 +343,58 @@ describe("HealthCheckPanel", () => {
     expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "class");
   });
 
+  it("shows related entities for duplicate-label issues", async () => {
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        {
+          ...baseIssues.items[0],
+          rule_id: "duplicate-label",
+          message: "Label 'Foo' is shared with 1 other resource(s)",
+          details: {
+            duplicate_iris: ["http://example.org/Bar", "http://example.org/Baz"],
+            label: "Foo",
+            local_name: "Foo",
+            total_duplicates: 2,
+          },
+        },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    const onNav = vi.fn();
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("Also:")).toBeDefined();
+      expect(screen.getByText("Bar")).toBeDefined();
+      expect(screen.getByText("Baz")).toBeDefined();
+    });
+    // Click a related entity
+    await userEvent.click(screen.getByText("Bar"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/Bar", "class");
+  });
+
+  it("shows conflicting values for label-per-language issues", async () => {
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        {
+          ...baseIssues.items[0],
+          rule_id: "label-per-language",
+          message: "Multiple different rdfs:label values for language 'no language tag'",
+          details: {
+            labels: ["Label One", "Label Two"],
+            predicate: "rdfs:label",
+            language: "no language tag",
+            local_name: "Foo",
+          },
+        },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Values:")).toBeDefined();
+    });
+  });
+
   it("switches to consistency tab", async () => {
     setup();
     await waitFor(() => {
