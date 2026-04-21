@@ -67,6 +67,7 @@ const baseIssues = {
       rule_id: "R001",
       message: "Missing label",
       subject_iri: "http://example.org/Foo",
+      subject_type: "class" as const,
       details: null,
       created_at: "2025-01-01T00:00:00Z",
       resolved_at: null,
@@ -79,6 +80,7 @@ const baseIssues = {
       rule_id: "R002",
       message: "Deprecated parent",
       subject_iri: null,
+      subject_type: null,
       details: null,
       created_at: "2025-01-01T00:00:00Z",
       resolved_at: null,
@@ -274,7 +276,7 @@ describe("HealthCheckPanel", () => {
       expect(screen.getByText("Foo")).toBeDefined();
     });
     await userEvent.click(screen.getByText("Foo"));
-    expect(onNav).toHaveBeenCalledWith("http://example.org/Foo");
+    expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "class");
   });
 
   it("switches to consistency tab", async () => {

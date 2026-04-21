@@ -7,6 +7,7 @@ import { api } from "./client";
 // Types
 export type LintIssueType = "error" | "warning" | "info";
 export type LintRunStatus = "pending" | "running" | "completed" | "failed";
+export type SubjectType = "class" | "property" | "individual" | "other";
 
 export interface LintIssue {
   id: string;
@@ -16,6 +17,7 @@ export interface LintIssue {
   rule_id: string;
   message: string;
   subject_iri: string | null;
+  subject_type: SubjectType | null;
   details: Record<string, unknown> | null;
   created_at: string;
   resolved_at: string | null;

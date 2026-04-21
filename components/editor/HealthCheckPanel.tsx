@@ -37,7 +37,7 @@ interface HealthCheckPanelProps {
   branch?: string;
   isOpen: boolean;
   onClose: () => void;
-  onNavigateToClass?: (iri: string) => void;
+  onNavigateToClass?: (iri: string, subjectType?: string) => void;
   /** Whether the current user can trigger a lint run (requires admin/manager role) */
   canRunLint?: boolean;
 }
@@ -882,9 +882,16 @@ function SummaryCard({ label, count, color, active, onClick }: SummaryCardProps)
 
 interface IssueCardProps {
   issue: LintIssue;
-  onNavigate?: (iri: string) => void;
+  onNavigate?: (iri: string, subjectType?: string) => void;
   onDismiss?: () => void;
 }
+
+const SUBJECT_TYPE_BADGE: Record<string, { letter: string; colorClass: string }> = {
+  class: { letter: "C", colorClass: "text-owl-class bg-owl-class/10 border-owl-class/50" },
+  property: { letter: "P", colorClass: "text-emerald-600 bg-emerald-100/50 border-emerald-500/50 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-400/50" },
+  individual: { letter: "I", colorClass: "text-violet-600 bg-violet-100/50 border-violet-500/50 dark:text-violet-400 dark:bg-violet-900/20 dark:border-violet-400/50" },
+  other: { letter: "?", colorClass: "text-slate-500 bg-slate-100/50 border-slate-400/50 dark:text-slate-400 dark:bg-slate-700/50 dark:border-slate-500/50" },
+};
 
 function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
   return (
@@ -905,19 +912,22 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
           <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
             {issue.message}
           </p>
-          {issue.subject_iri && (
-            <button
-              onClick={() => onNavigate?.(issue.subject_iri!)}
-              className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
-              title={issue.subject_iri}
-            >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-owl-class/10 border border-owl-class/50">
-                <span className="text-[8px] font-bold text-owl-class">C</span>
-              </span>
-              {getLocalName(issue.subject_iri)}
-              <ExternalLink className="h-3 w-3 opacity-50" />
-            </button>
-          )}
+          {issue.subject_iri && (() => {
+            const badge = SUBJECT_TYPE_BADGE[issue.subject_type ?? "class"];
+            return (
+              <button
+                onClick={() => onNavigate?.(issue.subject_iri!, issue.subject_type ?? "class")}
+                className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
+                title={issue.subject_iri}
+              >
+                <span className={cn("flex h-4 w-4 items-center justify-center rounded-full border", badge.colorClass)}>
+                  <span className="text-[8px] font-bold">{badge.letter}</span>
+                </span>
+                {getLocalName(issue.subject_iri)}
+                <ExternalLink className="h-3 w-3 opacity-50" />
+              </button>
+            );
+          })()}
         </div>
         {onDismiss && (
           <button

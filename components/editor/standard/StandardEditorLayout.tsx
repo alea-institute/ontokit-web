@@ -85,6 +85,9 @@ export interface StandardEditorLayoutProps {
   onReparentClass?: (classIri: string, oldParentIris: string[], newParentIris: string[], mode: DragMode) => Promise<void>;
   reparentOptimistic?: (iri: string, oldParentIri: string | null, newParentIri: string | null) => { previousNodes: ClassTreeNode[] };
   rollbackReparent?: (snapshot: { previousNodes: ClassTreeNode[] }) => void;
+
+  /** Ref populated with a function to navigate to any entity type */
+  entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -216,6 +219,27 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   // Track selected entity per tab (properties/individuals have their own selection)
   const [selectedPropertyIri, setSelectedPropertyIri] = useState<string | null>(null);
   const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
+
+  // Expose entity navigation to parent via ref
+  useEffect(() => {
+    if (props.entityNavigationRef) {
+      props.entityNavigationRef.current = (iri: string, type?: string) => {
+        if (type === "property") {
+          setActiveTab("properties");
+          setSelectedPropertyIri(iri);
+        } else if (type === "individual") {
+          setActiveTab("individuals");
+          setSelectedIndividualIri(iri);
+        } else {
+          setActiveTab("classes");
+          props.navigateToNode(iri);
+        }
+      };
+    }
+    return () => {
+      if (props.entityNavigationRef) props.entityNavigationRef.current = null;
+    };
+  }, [props.entityNavigationRef, props.navigateToNode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Shared search state
   const {

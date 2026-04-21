@@ -101,6 +101,7 @@ export default function EditorPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
+  const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
 
   // Commit dialog
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
@@ -1062,6 +1063,7 @@ export default function EditorPage() {
                 activeBranch={activeBranch}
                 canEdit={!!canEdit}
                 canSuggest={!!canSuggest}
+                entityNavigationRef={entityNavigationRef}
                 isSuggestionMode={isSuggestionMode}
                 nodes={nodes}
                 isTreeLoading={isTreeLoading}
@@ -1103,7 +1105,13 @@ export default function EditorPage() {
                 branch={activeBranch}
                 isOpen={showHealthCheck}
                 onClose={() => setShowHealthCheck(false)}
-                onNavigateToClass={(iri) => navigateToNode(iri)}
+                onNavigateToClass={(iri, subjectType) => {
+                  if (entityNavigationRef.current) {
+                    entityNavigationRef.current(iri, subjectType);
+                  } else {
+                    navigateToNode(iri);
+                  }
+                }}
                 canRunLint={!!canManage}
               />
             </div>
