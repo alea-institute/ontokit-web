@@ -256,29 +256,34 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
 
   // Expose entity navigation to parent via ref
+  const { entityNavigationRef, navigateToNode: navToNode, setPendingScrollIri: setScrollIri } = props;
   useEffect(() => {
-    if (props.entityNavigationRef) {
-      props.entityNavigationRef.current = (iri: string, type?: string) => {
-        if (type === "property") {
-          setActiveTab("properties");
-          setSelectedPropertyIri(iri);
-        } else if (type === "individual") {
-          setActiveTab("individuals");
-          setSelectedIndividualIri(iri);
-        } else if (type === "other") {
-          // Untyped entities: switch to source view and scroll to IRI
-          setViewMode("source");
-          props.setPendingScrollIri(iri);
-        } else {
-          setActiveTab("classes");
-          props.navigateToNode(iri);
-        }
-      };
-    }
-    return () => {
-      if (props.entityNavigationRef) props.entityNavigationRef.current = null;
+    if (!entityNavigationRef) return;
+
+    const handler = (iri: string, type?: string) => {
+      if (type === "property") {
+        setActiveTab("properties");
+        setSelectedPropertyIri(iri);
+      } else if (type === "individual") {
+        setActiveTab("individuals");
+        setSelectedIndividualIri(iri);
+      } else if (type === "other") {
+        // Untyped entities: switch to source view and scroll to IRI
+        setViewMode("source");
+        setScrollIri(iri);
+      } else {
+        setActiveTab("classes");
+        navToNode(iri);
+      }
     };
-  }, [props.entityNavigationRef, props.navigateToNode, props.setPendingScrollIri]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    entityNavigationRef.current = handler;
+    return () => {
+      if (entityNavigationRef.current === handler) {
+        entityNavigationRef.current = null;
+      }
+    };
+  }, [entityNavigationRef, navToNode, setScrollIri]);
 
   // Shared search state
   const {
