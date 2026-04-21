@@ -1015,6 +1015,7 @@ export default function EditorPage() {
                   accessToken={session?.accessToken}
                   activeBranch={activeBranch}
                   canEdit={!!canEdit}
+                  entityNavigationRef={entityNavigationRef}
                   canSuggest={!!canSuggest}
                   isSuggestionMode={isSuggestionMode}
                   nodes={nodes}
