@@ -226,6 +226,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     if (!entityNavigationRef) return;
 
     const handler = (iri: string, type?: string) => {
+      // Always exit graph view first — otherwise the user clicks a lint issue
+      // and stays staring at the graph instead of the entity they navigated to.
+      setShowGraph(false);
       if (type === "property") {
         setActiveTab("properties");
         setSelectedPropertyIri(iri);
