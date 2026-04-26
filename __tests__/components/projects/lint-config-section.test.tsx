@@ -83,7 +83,7 @@ import {
   getSeverityColor,
 } from "@/app/projects/[id]/settings/page";
 import { lintApi } from "@/lib/api/lint";
-import type { LintRuleInfo } from "@/lib/api/lint";
+import type { LintLevelsResponse, LintRuleInfo } from "@/lib/api/lint";
 
 const mockLintApi = vi.mocked(lintApi);
 
@@ -122,7 +122,7 @@ const sampleLevels = {
     { level: 2, name: "Consistency", description: "Orphan classes, duplicates", rule_ids: ["R001", "R002", "R003"] },
     { level: 3, name: "Labels", description: "Label checks", rule_ids: ["R001", "R002", "R003", "R004"] },
   ],
-};
+} satisfies LintLevelsResponse;
 
 describe("LintConfigSection", () => {
   beforeEach(() => {
@@ -299,26 +299,28 @@ describe("LintConfigSection", () => {
     expect(screen.queryByText("Save Lint Configuration")).toBeNull();
   });
 
-  it("falls back to defaults when config endpoint returns 404", async () => {
+  it("surfaces the API error when config endpoint returns 404", async () => {
+    // No silent fallback — a 404 from the config endpoint is now reported to
+    // the user instead of fabricating Level 2 defaults that could overwrite
+    // real config on save.
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockRejectedValue(new MockApiError(404, "Not Found", "Not found"));
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
-      // Should default to level 2 (Standard) with error + warning rules enabled
-      expect(screen.getByText("Rules (3 of 4 enabled)")).toBeDefined();
+      expect(screen.getByText("Not found")).toBeDefined();
     });
   });
 
-  it("shows error when config endpoint returns non-404 error", async () => {
+  it("surfaces the API error when config endpoint returns 500", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockRejectedValue(new MockApiError(500, "Internal Server Error", "Server error"));
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
 
     await waitFor(() => {
-      expect(screen.getByText("Failed to load lint configuration")).toBeDefined();
+      expect(screen.getByText("Server error")).toBeDefined();
     });
   });
 

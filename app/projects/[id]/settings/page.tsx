@@ -77,6 +77,7 @@ import {
 import {
   lintApi,
   type LintConfig,
+  type LintLevel,
   type LintSummary,
 } from "@/lib/api/lint";
 
@@ -3415,13 +3416,13 @@ export function LintConfigSection({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Editable state
-  const [lintLevel, setLintLevel] = useState<number>(2); // Default: Standard
+  // Editable state. `lintLevel === null` means custom mode (explicit rule list).
+  const [lintLevel, setLintLevel] = useState<LintLevel | null>(2); // Default: Standard
   const [enabledRules, setEnabledRules] = useState<Set<string>>(new Set());
   const [hasChanges, setHasChanges] = useState(false);
 
   // Track saved state to detect changes
-  const [savedLevel, setSavedLevel] = useState<number>(2);
+  const [savedLevel, setSavedLevel] = useState<LintLevel | null>(2);
   const [savedRules, setSavedRules] = useState<Set<string>>(new Set());
 
   // Fetch available lint rules
@@ -3440,8 +3441,8 @@ export function LintConfigSection({
 
   // Build a map of level -> rule_ids from backend definitions
   const levelRuleMap = useMemo(() => {
-    if (!levelsQuery.data) return new Map<number, Set<string>>();
-    const map = new Map<number, Set<string>>();
+    if (!levelsQuery.data) return new Map<LintLevel, Set<string>>();
+    const map = new Map<LintLevel, Set<string>>();
     for (const level of levelsQuery.data.levels) {
       map.set(level.level, new Set(level.rule_ids));
     }
@@ -3489,10 +3490,10 @@ export function LintConfigSection({
 
     if (configQuery.data) {
       const cfg = configQuery.data;
-      const level = cfg.lint_level ?? 0; // null means custom
+      const level = cfg.lint_level;
       setLintLevel(level);
       setSavedLevel(level);
-      if (level === 0) {
+      if (level === null) {
         const ruleSet = new Set(cfg.enabled_rules ?? []);
         setEnabledRules(ruleSet);
         setSavedRules(ruleSet);
@@ -3502,17 +3503,11 @@ export function LintConfigSection({
         setSavedRules(presetRules);
       }
     } else if (configQuery.isError) {
-      const err = configQuery.error;
-      // Fall back to defaults only when config endpoint is missing (404/501)
-      if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
-        const defaultRules = levelRuleMap.get(2) ?? new Set<string>();
-        setLintLevel(2);
-        setSavedLevel(2);
-        setEnabledRules(defaultRules);
-        setSavedRules(defaultRules);
-      } else {
-        setError("Failed to load lint configuration");
-      }
+      setError(
+        configQuery.error instanceof Error
+          ? configQuery.error.message
+          : "Failed to load lint configuration"
+      );
     }
   }, [configQuery.data, configQuery.isError, configQuery.error, levelRuleMap]);
 
@@ -3524,7 +3519,7 @@ export function LintConfigSection({
       setHasChanges(true);
       return;
     }
-    if (lintLevel === 0) {
+    if (lintLevel === null) {
       // Custom mode: compare rule sets
       const currentIds = [...enabledRules].sort().join(",");
       const savedIds = [...savedRules].sort().join(",");
@@ -3534,17 +3529,17 @@ export function LintConfigSection({
     }
   }, [lintLevel, enabledRules, savedLevel, savedRules]);
 
-  const handleLevelChange = (level: number) => {
+  const handleLevelChange = (level: LintLevel | null) => {
     setLintLevel(level);
     setError(null);
     setSuccess(null);
-    if (level !== 0) {
+    if (level !== null) {
       setEnabledRules(levelRuleMap.get(level) ?? new Set<string>());
     }
   };
 
   const handleRuleToggle = (ruleId: string) => {
-    if (lintLevel !== 0) return; // Only toggle in custom mode
+    if (lintLevel !== null) return; // Only toggle in custom mode
     setError(null);
     setSuccess(null);
     setEnabledRules((prev) => {
@@ -3565,7 +3560,7 @@ export function LintConfigSection({
     setSuccess(null);
     try {
       const config: LintConfig = {
-        lint_level: lintLevel === 0 ? null : lintLevel,
+        lint_level: lintLevel,
         enabled_rules: [...enabledRules],
       };
       await lintApi.updateLintConfig(projectId, config, accessToken);
@@ -3576,11 +3571,7 @@ export function LintConfigSection({
       // Invalidate queries so cache stays fresh
       queryClient.invalidateQueries({ queryKey: ["lintConfig", projectId] });
     } catch (err) {
-      if (err instanceof ApiError && (err.status === 404 || err.status === 501)) {
-        setError("Backend lint config endpoint is not yet available");
-      } else {
-        setError(err instanceof Error ? err.message : "Failed to save lint configuration");
-      }
+      setError(err instanceof Error ? err.message : "Failed to save lint configuration");
     } finally {
       setIsSaving(false);
     }
@@ -3604,7 +3595,7 @@ export function LintConfigSection({
     }
   };
 
-  const isCustom = lintLevel === 0;
+  const isCustom = lintLevel === null;
 
   return (
     <section
@@ -3697,12 +3688,12 @@ export function LintConfigSection({
               ))}
               <button
                 type="button"
-                onClick={() => canManage && handleLevelChange(0)}
+                onClick={() => canManage && handleLevelChange(null)}
                 disabled={!canManage}
-                aria-pressed={lintLevel === 0}
+                aria-pressed={lintLevel === null}
                 className={cn(
                   "rounded-lg border p-3 text-left transition-all",
-                  lintLevel === 0
+                  lintLevel === null
                     ? "border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:border-primary-400 dark:bg-primary-900/20"
                     : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
                   !canManage && "cursor-not-allowed opacity-60"
