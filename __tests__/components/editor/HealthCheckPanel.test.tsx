@@ -242,10 +242,14 @@ describe("HealthCheckPanel", () => {
       expect(screen.getByText("Clear")).toBeDefined();
     });
     await userEvent.click(screen.getByText("Clear"));
+    // Each summary card pairs the count with its label inside the same button.
+    // Find each label, walk up to its button, and verify the numeric count is "0".
     await waitFor(() => {
-      // Summary section still visible with zeroed counters
-      expect(screen.getByText("Errors")).toBeDefined();
-      expect(screen.getByText("Warnings")).toBeDefined();
+      for (const label of ["Errors", "Warnings", "Info", "Total"]) {
+        const card = screen.getByText(label).closest("button")!;
+        const count = card.querySelector("p.text-lg")!;
+        expect(count.textContent).toBe("0");
+      }
     });
   });
 
@@ -274,6 +278,8 @@ describe("HealthCheckPanel", () => {
   });
 
   it("shows duplicate_iris related entities with +N more for many duplicates", async () => {
+    // Multi-letter local names so the test isn't confused with single-letter
+    // entity-type badges ("C", "P", "I", "?") that share a screen.
     mockLintApi.getIssues.mockResolvedValue({
       items: [
         {
@@ -282,10 +288,10 @@ describe("HealthCheckPanel", () => {
           message: "Label shared",
           details: {
             duplicate_iris: [
-              "http://example.org/A",
-              "http://example.org/B",
-              "http://example.org/C",
-              "http://example.org/D",
+              "http://example.org/Alpha",
+              "http://example.org/Beta",
+              "http://example.org/Gamma",
+              "http://example.org/Delta",
             ],
             label: "Foo",
             local_name: "Foo",
@@ -296,9 +302,14 @@ describe("HealthCheckPanel", () => {
       total: 1, skip: 0, limit: 500,
     });
     setup();
+    // First three are visible, fourth is hidden behind the "+N more" indicator.
     await waitFor(() => {
-      expect(screen.getByText("+1 more")).toBeDefined();
+      expect(screen.getByText("Alpha")).toBeDefined();
     });
+    expect(screen.getByText("Beta")).toBeDefined();
+    expect(screen.getByText("Gamma")).toBeDefined();
+    expect(screen.queryByText("Delta")).toBeNull();
+    expect(screen.getByText("+1 more")).toBeDefined();
   });
 
   it("shows error when triggerLint fails", async () => {
@@ -423,18 +434,10 @@ describe("HealthCheckPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("Foo")).toBeDefined();
     });
-    // Class badge: "C"
-    const classBadge = screen.getByText("C");
-    expect(classBadge).toBeDefined();
-    // Property badge: "P"
-    const propBadge = screen.getByText("P");
-    expect(propBadge).toBeDefined();
-    // Individual badge: "I"
-    const indBadge = screen.getByText("I");
-    expect(indBadge).toBeDefined();
-    // Other badge: "?"
-    const otherBadge = screen.getByText("?");
-    expect(otherBadge).toBeDefined();
+    expect(screen.getByTestId("subject-type-badge-class")).toBeDefined();
+    expect(screen.getByTestId("subject-type-badge-property")).toBeDefined();
+    expect(screen.getByTestId("subject-type-badge-individual")).toBeDefined();
+    expect(screen.getByTestId("subject-type-badge-other")).toBeDefined();
   });
 
   it("passes subject_type when navigating to property", async () => {

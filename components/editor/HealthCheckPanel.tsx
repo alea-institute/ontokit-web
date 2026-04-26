@@ -94,6 +94,9 @@ export function HealthCheckPanel({
   // Lint config hint (level name + rule count)
   const [lintConfigHint, setLintConfigHint] = useState<string | null>(null);
 
+  // Clear lint results
+  const [isClearing, setIsClearing] = useState(false);
+
   // Track whether the quality WebSocket is connected
   const qualityWsConnected = useRef(false);
   // Cancellation flag for the polling fallback loop
@@ -235,8 +238,6 @@ export function HealthCheckPanel({
     };
   }, [isOpen, projectId, accessToken]);
 
-  // Clear lint results
-  const [isClearing, setIsClearing] = useState(false);
   const handleClearResults = async () => {
     if (!accessToken) return;
     setIsClearing(true);
@@ -1026,7 +1027,11 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
               className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
               title={issue.subject_iri}
             >
-              <span className={cn("flex h-4 w-4 items-center justify-center rounded-full border", subjectBadge.colorClass)}>
+              <span
+                aria-label={`subject type: ${subjectTypeKey}`}
+                data-testid={`subject-type-badge-${subjectTypeKey}`}
+                className={cn("flex h-4 w-4 items-center justify-center rounded-full border", subjectBadge.colorClass)}
+              >
                 <span className="text-[8px] font-bold">{subjectBadge.letter}</span>
               </span>
               {getLocalName(issue.subject_iri)}

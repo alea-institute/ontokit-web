@@ -519,7 +519,7 @@ describe("LintConfigSection", () => {
     });
   });
 
-  it("sends null lint_level for custom mode", async () => {
+  it("marks Custom as active when lint_level is null", async () => {
     mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
     mockLintApi.getLintConfig.mockResolvedValue({
       project_id: "p1", lint_level: null, enabled_rules: ["R001"], effective_rules: ["R001"], updated_at: null,
