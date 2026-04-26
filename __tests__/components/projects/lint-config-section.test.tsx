@@ -55,8 +55,26 @@ vi.mock("@/lib/api/lint", () => ({
     updateLintConfig: vi.fn(),
     getStatus: vi.fn(),
     clearResults: vi.fn(),
+    triggerLint: vi.fn(),
   },
 }));
+
+const summaryWithResults = {
+  project_id: "p1",
+  last_run: {
+    id: "run1",
+    project_id: "p1",
+    status: "completed" as const,
+    started_at: "2026-04-20T10:00:00Z",
+    completed_at: "2026-04-20T10:01:00Z",
+    issues_found: 5,
+    error_message: null,
+  },
+  error_count: 2,
+  warning_count: 2,
+  info_count: 1,
+  total_issues: 5,
+};
 
 const { MockApiError } = vi.hoisted(() => {
   class MockApiError extends Error {
@@ -503,6 +521,8 @@ describe("LintConfigSection", () => {
     mockLintApi.getLintConfig.mockResolvedValue({
       project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
+    // Clear Results only renders when there's something to clear.
+    mockLintApi.getStatus.mockResolvedValue(summaryWithResults);
     mockLintApi.clearResults.mockResolvedValue(undefined);
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -586,6 +606,7 @@ describe("LintConfigSection", () => {
     mockLintApi.getLintConfig.mockResolvedValue({
       project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
     });
+    mockLintApi.getStatus.mockResolvedValue(summaryWithResults);
     mockLintApi.clearResults.mockRejectedValue(new Error("Server error"));
 
     renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
@@ -598,6 +619,89 @@ describe("LintConfigSection", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Server error")).toBeDefined();
+    });
+  });
+
+  it("shows Run Lint when no run exists, and triggers a run on click", async () => {
+    // Default status mock has last_run: null — so the Run Lint variant should
+    // render in place of Clear Results.
+    const user = userEvent.setup();
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
+    });
+    mockLintApi.triggerLint.mockResolvedValue({
+      job_id: "j1", status: "pending", message: "started",
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Run Lint")).toBeDefined();
+    });
+    expect(screen.queryByText("Clear Results")).toBeNull();
+
+    await user.click(screen.getByText("Run Lint"));
+
+    await waitFor(() => {
+      expect(mockLintApi.triggerLint).toHaveBeenCalledWith("p1", "tok");
+      expect(screen.getByText("Lint run started")).toBeDefined();
+    });
+  });
+
+  it("shows Run Lint (not Clear) when last run completed with zero issues", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
+    });
+    mockLintApi.getStatus.mockResolvedValue({
+      ...summaryWithResults,
+      error_count: 0, warning_count: 0, info_count: 0, total_issues: 0,
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Run Lint")).toBeDefined();
+    });
+    expect(screen.queryByText("Clear Results")).toBeNull();
+  });
+
+  it("disables Run Lint while a run is pending or running", async () => {
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
+    });
+    mockLintApi.getStatus.mockResolvedValue({
+      ...summaryWithResults,
+      last_run: { ...summaryWithResults.last_run, status: "running" as const },
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Running...")).toBeDefined();
+    });
+    const btn = screen.getByText("Running...").closest("button")!;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("shows error when triggerLint fails", async () => {
+    const user = userEvent.setup();
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: [], updated_at: null,
+    });
+    mockLintApi.triggerLint.mockRejectedValue(new Error("Backend down"));
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Run Lint")).toBeDefined();
+    });
+    await user.click(screen.getByText("Run Lint"));
+    await waitFor(() => {
+      expect(screen.getByText("Backend down")).toBeDefined();
     });
   });
 });

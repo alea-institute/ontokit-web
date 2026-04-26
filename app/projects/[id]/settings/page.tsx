@@ -3413,6 +3413,7 @@ export function LintConfigSection({
   const queryClient = useQueryClient();
   const [isSaving, setIsSaving] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [isRunningLint, setIsRunningLint] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -3604,7 +3605,29 @@ export function LintConfigSection({
     }
   };
 
+  const handleRunLint = async () => {
+    if (!accessToken) return;
+    setIsRunningLint(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await lintApi.triggerLint(projectId, accessToken);
+      setSuccess("Lint run started");
+      queryClient.invalidateQueries({ queryKey: ["lintSummary", projectId] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start lint run");
+    } finally {
+      setIsRunningLint(false);
+    }
+  };
+
   const isCustom = lintLevel === null;
+  // Mirror HealthCheckPanel: offer Clear only when there's something to clear,
+  // otherwise the action button re-prompts a fresh Run Lint.
+  const lastRunStatus = statusQuery.data?.last_run?.status;
+  const hasResultsToClear =
+    lastRunStatus === "completed" && (statusQuery.data?.total_issues ?? 0) > 0;
+  const isLintInProgress = lastRunStatus === "pending" || lastRunStatus === "running";
 
   return (
     <section
@@ -3834,14 +3857,25 @@ export function LintConfigSection({
               {success && (
                 <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
               )}
-              <Button
-                onClick={handleClearResults}
-                disabled={isClearing}
-                size="sm"
-                variant="outline"
-              >
-                {isClearing ? "Clearing..." : "Clear Results"}
-              </Button>
+              {hasResultsToClear ? (
+                <Button
+                  onClick={handleClearResults}
+                  disabled={isClearing}
+                  size="sm"
+                  variant="outline"
+                >
+                  {isClearing ? "Clearing..." : "Clear Results"}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleRunLint}
+                  disabled={isRunningLint || isLintInProgress}
+                  size="sm"
+                  variant="outline"
+                >
+                  {isRunningLint || isLintInProgress ? "Running..." : "Run Lint"}
+                </Button>
+              )}
               <Button
                 onClick={handleSave}
                 disabled={isSaving || !hasChanges}
