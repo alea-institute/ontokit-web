@@ -882,15 +882,15 @@ export default function ProjectSettingsPage() {
         <Header />
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-900/50 dark:bg-amber-900/20">
-              <h2 className="text-xl font-semibold text-amber-700 dark:text-amber-400">
-                Access Denied
+            <div className="rounded-lg border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
+              <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200">
+                Project not found
               </h2>
-              <p className="mt-2 text-amber-600 dark:text-amber-300">
-                Only project owners and admins can access settings.
+              <p className="mt-2 text-slate-600 dark:text-slate-400">
+                This project could not be loaded. It may have been deleted, or you may not have access.
               </p>
-              <Link href={`/projects/${projectId}`} className="mt-4 inline-block">
-                <Button variant="outline">Back to Project</Button>
+              <Link href="/projects" className="mt-4 inline-block">
+                <Button variant="outline">Back to Projects</Button>
               </Link>
             </div>
           </div>
