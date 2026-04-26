@@ -4,6 +4,7 @@ import {
   lintApi,
   createLintWebSocket,
   LintWebSocketManager,
+  type LintConfig,
 } from "@/lib/api/lint";
 
 const mockFetch = vi.fn();
@@ -251,7 +252,7 @@ describe("lintApi", () => {
 
   describe("updateLintConfig", () => {
     it("calls PUT /api/v1/projects/:id/lint/config with config body", async () => {
-      const config = { lint_level: 0, enabled_rules: ["R001"] };
+      const config: LintConfig = { lint_level: null, enabled_rules: ["R001"] };
       const response = { config };
       mockOk(response);
 
@@ -268,7 +269,7 @@ describe("lintApi", () => {
     });
 
     it("omits auth header when no token", async () => {
-      const config = { lint_level: 2, enabled_rules: [] };
+      const config: LintConfig = { lint_level: 2, enabled_rules: [] };
       mockOk({ config });
 
       await lintApi.updateLintConfig("p1", config);
@@ -281,7 +282,8 @@ describe("lintApi", () => {
       mockError(404, "Not Found", "Endpoint not available");
 
       try {
-        await lintApi.updateLintConfig("p1", { lint_level: 2, enabled_rules: [] }, "tok");
+        const config: LintConfig = { lint_level: 2, enabled_rules: [] };
+        await lintApi.updateLintConfig("p1", config, "tok");
         expect.unreachable("should have thrown");
       } catch (err) {
         expect(err).toBeInstanceOf(ApiError);

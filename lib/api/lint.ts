@@ -8,6 +8,8 @@ import { api } from "./client";
 export type LintIssueType = "error" | "warning" | "info";
 export type LintRunStatus = "pending" | "running" | "completed" | "failed";
 export type SubjectType = "class" | "property" | "individual" | "other";
+/** Numeric preset levels exposed by the backend's `/lint/levels` endpoint. */
+export type LintLevel = 1 | 2 | 3 | 4 | 5;
 
 /**
  * Known fields the backend populates inside `LintIssue.details`.
@@ -95,7 +97,7 @@ export interface LintRulesResponse {
 }
 
 export interface LintLevelInfo {
-  level: number;
+  level: LintLevel;
   name: string;
   description: string;
   rule_ids: string[];
@@ -105,14 +107,19 @@ export interface LintLevelsResponse {
   levels: LintLevelInfo[];
 }
 
+/**
+ * Lint configuration payload. `lint_level: null` discriminates "custom" mode,
+ * where `enabled_rules` is the explicit rule list to apply. When `lint_level`
+ * is set, the backend ignores `enabled_rules`.
+ */
 export interface LintConfig {
-  lint_level: number | null; // 1-5 for presets, null for custom
-  enabled_rules: string[]; // rule_id list (used when lint_level is null/custom)
+  lint_level: LintLevel | null;
+  enabled_rules: string[];
 }
 
 export interface LintConfigResponse {
   project_id: string;
-  lint_level: number | null;
+  lint_level: LintLevel | null;
   enabled_rules: string[] | null;
   effective_rules: string[];
   updated_at: string | null;
