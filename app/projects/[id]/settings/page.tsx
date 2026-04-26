@@ -3495,6 +3495,11 @@ export function LintConfigSection({
     if (configQuery.data) {
       const cfg = configQuery.data;
       const level = cfg.lint_level;
+      // For preset mode, defer until levelsQuery has resolved — otherwise
+      // levelRuleMap.get(level) returns undefined and we'd flash an
+      // all-disabled state until levels load. The effect re-runs when
+      // levelRuleMap changes.
+      if (level !== null && levelRuleMap.size === 0) return;
       setLintLevel(level);
       setSavedLevel(level);
       if (level === null) {
