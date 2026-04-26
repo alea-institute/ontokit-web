@@ -3456,9 +3456,11 @@ export function LintConfigSection({
     );
   }, [rulesQuery.data]);
 
-  // Fetch project lint config (depends on rules being loaded)
+  // Fetch project lint config (depends on rules being loaded). The access
+  // token is only used inside the queryFn; keeping it out of the queryKey
+  // means a token rotation does not invalidate the cache.
   const configQuery = useQuery({
-    queryKey: ["lintConfig", projectId, accessToken],
+    queryKey: ["lintConfig", projectId],
     queryFn: () => lintApi.getLintConfig(projectId, accessToken),
     enabled: !!accessToken && rules.length > 0,
     retry: false,
@@ -3466,17 +3468,19 @@ export function LintConfigSection({
 
   // Fetch lint status summary
   const statusQuery = useQuery<LintSummary>({
-    queryKey: ["lintSummary", projectId, accessToken],
+    queryKey: ["lintSummary", projectId],
     queryFn: () => lintApi.getStatus(projectId, accessToken),
     enabled: !!accessToken,
   });
 
-  // Sync rules query error
+  // Sync rules / levels query errors
   useEffect(() => {
     if (rulesQuery.isError) {
       setError("Failed to load lint rules");
+    } else if (levelsQuery.isError) {
+      setError("Failed to load lint levels");
     }
-  }, [rulesQuery.isError]);
+  }, [rulesQuery.isError, levelsQuery.isError]);
 
   // Stable ref for hasChanges so the sync effect can read it without re-running
   const hasChangesRef = useRef(hasChanges);
@@ -3718,6 +3722,7 @@ export function LintConfigSection({
               {isCustom && canManage && (
                 <div className="flex gap-2">
                   <button
+                    type="button"
                     onClick={() => setEnabledRules(new Set(rules.map((r) => r.rule_id)))}
                     className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
                   >
@@ -3725,6 +3730,7 @@ export function LintConfigSection({
                   </button>
                   <span className="text-xs text-slate-300 dark:text-slate-600">|</span>
                   <button
+                    type="button"
                     onClick={() => setEnabledRules(new Set())}
                     className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
                   >
