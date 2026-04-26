@@ -291,9 +291,10 @@ describe("LintConfigSection", () => {
     await user.click(screen.getByText("Save Lint Configuration"));
 
     await waitFor(() => {
+      // Preset mode must not include enabled_rules (backend's enforce_xor).
       expect(mockLintApi.updateLintConfig).toHaveBeenCalledWith(
         "p1",
-        { lint_level: 3, enabled_rules: ["R001", "R002", "R003", "R004"] },
+        { lint_level: 3 },
         "tok"
       );
       expect(screen.getByText("Lint configuration saved")).toBeDefined();

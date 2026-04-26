@@ -108,14 +108,17 @@ export interface LintLevelsResponse {
 }
 
 /**
- * Lint configuration payload. `lint_level: null` discriminates "custom" mode,
- * where `enabled_rules` is the explicit rule list to apply. When `lint_level`
- * is set, the backend ignores `enabled_rules`.
+ * Lint configuration payload. The two modes are mutually exclusive — the
+ * backend's `enforce_xor` validator rejects requests that set both fields.
+ * Modeling this as a discriminated union prevents the bad combination from
+ * compiling.
+ *
+ * - **preset**: `{ lint_level: 1..5 }` — backend computes effective_rules.
+ * - **custom**: `{ lint_level: null, enabled_rules: [...] }` — explicit rules.
  */
-export interface LintConfig {
-  lint_level: LintLevel | null;
-  enabled_rules: string[];
-}
+export type LintConfig =
+  | { lint_level: LintLevel; enabled_rules?: never }
+  | { lint_level: null; enabled_rules: string[] };
 
 export interface LintConfigResponse {
   project_id: string;

@@ -269,7 +269,7 @@ describe("lintApi", () => {
     });
 
     it("omits auth header when no token", async () => {
-      const config: LintConfig = { lint_level: 2, enabled_rules: [] };
+      const config: LintConfig = { lint_level: 2 };
       mockOk({ config });
 
       await lintApi.updateLintConfig("p1", config);
@@ -282,7 +282,7 @@ describe("lintApi", () => {
       mockError(404, "Not Found", "Endpoint not available");
 
       try {
-        const config: LintConfig = { lint_level: 2, enabled_rules: [] };
+        const config: LintConfig = { lint_level: 2 };
         await lintApi.updateLintConfig("p1", config, "tok");
         expect.unreachable("should have thrown");
       } catch (err) {

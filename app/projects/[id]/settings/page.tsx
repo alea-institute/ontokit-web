@@ -3569,10 +3569,12 @@ export function LintConfigSection({
     setError(null);
     setSuccess(null);
     try {
-      const config: LintConfig = {
-        lint_level: lintLevel,
-        enabled_rules: [...enabledRules],
-      };
+      // The backend's enforce_xor validator rejects payloads that set both
+      // lint_level AND enabled_rules — preset mode must omit enabled_rules.
+      const config: LintConfig =
+        lintLevel === null
+          ? { lint_level: null, enabled_rules: [...enabledRules] }
+          : { lint_level: lintLevel };
       await lintApi.updateLintConfig(projectId, config, accessToken);
       setSavedLevel(lintLevel);
       setSavedRules(new Set(enabledRules));
