@@ -944,7 +944,7 @@ describe("HealthCheckPanel", () => {
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Failed to load cached consistency issues"),
-        expect.any(Error)
+        expect.objectContaining({ projectId: "p1", err: expect.any(Error) })
       );
     });
     consoleSpy.mockRestore();
@@ -961,7 +961,7 @@ describe("HealthCheckPanel", () => {
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Failed to load cached duplicates"),
-        expect.any(Error)
+        expect.objectContaining({ projectId: "p1", err: expect.any(Error) })
       );
     });
     consoleSpy.mockRestore();

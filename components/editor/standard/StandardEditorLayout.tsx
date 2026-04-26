@@ -96,8 +96,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     accessToken,
     activeBranch,
     canEdit,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    canSuggest = false,
+    canSuggest: _canSuggest = false,
     isSuggestionMode = false,
     nodes,
     isTreeLoading,

@@ -439,7 +439,7 @@ export function HealthCheckPanel({
         setIsLoadingCachedConsistency(true);
         qualityApi.getConsistencyIssues(projectId, accessToken, branch)
           .then((r) => { if (!cancelled) setConsistencyIssues(r.issues); })
-          .catch((err) => { console.error(`Failed to load cached consistency issues for project ${projectId}:`, err); })
+          .catch((err) => { console.error("Failed to load cached consistency issues", { projectId, err }); })
           .finally(() => { if (!cancelled) setIsLoadingCachedConsistency(false); });
       });
     }
@@ -449,7 +449,7 @@ export function HealthCheckPanel({
         setIsLoadingCachedDuplicates(true);
         qualityApi.getLatestDuplicates(projectId, accessToken, branch)
           .then((r) => { if (!cancelled) setDuplicateClusters(r.clusters); })
-          .catch((err) => { console.error(`Failed to load cached duplicates for project ${projectId}:`, err); })
+          .catch((err) => { console.error("Failed to load cached duplicates", { projectId, err }); })
           .finally(() => { if (!cancelled) setIsLoadingCachedDuplicates(false); });
       });
     }

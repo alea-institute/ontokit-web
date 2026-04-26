@@ -9,7 +9,7 @@ function isHttpUrl(url: string): boolean {
   }
 }
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, type SyntheticEvent } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -353,7 +353,7 @@ export default function ProjectSettingsPage() {
     }
   };
 
-  const handleAddMember = async (e: React.FormEvent) => {
+  const handleAddMember = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!session?.accessToken || !project || !newMemberUserId) return;
 
