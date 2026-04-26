@@ -4,6 +4,7 @@ import {
   lintApi,
   createLintWebSocket,
   LintWebSocketManager,
+  type LintConfig,
 } from "@/lib/api/lint";
 
 const mockFetch = vi.fn();
@@ -207,7 +208,7 @@ describe("lintApi", () => {
     it("calls GET /api/v1/projects/lint/rules without auth", async () => {
       const rules = {
         rules: [
-          { rule_id: "R001", name: "Missing label", description: "Class has no label", severity: "warning" },
+          { rule_id: "R001", name: "Missing label", description: "Class has no label", severity: "warning", scope: ["class", "property", "individual"] },
         ],
       };
       mockOk(rules);
@@ -218,6 +219,112 @@ describe("lintApi", () => {
       const [url, options] = mockFetch.mock.calls[0];
       expect(url).toContain("/api/v1/projects/lint/rules");
       expect(options.method).toBe("GET");
+    });
+  });
+
+  // --- getLintConfig ---
+
+  describe("getLintConfig", () => {
+    it("calls GET /api/v1/projects/:id/lint/config with auth", async () => {
+      const config = { config: { lint_level: 2, enabled_rules: ["R001", "R002"] } };
+      mockOk(config);
+
+      const result = await lintApi.getLintConfig("p1", "tok");
+      expect(result).toEqual(config);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/lint/config");
+      expect(options.method).toBe("GET");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+    });
+
+    it("omits auth header when no token", async () => {
+      mockOk({ config: { lint_level: 2, enabled_rules: [] } });
+
+      await lintApi.getLintConfig("p1");
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers.has("Authorization")).toBe(false);
+    });
+  });
+
+  // --- updateLintConfig ---
+
+  describe("updateLintConfig", () => {
+    it("calls PUT /api/v1/projects/:id/lint/config with config body", async () => {
+      const config: LintConfig = { lint_level: null, enabled_rules: ["R001"] };
+      const response = { config };
+      mockOk(response);
+
+      const result = await lintApi.updateLintConfig("p1", config, "tok");
+      expect(result).toEqual(response);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/lint/config");
+      expect(options.method).toBe("PUT");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+
+      const body = JSON.parse(options.body);
+      expect(body).toEqual(config);
+    });
+
+    it("omits auth header when no token", async () => {
+      const config: LintConfig = { lint_level: 2 };
+      mockOk({ config });
+
+      await lintApi.updateLintConfig("p1", config);
+
+      const [, options] = mockFetch.mock.calls[0];
+      expect(options.headers.has("Authorization")).toBe(false);
+    });
+
+    it("throws ApiError on 404", async () => {
+      mockError(404, "Not Found", "Endpoint not available");
+
+      try {
+        const config: LintConfig = { lint_level: 2 };
+        await lintApi.updateLintConfig("p1", config, "tok");
+        expect.unreachable("should have thrown");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        expect((err as ApiError).status).toBe(404);
+      }
+    });
+  });
+
+  // --- getLevels ---
+
+  describe("getLevels", () => {
+    it("calls GET /api/v1/projects/lint/levels", async () => {
+      const levels = {
+        levels: [
+          { level: 1, name: "Critical", description: "Structural errors", rule_ids: ["R001"] },
+          { level: 2, name: "Consistency", description: "Orphan classes", rule_ids: ["R001", "R002"] },
+        ],
+      };
+      mockOk(levels);
+
+      const result = await lintApi.getLevels();
+      expect(result).toEqual(levels);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/lint/levels");
+      expect(options.method).toBe("GET");
+    });
+  });
+
+  // --- clearResults ---
+
+  describe("clearResults", () => {
+    it("calls DELETE /api/v1/projects/:id/lint/results with auth", async () => {
+      mockEmpty();
+
+      await lintApi.clearResults("p1", "tok");
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/lint/results");
+      expect(options.method).toBe("DELETE");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
     });
   });
 });

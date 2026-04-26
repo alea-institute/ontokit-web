@@ -9,6 +9,9 @@ vi.mock("@/lib/api/lint", () => ({
     getIssues: vi.fn(),
     triggerLint: vi.fn(),
     dismissIssue: vi.fn(),
+    clearResults: vi.fn(),
+    getLintConfig: vi.fn(),
+    getLevels: vi.fn(),
   },
   createLintWebSocket: vi.fn(() => ({ close: vi.fn() })),
 }));
@@ -67,6 +70,7 @@ const baseIssues = {
       rule_id: "R001",
       message: "Missing label",
       subject_iri: "http://example.org/Foo",
+      subject_type: "class" as const,
       details: null,
       created_at: "2025-01-01T00:00:00Z",
       resolved_at: null,
@@ -79,6 +83,7 @@ const baseIssues = {
       rule_id: "R002",
       message: "Deprecated parent",
       subject_iri: null,
+      subject_type: null,
       details: null,
       created_at: "2025-01-01T00:00:00Z",
       resolved_at: null,
@@ -111,6 +116,16 @@ describe("HealthCheckPanel", () => {
     });
     mockLintApi.getStatus.mockResolvedValue(baseSummary);
     mockLintApi.getIssues.mockResolvedValue(baseIssues);
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: null, effective_rules: ["R001", "R002", "R003"], updated_at: null,
+    });
+    mockLintApi.getLevels.mockResolvedValue({
+      levels: [
+        { level: 1, name: "Critical", description: "Structural errors", rule_ids: ["R001"] },
+        { level: 2, name: "Consistency", description: "Consistency checks", rule_ids: ["R001", "R002", "R003"] },
+        { level: 3, name: "Labels", description: "Label checks", rule_ids: ["R001", "R002", "R003", "R004"] },
+      ],
+    });
     mockQualityApi.getConsistencyIssues.mockResolvedValue({
       project_id: "p1",
       branch: "main",
@@ -161,7 +176,8 @@ describe("HealthCheckPanel", () => {
     expect(screen.getByText("R001")).toBeDefined();
   });
 
-  it("shows Run Lint button and triggers lint", async () => {
+  it("shows Run Lint button when no completed run exists", async () => {
+    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
     mockLintApi.triggerLint.mockResolvedValue({
       job_id: "j1",
       status: "pending",
@@ -176,7 +192,128 @@ describe("HealthCheckPanel", () => {
     expect(mockLintApi.triggerLint).toHaveBeenCalledWith("p1", "tok");
   });
 
+  it("shows Clear button after completed run", async () => {
+    mockLintApi.clearResults.mockResolvedValue(undefined);
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Clear")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Clear"));
+    expect(mockLintApi.clearResults).toHaveBeenCalledWith("p1", "tok");
+    // After clearing, should switch to Run Lint
+    await waitFor(() => {
+      expect(screen.getByText("Run Lint")).toBeDefined();
+    });
+  });
+
+  it("shows Run Lint (not Clear) when last run completed with zero issues", async () => {
+    // No issues = nothing to clear. Re-prompt Run Lint instead.
+    mockLintApi.getStatus.mockResolvedValue({
+      ...baseSummary,
+      error_count: 0,
+      warning_count: 0,
+      info_count: 0,
+      total_issues: 0,
+    });
+    mockLintApi.getIssues.mockResolvedValue({ items: [], total: 0, skip: 0, limit: 500 });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Run Lint")).toBeDefined();
+    });
+    expect(screen.queryByText("Clear")).toBeNull();
+  });
+
+  it("shows error when clear results fails", async () => {
+    mockLintApi.clearResults.mockRejectedValue(new Error("Clear failed"));
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Clear")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Clear"));
+    await waitFor(() => {
+      expect(screen.getByText("Clear failed")).toBeDefined();
+    });
+  });
+
+  it("keeps summary counters at zero after clearing", async () => {
+    mockLintApi.clearResults.mockResolvedValue(undefined);
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Clear")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Clear"));
+    // Each summary card pairs the count with its label inside the same button.
+    // Find each label, walk up to its button, and verify the numeric count is "0".
+    await waitFor(() => {
+      for (const label of ["Errors", "Warnings", "Info", "Total"]) {
+        const card = screen.getByText(label).closest("button")!;
+        const count = card.querySelector("p.text-lg")!;
+        expect(count.textContent).toBe("0");
+      }
+    });
+  });
+
+  it("shows all-rules config hint when no config is set", async () => {
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: null, enabled_rules: null, effective_rules: ["R001", "R002", "R003", "R004"], updated_at: null,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText(/All rules/)).toBeDefined();
+    });
+  });
+
+  it("does not show 'No issues found' when run is not completed", async () => {
+    mockLintApi.getStatus.mockResolvedValue({
+      ...baseSummary,
+      last_run: { ...baseSummary.last_run!, status: "running" as const },
+      error_count: 0, warning_count: 0, info_count: 0, total_issues: 0,
+    });
+    mockLintApi.getIssues.mockResolvedValue({ items: [], total: 0, skip: 0, limit: 500 });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Running")).toBeDefined();
+    });
+    expect(screen.queryByText("No issues found")).toBeNull();
+  });
+
+  it("shows duplicate_iris related entities with +N more for many duplicates", async () => {
+    // Multi-letter local names so the test isn't confused with single-letter
+    // entity-type badges ("C", "P", "I", "?") that share a screen.
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        {
+          ...baseIssues.items[0],
+          rule_id: "duplicate-label",
+          message: "Label shared",
+          details: {
+            duplicate_iris: [
+              "http://example.org/Alpha",
+              "http://example.org/Beta",
+              "http://example.org/Gamma",
+              "http://example.org/Delta",
+            ],
+            label: "Foo",
+            local_name: "Foo",
+            total_duplicates: 4,
+          },
+        },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    setup();
+    // First three are visible, fourth is hidden behind the "+N more" indicator.
+    await waitFor(() => {
+      expect(screen.getByText("Alpha")).toBeDefined();
+    });
+    expect(screen.getByText("Beta")).toBeDefined();
+    expect(screen.getByText("Gamma")).toBeDefined();
+    expect(screen.queryByText("Delta")).toBeNull();
+    expect(screen.getByText("+1 more")).toBeDefined();
+  });
+
   it("shows error when triggerLint fails", async () => {
+    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
     mockLintApi.triggerLint.mockRejectedValue(new Error("Nope"));
     setup();
     await waitFor(() => {
@@ -189,6 +326,7 @@ describe("HealthCheckPanel", () => {
   });
 
   it("disables Run Lint when canRunLint is false", async () => {
+    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
     setup({ canRunLint: false });
     await waitFor(() => {
       expect(screen.getByText("Run Lint")).toBeDefined();
@@ -198,6 +336,7 @@ describe("HealthCheckPanel", () => {
   });
 
   it("shows error when lint requires auth but none provided", async () => {
+    mockLintApi.getStatus.mockResolvedValue({ ...baseSummary, last_run: null });
     setup({ accessToken: undefined, canRunLint: true });
     await waitFor(() => {
       expect(screen.getByText("Run Lint")).toBeDefined();
@@ -274,7 +413,168 @@ describe("HealthCheckPanel", () => {
       expect(screen.getByText("Foo")).toBeDefined();
     });
     await userEvent.click(screen.getByText("Foo"));
-    expect(onNav).toHaveBeenCalledWith("http://example.org/Foo");
+    expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "class");
+  });
+
+  it("shows entity type badge based on subject_type", async () => {
+    mockLintApi.getStatus.mockResolvedValue({
+      ...baseSummary,
+      last_run: { ...baseSummary.last_run!, issues_found: 4 },
+    });
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        baseIssues.items[0],
+        { ...baseIssues.items[0], id: "i3", subject_iri: "http://example.org/hasFoo", subject_type: "property" as const, rule_id: "R003", message: "Domain violation" },
+        { ...baseIssues.items[0], id: "i4", subject_iri: "http://example.org/foo1", subject_type: "individual" as const, rule_id: "R004", message: "Range violation" },
+        { ...baseIssues.items[0], id: "i5", subject_iri: "http://example.org/unknown1", subject_type: "other" as const, rule_id: "R005", message: "Missing type" },
+      ],
+      total: 4, skip: 0, limit: 500,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Foo")).toBeDefined();
+    });
+    expect(screen.getByTestId("subject-type-badge-class")).toBeDefined();
+    expect(screen.getByTestId("subject-type-badge-property")).toBeDefined();
+    expect(screen.getByTestId("subject-type-badge-individual")).toBeDefined();
+    expect(screen.getByTestId("subject-type-badge-other")).toBeDefined();
+  });
+
+  it("passes subject_type when navigating to property", async () => {
+    const onNav = vi.fn();
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        { ...baseIssues.items[0], subject_iri: "http://example.org/hasFoo", subject_type: "property" as const },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("hasFoo")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("hasFoo"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/hasFoo", "property");
+  });
+
+  it("treats null subject_type as 'other' for navigation", async () => {
+    // Null subject_type means the backend couldn't classify the entity. Routing
+    // it as a class would lead to a 404 in the class tree if it's actually a
+    // property/individual. Routing as "other" lets each layout decide:
+    // Developer mode scrolls to source; Standard mode falls back to class tree
+    // (which surfaces ClassDetailPanel's helpful 404 message).
+    const onNav = vi.fn();
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        { ...baseIssues.items[0], subject_type: null },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("Foo")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("Foo"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "other");
+  });
+
+  it("shows lint configuration hint", async () => {
+    // Hint renders regardless of whether the action button is "Run Lint" or
+    // "Clear" — the default fixture (last_run completed) shows Clear.
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Level 2 — Consistency (3 rules)")).toBeDefined();
+    });
+  });
+
+  it("shows custom config hint when lint_level is null", async () => {
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: null, enabled_rules: ["R001", "R002"], effective_rules: ["R001", "R002"], updated_at: null,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Custom (2 rules)")).toBeDefined();
+    });
+  });
+
+  it("shows related entities for duplicate-label issues", async () => {
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        {
+          ...baseIssues.items[0],
+          rule_id: "duplicate-label",
+          message: "Label 'Foo' is shared with 1 other resource(s)",
+          details: {
+            duplicate_iris: ["http://example.org/Bar", "http://example.org/Baz"],
+            label: "Foo",
+            local_name: "Foo",
+            total_duplicates: 2,
+          },
+        },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    const onNav = vi.fn();
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("Also:")).toBeDefined();
+      expect(screen.getByText("Bar")).toBeDefined();
+      expect(screen.getByText("Baz")).toBeDefined();
+    });
+    // Click a related entity
+    await userEvent.click(screen.getByText("Bar"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/Bar", "class");
+  });
+
+  it("routes duplicate IRIs using the issue's own subject_type", async () => {
+    // For duplicate-label and similar rules, the related entities listed in
+    // duplicate_iris are the same kind as the issue's subject. Hardcoding
+    // "class" would route property/individual duplicates to the class tree
+    // and surface a 404.
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        {
+          ...baseIssues.items[0],
+          subject_iri: "http://example.org/hasFoo",
+          subject_type: "property" as const,
+          rule_id: "duplicate-label",
+          message: "Label 'Foo' is shared with 1 other property",
+          details: {
+            duplicate_iris: ["http://example.org/hasBar"],
+          },
+        },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    const onNav = vi.fn();
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("hasBar")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("hasBar"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/hasBar", "property");
+  });
+
+  it("shows conflicting values for label-per-language issues", async () => {
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        {
+          ...baseIssues.items[0],
+          rule_id: "label-per-language",
+          message: "Multiple different rdfs:label values for language 'no language tag'",
+          details: {
+            labels: ["Label One", "Label Two"],
+            predicate: "rdfs:label",
+            language: "no language tag",
+            local_name: "Foo",
+          },
+        },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Values:")).toBeDefined();
+    });
   });
 
   it("switches to consistency tab", async () => {
@@ -647,7 +947,7 @@ describe("HealthCheckPanel", () => {
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Failed to load cached consistency issues"),
-        expect.any(Error)
+        expect.objectContaining({ projectId: "p1", err: expect.any(Error) })
       );
     });
     consoleSpy.mockRestore();
@@ -664,7 +964,7 @@ describe("HealthCheckPanel", () => {
     await waitFor(() => {
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("Failed to load cached duplicates"),
-        expect.any(Error)
+        expect.objectContaining({ projectId: "p1", err: expect.any(Error) })
       );
     });
     consoleSpy.mockRestore();
@@ -899,7 +1199,7 @@ describe("HealthCheckPanel", () => {
       expect(screen.getByText("DupA")).toBeDefined();
     });
     await userEvent.click(screen.getByText("DupA"));
-    expect(onNav).toHaveBeenCalledWith("http://example.org/DupA");
+    expect(onNav).toHaveBeenCalledWith("http://example.org/DupA", "class");
   });
 
   it("navigates to entity from consistency issue", async () => {
@@ -928,7 +1228,7 @@ describe("HealthCheckPanel", () => {
       expect(screen.getByText("ConsEntity")).toBeDefined();
     });
     await userEvent.click(screen.getByText("ConsEntity"));
-    expect(onNav).toHaveBeenCalledWith("http://example.org/ConsEntity");
+    expect(onNav).toHaveBeenCalledWith("http://example.org/ConsEntity", "class");
   });
 
   it("handles quality WebSocket duplicates_complete message", async () => {
@@ -1775,5 +2075,28 @@ describe("HealthCheckPanel", () => {
 
     // Restore the synchronous mock for other tests
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
+  });
+
+  it("does not reopen the lint WebSocket when the issue filter changes", async () => {
+    // The fetchDataRef pattern keeps `filter` out of the WS effect's deps so
+    // changing filters re-issues HTTP for filtered issues without tearing
+    // down the WS — losing in-flight lint_started/lint_complete messages.
+    setup();
+    await waitFor(() => {
+      expect(mockCreateLintWebSocket).toHaveBeenCalledTimes(1);
+    });
+
+    const initialIssuesCalls = mockLintApi.getIssues.mock.calls.length;
+
+    await userEvent.click(screen.getByText("Errors"));
+    await waitFor(() => {
+      // Filter change should re-fetch issues
+      expect(mockLintApi.getIssues.mock.calls.length).toBeGreaterThan(initialIssuesCalls);
+    });
+    await userEvent.click(screen.getByText("Warnings"));
+    await userEvent.click(screen.getByText("Total"));
+
+    // WebSocket must NOT have been re-opened across any of the filter changes.
+    expect(mockCreateLintWebSocket).toHaveBeenCalledTimes(1);
   });
 });

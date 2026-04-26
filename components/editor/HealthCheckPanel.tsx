@@ -22,6 +22,7 @@ import {
   type LintIssueType,
   type LintSummary,
   type LintWebSocketMessage,
+  type SubjectType,
 } from "@/lib/api/lint";
 import {
   qualityApi,
@@ -29,6 +30,7 @@ import {
   type QualityWebSocketMessage,
 } from "@/lib/api/quality";
 import type { ConsistencyCheckResult, ConsistencyIssue, DuplicateCluster, DuplicateDetectionResult } from "@/lib/ontology/qualityTypes";
+import Link from "next/link";
 import { cn, formatDateTime, getLocalName } from "@/lib/utils";
 
 interface HealthCheckPanelProps {
@@ -37,7 +39,7 @@ interface HealthCheckPanelProps {
   branch?: string;
   isOpen: boolean;
   onClose: () => void;
-  onNavigateToClass?: (iri: string) => void;
+  onNavigateToClass?: (iri: string, subjectType?: string) => void;
   /** Whether the current user can trigger a lint run (requires admin/manager role) */
   canRunLint?: boolean;
 }
@@ -89,6 +91,12 @@ export function HealthCheckPanel({
   const [isLoadingCachedConsistency, setIsLoadingCachedConsistency] = useState(false);
   const [isLoadingCachedDuplicates, setIsLoadingCachedDuplicates] = useState(false);
 
+  // Lint config hint (level name + rule count)
+  const [lintConfigHint, setLintConfigHint] = useState<string | null>(null);
+
+  // Clear lint results
+  const [isClearing, setIsClearing] = useState(false);
+
   // Track whether the quality WebSocket is connected
   const qualityWsConnected = useRef(false);
   // Cancellation flag for the polling fallback loop
@@ -137,6 +145,43 @@ export function HealthCheckPanel({
     }
   }, [projectId, accessToken, isOpen, filter]);
 
+  // Stable ref for fetchData so the WebSocket effect can call it without re-running
+  const fetchDataRef = useRef(fetchData);
+  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+
+  // Fetch lint config hint (level name + rule count)
+  useEffect(() => {
+    if (!isOpen || !accessToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [config, levels] = await Promise.all([
+          lintApi.getLintConfig(projectId, accessToken),
+          lintApi.getLevels(),
+        ]);
+        if (cancelled) return;
+        if (config.lint_level != null) {
+          const level = levels.levels.find((l) => l.level === config.lint_level);
+          if (level) {
+            setLintConfigHint(`Level ${level.level} — ${level.name} (${level.rule_ids.length} rules)`);
+          } else {
+            setLintConfigHint(`Level ${config.lint_level} (${config.effective_rules.length} rules)`);
+          }
+        } else if (config.enabled_rules) {
+          setLintConfigHint(`Custom (${config.enabled_rules.length} rules)`);
+        } else {
+          // No explicit config — backend's effective_rules is the authoritative
+          // count of what the linter will actually run for this project.
+          setLintConfigHint(`All rules (${config.effective_rules.length})`);
+        }
+      } catch (err) {
+        // Hint is non-critical UI, but the failure must be observable.
+        console.error("Failed to fetch lint config hint:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, projectId, accessToken]);
+
   // Initial load
   useEffect(() => {
     if (isOpen) {
@@ -158,7 +203,7 @@ export function HealthCheckPanel({
         setIsRunning(true);
       } else if (message.type === "lint_complete" || message.type === "lint_failed") {
         setIsRunning(false);
-        fetchData();
+        fetchDataRef.current();
       }
     };
 
@@ -191,7 +236,28 @@ export function HealthCheckPanel({
         ws.close();
       }
     };
-  }, [isOpen, projectId, accessToken, fetchData]);
+  }, [isOpen, projectId, accessToken]);
+
+  const handleClearResults = async () => {
+    if (!accessToken) return;
+    setIsClearing(true);
+    try {
+      await lintApi.clearResults(projectId, accessToken);
+      setSummary((prev) => prev ? {
+        ...prev,
+        last_run: null,
+        error_count: 0,
+        warning_count: 0,
+        info_count: 0,
+        total_issues: 0,
+      } : null);
+      setIssues([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear results");
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   // Trigger a new lint run
   const handleRunLint = async () => {
@@ -374,7 +440,7 @@ export function HealthCheckPanel({
         setIsLoadingCachedConsistency(true);
         qualityApi.getConsistencyIssues(projectId, accessToken, branch)
           .then((r) => { if (!cancelled) setConsistencyIssues(r.issues); })
-          .catch((err) => { console.error(`Failed to load cached consistency issues for project ${projectId}:`, err); })
+          .catch((err) => { console.error("Failed to load cached consistency issues", { projectId, err }); })
           .finally(() => { if (!cancelled) setIsLoadingCachedConsistency(false); });
       });
     }
@@ -384,7 +450,7 @@ export function HealthCheckPanel({
         setIsLoadingCachedDuplicates(true);
         qualityApi.getLatestDuplicates(projectId, accessToken, branch)
           .then((r) => { if (!cancelled) setDuplicateClusters(r.clusters); })
-          .catch((err) => { console.error(`Failed to load cached duplicates for project ${projectId}:`, err); })
+          .catch((err) => { console.error("Failed to load cached duplicates", { projectId, err }); })
           .finally(() => { if (!cancelled) setIsLoadingCachedDuplicates(false); });
       });
     }
@@ -550,16 +616,31 @@ export function HealthCheckPanel({
           </div>
           <div className="flex items-center gap-2">
             {activeTab === "lint" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRunLint}
-                disabled={isRunning || !accessToken || !canRunLint}
-                className="gap-1"
-              >
-                <RefreshCw className={cn("h-4 w-4", isRunning && "animate-spin")} />
-                {isRunning ? "Running..." : "Run Lint"}
-              </Button>
+              // Only offer Clear when there's actually something to clear.
+              // A completed run with zero issues should re-prompt Run Lint.
+              summary?.last_run?.status === "completed" && !isRunning && summary.total_issues > 0 ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearResults}
+                  disabled={isClearing || !accessToken || !canRunLint}
+                  className="gap-1"
+                >
+                  <X className="h-4 w-4" />
+                  {isClearing ? "Clearing..." : "Clear"}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunLint}
+                  disabled={isRunning || !accessToken || !canRunLint}
+                  className="gap-1"
+                >
+                  <RefreshCw className={cn("h-4 w-4", isRunning && "animate-spin")} />
+                  {isRunning ? "Running..." : "Run Lint"}
+                </Button>
+              )
             )}
             {activeTab === "consistency" && (
               <Button
@@ -645,18 +726,33 @@ export function HealthCheckPanel({
               onClick={() => handleFilterChange("all")}
             />
           </div>
-          {summary.last_run && (
-            <div className="mt-2 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-              <Clock className="h-3 w-3" />
-              Last run: {formatDateTime(summary.last_run.started_at)}
-              {summary.last_run.status === "completed" && (
-                <CheckCircle2 className="ml-1 h-3 w-3 text-green-500" />
-              )}
-              {summary.last_run.status === "failed" && (
-                <XCircle className="ml-1 h-3 w-3 text-red-500" />
-              )}
-            </div>
-          )}
+          <div className="mt-2 space-y-0.5">
+            {summary.last_run && (
+              <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <Clock className="h-3 w-3" />
+                Last run: {formatDateTime(summary.last_run.started_at)}
+                {summary.last_run.status === "completed" && (
+                  <CheckCircle2 className="ml-1 h-3 w-3 text-green-500" />
+                )}
+                {summary.last_run.status === "failed" && (
+                  <XCircle className="ml-1 h-3 w-3 text-red-500" />
+                )}
+              </div>
+            )}
+            {lintConfigHint && (
+              <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                <Info className="h-3 w-3" />
+                {lintConfigHint}
+                <span className="mx-0.5">&mdash;</span>
+                <Link
+                  href={`/projects/${projectId}/settings#lint-config`}
+                  className="text-primary-600 hover:underline dark:text-primary-400"
+                >
+                  configure
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -674,8 +770,8 @@ export function HealthCheckPanel({
         </div>
       )}
 
-      {/* No issues */}
-      {!isLoading && summary && summary.total_issues === 0 && (
+      {/* No issues (only after a completed run) */}
+      {!isLoading && summary?.last_run?.status === "completed" && summary.total_issues === 0 && (
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
           <CheckCircle2 className="h-12 w-12 text-green-500" />
           <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -767,7 +863,7 @@ export function HealthCheckPanel({
                       </p>
                       {issue.entity_iri && (
                         <button
-                          onClick={() => onNavigateToClass?.(issue.entity_iri)}
+                          onClick={() => onNavigateToClass?.(issue.entity_iri, issue.entity_type)}
                           className="mt-1 text-xs text-primary-600 hover:underline dark:text-primary-400"
                         >
                           {getLocalName(issue.entity_iri)}
@@ -820,7 +916,7 @@ export function HealthCheckPanel({
                     {cluster.entities.map((entity) => (
                       <button
                         key={entity.iri}
-                        onClick={() => onNavigateToClass?.(entity.iri)}
+                        onClick={() => onNavigateToClass?.(entity.iri, entity.entity_type)}
                         className="flex w-full items-center gap-2 text-left text-sm text-primary-600 hover:underline dark:text-primary-400"
                       >
                         <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-owl-class/10 border border-owl-class/50">
@@ -882,11 +978,31 @@ function SummaryCard({ label, count, color, active, onClick }: SummaryCardProps)
 
 interface IssueCardProps {
   issue: LintIssue;
-  onNavigate?: (iri: string) => void;
+  onNavigate?: (iri: string, subjectType?: string) => void;
   onDismiss?: () => void;
 }
 
+const SUBJECT_TYPE_BADGE: Record<SubjectType, { letter: string; colorClass: string }> = {
+  class: { letter: "C", colorClass: "text-owl-class bg-owl-class/10 border-owl-class/50" },
+  property: { letter: "P", colorClass: "text-emerald-600 bg-emerald-100/50 border-emerald-500/50 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-400/50" },
+  individual: { letter: "I", colorClass: "text-violet-600 bg-violet-100/50 border-violet-500/50 dark:text-violet-400 dark:bg-violet-900/20 dark:border-violet-400/50" },
+  other: { letter: "?", colorClass: "text-slate-500 bg-slate-100/50 border-slate-400/50 dark:text-slate-400 dark:bg-slate-700/50 dark:border-slate-500/50" },
+};
+
+function resolveBadgeKey(subjectType: SubjectType | null): SubjectType {
+  if (subjectType === null) return "other";
+  if (subjectType in SUBJECT_TYPE_BADGE) return subjectType;
+  // Unknown SubjectType from backend (schema drift) — surface for observability.
+  console.error("Unknown lint issue subject_type:", subjectType);
+  return "other";
+}
+
 function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
+  // Resolved once so the subject button and the related-entity buttons agree
+  // on the entity type when navigating. duplicate-label and similar rules
+  // emit `duplicate_iris` for entities of the same kind as `subject_type`.
+  const subjectTypeKey = resolveBadgeKey(issue.subject_type);
+  const subjectBadge = SUBJECT_TYPE_BADGE[subjectTypeKey];
   return (
     <div
       className={cn(
@@ -907,16 +1023,51 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
           </p>
           {issue.subject_iri && (
             <button
-              onClick={() => onNavigate?.(issue.subject_iri!)}
+              onClick={() => onNavigate?.(issue.subject_iri!, subjectTypeKey)}
               className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
               title={issue.subject_iri}
             >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-owl-class/10 border border-owl-class/50">
-                <span className="text-[8px] font-bold text-owl-class">C</span>
+              <span
+                aria-label={`subject type: ${subjectTypeKey}`}
+                data-testid={`subject-type-badge-${subjectTypeKey}`}
+                className={cn("flex h-4 w-4 items-center justify-center rounded-full border", subjectBadge.colorClass)}
+              >
+                <span className="text-[8px] font-bold">{subjectBadge.letter}</span>
               </span>
               {getLocalName(issue.subject_iri)}
               <ExternalLink className="h-3 w-3 opacity-50" />
             </button>
+          )}
+          {/* Related entities from issue details */}
+          {issue.details?.duplicate_iris && issue.details.duplicate_iris.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+              <span>Also:</span>
+              {issue.details.duplicate_iris.slice(0, 3).map((iri) => (
+                <button
+                  key={iri}
+                  onClick={() => onNavigate?.(iri, subjectTypeKey)}
+                  className="text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
+                  title={iri}
+                >
+                  {getLocalName(iri)}
+                </button>
+              ))}
+              {issue.details.duplicate_iris.length > 3 && (
+                <span>+{issue.details.duplicate_iris.length - 3} more</span>
+              )}
+            </div>
+          )}
+          {/* Conflicting values from label-per-language */}
+          {issue.details?.labels && issue.details.labels.length > 1 && (
+            <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <span>Values: </span>
+              {issue.details.labels.map((label, i) => (
+                <span key={i}>
+                  {i > 0 && ", "}
+                  <span className="font-mono text-slate-600 dark:text-slate-300">&ldquo;{label}&rdquo;</span>
+                </span>
+              ))}
+            </div>
           )}
         </div>
         {onDismiss && (

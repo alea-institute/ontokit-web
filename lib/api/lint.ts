@@ -7,6 +7,25 @@ import { api } from "./client";
 // Types
 export type LintIssueType = "error" | "warning" | "info";
 export type LintRunStatus = "pending" | "running" | "completed" | "failed";
+export type SubjectType = "class" | "property" | "individual" | "other";
+/** Numeric preset levels exposed by the backend's `/lint/levels` endpoint. */
+export type LintLevel = 1 | 2 | 3 | 4 | 5;
+
+/**
+ * Known fields the backend populates inside `LintIssue.details`.
+ *
+ * Add fields here when introducing a new lint rule that emits structured
+ * payload data. The index signature keeps the type forward-compatible with
+ * unknown rules, but consumers should validate at runtime before reading
+ * unknown keys.
+ */
+export interface LintIssueDetails {
+  /** Other entity IRIs that share the offending property (duplicate-label, etc.) */
+  duplicate_iris?: string[];
+  /** Conflicting label values (label-per-language) */
+  labels?: string[];
+  [key: string]: unknown;
+}
 
 export interface LintIssue {
   id: string;
@@ -16,7 +35,8 @@ export interface LintIssue {
   rule_id: string;
   message: string;
   subject_iri: string | null;
-  details: Record<string, unknown> | null;
+  subject_type: SubjectType | null;
+  details: LintIssueDetails | null;
   created_at: string;
   resolved_at: string | null;
 }
@@ -69,10 +89,43 @@ export interface LintRuleInfo {
   name: string;
   description: string;
   severity: LintIssueType;
+  scope: string[];
 }
 
 export interface LintRulesResponse {
   rules: LintRuleInfo[];
+}
+
+export interface LintLevelInfo {
+  level: LintLevel;
+  name: string;
+  description: string;
+  rule_ids: string[];
+}
+
+export interface LintLevelsResponse {
+  levels: LintLevelInfo[];
+}
+
+/**
+ * Lint configuration payload. The two modes are mutually exclusive — the
+ * backend's `enforce_xor` validator rejects requests that set both fields.
+ * Modeling this as a discriminated union prevents the bad combination from
+ * compiling.
+ *
+ * - **preset**: `{ lint_level: 1..5 }` — backend computes effective_rules.
+ * - **custom**: `{ lint_level: null, enabled_rules: [...] }` — explicit rules.
+ */
+export type LintConfig =
+  | { lint_level: LintLevel; enabled_rules?: never }
+  | { lint_level: null; enabled_rules: string[] };
+
+export interface LintConfigResponse {
+  project_id: string;
+  lint_level: LintLevel | null;
+  enabled_rules: string[] | null;
+  effective_rules: string[];
+  updated_at: string | null;
 }
 
 // WebSocket message types
@@ -165,6 +218,39 @@ export const lintApi = {
    * Get the list of available lint rules
    */
   getRules: () => api.get<LintRulesResponse>("/api/v1/projects/lint/rules"),
+
+  /**
+   * Get lint level definitions (which rules are in each level)
+   */
+  getLevels: () => api.get<LintLevelsResponse>("/api/v1/projects/lint/levels"),
+
+  /**
+   * Get lint configuration for a project
+   */
+  getLintConfig: (projectId: string, token?: string) =>
+    api.get<LintConfigResponse>(`/api/v1/projects/${projectId}/lint/config`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    }),
+
+  /**
+   * Update lint configuration for a project
+   */
+  updateLintConfig: (projectId: string, config: LintConfig, token?: string) =>
+    api.put<LintConfigResponse>(
+      `/api/v1/projects/${projectId}/lint/config`,
+      config,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      }
+    ),
+
+  /**
+   * Clear all lint results (runs and issues) for a project
+   */
+  clearResults: (projectId: string, token: string) =>
+    api.delete(`/api/v1/projects/${projectId}/lint/results`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
 };
 
 /**

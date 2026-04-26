@@ -113,6 +113,9 @@ export interface DeveloperEditorLayoutProps {
   onReparentClass?: (classIri: string, oldParentIris: string[], newParentIris: string[], mode: DragMode) => Promise<void>;
   reparentOptimistic?: (iri: string, oldParentIri: string | null, newParentIri: string | null) => { previousNodes: ClassTreeNode[] };
   rollbackReparent?: (snapshot: { previousNodes: ClassTreeNode[] }) => void;
+
+  /** Ref populated with a function to navigate to any entity type */
+  entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
 }
 
 export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
@@ -251,6 +254,36 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   // Track selected entity per tab (properties/individuals have their own selection)
   const [selectedPropertyIri, setSelectedPropertyIri] = useState<string | null>(null);
   const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
+
+  // Expose entity navigation to parent via ref
+  const { entityNavigationRef, navigateToNode: navToNode, setPendingScrollIri: setScrollIri } = props;
+  useEffect(() => {
+    if (!entityNavigationRef) return;
+
+    const handler = (iri: string, type?: string) => {
+      if (type === "property") {
+        setActiveTab("properties");
+        setSelectedPropertyIri(iri);
+      } else if (type === "individual") {
+        setActiveTab("individuals");
+        setSelectedIndividualIri(iri);
+      } else if (type === "other") {
+        // Untyped entities: switch to source view and scroll to IRI
+        setViewMode("source");
+        setScrollIri(iri);
+      } else {
+        setActiveTab("classes");
+        navToNode(iri);
+      }
+    };
+
+    entityNavigationRef.current = handler;
+    return () => {
+      if (entityNavigationRef.current === handler) {
+        entityNavigationRef.current = null;
+      }
+    };
+  }, [entityNavigationRef, navToNode, setScrollIri]);
 
   // Shared search state
   const {
