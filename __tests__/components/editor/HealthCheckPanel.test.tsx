@@ -436,7 +436,12 @@ describe("HealthCheckPanel", () => {
     expect(onNav).toHaveBeenCalledWith("http://example.org/hasFoo", "property");
   });
 
-  it("defaults to class when subject_type is null", async () => {
+  it("treats null subject_type as 'other' for navigation", async () => {
+    // Null subject_type means the backend couldn't classify the entity. Routing
+    // it as a class would lead to a 404 in the class tree if it's actually a
+    // property/individual. Routing as "other" lets each layout decide:
+    // Developer mode scrolls to source; Standard mode falls back to class tree
+    // (which surfaces ClassDetailPanel's helpful 404 message).
     const onNav = vi.fn();
     mockLintApi.getIssues.mockResolvedValue({
       items: [
@@ -449,7 +454,7 @@ describe("HealthCheckPanel", () => {
       expect(screen.getByText("Foo")).toBeDefined();
     });
     await userEvent.click(screen.getByText("Foo"));
-    expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "class");
+    expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "other");
   });
 
   it("shows lint configuration hint near Run Lint button", async () => {

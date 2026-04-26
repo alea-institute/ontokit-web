@@ -9,6 +9,22 @@ export type LintIssueType = "error" | "warning" | "info";
 export type LintRunStatus = "pending" | "running" | "completed" | "failed";
 export type SubjectType = "class" | "property" | "individual" | "other";
 
+/**
+ * Known fields the backend populates inside `LintIssue.details`.
+ *
+ * Add fields here when introducing a new lint rule that emits structured
+ * payload data. The index signature keeps the type forward-compatible with
+ * unknown rules, but consumers should validate at runtime before reading
+ * unknown keys.
+ */
+export interface LintIssueDetails {
+  /** Other entity IRIs that share the offending property (duplicate-label, etc.) */
+  duplicate_iris?: string[];
+  /** Conflicting label values (label-per-language) */
+  labels?: string[];
+  [key: string]: unknown;
+}
+
 export interface LintIssue {
   id: string;
   run_id: string;
@@ -18,7 +34,7 @@ export interface LintIssue {
   message: string;
   subject_iri: string | null;
   subject_type: SubjectType | null;
-  details: Record<string, unknown> | null;
+  details: LintIssueDetails | null;
   created_at: string;
   resolved_at: string | null;
 }

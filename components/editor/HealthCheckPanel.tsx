@@ -22,6 +22,7 @@ import {
   type LintIssueType,
   type LintSummary,
   type LintWebSocketMessage,
+  type SubjectType,
 } from "@/lib/api/lint";
 import {
   qualityApi,
@@ -169,8 +170,9 @@ export function HealthCheckPanel({
           const allRulesCount = levels.levels.at(-1)?.rule_ids.length ?? 0;
           setLintConfigHint(`All rules (${allRulesCount})`);
         }
-      } catch {
-        // Silently ignore — hint is non-critical
+      } catch (err) {
+        // Hint is non-critical UI, but the failure must be observable.
+        console.error("Failed to fetch lint config hint:", err);
       }
     })();
     return () => { cancelled = true; };
@@ -976,12 +978,20 @@ interface IssueCardProps {
   onDismiss?: () => void;
 }
 
-const SUBJECT_TYPE_BADGE: Record<string, { letter: string; colorClass: string }> = {
+const SUBJECT_TYPE_BADGE: Record<SubjectType, { letter: string; colorClass: string }> = {
   class: { letter: "C", colorClass: "text-owl-class bg-owl-class/10 border-owl-class/50" },
   property: { letter: "P", colorClass: "text-emerald-600 bg-emerald-100/50 border-emerald-500/50 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-400/50" },
   individual: { letter: "I", colorClass: "text-violet-600 bg-violet-100/50 border-violet-500/50 dark:text-violet-400 dark:bg-violet-900/20 dark:border-violet-400/50" },
   other: { letter: "?", colorClass: "text-slate-500 bg-slate-100/50 border-slate-400/50 dark:text-slate-400 dark:bg-slate-700/50 dark:border-slate-500/50" },
 };
+
+function resolveBadgeKey(subjectType: SubjectType | null): SubjectType {
+  if (subjectType === null) return "other";
+  if (subjectType in SUBJECT_TYPE_BADGE) return subjectType;
+  // Unknown SubjectType from backend (schema drift) — surface for observability.
+  console.error("Unknown lint issue subject_type:", subjectType);
+  return "other";
+}
 
 function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
   return (
@@ -1003,11 +1013,11 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
             {issue.message}
           </p>
           {issue.subject_iri && (() => {
-            const key = issue.subject_type ?? "class";
-            const badge = SUBJECT_TYPE_BADGE[key] ?? SUBJECT_TYPE_BADGE["other"];
+            const key = resolveBadgeKey(issue.subject_type);
+            const badge = SUBJECT_TYPE_BADGE[key];
             return (
               <button
-                onClick={() => onNavigate?.(issue.subject_iri!, issue.subject_type ?? "class")}
+                onClick={() => onNavigate?.(issue.subject_iri!, key)}
                 className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
                 title={issue.subject_iri}
               >
@@ -1020,10 +1030,10 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
             );
           })()}
           {/* Related entities from issue details */}
-          {issue.details && Array.isArray(issue.details.duplicate_iris) && (issue.details.duplicate_iris as string[]).length > 0 && (
+          {issue.details?.duplicate_iris && issue.details.duplicate_iris.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
               <span>Also:</span>
-              {(issue.details.duplicate_iris as string[]).slice(0, 3).map((iri) => (
+              {issue.details.duplicate_iris.slice(0, 3).map((iri) => (
                 <button
                   key={iri}
                   onClick={() => onNavigate?.(iri, "class")}
@@ -1033,16 +1043,16 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
                   {getLocalName(iri)}
                 </button>
               ))}
-              {(issue.details.duplicate_iris as string[]).length > 3 && (
-                <span>+{(issue.details.duplicate_iris as string[]).length - 3} more</span>
+              {issue.details.duplicate_iris.length > 3 && (
+                <span>+{issue.details.duplicate_iris.length - 3} more</span>
               )}
             </div>
           )}
           {/* Conflicting values from label-per-language */}
-          {issue.details && Array.isArray(issue.details.labels) && (issue.details.labels as string[]).length > 1 && (
+          {issue.details?.labels && issue.details.labels.length > 1 && (
             <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
               <span>Values: </span>
-              {(issue.details.labels as string[]).map((label, i) => (
+              {issue.details.labels.map((label, i) => (
                 <span key={i}>
                   {i > 0 && ", "}
                   <span className="font-mono text-slate-600 dark:text-slate-300">&ldquo;{label}&rdquo;</span>

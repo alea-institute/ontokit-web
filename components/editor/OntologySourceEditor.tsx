@@ -573,10 +573,10 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                       </span>
                     )}
                   </div>
-                  {issue.details && Array.isArray(issue.details.duplicate_iris) && (issue.details.duplicate_iris as string[]).length > 0 && (
+                  {issue.details?.duplicate_iris && issue.details.duplicate_iris.length > 0 && (
                     <div className="mt-0.5 flex flex-wrap items-center gap-x-1 text-xs text-slate-400 dark:text-slate-500">
                       <span>Also:</span>
-                      {(issue.details.duplicate_iris as string[]).slice(0, 3).map((iri: string) => {
+                      {issue.details.duplicate_iris.slice(0, 3).map((iri) => {
                         const pos = iriIndex.get(iri);
                         return pos ? (
                           <button
@@ -592,8 +592,8 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                           <span key={iri} title={iri}>{getLocalName(iri)}</span>
                         );
                       })}
-                      {(issue.details.duplicate_iris as string[]).length > 3 && (
-                        <span>+{(issue.details.duplicate_iris as string[]).length - 3} more</span>
+                      {issue.details.duplicate_iris.length > 3 && (
+                        <span>+{issue.details.duplicate_iris.length - 3} more</span>
                       )}
                     </div>
                   )}
