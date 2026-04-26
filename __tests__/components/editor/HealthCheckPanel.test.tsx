@@ -2025,4 +2025,27 @@ describe("HealthCheckPanel", () => {
     // Restore the synchronous mock for other tests
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => { cb(0); return 0; });
   });
+
+  it("does not reopen the lint WebSocket when the issue filter changes", async () => {
+    // The fetchDataRef pattern keeps `filter` out of the WS effect's deps so
+    // changing filters re-issues HTTP for filtered issues without tearing
+    // down the WS — losing in-flight lint_started/lint_complete messages.
+    setup();
+    await waitFor(() => {
+      expect(mockCreateLintWebSocket).toHaveBeenCalledTimes(1);
+    });
+
+    const initialIssuesCalls = mockLintApi.getIssues.mock.calls.length;
+
+    await userEvent.click(screen.getByText("Errors"));
+    await waitFor(() => {
+      // Filter change should re-fetch issues
+      expect(mockLintApi.getIssues.mock.calls.length).toBeGreaterThan(initialIssuesCalls);
+    });
+    await userEvent.click(screen.getByText("Warnings"));
+    await userEvent.click(screen.getByText("Total"));
+
+    // WebSocket must NOT have been re-opened across any of the filter changes.
+    expect(mockCreateLintWebSocket).toHaveBeenCalledTimes(1);
+  });
 });

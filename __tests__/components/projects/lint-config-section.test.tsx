@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderWithQueryClient } from "@/__tests__/helpers/renderWithProviders";
 
 // ---- matchMedia polyfill (must be before any import that touches the store) ----
@@ -279,6 +280,86 @@ describe("LintConfigSection", () => {
       );
       expect(screen.getByText("Lint configuration saved")).toBeDefined();
     });
+  });
+
+  it("saves with lint_level: null when switching from preset to Custom", async () => {
+    // Round-trip the wire format for custom mode: starting from a preset
+    // (Level 2 → R001/R002/R003), switching to Custom and saving must send
+    // `lint_level: null` with the explicit rule list. Without this, the
+    // backend would interpret the request as a preset and ignore enabled_rules.
+    const user = userEvent.setup();
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: ["R001", "R002", "R003"], updated_at: null,
+    });
+    mockLintApi.updateLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: null, enabled_rules: ["R001", "R002", "R003"], effective_rules: ["R001", "R002", "R003"], updated_at: null,
+    });
+
+    renderWithQueryClient(<LintConfigSection projectId="p1" accessToken="tok" canManage={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Custom")).toBeDefined();
+    });
+
+    await user.click(screen.getByText("Custom"));
+    await user.click(screen.getByText("Save Lint Configuration"));
+
+    await waitFor(() => {
+      expect(mockLintApi.updateLintConfig).toHaveBeenCalledWith(
+        "p1",
+        expect.objectContaining({ lint_level: null }),
+        "tok"
+      );
+    });
+    // The rule list carried over from the preset should be persisted.
+    const [, payload] = mockLintApi.updateLintConfig.mock.calls[0];
+    expect(new Set((payload as { enabled_rules: string[] }).enabled_rules)).toEqual(
+      new Set(["R001", "R002", "R003"])
+    );
+  });
+
+  it("does not overwrite in-progress edits when the config refetches", async () => {
+    // The hasChangesRef short-circuit in the config-sync effect prevents a
+    // background refetch (e.g. on window focus) from clobbering whatever the
+    // user is in the middle of editing. Without it, switching to Level 3 and
+    // then triggering a refetch would silently revert the level to 2.
+    const user = userEvent.setup();
+    mockLintApi.getRules.mockResolvedValue({ rules: sampleRules });
+    mockLintApi.getLintConfig.mockResolvedValue({
+      project_id: "p1", lint_level: 2, enabled_rules: [], effective_rules: ["R001", "R002", "R003"], updated_at: null,
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <LintConfigSection projectId="p1" accessToken="tok" canManage={true} />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Level 3 — Labels/)).toBeDefined();
+    });
+
+    // Make a dirty edit.
+    await user.click(screen.getByText(/Level 3 — Labels/));
+    await waitFor(() => {
+      const lvl3Btn = screen.getByText(/Level 3 — Labels/).closest("button")!;
+      expect(lvl3Btn.getAttribute("aria-pressed")).toBe("true");
+    });
+
+    // Simulate a background refetch that returns the original Level 2 payload.
+    await queryClient.invalidateQueries({ queryKey: ["lintConfig"] });
+
+    // The dirty edit must survive the refetch.
+    await waitFor(() => {
+      const lvl3Btn = screen.getByText(/Level 3 — Labels/).closest("button")!;
+      expect(lvl3Btn.getAttribute("aria-pressed")).toBe("true");
+    });
+    const lvl2Btn = screen.getByText(/Level 2 — Consistency/).closest("button")!;
+    expect(lvl2Btn.getAttribute("aria-pressed")).toBe("false");
   });
 
   it("shows read-only message when canManage is false", async () => {
