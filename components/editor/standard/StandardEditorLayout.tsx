@@ -221,27 +221,32 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
 
   // Expose entity navigation to parent via ref
+  const { entityNavigationRef, navigateToNode: navToNode } = props;
   useEffect(() => {
-    if (props.entityNavigationRef) {
-      props.entityNavigationRef.current = (iri: string, type?: string) => {
-        if (type === "property") {
-          setActiveTab("properties");
-          setSelectedPropertyIri(iri);
-        } else if (type === "individual") {
-          setActiveTab("individuals");
-          setSelectedIndividualIri(iri);
-        } else {
-          // For "other" (untyped) entities, navigate to class tree which
-          // triggers ClassDetailPanel's 404 handler with a helpful message
-          setActiveTab("classes");
-          props.navigateToNode(iri);
-        }
-      };
-    }
-    return () => {
-      if (props.entityNavigationRef) props.entityNavigationRef.current = null;
+    if (!entityNavigationRef) return;
+
+    const handler = (iri: string, type?: string) => {
+      if (type === "property") {
+        setActiveTab("properties");
+        setSelectedPropertyIri(iri);
+      } else if (type === "individual") {
+        setActiveTab("individuals");
+        setSelectedIndividualIri(iri);
+      } else {
+        // For "other" (untyped) entities, navigate to class tree which
+        // triggers ClassDetailPanel's 404 handler with a helpful message
+        setActiveTab("classes");
+        navToNode(iri);
+      }
     };
-  }, [props.entityNavigationRef, props.navigateToNode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    entityNavigationRef.current = handler;
+    return () => {
+      if (entityNavigationRef.current === handler) {
+        entityNavigationRef.current = null;
+      }
+    };
+  }, [entityNavigationRef, navToNode]);
 
   // Shared search state
   const {
