@@ -167,8 +167,9 @@ export function HealthCheckPanel({
         } else if (config.enabled_rules) {
           setLintConfigHint(`Custom (${config.enabled_rules.length} rules)`);
         } else {
-          const allRulesCount = levels.levels.at(-1)?.rule_ids.length ?? 0;
-          setLintConfigHint(`All rules (${allRulesCount})`);
+          // No explicit config — backend's effective_rules is the authoritative
+          // count of what the linter will actually run for this project.
+          setLintConfigHint(`All rules (${config.effective_rules.length})`);
         }
       } catch (err) {
         // Hint is non-critical UI, but the failure must be observable.
@@ -994,6 +995,11 @@ function resolveBadgeKey(subjectType: SubjectType | null): SubjectType {
 }
 
 function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
+  // Resolved once so the subject button and the related-entity buttons agree
+  // on the entity type when navigating. duplicate-label and similar rules
+  // emit `duplicate_iris` for entities of the same kind as `subject_type`.
+  const subjectTypeKey = resolveBadgeKey(issue.subject_type);
+  const subjectBadge = SUBJECT_TYPE_BADGE[subjectTypeKey];
   return (
     <div
       className={cn(
@@ -1012,23 +1018,19 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
           <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
             {issue.message}
           </p>
-          {issue.subject_iri && (() => {
-            const key = resolveBadgeKey(issue.subject_type);
-            const badge = SUBJECT_TYPE_BADGE[key];
-            return (
-              <button
-                onClick={() => onNavigate?.(issue.subject_iri!, key)}
-                className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
-                title={issue.subject_iri}
-              >
-                <span className={cn("flex h-4 w-4 items-center justify-center rounded-full border", badge.colorClass)}>
-                  <span className="text-[8px] font-bold">{badge.letter}</span>
-                </span>
-                {getLocalName(issue.subject_iri)}
-                <ExternalLink className="h-3 w-3 opacity-50" />
-              </button>
-            );
-          })()}
+          {issue.subject_iri && (
+            <button
+              onClick={() => onNavigate?.(issue.subject_iri!, subjectTypeKey)}
+              className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
+              title={issue.subject_iri}
+            >
+              <span className={cn("flex h-4 w-4 items-center justify-center rounded-full border", subjectBadge.colorClass)}>
+                <span className="text-[8px] font-bold">{subjectBadge.letter}</span>
+              </span>
+              {getLocalName(issue.subject_iri)}
+              <ExternalLink className="h-3 w-3 opacity-50" />
+            </button>
+          )}
           {/* Related entities from issue details */}
           {issue.details?.duplicate_iris && issue.details.duplicate_iris.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
@@ -1036,7 +1038,7 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
               {issue.details.duplicate_iris.slice(0, 3).map((iri) => (
                 <button
                   key={iri}
-                  onClick={() => onNavigate?.(iri, "class")}
+                  onClick={() => onNavigate?.(iri, subjectTypeKey)}
                   className="text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
                   title={iri}
                 >

@@ -457,7 +457,9 @@ describe("HealthCheckPanel", () => {
     expect(onNav).toHaveBeenCalledWith("http://example.org/Foo", "other");
   });
 
-  it("shows lint configuration hint near Run Lint button", async () => {
+  it("shows lint configuration hint", async () => {
+    // Hint renders regardless of whether the action button is "Run Lint" or
+    // "Clear" — the default fixture (last_run completed) shows Clear.
     setup();
     await waitFor(() => {
       expect(screen.getByText("Level 2 — Consistency (3 rules)")).toBeDefined();
@@ -501,6 +503,35 @@ describe("HealthCheckPanel", () => {
     // Click a related entity
     await userEvent.click(screen.getByText("Bar"));
     expect(onNav).toHaveBeenCalledWith("http://example.org/Bar", "class");
+  });
+
+  it("routes duplicate IRIs using the issue's own subject_type", async () => {
+    // For duplicate-label and similar rules, the related entities listed in
+    // duplicate_iris are the same kind as the issue's subject. Hardcoding
+    // "class" would route property/individual duplicates to the class tree
+    // and surface a 404.
+    mockLintApi.getIssues.mockResolvedValue({
+      items: [
+        {
+          ...baseIssues.items[0],
+          subject_iri: "http://example.org/hasFoo",
+          subject_type: "property" as const,
+          rule_id: "duplicate-label",
+          message: "Label 'Foo' is shared with 1 other property",
+          details: {
+            duplicate_iris: ["http://example.org/hasBar"],
+          },
+        },
+      ],
+      total: 1, skip: 0, limit: 500,
+    });
+    const onNav = vi.fn();
+    setup({ onNavigateToClass: onNav });
+    await waitFor(() => {
+      expect(screen.getByText("hasBar")).toBeDefined();
+    });
+    await userEvent.click(screen.getByText("hasBar"));
+    expect(onNav).toHaveBeenCalledWith("http://example.org/hasBar", "property");
   });
 
   it("shows conflicting values for label-per-language issues", async () => {
