@@ -206,6 +206,23 @@ describe("HealthCheckPanel", () => {
     });
   });
 
+  it("shows Run Lint (not Clear) when last run completed with zero issues", async () => {
+    // No issues = nothing to clear. Re-prompt Run Lint instead.
+    mockLintApi.getStatus.mockResolvedValue({
+      ...baseSummary,
+      error_count: 0,
+      warning_count: 0,
+      info_count: 0,
+      total_issues: 0,
+    });
+    mockLintApi.getIssues.mockResolvedValue({ items: [], total: 0, skip: 0, limit: 500 });
+    setup();
+    await waitFor(() => {
+      expect(screen.getByText("Run Lint")).toBeDefined();
+    });
+    expect(screen.queryByText("Clear")).toBeNull();
+  });
+
   it("shows error when clear results fails", async () => {
     mockLintApi.clearResults.mockRejectedValue(new Error("Clear failed"));
     setup();

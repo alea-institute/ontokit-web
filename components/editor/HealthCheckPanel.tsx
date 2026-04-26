@@ -615,7 +615,9 @@ export function HealthCheckPanel({
           </div>
           <div className="flex items-center gap-2">
             {activeTab === "lint" && (
-              summary?.last_run?.status === "completed" && !isRunning ? (
+              // Only offer Clear when there's actually something to clear.
+              // A completed run with zero issues should re-prompt Run Lint.
+              summary?.last_run?.status === "completed" && !isRunning && summary.total_issues > 0 ? (
                 <Button
                   variant="outline"
                   size="sm"
