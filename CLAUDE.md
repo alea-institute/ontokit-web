@@ -14,6 +14,42 @@ npm run test         # Run tests with Vitest
 npm run test:coverage # Run tests with coverage
 ```
 
+### Local Semgrep scan
+
+CI runs `semgrep ci` (diff-aware against the PR baseline). For local one-shot
+scans you have two options depending on whether you've signed up for Semgrep
+Pro:
+
+**With Pro entitlement** — runs the same engine as CI, including taint analysis
+and the curated Pro rule pack. Requires `pipx install semgrep` and a one-time
+`semgrep login`.
+
+```bash
+semgrep --pro \
+  --config p/default \
+  --config p/owasp-top-ten \
+  --config p/javascript \
+  --config p/typescript \
+  --config p/react \
+  --config p/nextjs \
+  --config p/jwt
+```
+
+**Without Pro (community fallback)** — drop `--pro`. You get the same rule
+packs but only the OSS engine; some advanced cross-file taint findings won't
+surface. Useful for forks and external contributors.
+
+```bash
+semgrep \
+  --config p/default \
+  --config p/owasp-top-ten \
+  --config p/javascript \
+  --config p/typescript \
+  --config p/react \
+  --config p/nextjs \
+  --config p/jwt
+```
+
 ## Development Server Management Script
 
 Use the `ontokit-web.sh` script to manage the development server:

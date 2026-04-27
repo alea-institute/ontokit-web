@@ -1,0 +1,27 @@
+# Build outputs and dependency caches
+node_modules/
+.next/
+coverage/
+.turbo/
+out/
+build/
+dist/
+
+# Tests carry intentional anti-patterns (insecure WebSocket URL fixtures,
+# fake credentials, regex-by-construction examples) that produce false
+# positives if scanned the same way as production code.
+__tests__/
+
+# Documentation may quote unsafe code samples for explanatory purposes
+docs/
+README.md
+.planning/
+
+# Static assets are not executable code
+public/
+
+# Build/tool config (next.config, vitest.config, eslint.config, etc.)
+# These have framework-prescribed shapes and would only produce noise.
+*.config.js
+*.config.ts
+*.config.mjs
