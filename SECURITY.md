@@ -37,12 +37,22 @@ expanded.
 
 ## Security Tooling
 
-Both `ontokit-web` and `ontokit-api` are scanned on every PR and on every push
-to `main` / `dev` by **[Semgrep](https://semgrep.dev)** (Pro engine, server-
-side AppSec policy). The scan workflow lives at
+Both `ontokit-web` and `ontokit-api` are scanned on PRs targeting `dev` and on
+every push to `main` / `dev` by **[Semgrep](https://semgrep.dev)** (Pro
+engine, server-side AppSec policy). The scan workflow lives at
 `.github/workflows/semgrep.yml` and covers ~98,000 rules per scan.
 
 ### Enforcement modes
+
+The mode semantics described below (**Block / Comment / Monitor**) are
+applied by the Semgrep AppSec Platform when the workflow runs with
+`SEMGREP_APP_TOKEN` set — i.e., the primary CI path. When the token isn't
+available (typical for forks or contributors outside the org), `semgrep ci`
+falls back to the explicit `--config p/...` rulesets in the workflow file.
+In that fallback path, ERROR-severity findings still fail CI (so Block-mode
+rules effectively still block), but Comment-mode rules don't post inline PR
+comments — there's no semgrep-app[bot] integration without the token — and
+Monitor-mode collapses into the same CI-log surface as Comment-mode.
 
 The org-wide policy at
 <https://semgrep.dev/orgs/priest-johnromanodorazio-com/policies> applies the
@@ -72,7 +82,10 @@ them.
 - **Inline PR comments** from `semgrep-app[bot]` for Comment-mode findings
   (only when the GitHub App is installed on the org — see
   <https://github.com/apps/semgrep>). These are advisory and don't block
-  merge.
+  merge. **Forks and contributors without org access** won't see these
+  inline comments because the GitHub App can't post on their behalf —
+  findings still appear in the CI job log and the Block-mode CI gate still
+  applies, just without the inline-comment notification.
 - A link from the check's "Details" page to the matching dashboard view at
   semgrep.dev for triage history.
 
@@ -117,7 +130,7 @@ The following are **not** considered security vulnerabilities:
 
 ## Disclosure Coordination
 
-Once a fix is shipped, we'll publish a GitHub Security Advisory (with the
+Once a fix is available for release, we'll publish a GitHub Security Advisory (with the
 reporter credited unless they request anonymity) and request a CVE if the
 issue warrants one. Please don't disclose details publicly — including via
 social media, blog posts, or conference talks — until the advisory is
