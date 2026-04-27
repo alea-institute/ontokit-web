@@ -21,17 +21,24 @@ jobs:
     if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v6
-      - run: >-
-          semgrep ci
-          --config p/default
-          --config p/owasp-top-ten
-          --config p/javascript
-          --config p/typescript
-          --config p/react
-          --config p/nextjs
-          --config p/jwt
+      # `semgrep ci` is incompatible with explicit --config flags when logged in
+      # (SEMGREP_APP_TOKEN set) — it expects rules from the server-side AppSec
+      # policy. When not logged in, fall back to the explicit local rulesets so
+      # the workflow still runs out-of-the-box without any secrets configured.
+      # `--no-suppress-errors` makes silent misconfiguration fail loudly.
+      - name: Run Semgrep
         env:
-          # Optional: when set, findings are also reported to the Semgrep
-          # AppSec dashboard. Without it, the scan still runs locally and
-          # fails CI on ERROR-severity findings.
           SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          if [ -n "$SEMGREP_APP_TOKEN" ]; then
+            semgrep ci --no-suppress-errors
+          else
+            semgrep ci --no-suppress-errors \
+              --config p/default \
+              --config p/owasp-top-ten \
+              --config p/javascript \
+              --config p/typescript \
+              --config p/react \
+              --config p/nextjs \
+              --config p/jwt
+          fi
