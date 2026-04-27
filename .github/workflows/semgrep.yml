@@ -1,0 +1,37 @@
+name: Semgrep
+
+on:
+  pull_request:
+  push:
+    branches: [main, dev]
+  schedule:
+    # Weekly scan picks up new rules added to published rulesets between PRs.
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    # Skip on Dependabot PRs — package bumps shouldn't trigger a security scan
+    # of the whole codebase, and Dependabot can't read repository secrets anyway.
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v6
+      - run: >-
+          semgrep ci
+          --config p/default
+          --config p/owasp-top-ten
+          --config p/javascript
+          --config p/typescript
+          --config p/react
+          --config p/nextjs
+          --config p/jwt
+        env:
+          # Optional: when set, findings are also reported to the Semgrep
+          # AppSec dashboard. Without it, the scan still runs locally and
+          # fails CI on ERROR-severity findings.
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}

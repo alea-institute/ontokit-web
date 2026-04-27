@@ -14,6 +14,22 @@ npm run test         # Run tests with Vitest
 npm run test:coverage # Run tests with coverage
 ```
 
+### Local Semgrep scan
+
+Same ruleset CI runs (matches `.github/workflows/semgrep.yml`). Requires
+`pipx install semgrep` and `semgrep login` once.
+
+```bash
+semgrep --pro \
+  --config p/default \
+  --config p/owasp-top-ten \
+  --config p/javascript \
+  --config p/typescript \
+  --config p/react \
+  --config p/nextjs \
+  --config p/jwt
+```
+
 ## Development Server Management Script
 
 Use the `ontokit-web.sh` script to manage the development server:
