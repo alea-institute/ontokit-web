@@ -229,11 +229,16 @@ export function ClassDetailPanel({
   // The panel stays in edit mode — the editor is always editable.
   const cancelEditMode = useCallback(() => {
     discardDraft();
+    // Explicitly clear the autosave ref so an unmount in the same React
+    // batch as this cancel can't resurrect the discarded edit via flushToGit.
+    // The editStateRef-sync effect would refill this ref after the next
+    // commit anyway, but that's too late if unmount happens first.
+    editStateRef.current = null;
     if (classDetail) {
       initEditState(classDetail);
     }
     setShowParentPicker(false);
-  }, [classDetail, discardDraft, initEditState]);
+  }, [classDetail, discardDraft, initEditState, editStateRef]);
 
   // Manual save: flush the current draft to git. Stays in edit mode.
   const flushDraftToGit = useCallback(async () => {
