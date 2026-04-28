@@ -51,3 +51,6 @@ public/sitemap.xml
 
 .ontokit-web.log
 .ontokit-web.pid
+
+# Local git worktrees
+.worktrees/
