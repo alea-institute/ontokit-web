@@ -26,6 +26,7 @@ import type { ClassTreeNode } from "@/lib/ontology/types";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 import type { IriPosition } from "@/lib/editor/indexWorker";
 import { useDraftStore } from "@/lib/stores/draftStore";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { getLocalName } from "@/lib/utils";
 import { extractTreeLabelMap } from "@/lib/graph/buildGraphData";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
@@ -284,6 +285,22 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
       }
     };
   }, [entityNavigationRef, navToNode, setScrollIri]);
+
+  // Mirror the active-tab selection into the shared store so cross-page chrome
+  // (e.g. the Viewer/Editor switcher) can synthesize the right ?<type>Iri= key
+  // without having to know about local-state plumbing here.
+  const setSelection = useSelectionStore((s) => s.setSelection);
+  const clearSelection = useSelectionStore((s) => s.clear);
+  useEffect(() => {
+    if (activeTab === "classes") {
+      setSelection(selectedIri ?? null, selectedIri ? "class" : null);
+    } else if (activeTab === "properties") {
+      setSelection(selectedPropertyIri ?? null, selectedPropertyIri ? "property" : null);
+    } else {
+      setSelection(selectedIndividualIri ?? null, selectedIndividualIri ? "individual" : null);
+    }
+  }, [activeTab, selectedIri, selectedPropertyIri, selectedIndividualIri, setSelection]);
+  useEffect(() => () => clearSelection(), [clearSelection]);
 
   // Shared search state
   const {

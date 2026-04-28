@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 
 vi.mock("next/link", () => ({
   __esModule: true,
@@ -23,6 +24,7 @@ describe("ViewerEditorSwitcher", () => {
   beforeEach(() => {
     mockPathname = "/projects/proj-1";
     mockSearch = "";
+    useSelectionStore.getState().clear();
   });
 
   it("renders both segments with their labels", () => {
@@ -83,6 +85,33 @@ describe("ViewerEditorSwitcher", () => {
   it("carries an individual IRI selection through to the destination", () => {
     mockPathname = "/projects/proj-1";
     mockSearch = "individualIri=" + encodeURIComponent("http://example.org/alice");
+    render(<ViewerEditorSwitcher projectId="proj-1" />);
+
+    const editorLink = screen.getByText("Editor").closest("a");
+    expect(editorLink?.getAttribute("href")).toBe(
+      "/projects/proj-1/editor?individualIri=" + encodeURIComponent("http://example.org/alice"),
+    );
+  });
+
+  it("prefers the selection store over URL params when both are set", () => {
+    mockPathname = "/projects/proj-1";
+    // URL says one thing — typically a stale initial-load value
+    mockSearch = "classIri=" + encodeURIComponent("http://example.org/Stale");
+    // …but the user has since selected a property in this session
+    useSelectionStore.getState().setSelection("http://example.org/hasName", "property");
+
+    render(<ViewerEditorSwitcher projectId="proj-1" />);
+
+    const editorLink = screen.getByText("Editor").closest("a");
+    expect(editorLink?.getAttribute("href")).toBe(
+      "/projects/proj-1/editor?propertyIri=" + encodeURIComponent("http://example.org/hasName"),
+    );
+  });
+
+  it("falls back to URL params when the selection store is empty", () => {
+    mockPathname = "/projects/proj-1";
+    mockSearch = "individualIri=" + encodeURIComponent("http://example.org/alice");
+    // store is cleared by beforeEach
     render(<ViewerEditorSwitcher projectId="proj-1" />);
 
     const editorLink = screen.getByText("Editor").closest("a");

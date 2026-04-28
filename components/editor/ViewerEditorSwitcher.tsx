@@ -4,6 +4,7 @@ import { Eye, Pencil } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 import {
   buildSelectionQuery,
   readSelectionFromSearchParams,
@@ -28,7 +29,15 @@ export function ViewerEditorSwitcher({ projectId, className }: ViewerEditorSwitc
   const isEditor = pathname?.endsWith("/editor") ?? false;
   const activeMode: Mode = isEditor ? "editor" : "viewer";
 
-  const selection = readSelectionFromSearchParams(searchParams);
+  // Prefer the in-memory selection store (reflects the active-tab selection
+  // chosen by the user in this session). Fall back to URL params on initial
+  // load, before any layout effect has populated the store.
+  const storeIri = useSelectionStore((s) => s.iri);
+  const storeType = useSelectionStore((s) => s.type);
+  const selection =
+    storeIri && storeType
+      ? { iri: storeIri, type: storeType }
+      : readSelectionFromSearchParams(searchParams);
   const query = buildSelectionQuery(selection);
 
   const hrefFor = (mode: Mode) =>
