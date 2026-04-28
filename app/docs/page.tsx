@@ -18,8 +18,8 @@ export default function DocsPage() {
               </h2>
               <div className="prose prose-slate dark:prose-invert max-w-none">
                 <p className="text-slate-600 dark:text-slate-400 mb-4">
-                  OntoKit is a modern, collaborative OWL ontology curation platform designed as a
-                  replacement for Stanford WebProtege. It provides a streamlined workflow for creating,
+                  OntoKit is a modern, collaborative OWL ontology curation platform designed as a{" "}
+                  replacement for Stanford WebProtege. It provides a streamlined workflow for creating,{" "}
                   editing, and managing semantic web ontologies.
                 </p>
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
@@ -45,44 +45,44 @@ export default function DocsPage() {
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Projects</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Projects are containers for your ontologies. Each project has its own Git repository
+                    Projects are containers for your ontologies. Each project has its own Git repository{" "}
                     for version control, team members, and access settings.
                   </p>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Branches</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Work on changes in isolated branches without affecting the main ontology.
+                    Work on changes in isolated branches without affecting the main ontology.{" "}
                     Merge changes through pull requests when ready.
                   </p>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Pull Requests</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Propose changes to the ontology through pull requests. Review semantic diffs,
+                    Propose changes to the ontology through pull requests. Review semantic diffs,{" "}
                     discuss changes, and merge when approved.
                   </p>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Suggestions</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Suggesters can propose changes without direct edit access. Suggestions are
-                    auto-saved as you work and submitted for editor review with approve, reject, or
+                    Suggesters can propose changes without direct edit access. Suggestions are{" "}
+                    auto-saved as you work and submitted for editor review with approve, reject, or{" "}
                     request-changes outcomes.
                   </p>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Linting</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    Automatic validation checks your ontology for common issues, missing labels,
+                    Automatic validation checks your ontology for common issues, missing labels,{" "}
                     and best practice violations.
                   </p>
                 </div>
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Auto-Save</h3>
                   <p className="text-slate-600 dark:text-slate-400 text-sm">
-                    A two-tier auto-save system protects your work: edits are cached locally on blur,
-                    and committed to git when you navigate away. Draft indicators show unsaved changes
+                    A two-tier auto-save system protects your work: edits are cached locally on blur,{" "}
+                    and committed to git when you navigate away. Draft indicators show unsaved changes{" "}
                     on tree nodes.
                   </p>
                 </div>
@@ -96,7 +96,7 @@ export default function DocsPage() {
               </h2>
               <div className="space-y-4">
                 <p className="text-slate-600 dark:text-slate-400">
-                  Each project member is assigned a role that determines what they can do.
+                  Each project member is assigned a role that determines what they can do.{" "}
                   Roles are project-scoped &mdash; a user can have different roles in different projects.
                 </p>
                 <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -111,38 +111,38 @@ export default function DocsPage() {
                       <tr>
                         <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Owner</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
-                          Full control over the project. Can delete the project, transfer ownership,
+                          Full control over the project. Can delete the project, transfer ownership,{" "}
                           manage members and settings, create branches, edit the ontology, and run the health check.
                         </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Admin</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
-                          Manage members and project settings, create branches, edit the ontology,
+                          Manage members and project settings, create branches, edit the ontology,{" "}
                           and run the health check. Cannot delete the project.
                         </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Editor</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
-                          Create branches, edit ontology source, and create pull requests.
-                          Review and approve/reject suggestions from suggesters.
+                          Create branches, edit ontology source, and create pull requests.{" "}
+                          Review and approve/reject suggestions from suggesters.{" "}
                           Cannot manage members, change settings, or run the health check.
                         </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Suggester</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
-                          Propose changes via suggestion sessions that are reviewed by editors.
-                          Can browse the ontology, create and submit suggestions, and view their
-                          own suggestion history. Cannot directly edit the ontology or create branches.
+                          Propose changes via suggestion sessions that are reviewed by editors.{" "}
+                          Can browse the ontology, create and submit suggestions, and view their{" "}
+                          own suggestion history. Cannot directly edit the ontology or create branches.{" "}
                           This is the default role for new project members.
                         </td>
                       </tr>
                       <tr>
                         <td className="px-4 py-3 text-slate-900 dark:text-white font-medium align-top">Viewer</td>
                         <td className="px-4 py-3 text-slate-600 dark:text-slate-400">
-                          Browse the class tree, view the source in read-only mode, and view
+                          Browse the class tree, view the source in read-only mode, and view{" "}
                           health check results. Cannot make any changes.
                         </td>
                       </tr>
@@ -170,24 +170,24 @@ export default function DocsPage() {
               </h2>
               <div className="space-y-4">
                 <p className="text-slate-600 dark:text-slate-400">
-                  OntoKit offers two editing modes to suit different workflows. Your preference
+                  OntoKit offers two editing modes to suit different workflows. Your preference{" "}
                   is saved and persists across sessions.
                 </p>
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Standard Mode</h3>
                     <p className="text-slate-600 dark:text-slate-400 text-sm">
-                      A form-based editing experience for classes, properties, and individuals.
-                      Edit labels, comments, annotations, and relationships through structured
-                      fields. Entities are read-only by default &mdash; click &quot;Edit Item&quot; to
+                      A form-based editing experience for classes, properties, and individuals.{" "}
+                      Edit labels, comments, annotations, and relationships through structured{" "}
+                      fields. Entities are read-only by default &mdash; click &quot;Edit Item&quot; to{" "}
                       start editing, with changes auto-saved as you work.
                     </p>
                   </div>
                   <div className="bg-white dark:bg-slate-800 rounded-lg p-5 border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">Developer Mode</h3>
                     <p className="text-slate-600 dark:text-slate-400 text-sm">
-                      Direct access to the Turtle source with full syntax highlighting,
-                      auto-completion, and inline validation in a Monaco-based editor. Ideal for
+                      Direct access to the Turtle source with full syntax highlighting,{" "}
+                      auto-completion, and inline validation in a Monaco-based editor. Ideal for{" "}
                       power users who prefer working with raw RDF/OWL syntax.
                     </p>
                   </div>
@@ -204,8 +204,8 @@ export default function DocsPage() {
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Entity Tree</h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
-                    Navigate your ontology using hierarchical trees for classes, properties, and
-                    individuals. Entities are organized by their subclass/subproperty relationships,
+                    Navigate your ontology using hierarchical trees for classes, properties, and{" "}
+                    individuals. Entities are organized by their subclass/subproperty relationships,{" "}
                     with lazy loading for large ontologies.
                   </p>
                   <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
@@ -223,8 +223,8 @@ export default function DocsPage() {
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Detail Panel</h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
-                    View and edit entity metadata through structured forms. Separate panels are
-                    provided for classes, properties, and individuals, each tailored to their
+                    View and edit entity metadata through structured forms. Separate panels are{" "}
+                    provided for classes, properties, and individuals, each tailored to their{" "}
                     specific OWL constructs.
                   </p>
                   <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
@@ -243,7 +243,7 @@ export default function DocsPage() {
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Graph Visualization</h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
-                    Explore ontology relationships visually with an interactive graph view powered
+                    Explore ontology relationships visually with an interactive graph view powered{" "}
                     by React Flow and ELK layout.
                   </p>
                   <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
@@ -257,8 +257,8 @@ export default function DocsPage() {
                 <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
                   <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-3">Source Editor</h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-3">
-                    Edit your ontology directly in Turtle syntax with full syntax highlighting,
-                    auto-completion, and inline validation. Available in Developer mode or via
+                    Edit your ontology directly in Turtle syntax with full syntax highlighting,{" "}
+                    auto-completion, and inline validation. Available in Developer mode or via{" "}
                     the Source tab.
                   </p>
                   <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
@@ -362,8 +362,8 @@ export default function DocsPage() {
                     Canonical Turtle Format
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-4">
-                    When you import an ontology file, OntoKit normalizes it to a canonical Turtle format.
-                    This ensures consistent formatting across all edits and produces minimal, meaningful
+                    When you import an ontology file, OntoKit normalizes it to a canonical Turtle format.{" "}
+                    This ensures consistent formatting across all edits and produces minimal, meaningful{" "}
                     diffs in version history. The normalization happens once at import time.
                   </p>
                   <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
@@ -385,7 +385,7 @@ export default function DocsPage() {
                     Metadata Synchronization
                   </h3>
                   <p className="text-slate-600 dark:text-slate-400 mb-4">
-                    When you update a project&apos;s name or description in Project Settings, OntoKit
+                    When you update a project&apos;s name or description in Project Settings, OntoKit{" "}
                     automatically syncs these changes to the ontology&apos;s RDF metadata properties.
                   </p>
                   <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-4">
@@ -414,7 +414,7 @@ export default function DocsPage() {
               </h2>
               <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
                 <p className="text-slate-600 dark:text-slate-400 mb-4">
-                  OntoKit provides a comprehensive REST API for programmatic access to all platform features.
+                  OntoKit provides a comprehensive REST API for programmatic access to all platform features.{" "}
                   Use the API to integrate OntoKit with your existing tools and workflows.
                 </p>
                 <Link
