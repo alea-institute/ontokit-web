@@ -440,6 +440,10 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           </div>
         ) : activeTab === "classes" ? (
           <ClassDetailPanel
+            // Remount on selection change so internal edit-state and refs reset
+            // cleanly — prevents the previous class's edit fields from bleeding
+            // into the newly-selected class while the new fetch is in flight.
+            key={selectedIri ?? "no-class"}
             projectId={projectId}
             classIri={selectedIri}
             accessToken={accessToken}
@@ -464,6 +468,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           />
         ) : activeTab === "properties" ? (
           <PropertyDetailPanel
+            key={selectedPropertyIri ?? "no-property"}
             projectId={projectId}
             propertyIri={selectedPropertyIri}
             sourceContent={sourceContent || ""}
@@ -478,6 +483,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           />
         ) : (
           <IndividualDetailPanel
+            key={selectedIndividualIri ?? "no-individual"}
             projectId={projectId}
             individualIri={selectedIndividualIri}
             sourceContent={sourceContent || ""}

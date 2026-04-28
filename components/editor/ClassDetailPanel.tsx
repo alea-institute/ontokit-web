@@ -110,8 +110,6 @@ export function ClassDetailPanel({
   const [editRelationships, setEditRelationships] = useState<RelationshipGroup[]>([]);
   const [showParentPicker, setShowParentPicker] = useState(false);
 
-  // Track the previous classIri so we can flush on navigate
-  const prevClassIriRef = useRef<string | null>(null);
   const editInitializedRef = useRef(false);
 
   // Toast for error feedback
@@ -158,17 +156,16 @@ export function ClassDetailPanel({
     }
   }, [isEditing, editStateRef]);
 
-  // Flush to git when class selection changes, then reset to read-only
+  // Flush any pending draft to git when this panel unmounts (the parent
+  // remounts the panel on classIri change via a key prop, so "navigate
+  // away" maps to "instance unmount" — flushing in the cleanup function is
+  // what carries the user's last edit through to the backend).
   useEffect(() => {
-    if (prevClassIriRef.current && prevClassIriRef.current !== classIri) {
+    return () => {
       flushToGit();
-    }
-    prevClassIriRef.current = classIri;
-    setResolvedTargetLabels({});
-    editInitializedRef.current = false;
-    setIsEditing(false);
-    setShowParentPicker(false);
-  }, [classIri]); // eslint-disable-line react-hooks/exhaustive-deps
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush reads from refs; cleanup needs the latest closure
+  }, [classIri]);
 
   // Enter edit mode: initialize edit state from classDetail
   const enterEditMode = useCallback(() => {

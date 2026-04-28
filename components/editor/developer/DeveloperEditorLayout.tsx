@@ -544,6 +544,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             <div className="min-w-0 flex-1 bg-white dark:bg-slate-800">
               {activeTab === "classes" ? (
                 <ClassDetailPanel
+                  // Remount on selection change so internal edit-state and
+                  // refs reset cleanly between selections.
+                  key={selectedIri ?? "no-class"}
                   projectId={projectId}
                   classIri={selectedIri}
                   accessToken={accessToken}
@@ -559,6 +562,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 />
               ) : activeTab === "properties" ? (
                 <PropertyDetailPanel
+                  key={selectedPropertyIri ?? "no-property"}
                   projectId={projectId}
                   propertyIri={selectedPropertyIri}
                   sourceContent={sourceContent || ""}
@@ -573,6 +577,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 />
               ) : (
                 <IndividualDetailPanel
+                  key={selectedIndividualIri ?? "no-individual"}
                   projectId={projectId}
                   individualIri={selectedIndividualIri}
                   sourceContent={sourceContent || ""}

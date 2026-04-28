@@ -121,7 +121,6 @@ export function PropertyDetailPanel({
   const [editRelationships, setEditRelationships] = useState<RelationshipGroup[]>([]);
   const [editPropertyType, setEditPropertyType] = useState<PropertyType>("object");
 
-  const prevIriRef = useRef<string | null>(null);
   const editInitializedRef = useRef(false);
   const toast = useToast();
 
@@ -250,15 +249,15 @@ export function PropertyDetailPanel({
     setEditAnnotations(regularAnnotations);
   }, []);
 
-  // Flush to git on navigate away
+  // Flush any pending draft to git when this panel unmounts (the parent
+  // remounts the panel on propertyIri change via a key prop, so "navigate
+  // away" maps to "instance unmount").
   useEffect(() => {
-    if (prevIriRef.current && prevIriRef.current !== propertyIri) {
+    return () => {
       flushToGit();
-    }
-    prevIriRef.current = propertyIri;
-    editInitializedRef.current = false;
-    setIsEditing(false);
-  }, [propertyIri]); // eslint-disable-line react-hooks/exhaustive-deps
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush reads from refs; cleanup needs the latest closure
+  }, [propertyIri]);
 
   const enterEditMode = useCallback(() => {
     if (!detail) return;
