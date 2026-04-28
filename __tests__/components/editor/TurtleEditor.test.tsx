@@ -36,6 +36,12 @@ vi.mock("@monaco-editor/react", async () => {
     // eslint-disable-next-line react-hooks/globals
     capturedProps = props;
 
+    // The mock fires beforeMount/onMount exactly once per editor instance,
+    // mirroring monaco-react's own behavior. We deliberately use an empty
+    // deps array (with a manual ref-equality guard) instead of including
+    // props.beforeMount/onMount, because re-running these effects on every
+    // re-render would produce duplicate beforeMount/onMount invocations and
+    // break tests that assert call count.
     React.useEffect(() => {
       if (typeof props.beforeMount === "function" && capturedBeforeMount !== props.beforeMount) {
         capturedBeforeMount = props.beforeMount as (monaco: unknown) => void;
@@ -55,7 +61,7 @@ vi.mock("@monaco-editor/react", async () => {
           },
         });
       }
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     React.useEffect(() => {
       if (typeof props.onMount === "function" && capturedOnMount !== props.onMount) {
@@ -80,7 +86,7 @@ vi.mock("@monaco-editor/react", async () => {
         };
         (props.onMount as (e: unknown, m: unknown) => void)(mockEditor, mockMonaco);
       }
-    }, []);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     return React.createElement("div", {
       "data-testid": "monaco-editor",
