@@ -1185,7 +1185,7 @@ describe("IndividualDetailPanel", () => {
 
   // ── Manual save via AutoSaveAffordanceBar ──
 
-  it("invokes saveAndExitEditMode via AutoSaveAffordanceBar onManualSave", async () => {
+  it("invokes flushDraftToGit via AutoSaveAffordanceBar onManualSave", async () => {
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1778,7 +1778,7 @@ describe("IndividualDetailPanel", () => {
 
   // ── Manual save stays in edit mode when flushToGit fails ──
 
-  it("stays in edit mode when saveAndExitEditMode flush fails", async () => {
+  it("stays in edit mode when flushDraftToGit flush fails", async () => {
     const onUpdateIndividual = vi.fn();
     mockFlushToGit.mockResolvedValue(false);
     render(

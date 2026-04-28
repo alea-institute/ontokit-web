@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -161,7 +161,13 @@ function ViewerContent({
   sessionStatus: "loading" | "authenticated" | "unauthenticated";
 }) {
   const searchParams = useSearchParams();
-  const initialSelection = readSelectionFromSearchParams(searchParams);
+  // Memoize the parsed URL selection so the URL-restore effect doesn't re-fire
+  // (and risk clobbering the user's in-page selection) on every render.
+  const searchParamsString = searchParams.toString();
+  const initialSelection = useMemo(
+    () => readSelectionFromSearchParams(new URLSearchParams(searchParamsString)),
+    [searchParamsString],
+  );
   const editorMode = useEditorModeStore((s) => s.editorMode);
 
   // Use the default branch from the BranchProvider context
@@ -189,6 +195,10 @@ function ViewerContent({
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
   const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
+  // Tracks the URL selection we've already applied — see editor page for the
+  // full rationale. Prevents an in-page selection change from being clobbered
+  // by a re-fire of this effect.
+  const consumedSelectionRef = useRef<string | null>(null);
 
   // Restore selected entity from URL query param. Class navigation goes
   // through the class tree once it's loaded; properties and individuals are
@@ -196,13 +206,20 @@ function ViewerContent({
   // per-tab selection are set correctly.
   useEffect(() => {
     if (!initialSelection) return;
+    const key = `${initialSelection.type}:${initialSelection.iri}`;
+    if (consumedSelectionRef.current === key) return;
+
     if (initialSelection.type === "class") {
       if (isTreeLoading || !nodes.length) return;
-      if (selectedIri === initialSelection.iri) return;
-      navigateToNode(initialSelection.iri);
+      if (selectedIri !== initialSelection.iri) {
+        navigateToNode(initialSelection.iri);
+      }
+      consumedSelectionRef.current = key;
       return;
     }
-    entityNavigationRef.current?.(initialSelection.iri, initialSelection.type);
+    if (!entityNavigationRef.current) return;
+    entityNavigationRef.current(initialSelection.iri, initialSelection.type);
+    consumedSelectionRef.current = key;
   }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
 
   const toast = useToast();

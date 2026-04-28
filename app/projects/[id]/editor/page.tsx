@@ -53,7 +53,18 @@ export default function EditorPage() {
   const projectId = params.id as string;
   const resumeSessionParam = searchParams.get("resumeSession") || undefined;
   const resumeBranchParam = searchParams.get("branch") || undefined;
-  const initialSelection = readSelectionFromSearchParams(searchParams);
+  // Memoize the parsed URL selection so its identity is stable across renders
+  // when the URL hasn't changed — otherwise the URL-restore effect would re-fire
+  // every render and risk clobbering the user's in-page selection.
+  const searchParamsString = searchParams.toString();
+  const initialSelection = useMemo(
+    () => readSelectionFromSearchParams(new URLSearchParams(searchParamsString)),
+    [searchParamsString],
+  );
+  // Tracks the URL selection we've already applied. Each unique
+  // `${type}:${iri}` is consumed at most once per page-instance — if the URL
+  // changes mid-session, we apply the new key, but we never re-apply a key.
+  const consumedSelectionRef = useRef<string | null>(null);
   const initialBranch = resumeBranchParam
     || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
@@ -100,17 +111,26 @@ export default function EditorPage() {
   // Restore selected entity from URL query param. For classes we wait for the
   // class tree to load; for properties and individuals we dispatch through the
   // layout's nav handler (entityNavigationRef), which switches the active tab
-  // and selects the entity directly.
+  // and selects the entity directly. Each URL-derived selection is applied at
+  // most once via consumedSelectionRef — that way an in-page selection change
+  // (which doesn't update the URL) isn't undone on the next render.
   useEffect(() => {
     if (!initialSelection) return;
+    const key = `${initialSelection.type}:${initialSelection.iri}`;
+    if (consumedSelectionRef.current === key) return;
+
     if (initialSelection.type === "class") {
       if (isTreeLoading || !nodes.length) return;
-      if (selectedIri === initialSelection.iri) return;
-      navigateToNode(initialSelection.iri);
+      if (selectedIri !== initialSelection.iri) {
+        navigateToNode(initialSelection.iri);
+      }
+      consumedSelectionRef.current = key;
       return;
     }
     if (isLoading) return; // layout not yet mounted
-    entityNavigationRef.current?.(initialSelection.iri, initialSelection.type);
+    if (!entityNavigationRef.current) return; // layout's ref not yet populated
+    entityNavigationRef.current(initialSelection.iri, initialSelection.type);
+    consumedSelectionRef.current = key;
   }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode, isLoading]);
 
   // Commit dialog

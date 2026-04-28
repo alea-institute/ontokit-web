@@ -189,7 +189,7 @@ export function ClassDetailPanel({
   }, [classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Manual save: flush the current draft to git. Stays in edit mode.
-  const saveAndExitEditMode = useCallback(async () => {
+  const flushDraftToGit = useCallback(async () => {
     triggerSave();
     await flushToGit();
   }, [triggerSave, flushToGit]);
@@ -617,7 +617,7 @@ export function ClassDetailPanel({
           error={saveError}
           validationError={validationError}
           onRetry={() => flushToGit()}
-          onManualSave={saveAndExitEditMode}
+          onManualSave={flushDraftToGit}
           onCancel={cancelEditMode}
         />
       )}

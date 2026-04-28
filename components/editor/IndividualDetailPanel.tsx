@@ -261,7 +261,7 @@ export function IndividualDetailPanel({
   }, [detail, discardDraft, initEditState]);
 
   // Manual save: flush the current draft to git. Stays in edit mode.
-  const saveAndExitEditMode = useCallback(async () => {
+  const flushDraftToGit = useCallback(async () => {
     triggerSave();
     await flushToGit();
   }, [triggerSave, flushToGit]);
@@ -435,7 +435,7 @@ export function IndividualDetailPanel({
           error={saveError}
           validationError={validationError}
           onRetry={() => flushToGit()}
-          onManualSave={saveAndExitEditMode}
+          onManualSave={flushDraftToGit}
           onCancel={cancelEditMode}
         />
       )}

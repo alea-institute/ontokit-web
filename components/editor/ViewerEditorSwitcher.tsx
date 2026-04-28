@@ -63,7 +63,7 @@ export function ViewerEditorSwitcher({ projectId, className }: ViewerEditorSwitc
 
         if (isActive) {
           return (
-            <span key={value} aria-current="page" className={classes}>
+            <span key={value} aria-current="page" aria-label={label} className={classes}>
               <Icon className="h-4 w-4" />
               <span className="hidden sm:inline">{label}</span>
             </span>

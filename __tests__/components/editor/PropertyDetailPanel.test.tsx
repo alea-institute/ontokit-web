@@ -1233,7 +1233,7 @@ describe("PropertyDetailPanel", () => {
 
   // ── Manual save via AutoSaveAffordanceBar ──
 
-  it("invokes saveAndExitEditMode via AutoSaveAffordanceBar onManualSave", async () => {
+  it("invokes flushDraftToGit via AutoSaveAffordanceBar onManualSave", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1697,7 +1697,7 @@ describe("PropertyDetailPanel", () => {
 
   // ── Manual save stays in edit mode when flushToGit fails ──
 
-  it("stays in edit mode when saveAndExitEditMode flush fails", async () => {
+  it("stays in edit mode when flushDraftToGit flush fails", async () => {
     const onUpdateProperty = vi.fn();
     mockFlushToGit.mockResolvedValue(false);
     render(

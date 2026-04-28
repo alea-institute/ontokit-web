@@ -430,23 +430,6 @@ describe("ClassDetailPanel", () => {
     expect(screen.queryByText("Edit Item")).toBeNull();
   });
 
-  // ── Edit mode (canEdit=true) ──
-
-  it("auto-enters edit mode when canEdit is true and onUpdateClass provided", async () => {
-    const onUpdateClass = vi.fn();
-    render(
-      <ClassDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateClass={onUpdateClass}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
-    });
-  });
-
   // ── Tree-node fallback for unsaved entities ──
 
   it("renders unsaved entity fallback with parent link", async () => {
@@ -1687,7 +1670,7 @@ describe("ClassDetailPanel", () => {
 
   // ── Manual save stays in edit mode when flushToGit fails ──
 
-  it("stays in edit mode when saveAndExitEditMode flush fails", async () => {
+  it("stays in edit mode when flushDraftToGit flush fails", async () => {
     const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockFlushToGit.mockResolvedValue(false);
@@ -1716,23 +1699,6 @@ describe("ClassDetailPanel", () => {
     });
     // Auto-save bar should still be visible (still editing)
     expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
-  });
-
-  // ── Auto-enter edit mode in editor context ──
-
-  it("auto-enters edit mode when onUpdateClass is provided", async () => {
-    const onUpdateClass = vi.fn();
-    render(
-      <ClassDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateClass={onUpdateClass}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
-    });
   });
 
   // ── Cancel keeps the panel in edit mode ──
