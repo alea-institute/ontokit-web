@@ -7,7 +7,7 @@ export default function TypesPage() {
         What are the Types of Ontologies?
       </h1>
       <p className="text-slate-600 dark:text-slate-400 mb-8">
-        Ontologies range from simple word lists to rich logical theories. Understanding the spectrum
+        Ontologies range from simple word lists to rich logical theories. Understanding the spectrum{" "}
         helps you choose the right level of formality for your project.
       </p>
 
@@ -23,13 +23,13 @@ export default function TypesPage() {
             </p>
             <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 space-y-2">
               <li>
-                <strong>Lightweight ontologies</strong> capture basic hierarchies and associations
-                without complex logical axioms. They are easier to build and maintain but offer
+                <strong>Lightweight ontologies</strong> capture basic hierarchies and associations{" "}
+                without complex logical axioms. They are easier to build and maintain but offer{" "}
                 limited reasoning.
               </li>
               <li>
-                <strong>Heavyweight ontologies</strong> add rich axioms &mdash; cardinality
-                constraints, property restrictions, disjointness, equivalence &mdash; enabling
+                <strong>Heavyweight ontologies</strong> add rich axioms &mdash; cardinality{" "}
+                constraints, property restrictions, disjointness, equivalence &mdash; enabling{" "}
                 automated classification and consistency checking.
               </li>
             </ul>
@@ -43,12 +43,12 @@ export default function TypesPage() {
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-3">
-              A taxonomy is a hierarchical classification &mdash; a tree of &ldquo;is-a&rdquo;
-              relationships. Think of the Linnaean biological classification (Kingdom &rarr; Phylum
+              A taxonomy is a hierarchical classification &mdash; a tree of &ldquo;is-a&rdquo;{" "}
+              relationships. Think of the Linnaean biological classification (Kingdom &rarr; Phylum{" "}
               &rarr; Class &rarr; &hellip; &rarr; Species) or a website&rsquo;s category navigation.
             </p>
             <p className="text-slate-600 dark:text-slate-400 text-sm">
-              Taxonomies are the simplest form of ontology. They organize concepts into parent/child
+              Taxonomies are the simplest form of ontology. They organize concepts into parent/child{" "}
               relationships but do not define properties or constraints.
             </p>
           </div>
@@ -61,13 +61,13 @@ export default function TypesPage() {
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-3">
-              A step beyond taxonomies, thesauri add relationships like &ldquo;broader
-              term&rdquo;, &ldquo;narrower term&rdquo;, and &ldquo;related term&rdquo;. They also
-              record preferred labels, alternative labels, and scope notes. SKOS (Simple Knowledge
+              A step beyond taxonomies, thesauri add relationships like &ldquo;broader{" "}
+              term&rdquo;, &ldquo;narrower term&rdquo;, and &ldquo;related term&rdquo;. They also{" "}
+              record preferred labels, alternative labels, and scope notes. SKOS (Simple Knowledge{" "}
               Organization System) is the W3C standard for publishing thesauri on the web.
             </p>
             <p className="text-slate-600 dark:text-slate-400 text-sm">
-              Examples include the Library of Congress Subject Headings (LCSH), the Getty Art &
+              Examples include the Library of Congress Subject Headings (LCSH), the Getty Art &{" "}
               Architecture Thesaurus (AAT), and UNESCO Thesaurus.
             </p>
           </div>
@@ -80,13 +80,13 @@ export default function TypesPage() {
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-3">
-              Formal ontologies use the Web Ontology Language (OWL) to express rich logical axioms.
-              OWL is grounded in Description Logics and supports class restrictions, cardinality
-              constraints, property characteristics (transitive, symmetric, functional), and
+              Formal ontologies use the Web Ontology Language (OWL) to express rich logical axioms.{" "}
+              OWL is grounded in Description Logics and supports class restrictions, cardinality{" "}
+              constraints, property characteristics (transitive, symmetric, functional), and{" "}
               equivalence/disjointness declarations.
             </p>
             <p className="text-slate-600 dark:text-slate-400 text-sm">
-              This is the level of formality that OntoKit targets &mdash; editing and curating
+              This is the level of formality that OntoKit targets &mdash; editing and curating{" "}
               OWL ontologies with full expressiveness.
             </p>
           </div>
@@ -103,8 +103,8 @@ export default function TypesPage() {
                 Domain Ontologies
               </h3>
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                Focused on a specific subject area: biomedicine, finance, geography, etc. They
-                define the classes and properties relevant to that domain. Examples: Gene Ontology,
+                Focused on a specific subject area: biomedicine, finance, geography, etc. They{" "}
+                define the classes and properties relevant to that domain. Examples: Gene Ontology,{" "}
                 FIBO (Financial Industry Business Ontology), GeoNames.
               </p>
             </div>
@@ -113,8 +113,8 @@ export default function TypesPage() {
                 Upper-Level Ontologies
               </h3>
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                Provide very general categories (object, event, quality, role) that span all
-                domains. Domain ontologies can align to an upper ontology for cross-domain
+                Provide very general categories (object, event, quality, role) that span all{" "}
+                domains. Domain ontologies can align to an upper ontology for cross-domain{" "}
                 interoperability. Examples: BFO (Basic Formal Ontology), DOLCE, SUMO.
               </p>
             </div>

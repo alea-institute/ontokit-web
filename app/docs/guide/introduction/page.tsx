@@ -18,15 +18,15 @@ export default function IntroductionPage() {
           </h2>
           <div className="prose prose-slate dark:prose-invert max-w-none space-y-4">
             <p className="text-slate-600 dark:text-slate-400">
-              In philosophy, an ontology is the study of what exists &mdash; the nature of being and
-              the categories of reality. In computer science and the Semantic Web, the term has been
-              borrowed to mean something more specific: a <strong>formal, explicit specification of
+              In philosophy, an ontology is the study of what exists &mdash; the nature of being and{" "}
+              the categories of reality. In computer science and the Semantic Web, the term has been{" "}
+              borrowed to mean something more specific: a <strong>formal, explicit specification of{" "}
               a shared conceptualization</strong>.
             </p>
             <p className="text-slate-600 dark:text-slate-400">
-              Put simply, an ontology is a structured way to describe the concepts in a domain (such
-              as medicine, law, or cultural heritage) and the relationships between them. Unlike a
-              simple glossary or database schema, an ontology uses logic-based formalisms that allow
+              Put simply, an ontology is a structured way to describe the concepts in a domain (such{" "}
+              as medicine, law, or cultural heritage) and the relationships between them. Unlike a{" "}
+              simple glossary or database schema, an ontology uses logic-based formalisms that allow{" "}
               machines to reason about the data automatically.
             </p>
           </div>
@@ -40,22 +40,22 @@ export default function IntroductionPage() {
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700 space-y-3">
             <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 space-y-2">
               <li>
-                <strong>Interoperability:</strong> Ontologies provide a common vocabulary so that
-                different systems, organizations, and datasets can share and integrate data without
+                <strong>Interoperability:</strong> Ontologies provide a common vocabulary so that{" "}
+                different systems, organizations, and datasets can share and integrate data without{" "}
                 ambiguity.
               </li>
               <li>
-                <strong>Reasoning:</strong> Because ontologies are logic-based, reasoners can infer
-                new facts that were not explicitly stated &mdash; for example, deducing that a
-                &ldquo;Penguin&rdquo; is a &ldquo;Bird&rdquo; even if only the subclass chain is
+                <strong>Reasoning:</strong> Because ontologies are logic-based, reasoners can infer{" "}
+                new facts that were not explicitly stated &mdash; for example, deducing that a{" "}
+                &ldquo;Penguin&rdquo; is a &ldquo;Bird&rdquo; even if only the subclass chain is{" "}
                 defined.
               </li>
               <li>
-                <strong>Knowledge reuse:</strong> Well-designed ontologies can be shared and extended
+                <strong>Knowledge reuse:</strong> Well-designed ontologies can be shared and extended{" "}
                 across projects, preventing each team from reinventing the same domain model.
               </li>
               <li>
-                <strong>Data validation:</strong> Ontologies define constraints (e.g., a person must
+                <strong>Data validation:</strong> Ontologies define constraints (e.g., a person must{" "}
                 have exactly one birth date) that can be used to validate data quality.
               </li>
             </ul>
@@ -73,7 +73,7 @@ export default function IntroductionPage() {
                 Biomedical Sciences
               </h3>
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                The Gene Ontology (GO) and SNOMED CT organize biological processes and clinical
+                The Gene Ontology (GO) and SNOMED CT organize biological processes and clinical{" "}
                 terminology used by researchers and hospitals worldwide.
               </p>
             </div>
@@ -82,7 +82,7 @@ export default function IntroductionPage() {
                 Cultural Heritage
               </h3>
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                CIDOC-CRM models museum artifacts, historical events, and provenance so that
+                CIDOC-CRM models museum artifacts, historical events, and provenance so that{" "}
                 collections across institutions can be linked together.
               </p>
             </div>
@@ -91,7 +91,7 @@ export default function IntroductionPage() {
                 E-Commerce
               </h3>
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                Schema.org provides structured product data that search engines use to display rich
+                Schema.org provides structured product data that search engines use to display rich{" "}
                 snippets and power product comparisons.
               </p>
             </div>
@@ -100,7 +100,7 @@ export default function IntroductionPage() {
                 Libraries & Publishing
               </h3>
               <p className="text-slate-600 dark:text-slate-400 text-sm">
-                Dublin Core and BIBFRAME describe publications and library holdings, enabling
+                Dublin Core and BIBFRAME describe publications and library holdings, enabling{" "}
                 cross-catalog search and linked open data.
               </p>
             </div>
@@ -114,7 +114,7 @@ export default function IntroductionPage() {
           </h2>
           <div className="prose prose-slate dark:prose-invert max-w-none space-y-4">
             <p className="text-slate-600 dark:text-slate-400">
-              Ontologies sit at the heart of the W3C Semantic Web architecture, often visualized as
+              Ontologies sit at the heart of the W3C Semantic Web architecture, often visualized as{" "}
               a layered &ldquo;cake&rdquo;:
             </p>
           </div>
@@ -136,8 +136,8 @@ export default function IntroductionPage() {
   └───────────────────────┘`}</pre>
           </div>
           <p className="text-slate-600 dark:text-slate-400 text-sm mt-3">
-            Each layer builds on those below it. RDF provides the basic data model of triples (subject,
-            predicate, object). RDFS adds vocabulary constructs like classes and properties. OWL adds
+            Each layer builds on those below it. RDF provides the basic data model of triples (subject,{" "}
+            predicate, object). RDFS adds vocabulary constructs like classes and properties. OWL adds{" "}
             formal logic for richer ontology modeling.
           </p>
         </section>
