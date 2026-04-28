@@ -792,6 +792,36 @@ describe("ClassDetailPanel", () => {
     });
   });
 
+  it("closes the parent picker when the user cancels", async () => {
+    const user = userEvent.setup();
+    const onUpdateClass = vi.fn();
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit={true}
+        onUpdateClass={onUpdateClass}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Add parent")).not.toBeNull();
+    });
+
+    // Open the parent picker
+    await user.click(screen.getByText("Add parent"));
+    await waitFor(() => {
+      expect(screen.queryByText("Add parent")).toBeNull();
+    });
+
+    // Cancel via the AutoSaveAffordanceBar stub
+    await user.click(screen.getByTestId("cancel-edit"));
+
+    // The picker should close — Add parent button reappears
+    await waitFor(() => {
+      expect(screen.getByText("Add parent")).not.toBeNull();
+    });
+  });
+
   // ── Save flow ──
 
   it("triggers save on label input blur", async () => {

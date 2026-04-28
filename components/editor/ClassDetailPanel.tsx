@@ -167,6 +167,7 @@ export function ClassDetailPanel({
     setResolvedTargetLabels({});
     editInitializedRef.current = false;
     setIsEditing(false);
+    setShowParentPicker(false);
   }, [classIri]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Enter edit mode: initialize edit state from classDetail
@@ -184,6 +185,7 @@ export function ClassDetailPanel({
     if (classDetail) {
       initEditState(classDetail);
     }
+    setShowParentPicker(false);
   }, [classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Manual save: flush the current draft to git. Stays in edit mode.

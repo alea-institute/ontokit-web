@@ -282,7 +282,7 @@ export function PropertyDetailPanel({
   // Auto-enter edit mode
   useEffect(() => {
     if (isEditing || editInitializedRef.current) return;
-    if (!canEdit || !detail) return;
+    if (!canEdit || !onUpdateProperty || !detail) return;
 
     if (restoredDraft && restoredDraft.entityType === "property" && propertyIri) {
       const d = restoredDraft as PropertyDraftEntry;
@@ -303,9 +303,7 @@ export function PropertyDetailPanel({
       return;
     }
 
-    if (onUpdateProperty) {
-      enterEditMode();
-    }
+    enterEditMode();
   }, [detail, canEdit, restoredDraft, propertyIri, clearRestoredDraft, onUpdateProperty, isEditing, enterEditMode]);
 
   // ── Edit helpers ──

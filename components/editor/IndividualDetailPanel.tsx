@@ -268,7 +268,7 @@ export function IndividualDetailPanel({
 
   useEffect(() => {
     if (isEditing || editInitializedRef.current) return;
-    if (!canEdit || !detail) return;
+    if (!canEdit || !onUpdateIndividual || !detail) return;
 
     if (restoredDraft && restoredDraft.entityType === "individual" && individualIri) {
       const d = restoredDraft as IndividualDraftEntry;
@@ -288,9 +288,7 @@ export function IndividualDetailPanel({
       return;
     }
 
-    if (onUpdateIndividual) {
-      enterEditMode();
-    }
+    enterEditMode();
   }, [detail, canEdit, restoredDraft, individualIri, clearRestoredDraft, onUpdateIndividual, isEditing, enterEditMode]);
 
   // ── Edit helpers ──
