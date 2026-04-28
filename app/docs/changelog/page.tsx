@@ -1,3 +1,5 @@
+import { ChangelogToc } from "@/components/docs/ChangelogToc";
+
 interface ChangelogCategory {
   title: string;
   items: string[];
@@ -170,46 +172,52 @@ const changelog: ChangelogEntry[] = [
 
 export default function ChangelogPage() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-        Changelog
-      </h1>
-      <p className="text-slate-600 dark:text-slate-400 mb-8">
-        Summary of changes for each release.
-      </p>
+    <div className="container mx-auto px-4 py-8 flex gap-8">
+      <div className="min-w-0 flex-1 max-w-4xl">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+          Changelog
+        </h1>
+        <p className="text-slate-600 dark:text-slate-400 mb-8">
+          Summary of changes for each release.
+        </p>
 
-      <div className="space-y-8">
-        {changelog.map((entry) => (
-          <div
-            key={entry.version}
-            className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6"
-          >
-            <div className="flex items-baseline gap-3 mb-4">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-                {entry.version}
-              </h2>
-              <span className="text-sm text-slate-500 dark:text-slate-400">
-                {entry.date}
-              </span>
-            </div>
+        <div className="space-y-8">
+          {changelog.map((entry) => (
+            <section
+              key={entry.version}
+              id={`v-${entry.version.replace(/\./g, "-")}`}
+              className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 scroll-mt-4"
+            >
+              <div className="flex items-baseline gap-3 mb-4">
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                  {entry.version}
+                </h2>
+                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  {entry.date}
+                </span>
+              </div>
 
-            <div className="space-y-4">
-              {entry.categories.map((category) => (
-                <div key={category.title}>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-2">
-                    {category.title}
-                  </h3>
-                  <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
-                    {category.items.map((item, i) => (
-                      <li key={i}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+              <div className="space-y-4">
+                {entry.categories.map((category) => (
+                  <div key={category.title}>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-2">
+                      {category.title}
+                    </h3>
+                    <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
+                      {category.items.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
+      <ChangelogToc
+        entries={changelog.map(({ version, date }) => ({ version, date }))}
+      />
     </div>
   );
 }
