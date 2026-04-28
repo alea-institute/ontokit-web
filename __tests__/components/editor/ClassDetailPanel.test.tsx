@@ -353,6 +353,22 @@ describe("ClassDetailPanel", () => {
     });
   });
 
+  it("renders the class detail when lintApi.getIssues rejects", async () => {
+    // The fetch effect tolerates a lint failure (it's wrapped in .catch
+    // that returns an empty issues list) so the rest of the panel still
+    // renders. Cover that branch.
+    mockGetIssues.mockRejectedValue(new Error("lint service down"));
+    render(<ClassDetailPanel {...DEFAULT_PROPS} />);
+
+    await waitFor(() => {
+      expect(mockGetClassDetail).toHaveBeenCalled();
+    });
+    // No lint summary should be shown despite a class being loaded.
+    await waitFor(() => {
+      expect(screen.queryByText(/Health Issues/i)).toBeNull();
+    });
+  });
+
   // ── Lint issues ──
 
   it("shows lint issues for the class", async () => {

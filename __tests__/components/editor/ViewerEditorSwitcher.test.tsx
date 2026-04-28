@@ -119,4 +119,39 @@ describe("ViewerEditorSwitcher", () => {
       "/projects/proj-1/editor?individualIri=" + encodeURIComponent("http://example.org/alice"),
     );
   });
+
+  it("preserves unrelated query params (branch, resumeSession) in the destination href", () => {
+    mockPathname = "/projects/proj-1";
+    mockSearch =
+      "branch=feature%2Ffoo" +
+      "&resumeSession=abc123" +
+      "&classIri=" + encodeURIComponent("http://example.org/Person");
+    render(<ViewerEditorSwitcher projectId="proj-1" />);
+
+    const editorLink = screen.getByText("Editor").closest("a");
+    const href = editorLink?.getAttribute("href") ?? "";
+    expect(href.startsWith("/projects/proj-1/editor?")).toBe(true);
+    const params = new URLSearchParams(href.split("?")[1] ?? "");
+    // unrelated params survive
+    expect(params.get("branch")).toBe("feature/foo");
+    expect(params.get("resumeSession")).toBe("abc123");
+    // selection key is still carried correctly
+    expect(params.get("classIri")).toBe("http://example.org/Person");
+  });
+
+  it("strips the previous selection key before writing a new one (mutual exclusion)", () => {
+    mockPathname = "/projects/proj-1";
+    // URL has a stale classIri…
+    mockSearch = "classIri=" + encodeURIComponent("http://example.org/Stale");
+    // …but the user has since selected a property in this session
+    useSelectionStore.getState().setSelection("http://example.org/hasName", "property");
+
+    render(<ViewerEditorSwitcher projectId="proj-1" />);
+
+    const editorLink = screen.getByText("Editor").closest("a");
+    const href = editorLink?.getAttribute("href") ?? "";
+    const params = new URLSearchParams(href.split("?")[1] ?? "");
+    expect(params.get("classIri")).toBeNull();
+    expect(params.get("propertyIri")).toBe("http://example.org/hasName");
+  });
 });

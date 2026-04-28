@@ -205,6 +205,10 @@ describe("useIriLabels", () => {
     "http://www.w3.org/2002/07/owl#topObjectProperty",
     "http://purl.org/dc/terms/hasVersion",
     "http://www.w3.org/2001/XMLSchema#string",
+    // https:// variants of the same vocabularies must also be skipped
+    "https://www.w3.org/2004/02/skos/core#prefLabel",
+    "https://purl.org/dc/terms/title",
+    "https://www.w3.org/2002/07/owl#sameAs",
   ])("skips both class probe and search for external-vocabulary IRI %s", async (iri) => {
     mockedGetClassDetail.mockResolvedValue({ labels: [{ value: "should-not", lang: "en" }] });
     mockedSearchEntities.mockResolvedValue({ results: [] });
@@ -219,6 +223,27 @@ describe("useIriLabels", () => {
     expect(mockedGetClassDetail).not.toHaveBeenCalled();
     expect(mockedSearchEntities).not.toHaveBeenCalled();
     expect(result.current[iri]).toBeUndefined();
+  });
+
+  it.each([
+    "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+    "tel:+1-555-0100",
+    "bare-string-no-scheme",
+  ])("does not short-circuit non-http(s) IRIs: %s", async (iri) => {
+    // Non-http(s) IRIs aren't in the external-vocabulary skip-list, so the
+    // hook should fall through to its normal probe path. Configure both
+    // mocks to return empty results — we just want to assert that the hook
+    // ATTEMPTED to resolve (i.e., did not silently skip).
+    mockedSearchEntities.mockResolvedValue({ results: [] });
+    mockedGetClassDetail.mockRejectedValue(new Error("not found"));
+
+    renderHook(() =>
+      useIriLabels([iri], { projectId: "proj-1", accessToken: "token" }),
+    );
+
+    await waitFor(() => {
+      expect(mockedSearchEntities).toHaveBeenCalled();
+    });
   });
 
   it("still resolves project-internal IRIs that aren't in the external skip-list", async () => {
