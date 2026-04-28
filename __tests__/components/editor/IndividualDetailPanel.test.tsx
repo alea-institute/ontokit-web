@@ -39,7 +39,7 @@ vi.mock("@/lib/hooks/useEntityAutoSave", () => ({
 
 vi.mock("@/lib/stores/editorModeStore", () => ({
   useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ editorMode: "standard", preferEditMode: true, ...editorModeOverrides }),
+    selector({ editorMode: "standard", ...editorModeOverrides }),
 }));
 
 vi.mock("@/lib/hooks/useIriLabels", () => ({
@@ -380,9 +380,7 @@ describe("IndividualDetailPanel", () => {
     });
   });
 
-  it("enters edit mode when Edit Item is clicked", async () => {
-    editorModeOverrides = { preferEditMode: false };
-    const user = userEvent.setup();
+  it("never renders an Edit Item button in editor context", async () => {
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -392,17 +390,10 @@ describe("IndividualDetailPanel", () => {
       />
     );
 
-    // With preferEditMode off the panel mounts read-only; user must click Edit Item.
-    await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
-    });
-    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
-
-    await user.click(screen.getByText("Edit Item"));
-
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
+    expect(screen.queryByText("Edit Item")).toBeNull();
   });
 
   // ── API call verification ──
@@ -649,9 +640,9 @@ describe("IndividualDetailPanel", () => {
     expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
-  // ── Auto-enter edit mode gated by preferEditMode ──
+  // ── Auto-enter edit mode in editor context ──
 
-  it("auto-enters edit mode when preferEditMode is on (editor context)", async () => {
+  it("auto-enters edit mode when onUpdateIndividual is provided", async () => {
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -663,22 +654,6 @@ describe("IndividualDetailPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-  });
-
-  it("does not auto-enter edit mode when preferEditMode is off", async () => {
-    editorModeOverrides = { preferEditMode: false };
-    const onUpdateIndividual = vi.fn();
-    render(
-      <IndividualDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateIndividual={onUpdateIndividual}
-      />
-    );
-    await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
-    });
-    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
   });
 
   // ── Draft restoration ──
@@ -1954,9 +1929,9 @@ describe("IndividualDetailPanel", () => {
     expect(screen.getByText("Label(s)")).not.toBeNull();
   });
 
-  // ── Cancel in editor context prevents re-entry ──
+  // ── Cancel keeps the panel in edit mode ──
 
-  it("does not re-enter edit mode after cancel in editor context", async () => {
+  it("stays in edit mode after cancel and discards the draft", async () => {
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1976,8 +1951,8 @@ describe("IndividualDetailPanel", () => {
 
     await waitFor(() => {
       expect(mockDiscardDraft).toHaveBeenCalled();
-      expect(screen.getByText("Edit Item")).not.toBeNull();
     });
+    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
   // ── Edit mode with isDefinedBy relationships ──

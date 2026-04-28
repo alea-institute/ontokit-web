@@ -48,7 +48,7 @@ vi.mock("@/lib/hooks/useEntityAutoSave", () => ({
 
 vi.mock("@/lib/stores/editorModeStore", () => ({
   useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ editorMode: "standard", preferEditMode: true, ...editorModeOverrides }),
+    selector({ editorMode: "standard", ...editorModeOverrides }),
 }));
 
 vi.mock("@/lib/hooks/useIriLabels", () => ({
@@ -395,9 +395,7 @@ describe("PropertyDetailPanel", () => {
     });
   });
 
-  it("enters edit mode when Edit Item is clicked", async () => {
-    editorModeOverrides = { preferEditMode: false };
-    const user = userEvent.setup();
+  it("never renders an Edit Item button in editor context", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -407,17 +405,10 @@ describe("PropertyDetailPanel", () => {
       />
     );
 
-    // With preferEditMode off the panel mounts read-only; user must click Edit Item.
-    await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
-    });
-    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
-
-    await user.click(screen.getByText("Edit Item"));
-
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
+    expect(screen.queryByText("Edit Item")).toBeNull();
   });
 
   // ── API call verification ──
@@ -667,7 +658,7 @@ describe("PropertyDetailPanel", () => {
 
   // ── Cancel edit mode ──
 
-  it("exits edit mode and calls discardDraft when cancel flow is triggered", async () => {
+  it("discards draft when cancel is invoked but stays in edit mode", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -679,8 +670,6 @@ describe("PropertyDetailPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    // Verify we are in edit mode
-    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
 
     // Trigger cancel via the captured AutoSaveAffordanceBar callback
     expect(capturedAutoSaveBarProps).not.toBeNull();
@@ -690,14 +679,14 @@ describe("PropertyDetailPanel", () => {
 
     await waitFor(() => {
       expect(mockDiscardDraft).toHaveBeenCalled();
-      // Verify edit mode exited — "Edit Item" button should be visible again
-      expect(screen.getByText("Edit Item")).not.toBeNull();
     });
+    // Editor is always in edit mode — auto-save bar stays.
+    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
-  // ── Auto-enter edit mode gated by preferEditMode ──
+  // ── Auto-enter edit mode in editor context ──
 
-  it("auto-enters edit mode when preferEditMode is on (editor context)", async () => {
+  it("auto-enters edit mode when onUpdateProperty is provided", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -706,26 +695,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    // Should auto-enter edit mode and show auto-save bar
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-  });
-
-  it("does not auto-enter edit mode when preferEditMode is off", async () => {
-    editorModeOverrides = { preferEditMode: false };
-    const onUpdateProperty = vi.fn();
-    render(
-      <PropertyDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateProperty={onUpdateProperty}
-      />
-    );
-    await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
-    });
-    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
   });
 
   // ── Draft restoration ──
@@ -1876,32 +1848,6 @@ describe("PropertyDetailPanel", () => {
   it("renders labels section title in read-only when labels exist", () => {
     render(<PropertyDetailPanel {...DEFAULT_PROPS} />);
     expect(screen.getByText("Label(s)")).not.toBeNull();
-  });
-
-  // ── Cancel in editor context prevents re-entry ──
-
-  it("does not re-enter edit mode after cancel in editor context", async () => {
-    const onUpdateProperty = vi.fn();
-    render(
-      <PropertyDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateProperty={onUpdateProperty}
-      />
-    );
-    await waitFor(() => {
-      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
-    });
-
-    // Trigger cancel
-    expect(capturedAutoSaveBarProps).not.toBeNull();
-    const onCancel = capturedAutoSaveBarProps!.onCancel as () => void;
-    onCancel();
-
-    await waitFor(() => {
-      expect(mockDiscardDraft).toHaveBeenCalled();
-      expect(screen.getByText("Edit Item")).not.toBeNull();
-    });
   });
 
   // ── Edit mode with existing annotations shows custom annotation editing ──

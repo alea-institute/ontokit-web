@@ -9,7 +9,6 @@ import {
   Copy,
   Trash2,
   AlertTriangle,
-  Pencil,
   ArrowRight,
   ArrowLeftRight,
   CheckSquare,
@@ -29,7 +28,6 @@ import { RelationshipSection, type RelationshipGroup, type RelationshipTarget } 
 import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, SEE_ALSO_IRI, getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
 import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar";
 import { useEntityAutoSave } from "@/lib/hooks/useEntityAutoSave";
-import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 import {
   extractPropertyDetail,
@@ -125,8 +123,6 @@ export function PropertyDetailPanel({
 
   const prevIriRef = useRef<string | null>(null);
   const editInitializedRef = useRef(false);
-  const cancelledIriRef = useRef<string | null>(null);
-  const preferEditMode = useEditorModeStore((s) => s.preferEditMode);
   const toast = useToast();
 
   // Build draft entry for auto-save
@@ -262,7 +258,6 @@ export function PropertyDetailPanel({
     prevIriRef.current = propertyIri;
     editInitializedRef.current = false;
     setIsEditing(false);
-    cancelledIriRef.current = null;
   }, [propertyIri]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const enterEditMode = useCallback(() => {
@@ -272,18 +267,16 @@ export function PropertyDetailPanel({
     setIsEditing(true);
   }, [detail, initEditState]);
 
+  // Cancel: discard draft, re-init from server. Stay in edit mode.
   const cancelEditMode = useCallback(() => {
     discardDraft();
     if (detail) initEditState(detail);
-    setIsEditing(false);
-    cancelledIriRef.current = propertyIri;
-  }, [propertyIri, detail, discardDraft, initEditState]);
+  }, [detail, discardDraft, initEditState]);
 
-  // Manual save: trigger draft save, flush to git, exit edit mode on success
+  // Manual save: flush the current draft to git. Stays in edit mode.
   const saveAndExitEditMode = useCallback(async () => {
     triggerSave();
-    const ok = await flushToGit();
-    if (ok) setIsEditing(false);
+    await flushToGit();
   }, [triggerSave, flushToGit]);
 
   // Auto-enter edit mode
@@ -310,10 +303,10 @@ export function PropertyDetailPanel({
       return;
     }
 
-    if (preferEditMode && onUpdateProperty && cancelledIriRef.current !== propertyIri) {
+    if (onUpdateProperty) {
       enterEditMode();
     }
-  }, [detail, canEdit, restoredDraft, propertyIri, clearRestoredDraft, onUpdateProperty, preferEditMode, isEditing, enterEditMode]);
+  }, [detail, canEdit, restoredDraft, propertyIri, clearRestoredDraft, onUpdateProperty, isEditing, enterEditMode]);
 
   // ── Edit helpers ──
   const updateLabel = useCallback((index: number, field: "value" | "lang", val: string) => {
@@ -447,7 +440,6 @@ export function PropertyDetailPanel({
 
   const typeInfo = PROPERTY_TYPE_LABELS[detail.propertyType];
   const displayLabel = detail.labels.length > 0 ? detail.labels[0].value : getLocalName(propertyIri);
-  const canEnterEdit = canEdit && !!onUpdateProperty;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -468,13 +460,6 @@ export function PropertyDetailPanel({
                   </span>
                 )}
               </h2>
-              {canEnterEdit && !isEditing && (
-                <div className="shrink-0">
-                  <button onClick={enterEditMode} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20" title="Enter edit mode">
-                    <Pencil className="h-3.5 w-3.5" />Edit Item
-                  </button>
-                </div>
-              )}
             </div>
             <div className="mt-1 flex items-center gap-2">
               <span className={cn("rounded-full px-2 py-0.5 text-[10px] font-medium border", typeInfo.color)}>

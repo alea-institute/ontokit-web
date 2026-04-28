@@ -466,7 +466,7 @@ function EditorPreferencesSection() {
               {preferEditMode ? "On" : "Off"}
             </p>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              When on, opening an entity in the editor enters edit mode immediately. When off, entities open read-only and you click &ldquo;Edit Item&rdquo; to make changes.
+              When on, opening a project takes you straight to the editor. When off, projects open in the read-only viewer first.
             </p>
           </div>
         </button>

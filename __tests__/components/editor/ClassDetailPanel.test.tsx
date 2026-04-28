@@ -50,7 +50,7 @@ vi.mock("@/lib/hooks/useAutoSave", () => ({
 
 vi.mock("@/lib/stores/editorModeStore", () => ({
   useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ editorMode: "standard", preferEditMode: true, ...editorModeOverrides }),
+    selector({ editorMode: "standard", ...editorModeOverrides }),
 }));
 
 // Stub child components
@@ -447,22 +447,6 @@ describe("ClassDetailPanel", () => {
     });
   });
 
-  it("shows 'Suggest Changes' when isSuggestionMode is true", async () => {
-    const onUpdateClass = vi.fn();
-    render(
-      <ClassDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        isSuggestionMode={true}
-        onUpdateClass={onUpdateClass}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Suggest Changes")).toBeDefined();
-    });
-  });
-
   // ── Tree-node fallback for unsaved entities ──
 
   it("renders unsaved entity fallback with parent link", async () => {
@@ -581,9 +565,7 @@ describe("ClassDetailPanel", () => {
 
   // ── Edit mode entry ──
 
-  it("enters edit mode when Edit Item button is clicked", async () => {
-    editorModeOverrides = { preferEditMode: false };
-    const user = userEvent.setup();
+  it("auto-enters edit mode and renders inputs when onUpdateClass is provided", async () => {
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -592,14 +574,6 @@ describe("ClassDetailPanel", () => {
         onUpdateClass={onUpdateClass}
       />
     );
-
-    // With preferEditMode off the panel mounts read-only; user must click Edit Item.
-    await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
-    });
-    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
-
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
@@ -848,7 +822,7 @@ describe("ClassDetailPanel", () => {
 
   // ── Cancel flow ──
 
-  it("exits edit mode and discards draft when cancel is invoked", async () => {
+  it("discards draft when cancel is invoked but stays in edit mode", async () => {
     const user = userEvent.setup();
     const onUpdateClass = vi.fn();
 
@@ -874,9 +848,9 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       expect(mockDiscardDraft).toHaveBeenCalled();
-      // Verify edit mode exited — "Edit Item" button should be visible again
-      expect(screen.getByText("Edit Item")).not.toBeNull();
     });
+    // Editor is always in edit mode — auto-save bar stays.
+    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
   it("calls flushToGit when navigating to a different class", async () => {
@@ -969,9 +943,9 @@ describe("ClassDetailPanel", () => {
     });
   });
 
-  // ── Edit mode hides Edit Item button ──
+  // ── No "Edit Item" affordance in editor context ──
 
-  it("hides Edit Item button while in edit mode", async () => {
+  it("never renders an Edit Item button in editor context", async () => {
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -984,10 +958,7 @@ describe("ClassDetailPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-
-    await waitFor(() => {
-      expect(screen.queryByText("Edit Item")).toBeNull();
-    });
+    expect(screen.queryByText("Edit Item")).toBeNull();
   });
 
   // ── Definition in edit mode ──
@@ -1717,9 +1688,9 @@ describe("ClassDetailPanel", () => {
     expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
-  // ── Auto-enter edit mode gated by preferEditMode ──
+  // ── Auto-enter edit mode in editor context ──
 
-  it("auto-enters edit mode when preferEditMode is on (editor context)", async () => {
+  it("auto-enters edit mode when onUpdateClass is provided", async () => {
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -1734,26 +1705,9 @@ describe("ClassDetailPanel", () => {
     });
   });
 
-  it("does not auto-enter edit mode when preferEditMode is off", async () => {
-    editorModeOverrides = { preferEditMode: false };
-    const onUpdateClass = vi.fn();
-    render(
-      <ClassDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateClass={onUpdateClass}
-      />
-    );
+  // ── Cancel keeps the panel in edit mode ──
 
-    await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
-    });
-    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
-  });
-
-  // ── Does not auto-enter after cancel ──
-
-  it("does not re-enter edit mode after cancel in editor context", async () => {
+  it("stays in edit mode after cancel and discards the draft", async () => {
     const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
@@ -1773,8 +1727,8 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       expect(mockDiscardDraft).toHaveBeenCalled();
-      expect(screen.getByText("Edit Item")).not.toBeNull();
     });
+    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
   // ── Draft restoration auto-enter ──

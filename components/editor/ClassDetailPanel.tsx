@@ -26,7 +26,6 @@ import {
   StickyNote,
   Hash,
   Link2,
-  Pencil,
 } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail, type ClassUpdatePayload, type AnnotationUpdate } from "@/lib/api/client";
 import type { LocalizedString } from "@/lib/api/client";
@@ -44,7 +43,6 @@ import { CrossReferencesPanel } from "@/components/editor/CrossReferencesPanel";
 import { SimilarConceptsPanel } from "@/components/editor/SimilarConceptsPanel";
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
-import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
@@ -90,7 +88,6 @@ export function ClassDetailPanel({
   onCopyIri,
   selectedNodeFallback,
   canEdit,
-  isSuggestionMode = false,
   onUpdateClass,
   refreshKey,
   headerActions,
@@ -116,10 +113,6 @@ export function ClassDetailPanel({
   // Track the previous classIri so we can flush on navigate
   const prevClassIriRef = useRef<string | null>(null);
   const editInitializedRef = useRef(false);
-  // Track if user explicitly cancelled editing for this classIri (prevents auto-re-entry)
-  const cancelledIriRef = useRef<string | null>(null);
-
-  const preferEditMode = useEditorModeStore((s) => s.preferEditMode);
 
   // Toast for error feedback
   const toast = useToast();
@@ -174,7 +167,6 @@ export function ClassDetailPanel({
     setResolvedTargetLabels({});
     editInitializedRef.current = false;
     setIsEditing(false);
-    cancelledIriRef.current = null;
   }, [classIri]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Enter edit mode: initialize edit state from classDetail
@@ -185,21 +177,19 @@ export function ClassDetailPanel({
     setIsEditing(true);
   }, [classDetail]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Cancel edit mode: discard draft, revert to server state
+  // Cancel: discard the in-progress draft and re-init from server state.
+  // The panel stays in edit mode — the editor is always editable.
   const cancelEditMode = useCallback(() => {
     discardDraft();
     if (classDetail) {
       initEditState(classDetail);
     }
-    setIsEditing(false);
-    cancelledIriRef.current = classIri;
-  }, [classIri, classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Manual save: trigger draft save, flush to git, exit edit mode on success
+  // Manual save: flush the current draft to git. Stays in edit mode.
   const saveAndExitEditMode = useCallback(async () => {
     triggerSave();
-    const ok = await flushToGit();
-    if (ok) setIsEditing(false);
+    await flushToGit();
   }, [triggerSave, flushToGit]);
 
   // Auto-enter edit mode based on continuous editing or restored draft
@@ -221,13 +211,9 @@ export function ClassDetailPanel({
       return;
     }
 
-    // In editor context with the "prefer edit mode" preference enabled, auto-enter edit mode
-    // unless the user explicitly cancelled for this class
-    if (preferEditMode && !!onUpdateClass && cancelledIriRef.current !== classIri) {
-      enterEditMode();
-      return;
-    }
-  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, onUpdateClass, preferEditMode, isEditing, enterEditMode]);
+    // In editor context (canEdit + onUpdateClass), always auto-enter edit mode.
+    enterEditMode();
+  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, onUpdateClass, isEditing, enterEditMode]);
 
   // Initialize edit state from OWLClassDetail
   const initEditState = useCallback((detail: OWLClassDetail) => {
@@ -570,7 +556,6 @@ export function ClassDetailPanel({
   }
 
   const displayLabel = getPreferredLabel(classDetail.labels) || getLocalName(classDetail.iri);
-  const canEnterEdit = !!canEdit && !!onUpdateClass;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -593,16 +578,6 @@ export function ClassDetailPanel({
               </h2>
               <div className="flex shrink-0 items-center gap-1">
                 {headerActions}
-                {canEnterEdit && !isEditing && (
-                  <button
-                    onClick={enterEditMode}
-                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-                    title="Enter edit mode"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    {isSuggestionMode ? "Suggest Changes" : "Edit Item"}
-                  </button>
-                )}
               </div>
             </div>
             <div className="mt-1 flex items-center gap-2">
