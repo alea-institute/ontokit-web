@@ -51,35 +51,28 @@ export function PropertyTree({
 
         if (cancelled) return;
 
-        // Group properties by likely type based on IRI patterns
+        // Group properties by their declared OWL subtype as exposed by the
+        // backend. Falls back to "Other" when property_kind is missing — that
+        // covers both unusual rdf:type combinations (e.g. plain rdf:Property)
+        // and older backends that don't yet populate the field.
         const objectProps: EntitySearchResult[] = [];
         const dataProps: EntitySearchResult[] = [];
         const annotationProps: EntitySearchResult[] = [];
+        const otherProps: EntitySearchResult[] = [];
 
         for (const prop of response.results) {
-          const iri = prop.iri.toLowerCase();
-          if (
-            iri.includes("objectproperty") ||
-            iri.includes("object-property")
-          ) {
-            objectProps.push(prop);
-          } else if (
-            iri.includes("datatypeproperty") ||
-            iri.includes("datatype-property") ||
-            iri.includes("dataproperty")
-          ) {
-            dataProps.push(prop);
-          } else if (
-            iri.includes("annotationproperty") ||
-            iri.includes("annotation-property") ||
-            iri.startsWith("http://www.w3.org/2000/01/rdf-schema#") ||
-            iri.startsWith("http://www.w3.org/2004/02/skos/core#") ||
-            iri.startsWith("http://purl.org/dc/")
-          ) {
-            annotationProps.push(prop);
-          } else {
-            // Default to object property group
-            objectProps.push(prop);
+          switch (prop.property_kind) {
+            case "object":
+              objectProps.push(prop);
+              break;
+            case "data":
+              dataProps.push(prop);
+              break;
+            case "annotation":
+              annotationProps.push(prop);
+              break;
+            default:
+              otherProps.push(prop);
           }
         }
 
@@ -93,10 +86,8 @@ export function PropertyTree({
         if (annotationProps.length > 0) {
           newGroups.push({ label: "Annotation Properties", type: "annotation", items: annotationProps, isExpanded: true });
         }
-
-        // If all ended up in one bucket with no type hints, show flat
-        if (newGroups.length === 0 && response.results.length > 0) {
-          newGroups.push({ label: "Properties", type: "all", items: response.results, isExpanded: true });
+        if (otherProps.length > 0) {
+          newGroups.push({ label: "Other Properties", type: "other", items: otherProps, isExpanded: true });
         }
 
         setGroups(newGroups);
