@@ -3,6 +3,32 @@ import { projectOntologyApi } from "@/lib/api/client";
 import { getPreferredLabel, getLocalName } from "@/lib/utils";
 
 /**
+ * IRIs whose namespace belongs to a well-known external vocabulary will never
+ * resolve via the project's class/property/individual endpoints — and the
+ * project's own searchEntities endpoint won't find them either. Skipping the
+ * probe for these saves a round-trip and eliminates noisy 404s in the console
+ * while still letting getLocalName provide a sensible default label.
+ */
+const EXTERNAL_VOCABULARY_PREFIXES: readonly string[] = [
+  "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+  "http://www.w3.org/2000/01/rdf-schema#",
+  "http://www.w3.org/2001/XMLSchema#",
+  "http://www.w3.org/2002/07/owl#",
+  "http://www.w3.org/2004/02/skos/core#",
+  "http://purl.org/dc/elements/1.1/",
+  "http://purl.org/dc/terms/",
+  "http://xmlns.com/foaf/0.1/",
+  "http://www.w3.org/ns/prov#",
+];
+
+function isExternalVocabularyIri(iri: string): boolean {
+  for (const prefix of EXTERNAL_VOCABULARY_PREFIXES) {
+    if (iri.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
+/**
  * Async-resolve rdfs:labels for a set of IRIs.
  *
  * Returns a stable `Record<string, string>` that maps IRI → human-readable label.
@@ -54,6 +80,12 @@ export function useIriLabels(
         const batch = unresolved.slice(i, i + 10);
         await Promise.all(
           batch.map(async (iri) => {
+            // External-vocabulary IRIs (skos, rdfs, owl, dcterms, …) live
+            // outside the project ontology, so neither the class endpoint nor
+            // the project search can resolve them. Skip the probe entirely
+            // and let the caller fall back on getLocalName.
+            if (isExternalVocabularyIri(iri)) return;
+
             // 1. Try class endpoint (fastest for classes)
             try {
               const detail = await projectOntologyApi.getClassDetail(
