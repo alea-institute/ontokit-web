@@ -138,8 +138,9 @@ ex:MyOntology ex:hasMaintainer "Jane Doe" .  # not used in inference`}</pre>
           </h2>
           <p className="text-slate-600 dark:text-slate-400 mb-4">
             OWL lets you mark a property with axioms that constrain how it behaves &mdash; a
-            reasoner uses these to derive new triples or detect contradictions. These apply
-            to object properties (and most also to datatype properties).
+            reasoner uses these to derive new triples or detect contradictions. In OWL 2 DL
+            these characteristics apply to object properties; the only one also permitted on
+            datatype properties is <code className="font-mono text-xs">owl:FunctionalProperty</code>.
           </p>
           <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
             <table className="w-full text-sm">
@@ -159,7 +160,7 @@ ex:MyOntology ex:hasMaintainer "Jane Doe" .  # not used in inference`}</pre>
                 <tr>
                   <td className="px-4 py-3 font-mono text-xs text-slate-900 dark:text-white">owl:InverseFunctionalProperty</td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-400">Each value identifies at most one subject (only on object properties)</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-mono text-xs">hasISBN</td>
+                  <td className="px-4 py-3 text-slate-600 dark:text-slate-400 font-mono text-xs">hasPassport</td>
                 </tr>
                 <tr>
                   <td className="px-4 py-3 font-mono text-xs text-slate-900 dark:text-white">owl:TransitiveProperty</td>
