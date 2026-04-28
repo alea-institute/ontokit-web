@@ -396,6 +396,8 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("enters edit mode when Edit Item is clicked", async () => {
+    editorModeOverrides = { preferEditMode: false };
+    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -404,11 +406,18 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
+
+    // With preferEditMode off the panel mounts read-only; user must click Edit Item.
+    await waitFor(() => {
+      expect(screen.getByText("Edit Item")).not.toBeNull();
+    });
+    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
+
+    await user.click(screen.getByText("Edit Item"));
+
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    // Auto-save bar should appear
-    expect(screen.getByTestId("auto-save-bar")).toBeDefined();
   });
 
   // ── API call verification ──

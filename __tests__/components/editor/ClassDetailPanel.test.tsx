@@ -582,6 +582,8 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode entry ──
 
   it("enters edit mode when Edit Item button is clicked", async () => {
+    editorModeOverrides = { preferEditMode: false };
+    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -591,16 +593,20 @@ describe("ClassDetailPanel", () => {
       />
     );
 
+    // With preferEditMode off the panel mounts read-only; user must click Edit Item.
+    await waitFor(() => {
+      expect(screen.getByText("Edit Item")).not.toBeNull();
+    });
+    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
+
+    await user.click(screen.getByText("Edit Item"));
+
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-
-    // In edit mode, label should be rendered in an input
-    await waitFor(() => {
-      const labelInput = screen.getByDisplayValue("Person");
-      expect(labelInput).not.toBeNull();
-      expect(labelInput.tagName).toBe("INPUT");
-    });
+    const labelInput = screen.getByDisplayValue("Person");
+    expect(labelInput).not.toBeNull();
+    expect(labelInput.tagName).toBe("INPUT");
   });
 
   // ── Label editing ──
