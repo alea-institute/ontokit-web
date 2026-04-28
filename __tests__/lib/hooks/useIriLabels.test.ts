@@ -27,32 +27,7 @@ describe("useIriLabels", () => {
     expect(mockedGetClassDetail).not.toHaveBeenCalled();
   });
 
-  it("resolves labels via getClassDetail", async () => {
-    mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Person", language: "en" }],
-    });
-
-    const { result } = renderHook(() =>
-      useIriLabels(["http://example.org/Person"], {
-        projectId: "proj-1",
-        accessToken: "token",
-        branch: "main",
-      }),
-    );
-
-    await waitFor(() => {
-      expect(result.current["http://example.org/Person"]).toBe("Person");
-    });
-    expect(mockedGetClassDetail).toHaveBeenCalledWith(
-      "proj-1",
-      "http://example.org/Person",
-      "token",
-      "main",
-    );
-  });
-
-  it("falls back to searchEntities when getClassDetail fails", async () => {
-    mockedGetClassDetail.mockRejectedValue(new Error("Not a class"));
+  it("resolves labels via searchEntities (primary path)", async () => {
     mockedSearchEntities.mockResolvedValue({
       results: [
         { iri: "http://example.org/hasPart", label: "has Part" },
@@ -69,6 +44,55 @@ describe("useIriLabels", () => {
     await waitFor(() => {
       expect(result.current["http://example.org/hasPart"]).toBe("has Part");
     });
+    // Search alone resolved it — no class probe needed.
+    expect(mockedSearchEntities).toHaveBeenCalled();
+    expect(mockedGetClassDetail).not.toHaveBeenCalled();
+  });
+
+  it("falls back to getClassDetail when search returns no match", async () => {
+    // Search returns an empty result set — IRI isn't in the search index.
+    mockedSearchEntities.mockResolvedValue({ results: [] });
+    mockedGetClassDetail.mockResolvedValue({
+      labels: [{ value: "Person", language: "en" }],
+    });
+
+    const { result } = renderHook(() =>
+      useIriLabels(["http://example.org/Person"], {
+        projectId: "proj-1",
+        accessToken: "token",
+        branch: "main",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current["http://example.org/Person"]).toBe("Person");
+    });
+    expect(mockedSearchEntities).toHaveBeenCalled();
+    expect(mockedGetClassDetail).toHaveBeenCalledWith(
+      "proj-1",
+      "http://example.org/Person",
+      "token",
+      "main",
+    );
+  });
+
+  it("falls back to getClassDetail when search throws", async () => {
+    mockedSearchEntities.mockRejectedValue(new Error("search down"));
+    mockedGetClassDetail.mockResolvedValue({
+      labels: [{ value: "Person", language: "en" }],
+    });
+
+    const { result } = renderHook(() =>
+      useIriLabels(["http://example.org/Person"], {
+        projectId: "proj-1",
+        accessToken: "token",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current["http://example.org/Person"]).toBe("Person");
+    });
+    expect(mockedGetClassDetail).toHaveBeenCalled();
   });
 
   it("returns labelHints for known IRIs without fetching", () => {

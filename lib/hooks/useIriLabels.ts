@@ -86,18 +86,11 @@ export function useIriLabels(
             // and let the caller fall back on getLocalName.
             if (isExternalVocabularyIri(iri)) return;
 
-            // 1. Try class endpoint (fastest for classes)
-            try {
-              const detail = await projectOntologyApi.getClassDetail(
-                projectId, iri, accessToken, branch,
-              );
-              const label = getPreferredLabel(detail.labels);
-              if (label) { newLabels[iri] = label; return; }
-            } catch {
-              // Not a class — fall through
-            }
-
-            // 2. Fallback: entity search by local name
+            // 1. Search by local name. searchEntities returns labels for any
+            //    entity type (class / property / individual) the project knows
+            //    about, so a single call resolves most internal IRIs without
+            //    the 404 noise that the class endpoint produces for properties
+            //    and individuals.
             try {
               const localName = getLocalName(iri);
               const result = await projectOntologyApi.searchEntities(
@@ -108,7 +101,20 @@ export function useIriLabels(
               );
               if (match?.label) { newLabels[iri] = match.label; return; }
             } catch {
-              // Search failed — leave unresolved
+              // Search failed — fall through to class probe
+            }
+
+            // 2. Fallback: try the class endpoint directly. This catches IRIs
+            //    that exist as classes but whose local name doesn't surface in
+            //    a search (e.g. opaque IDs that getLocalName trims to noise).
+            try {
+              const detail = await projectOntologyApi.getClassDetail(
+                projectId, iri, accessToken, branch,
+              );
+              const label = getPreferredLabel(detail.labels);
+              if (label) { newLabels[iri] = label; return; }
+            } catch {
+              // Not a class either — leave unresolved; caller falls back to getLocalName.
             }
           }),
         );
