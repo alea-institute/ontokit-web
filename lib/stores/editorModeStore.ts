@@ -8,9 +8,12 @@ interface EditorModeState {
   editorMode: EditorMode;
   theme: ThemePreference;
   hideSaveButton: boolean;
+  /** When true, opening an entity in the editor auto-enters edit mode (no extra "Edit Item" click). */
+  preferEditMode: boolean;
   setEditorMode: (mode: EditorMode) => void;
   setTheme: (theme: ThemePreference) => void;
   setHideSaveButton: (on: boolean) => void;
+  setPreferEditMode: (on: boolean) => void;
 }
 
 /**
@@ -38,6 +41,7 @@ export const useEditorModeStore = create<EditorModeState>()(
       editorMode: "standard",
       theme: "system",
       hideSaveButton: false,
+      preferEditMode: false,
 
       setEditorMode: (mode) => set({ editorMode: mode }),
 
@@ -47,6 +51,8 @@ export const useEditorModeStore = create<EditorModeState>()(
       },
 
       setHideSaveButton: (on) => set({ hideSaveButton: on }),
+
+      setPreferEditMode: (on) => set({ preferEditMode: on }),
     }),
     {
       name: "ontokit-editor-preferences",

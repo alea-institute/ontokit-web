@@ -28,6 +28,7 @@ import { RelationshipSection, type RelationshipGroup, type RelationshipTarget } 
 import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, SEE_ALSO_IRI, getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
 import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar";
 import { useEntityAutoSave } from "@/lib/hooks/useEntityAutoSave";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 import {
   extractPropertyDetail,
@@ -124,6 +125,7 @@ export function PropertyDetailPanel({
   const prevIriRef = useRef<string | null>(null);
   const editInitializedRef = useRef(false);
   const cancelledIriRef = useRef<string | null>(null);
+  const preferEditMode = useEditorModeStore((s) => s.preferEditMode);
   const toast = useToast();
 
   // Build draft entry for auto-save
@@ -307,10 +309,10 @@ export function PropertyDetailPanel({
       return;
     }
 
-    if (onUpdateProperty && cancelledIriRef.current !== propertyIri) {
+    if (preferEditMode && onUpdateProperty && cancelledIriRef.current !== propertyIri) {
       enterEditMode();
     }
-  }, [detail, canEdit, restoredDraft, propertyIri, clearRestoredDraft, onUpdateProperty, isEditing, enterEditMode]);
+  }, [detail, canEdit, restoredDraft, propertyIri, clearRestoredDraft, onUpdateProperty, preferEditMode, isEditing, enterEditMode]);
 
   // ── Edit helpers ──
   const updateLabel = useCallback((index: number, field: "value" | "lang", val: string) => {

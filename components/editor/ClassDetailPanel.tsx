@@ -43,6 +43,7 @@ import { CrossReferencesPanel } from "@/components/editor/CrossReferencesPanel";
 import { SimilarConceptsPanel } from "@/components/editor/SimilarConceptsPanel";
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
@@ -116,6 +117,8 @@ export function ClassDetailPanel({
   const editInitializedRef = useRef(false);
   // Track if user explicitly cancelled editing for this classIri (prevents auto-re-entry)
   const cancelledIriRef = useRef<string | null>(null);
+
+  const preferEditMode = useEditorModeStore((s) => s.preferEditMode);
 
   // Toast for error feedback
   const toast = useToast();
@@ -217,13 +220,13 @@ export function ClassDetailPanel({
       return;
     }
 
-    // In editor context (canEdit + onUpdateClass), auto-enter edit mode
-    // unless user explicitly cancelled for this class
-    if (!!onUpdateClass && cancelledIriRef.current !== classIri) {
+    // In editor context with the "prefer edit mode" preference enabled, auto-enter edit mode
+    // unless the user explicitly cancelled for this class
+    if (preferEditMode && !!onUpdateClass && cancelledIriRef.current !== classIri) {
       enterEditMode();
       return;
     }
-  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, onUpdateClass, isEditing, enterEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, onUpdateClass, preferEditMode, isEditing, enterEditMode]);
 
   // Initialize edit state from OWLClassDetail
   const initEditState = useCallback((detail: OWLClassDetail) => {

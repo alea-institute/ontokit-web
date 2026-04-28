@@ -12,7 +12,6 @@ import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
 import { useToast } from "@/lib/context/ToastContext";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
-
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";

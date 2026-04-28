@@ -83,6 +83,7 @@ describe("useEditorModeStore", () => {
       editorMode: "standard",
       theme: "system",
       hideSaveButton: false,
+      preferEditMode: false,
     });
   });
 
@@ -92,6 +93,7 @@ describe("useEditorModeStore", () => {
       expect(state.editorMode).toBe("standard");
       expect(state.theme).toBe("system");
       expect(state.hideSaveButton).toBe(false);
+      expect(state.preferEditMode).toBe(false);
     });
   });
 
@@ -141,6 +143,19 @@ describe("useEditorModeStore", () => {
       useEditorModeStore.getState().setHideSaveButton(true);
       useEditorModeStore.getState().setHideSaveButton(false);
       expect(useEditorModeStore.getState().hideSaveButton).toBe(false);
+    });
+  });
+
+  describe("setPreferEditMode", () => {
+    it("turns on the prefer-edit-mode preference", () => {
+      useEditorModeStore.getState().setPreferEditMode(true);
+      expect(useEditorModeStore.getState().preferEditMode).toBe(true);
+    });
+
+    it("turns the preference back off", () => {
+      useEditorModeStore.getState().setPreferEditMode(true);
+      useEditorModeStore.getState().setPreferEditMode(false);
+      expect(useEditorModeStore.getState().preferEditMode).toBe(false);
     });
   });
 });

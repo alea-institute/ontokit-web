@@ -28,6 +28,7 @@ import { PropertyAssertionSection } from "@/components/editor/standard/PropertyA
 import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, SEE_ALSO_IRI, getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
 import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar";
 import { useEntityAutoSave } from "@/lib/hooks/useEntityAutoSave";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 import {
   extractIndividualDetail,
@@ -119,6 +120,7 @@ export function IndividualDetailPanel({
 
   const editInitializedRef = useRef(false);
   const cancelledIriRef = useRef<string | null>(null);
+  const preferEditMode = useEditorModeStore((s) => s.preferEditMode);
   const toast = useToast();
 
   const buildDraftEntry = useCallback((): IndividualDraftEntry | null => {
@@ -292,10 +294,10 @@ export function IndividualDetailPanel({
       return;
     }
 
-    if (onUpdateIndividual && cancelledIriRef.current !== individualIri) {
+    if (preferEditMode && onUpdateIndividual && cancelledIriRef.current !== individualIri) {
       enterEditMode();
     }
-  }, [detail, canEdit, restoredDraft, individualIri, clearRestoredDraft, onUpdateIndividual, isEditing, enterEditMode]);
+  }, [detail, canEdit, restoredDraft, individualIri, clearRestoredDraft, onUpdateIndividual, preferEditMode, isEditing, enterEditMode]);
 
   // ── Edit helpers ──
   const updateLabel = useCallback((index: number, field: "value" | "lang", val: string) => {

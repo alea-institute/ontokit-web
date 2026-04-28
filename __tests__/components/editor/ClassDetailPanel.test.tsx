@@ -50,7 +50,7 @@ vi.mock("@/lib/hooks/useAutoSave", () => ({
 
 vi.mock("@/lib/stores/editorModeStore", () => ({
   useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ editorMode: "standard", ...editorModeOverrides }),
+    selector({ editorMode: "standard", preferEditMode: true, ...editorModeOverrides }),
 }));
 
 // Stub child components
@@ -1710,9 +1710,9 @@ describe("ClassDetailPanel", () => {
     expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
-  // ── Auto-enter edit mode in editor context ──
+  // ── Auto-enter edit mode gated by preferEditMode ──
 
-  it("auto-enters edit mode when onUpdateClass is provided (editor context)", async () => {
+  it("auto-enters edit mode when preferEditMode is on (editor context)", async () => {
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -1725,6 +1725,23 @@ describe("ClassDetailPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
+  });
+
+  it("does not auto-enter edit mode when preferEditMode is off", async () => {
+    editorModeOverrides = { preferEditMode: false };
+    const onUpdateClass = vi.fn();
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit={true}
+        onUpdateClass={onUpdateClass}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Edit Item")).not.toBeNull();
+    });
+    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
   });
 
   // ── Does not auto-enter after cancel ──

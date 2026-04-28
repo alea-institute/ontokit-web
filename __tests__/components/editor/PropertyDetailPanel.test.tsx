@@ -48,7 +48,7 @@ vi.mock("@/lib/hooks/useEntityAutoSave", () => ({
 
 vi.mock("@/lib/stores/editorModeStore", () => ({
   useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ editorMode: "standard", ...editorModeOverrides }),
+    selector({ editorMode: "standard", preferEditMode: true, ...editorModeOverrides }),
 }));
 
 vi.mock("@/lib/hooks/useIriLabels", () => ({
@@ -684,9 +684,9 @@ describe("PropertyDetailPanel", () => {
     });
   });
 
-  // ── Auto-enter edit mode in editor context ──
+  // ── Auto-enter edit mode gated by preferEditMode ──
 
-  it("auto-enters edit mode when onUpdateProperty is provided (editor context)", () => {
+  it("auto-enters edit mode when preferEditMode is on (editor context)", () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -697,6 +697,22 @@ describe("PropertyDetailPanel", () => {
     );
     // Should auto-enter edit mode and show auto-save bar
     expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+  });
+
+  it("does not auto-enter edit mode when preferEditMode is off", async () => {
+    editorModeOverrides = { preferEditMode: false };
+    const onUpdateProperty = vi.fn();
+    render(
+      <PropertyDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit={true}
+        onUpdateProperty={onUpdateProperty}
+      />
+    );
+    await waitFor(() => {
+      expect(screen.getByText("Edit Item")).not.toBeNull();
+    });
+    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
   });
 
   // ── Draft restoration ──
