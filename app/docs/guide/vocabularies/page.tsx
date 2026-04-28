@@ -272,7 +272,7 @@ ex:Mammals a skos:Concept ;
                   Linked Open Vocabularies (LOV)
                 </a>{" "}
                 <span className="text-slate-600 dark:text-slate-400">
-                  {" "}&mdash; A curated catalog of reusable RDF vocabularies with search and usage statistics.
+                  &mdash; A curated catalog of reusable RDF vocabularies with search and usage statistics.
                 </span>
               </li>
               <li>
@@ -280,7 +280,7 @@ ex:Mammals a skos:Concept ;
                   prefix.cc
                 </a>{" "}
                 <span className="text-slate-600 dark:text-slate-400">
-                  {" "}&mdash; A community-maintained registry for looking up namespace prefixes and their IRIs.
+                  &mdash; A community-maintained registry for looking up namespace prefixes and their IRIs.
                 </span>
               </li>
               <li>
@@ -288,7 +288,7 @@ ex:Mammals a skos:Concept ;
                   BARTOC
                 </a>{" "}
                 <span className="text-slate-600 dark:text-slate-400">
-                  {" "}&mdash; Basel Register of Thesauri, Ontologies & Classifications.
+                  &mdash; Basel Register of Thesauri, Ontologies & Classifications.
                 </span>
               </li>
             </ul>

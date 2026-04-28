@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { changelogAnchorId } from "@/lib/docs/changelog";
 import { cn } from "@/lib/utils";
 
 interface TocEntry {
@@ -8,15 +9,13 @@ interface TocEntry {
   date: string;
 }
 
-const idFor = (version: string) => `v-${version.replace(/\./g, "-")}`;
-
 export function ChangelogToc({ entries }: { entries: TocEntry[] }) {
   const [active, setActive] = useState<string | null>(
-    entries[0] ? idFor(entries[0].version) : null,
+    entries[0] ? changelogAnchorId(entries[0].version) : null,
   );
 
   useEffect(() => {
-    const ids = entries.map(({ version }) => idFor(version));
+    const ids = entries.map(({ version }) => changelogAnchorId(version));
     const targets = ids
       .map((id) => document.getElementById(id))
       .filter((el): el is HTMLElement => el !== null);
@@ -59,7 +58,7 @@ export function ChangelogToc({ entries }: { entries: TocEntry[] }) {
         </h3>
         <ul className="space-y-0.5">
           {entries.map(({ version, date }) => {
-            const id = idFor(version);
+            const id = changelogAnchorId(version);
             const isActive = active === id;
             return (
               <li key={version}>

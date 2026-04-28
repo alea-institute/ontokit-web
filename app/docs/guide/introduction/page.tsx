@@ -55,8 +55,19 @@ export default function IntroductionPage() {
                 across projects, preventing each team from reinventing the same domain model.
               </li>
               <li>
-                <strong>Data validation:</strong> Ontologies define constraints (e.g., a person must{" "}
-                have exactly one birth date) that can be used to validate data quality.
+                <strong>Entailment &amp; consistency checking:</strong> Ontologies express{" "}
+                constraints (e.g., a person has at most one birth date) that a reasoner uses to{" "}
+                derive new facts and detect contradictions. Because OWL adopts the open-world{" "}
+                assumption, it isn&apos;t a closed-world data validator &mdash; for that, use{" "}
+                <a
+                  href="https://www.w3.org/TR/shacl/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  SHACL
+                </a>{" "}
+                or a similar shape/constraint language alongside the ontology.
               </li>
             </ul>
           </div>

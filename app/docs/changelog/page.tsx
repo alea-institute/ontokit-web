@@ -1,4 +1,5 @@
 import { ChangelogToc } from "@/components/docs/ChangelogToc";
+import { changelogAnchorId } from "@/lib/docs/changelog";
 
 interface ChangelogCategory {
   title: string;
@@ -188,7 +189,7 @@ export default function ChangelogPage() {
           {changelog.map((entry) => (
             <section
               key={entry.version}
-              id={`v-${entry.version.replace(/\./g, "-")}`}
+              id={changelogAnchorId(entry.version)}
               className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 scroll-mt-4"
             >
               <div className="flex items-baseline gap-3 mb-4">
