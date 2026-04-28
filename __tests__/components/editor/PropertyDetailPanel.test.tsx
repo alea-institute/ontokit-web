@@ -735,22 +735,16 @@ describe("PropertyDetailPanel", () => {
     expect(mockClearRestoredDraft).toHaveBeenCalled();
   });
 
-  // ── flushToGit on IRI change ──
+  // ── flushToGit on unmount ──
 
-  it("calls flushToGit when propertyIri changes", async () => {
-    const { rerender } = render(
+  it("flushes pending draft to git on unmount", async () => {
+    // The parent layout remounts the panel on selection change via a key
+    // prop, so unmount is what carries pending edits to the backend.
+    const { unmount } = render(
       <PropertyDetailPanel {...DEFAULT_PROPS} canEdit={false} />
     );
-    rerender(
-      <PropertyDetailPanel
-        {...DEFAULT_PROPS}
-        propertyIri="http://example.org/ontology#hasChild"
-        canEdit={false}
-      />
-    );
-    await waitFor(() => {
-      expect(mockFlushToGit).toHaveBeenCalled();
-    });
+    unmount();
+    expect(mockFlushToGit).toHaveBeenCalled();
   });
 
   // ── Does not show characteristics for data properties ──

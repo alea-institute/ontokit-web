@@ -249,15 +249,20 @@ export function PropertyDetailPanel({
     setEditAnnotations(regularAnnotations);
   }, []);
 
-  // Flush any pending draft to git when this panel unmounts (the parent
-  // remounts the panel on propertyIri change via a key prop, so "navigate
-  // away" maps to "instance unmount").
+  // Flush any pending draft to git when this panel unmounts. The flush
+  // closure captures props that can change between mount and unmount, so
+  // route the call through a ref that we keep up to date in an effect — the
+  // cleanup then sees the latest closure rather than the one captured on
+  // first render.
+  const flushToGitRef = useRef(flushToGit);
+  useEffect(() => {
+    flushToGitRef.current = flushToGit;
+  }, [flushToGit]);
   useEffect(() => {
     return () => {
-      flushToGit();
+      flushToGitRef.current();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush reads from refs; cleanup needs the latest closure
-  }, [propertyIri]);
+  }, []);
 
   const enterEditMode = useCallback(() => {
     if (!detail) return;

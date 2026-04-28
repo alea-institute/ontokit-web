@@ -160,61 +160,23 @@ export function ClassDetailPanel({
   // remounts the panel on classIri change via a key prop, so "navigate
   // away" maps to "instance unmount" — flushing in the cleanup function is
   // what carries the user's last edit through to the backend).
+  // The flush function captures closure over canEdit/onUpdateClass/etc. and
+  // can be re-created mid-render; route the unmount call through a ref that
+  // we keep up to date in an effect, so cleanup always sees the latest
+  // closure rather than the one captured on first render.
+  const flushToGitRef = useRef(flushToGit);
+  useEffect(() => {
+    flushToGitRef.current = flushToGit;
+  }, [flushToGit]);
   useEffect(() => {
     return () => {
-      flushToGit();
+      flushToGitRef.current();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush reads from refs; cleanup needs the latest closure
-  }, [classIri]);
+  }, []);
 
-  // Enter edit mode: initialize edit state from classDetail
-  const enterEditMode = useCallback(() => {
-    if (!classDetail) return;
-    initEditState(classDetail);
-    editInitializedRef.current = true;
-    setIsEditing(true);
-  }, [classDetail]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Cancel: discard the in-progress draft and re-init from server state.
-  // The panel stays in edit mode — the editor is always editable.
-  const cancelEditMode = useCallback(() => {
-    discardDraft();
-    if (classDetail) {
-      initEditState(classDetail);
-    }
-    setShowParentPicker(false);
-  }, [classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Manual save: flush the current draft to git. Stays in edit mode.
-  const flushDraftToGit = useCallback(async () => {
-    triggerSave();
-    await flushToGit();
-  }, [triggerSave, flushToGit]);
-
-  // Auto-enter edit mode based on continuous editing or restored draft
-  useEffect(() => {
-    if (isEditing || editInitializedRef.current) return;
-    if (!canEdit || !onUpdateClass || !classDetail) return;
-
-    // Restored draft → always auto-enter
-    if (restoredDraft && classIri) {
-      setEditLabels(restoredDraft.labels.length > 0 ? restoredDraft.labels : [{ value: "", lang: "en" }]);
-      setEditComments(ensureTrailingEmpty(restoredDraft.comments));
-      setEditParentIris(restoredDraft.parentIris);
-      setEditParentLabels(restoredDraft.parentLabels);
-      setEditAnnotations(restoredDraft.annotations);
-      setEditRelationships(restoredDraft.relationships);
-      editInitializedRef.current = true;
-      setIsEditing(true);
-      clearRestoredDraft();
-      return;
-    }
-
-    // In editor context (canEdit + onUpdateClass), always auto-enter edit mode.
-    enterEditMode();
-  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, onUpdateClass, isEditing, enterEditMode]);
-
-  // Initialize edit state from OWLClassDetail
+  // Initialize edit state from OWLClassDetail.
+  // Declared before enterEditMode / cancelEditMode so those callbacks can list
+  // it in their dependency arrays without tripping a use-before-declared error.
   const initEditState = useCallback((detail: OWLClassDetail) => {
     setEditLabels(detail.labels.length > 0 ? detail.labels.map((l) => ({ ...l })) : [{ value: "", lang: "en" }]);
     setEditComments(ensureTrailingEmpty(detail.comments.map((c) => ({ ...c }))));
@@ -254,6 +216,53 @@ export function ClassDetailPanel({
     setEditAnnotations(regularAnnotations);
     setEditRelationships(relationships);
   }, [resolvedTargetLabels]);
+
+  // Enter edit mode: initialize edit state from classDetail
+  const enterEditMode = useCallback(() => {
+    if (!classDetail) return;
+    initEditState(classDetail);
+    editInitializedRef.current = true;
+    setIsEditing(true);
+  }, [classDetail, initEditState]);
+
+  // Cancel: discard the in-progress draft and re-init from server state.
+  // The panel stays in edit mode — the editor is always editable.
+  const cancelEditMode = useCallback(() => {
+    discardDraft();
+    if (classDetail) {
+      initEditState(classDetail);
+    }
+    setShowParentPicker(false);
+  }, [classDetail, discardDraft, initEditState]);
+
+  // Manual save: flush the current draft to git. Stays in edit mode.
+  const flushDraftToGit = useCallback(async () => {
+    triggerSave();
+    await flushToGit();
+  }, [triggerSave, flushToGit]);
+
+  // Auto-enter edit mode based on continuous editing or restored draft
+  useEffect(() => {
+    if (isEditing || editInitializedRef.current) return;
+    if (!canEdit || !onUpdateClass || !classDetail) return;
+
+    // Restored draft → always auto-enter
+    if (restoredDraft && classIri) {
+      setEditLabels(restoredDraft.labels.length > 0 ? restoredDraft.labels : [{ value: "", lang: "en" }]);
+      setEditComments(ensureTrailingEmpty(restoredDraft.comments));
+      setEditParentIris(restoredDraft.parentIris);
+      setEditParentLabels(restoredDraft.parentLabels);
+      setEditAnnotations(restoredDraft.annotations);
+      setEditRelationships(restoredDraft.relationships);
+      editInitializedRef.current = true;
+      setIsEditing(true);
+      clearRestoredDraft();
+      return;
+    }
+
+    // In editor context (canEdit + onUpdateClass), always auto-enter edit mode.
+    enterEditMode();
+  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, onUpdateClass, isEditing, enterEditMode]);
 
   // Fetch class data
   useEffect(() => {

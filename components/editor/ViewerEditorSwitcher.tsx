@@ -6,8 +6,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 import {
-  buildSelectionQuery,
   readSelectionFromSearchParams,
+  SELECTION_PARAM_BY_TYPE,
 } from "@/lib/utils/selectionUrl";
 
 interface ViewerEditorSwitcherProps {
@@ -38,10 +38,24 @@ export function ViewerEditorSwitcher({ projectId, className }: ViewerEditorSwitc
     storeIri && storeType
       ? { iri: storeIri, type: storeType }
       : readSelectionFromSearchParams(searchParams);
-  const query = buildSelectionQuery(selection);
 
-  const hrefFor = (mode: Mode) =>
-    mode === "editor" ? `/projects/${projectId}/editor${query}` : `/projects/${projectId}${query}`;
+  // Build the destination href by merging the selection key into the existing
+  // query string instead of replacing it — this preserves params like ?branch=
+  // and ?resumeSession= that the editor and viewer use.
+  const hrefFor = (mode: Mode) => {
+    const next = new URLSearchParams(searchParams.toString());
+    // Drop all known selection keys before writing the new one so we never
+    // emit two of them at once.
+    for (const key of Object.values(SELECTION_PARAM_BY_TYPE)) {
+      next.delete(key);
+    }
+    if (selection?.iri && selection.type) {
+      next.set(SELECTION_PARAM_BY_TYPE[selection.type], selection.iri);
+    }
+    const qs = next.toString();
+    const path = mode === "editor" ? `/projects/${projectId}/editor` : `/projects/${projectId}`;
+    return qs ? `${path}?${qs}` : path;
+  };
 
   return (
     <div

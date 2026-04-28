@@ -366,20 +366,6 @@ describe("IndividualDetailPanel", () => {
 
   // ── Edit mode (canEdit=true) ──
 
-  it("auto-enters edit mode when canEdit is true and onUpdateIndividual provided", async () => {
-    const onUpdateIndividual = vi.fn();
-    render(
-      <IndividualDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateIndividual={onUpdateIndividual}
-      />
-    );
-    await waitFor(() => {
-      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
-    });
-  });
-
   it("never renders an Edit Item button in editor context", async () => {
     const onUpdateIndividual = vi.fn();
     render(

@@ -121,11 +121,24 @@ export default function EditorPage() {
 
     if (initialSelection.type === "class") {
       if (isTreeLoading || !nodes.length) return;
-      if (selectedIri !== initialSelection.iri) {
-        navigateToNode(initialSelection.iri);
+      if (selectedIri === initialSelection.iri) {
+        consumedSelectionRef.current = key;
+        return;
       }
-      consumedSelectionRef.current = key;
-      return;
+      // Await the navigation so we only mark this URL key consumed when the
+      // tree-side restore actually succeeds. If it throws, leave the key
+      // unconsumed so a later render (e.g. once data is healthy) can retry.
+      let cancelled = false;
+      navigateToNode(initialSelection.iri)
+        .then(() => {
+          if (!cancelled) consumedSelectionRef.current = key;
+        })
+        .catch((err) => {
+          if (!cancelled) console.error("Failed to restore selection from URL:", err);
+        });
+      return () => {
+        cancelled = true;
+      };
     }
     if (isLoading) return; // layout not yet mounted
     if (!entityNavigationRef.current) return; // layout's ref not yet populated

@@ -866,29 +866,26 @@ describe("ClassDetailPanel", () => {
     expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
-  it("calls flushToGit when navigating to a different class", async () => {
+  it("flushes pending draft to git on unmount", async () => {
+    // The parent layout remounts the panel on selection change via a key
+    // prop, so the panel's contract for "navigate away" is "unmount and let
+    // the cleanup flush". This test exercises that contract directly.
     const onUpdateClass = vi.fn();
 
-    const { rerender } = render(
+    const { unmount } = render(
       <ClassDetailPanel
         {...DEFAULT_PROPS}
         canEdit={true}
         onUpdateClass={onUpdateClass}
       />
     );
-
-    rerender(
-      <ClassDetailPanel
-        {...DEFAULT_PROPS}
-        classIri="http://example.org/ontology#Animal"
-        canEdit={true}
-        onUpdateClass={onUpdateClass}
-      />
-    );
-
     await waitFor(() => {
-      expect(mockFlushToGit).toHaveBeenCalled();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
+
+    unmount();
+
+    expect(mockFlushToGit).toHaveBeenCalled();
   });
 
   // ── Multiple labels with remove ──

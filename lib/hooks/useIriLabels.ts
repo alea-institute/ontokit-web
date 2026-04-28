@@ -8,22 +8,30 @@ import { getPreferredLabel, getLocalName } from "@/lib/utils";
  * project's own searchEntities endpoint won't find them either. Skipping the
  * probe for these saves a round-trip and eliminates noisy 404s in the console
  * while still letting getLocalName provide a sensible default label.
+ *
+ * Prefixes are listed without scheme; the matcher normalizes both http:// and
+ * https:// forms so vocabularies served over either scheme are treated as the
+ * same external namespace.
  */
-const EXTERNAL_VOCABULARY_PREFIXES: readonly string[] = [
-  "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
-  "http://www.w3.org/2000/01/rdf-schema#",
-  "http://www.w3.org/2001/XMLSchema#",
-  "http://www.w3.org/2002/07/owl#",
-  "http://www.w3.org/2004/02/skos/core#",
-  "http://purl.org/dc/elements/1.1/",
-  "http://purl.org/dc/terms/",
-  "http://xmlns.com/foaf/0.1/",
-  "http://www.w3.org/ns/prov#",
+const EXTERNAL_VOCABULARY_AUTHORITIES_AND_PATHS: readonly string[] = [
+  "www.w3.org/1999/02/22-rdf-syntax-ns#",
+  "www.w3.org/2000/01/rdf-schema#",
+  "www.w3.org/2001/XMLSchema#",
+  "www.w3.org/2002/07/owl#",
+  "www.w3.org/2004/02/skos/core#",
+  "purl.org/dc/elements/1.1/",
+  "purl.org/dc/terms/",
+  "xmlns.com/foaf/0.1/",
+  "www.w3.org/ns/prov#",
 ];
 
 function isExternalVocabularyIri(iri: string): boolean {
-  for (const prefix of EXTERNAL_VOCABULARY_PREFIXES) {
-    if (iri.startsWith(prefix)) return true;
+  let rest: string;
+  if (iri.startsWith("http://")) rest = iri.slice("http://".length);
+  else if (iri.startsWith("https://")) rest = iri.slice("https://".length);
+  else return false;
+  for (const suffix of EXTERNAL_VOCABULARY_AUTHORITIES_AND_PATHS) {
+    if (rest.startsWith(suffix)) return true;
   }
   return false;
 }

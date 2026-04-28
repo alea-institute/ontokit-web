@@ -53,7 +53,7 @@ describe("useIriLabels", () => {
     // Search returns an empty result set — IRI isn't in the search index.
     mockedSearchEntities.mockResolvedValue({ results: [] });
     mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Person", language: "en" }],
+      labels: [{ value: "Person", lang: "en" }],
     });
 
     const { result } = renderHook(() =>
@@ -79,7 +79,7 @@ describe("useIriLabels", () => {
   it("falls back to getClassDetail when search throws", async () => {
     mockedSearchEntities.mockRejectedValue(new Error("search down"));
     mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Person", language: "en" }],
+      labels: [{ value: "Person", lang: "en" }],
     });
 
     const { result } = renderHook(() =>
@@ -114,7 +114,7 @@ describe("useIriLabels", () => {
   it("merges labelHints with fetched labels", async () => {
     const hints = { "http://example.org/Known": "Known Label" };
     mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Fetched", language: "en" }],
+      labels: [{ value: "Fetched", lang: "en" }],
     });
 
     const { result } = renderHook(() =>
@@ -146,7 +146,7 @@ describe("useIriLabels", () => {
 
   it("resets cache when projectId changes", async () => {
     mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Label1", language: "en" }],
+      labels: [{ value: "Label1", lang: "en" }],
     });
 
     const { result, rerender } = renderHook(
@@ -163,7 +163,7 @@ describe("useIriLabels", () => {
     });
 
     mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Label2", language: "en" }],
+      labels: [{ value: "Label2", lang: "en" }],
     });
 
     // Change projectId AND iris to trigger both the context reset and the IRI effect
@@ -206,7 +206,7 @@ describe("useIriLabels", () => {
     "http://purl.org/dc/terms/hasVersion",
     "http://www.w3.org/2001/XMLSchema#string",
   ])("skips both class probe and search for external-vocabulary IRI %s", async (iri) => {
-    mockedGetClassDetail.mockResolvedValue({ labels: [{ value: "should-not", language: "en" }] });
+    mockedGetClassDetail.mockResolvedValue({ labels: [{ value: "should-not", lang: "en" }] });
     mockedSearchEntities.mockResolvedValue({ results: [] });
 
     const { result } = renderHook(() =>
@@ -222,7 +222,7 @@ describe("useIriLabels", () => {
   });
 
   it("still resolves project-internal IRIs that aren't in the external skip-list", async () => {
-    mockedGetClassDetail.mockResolvedValue({ labels: [{ value: "Person", language: "en" }] });
+    mockedGetClassDetail.mockResolvedValue({ labels: [{ value: "Person", lang: "en" }] });
     mockedSearchEntities.mockResolvedValue({ results: [] });
 
     const { result } = renderHook(() =>

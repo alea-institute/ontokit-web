@@ -211,11 +211,21 @@ function ViewerContent({
 
     if (initialSelection.type === "class") {
       if (isTreeLoading || !nodes.length) return;
-      if (selectedIri !== initialSelection.iri) {
-        navigateToNode(initialSelection.iri);
+      if (selectedIri === initialSelection.iri) {
+        consumedSelectionRef.current = key;
+        return;
       }
-      consumedSelectionRef.current = key;
-      return;
+      let cancelled = false;
+      navigateToNode(initialSelection.iri)
+        .then(() => {
+          if (!cancelled) consumedSelectionRef.current = key;
+        })
+        .catch((err) => {
+          if (!cancelled) console.error("Failed to restore selection from URL:", err);
+        });
+      return () => {
+        cancelled = true;
+      };
     }
     if (!entityNavigationRef.current) return;
     entityNavigationRef.current(initialSelection.iri, initialSelection.type);
