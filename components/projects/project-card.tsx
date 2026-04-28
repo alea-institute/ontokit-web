@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { Globe, Lock, Users } from "lucide-react";
 import { cn, formatDate } from "@/lib/utils";
 import type { Project } from "@/lib/api/projects";
+import { derivePermissions } from "@/lib/hooks/useProject";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 
 interface ProjectCardProps {
   project: Project;
@@ -11,9 +14,20 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project, className }: ProjectCardProps) {
+  const { data: session } = useSession();
+  const { canSuggest } = derivePermissions(project, session?.accessToken);
+  const preferEditMode = useEditorModeStore((s) => s.preferEditMode);
+
+  // When the user has prefer-edit-mode on AND has at least suggester rights,
+  // open the project straight to the editor. Anyone without edit/suggest
+  // rights stays on the read-only viewer regardless of the preference.
+  const href = preferEditMode && canSuggest
+    ? `/projects/${project.id}/editor`
+    : `/projects/${project.id}`;
+
   return (
     <Link
-      href={`/projects/${project.id}`}
+      href={href}
       aria-label={`Open project ${project.name}`}
       className={cn(
         "block rounded-lg border border-slate-200 bg-white p-5 shadow-xs transition-all",
