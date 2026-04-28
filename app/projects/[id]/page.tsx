@@ -162,7 +162,6 @@ function ViewerContent({
 }) {
   const searchParams = useSearchParams();
   const initialSelection = readSelectionFromSearchParams(searchParams);
-  const classIriParam = initialSelection?.iri ?? null;
   const editorMode = useEditorModeStore((s) => s.editorMode);
 
   // Use the default branch from the BranchProvider context
@@ -189,13 +188,22 @@ function ViewerContent({
 
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
+  const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
 
-  // Navigate to classIri from URL query param once tree is ready
+  // Restore selected entity from URL query param. Class navigation goes
+  // through the class tree once it's loaded; properties and individuals are
+  // dispatched through the layout's nav handler so the active tab and
+  // per-tab selection are set correctly.
   useEffect(() => {
-    if (!classIriParam || isTreeLoading || !nodes.length) return;
-    if (selectedIri === classIriParam) return;
-    navigateToNode(classIriParam);
-  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
+    if (!initialSelection) return;
+    if (initialSelection.type === "class") {
+      if (isTreeLoading || !nodes.length) return;
+      if (selectedIri === initialSelection.iri) return;
+      navigateToNode(initialSelection.iri);
+      return;
+    }
+    entityNavigationRef.current?.(initialSelection.iri, initialSelection.type);
+  }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
 
   const toast = useToast();
   const handleCopyIri = useCallback(async (iri: string) => {
@@ -296,6 +304,7 @@ function ViewerContent({
                   hasExpandedNodes={hasExpandedNodes}
                   isExpandingAll={isExpandingAll}
                   navigateToNode={navigateToNode}
+                  entityNavigationRef={entityNavigationRef}
                   sourceContent={sourceContent}
                   setSourceContent={setSourceContent as (content: string | ((prev: string) => string)) => void}
                   isLoadingSource={isLoadingSource}
@@ -336,6 +345,7 @@ function ViewerContent({
                 hasExpandedNodes={hasExpandedNodes}
                 isExpandingAll={isExpandingAll}
                 navigateToNode={navigateToNode}
+                entityNavigationRef={entityNavigationRef}
                 onAddEntity={noop}
                 onCopyIri={handleCopyIri}
                 selectedNodeFallback={selectedNodeFallback}

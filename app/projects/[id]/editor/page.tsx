@@ -54,7 +54,6 @@ export default function EditorPage() {
   const resumeSessionParam = searchParams.get("resumeSession") || undefined;
   const resumeBranchParam = searchParams.get("branch") || undefined;
   const initialSelection = readSelectionFromSearchParams(searchParams);
-  const classIriParam = initialSelection?.iri ?? null;
   const initialBranch = resumeBranchParam
     || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
@@ -92,18 +91,27 @@ export default function EditorPage() {
     resetSourceState,
   } = viewer;
 
-  // Restore selected class from URL query param once tree is ready
-  useEffect(() => {
-    if (!classIriParam || isTreeLoading || !nodes.length) return;
-    if (selectedIri === classIriParam) return;
-    navigateToNode(classIriParam);
-  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
-
   // UI state (editor-only)
   const [showHistory, setShowHistory] = useState(false);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
   const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
+
+  // Restore selected entity from URL query param. For classes we wait for the
+  // class tree to load; for properties and individuals we dispatch through the
+  // layout's nav handler (entityNavigationRef), which switches the active tab
+  // and selects the entity directly.
+  useEffect(() => {
+    if (!initialSelection) return;
+    if (initialSelection.type === "class") {
+      if (isTreeLoading || !nodes.length) return;
+      if (selectedIri === initialSelection.iri) return;
+      navigateToNode(initialSelection.iri);
+      return;
+    }
+    if (isLoading) return; // layout not yet mounted
+    entityNavigationRef.current?.(initialSelection.iri, initialSelection.type);
+  }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode, isLoading]);
 
   // Commit dialog
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
