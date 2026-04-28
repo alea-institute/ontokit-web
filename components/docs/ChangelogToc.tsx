@@ -22,20 +22,33 @@ export function ChangelogToc({ entries }: { entries: TocEntry[] }) {
       .filter((el): el is HTMLElement => el !== null);
     if (targets.length === 0) return;
 
-    const observer = new IntersectionObserver(
-      (items) => {
-        const visible = items
-          .filter((i) => i.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible.length > 0) {
-          setActive(visible[0].target.id);
-        }
-      },
-      { rootMargin: "-80px 0px -60% 0px", threshold: 0 },
-    );
+    const update = () => {
+      const scrollY = window.scrollY;
+      const viewportBottom = scrollY + window.innerHeight;
+      const docHeight = document.documentElement.scrollHeight;
 
-    targets.forEach((el) => observer.observe(el));
-    return () => observer.disconnect();
+      if (docHeight - viewportBottom < 8) {
+        setActive(targets[targets.length - 1].id);
+        return;
+      }
+
+      const probe = scrollY + 120;
+      let current = targets[0].id;
+      for (const el of targets) {
+        const top = el.getBoundingClientRect().top + scrollY;
+        if (top <= probe) current = el.id;
+        else break;
+      }
+      setActive(current);
+    };
+
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
   }, [entries]);
 
   return (

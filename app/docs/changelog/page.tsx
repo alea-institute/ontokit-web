@@ -173,6 +173,9 @@ const changelog: ChangelogEntry[] = [
 export default function ChangelogPage() {
   return (
     <div className="container mx-auto px-4 py-8 flex gap-8">
+      <ChangelogToc
+        entries={changelog.map(({ version, date }) => ({ version, date }))}
+      />
       <div className="min-w-0 flex-1 max-w-4xl">
         <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
           Changelog
@@ -215,9 +218,6 @@ export default function ChangelogPage() {
           ))}
         </div>
       </div>
-      <ChangelogToc
-        entries={changelog.map(({ version, date }) => ({ version, date }))}
-      />
     </div>
   );
 }
