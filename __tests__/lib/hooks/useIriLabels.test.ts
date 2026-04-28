@@ -217,11 +217,13 @@ describe("useIriLabels", () => {
       useIriLabels([iri], { projectId: "proj-1", accessToken: "token" }),
     );
 
-    // Give the effect a chance to run
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(mockedGetClassDetail).not.toHaveBeenCalled();
-    expect(mockedSearchEntities).not.toHaveBeenCalled();
+    // Wait for the hook's effect to settle. waitFor's retry interval gives
+    // any would-be probe calls time to issue before we assert their absence.
+    // The result for an external-vocab IRI stays undefined throughout.
+    await waitFor(() => {
+      expect(mockedGetClassDetail).not.toHaveBeenCalled();
+      expect(mockedSearchEntities).not.toHaveBeenCalled();
+    });
     expect(result.current[iri]).toBeUndefined();
   });
 
