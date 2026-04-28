@@ -10,6 +10,7 @@ import {
   useHotEntities,
   useContributors,
 } from "@/lib/hooks/useProjectAnalytics";
+import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import { cn, getLocalName } from "@/lib/utils";
 
 export default function ProjectAnalyticsPage() {
@@ -18,6 +19,7 @@ export default function ProjectAnalyticsPage() {
   const router = useRouter();
   const projectId = params.id as string;
   const token = session?.accessToken;
+  const projectHomeHref = useProjectHomeHref(projectId);
 
   const { data: activity, isLoading: loadingActivity, error: activityError } = useProjectActivity(
     projectId,
@@ -45,7 +47,7 @@ export default function ProjectAnalyticsPage() {
       <main id="main-content" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <div className="mb-6 flex items-center gap-3">
           <Link
-            href={`/projects/${projectId}`}
+            href={projectHomeHref}
             className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
           >
             <ArrowLeft className="h-4 w-4" />

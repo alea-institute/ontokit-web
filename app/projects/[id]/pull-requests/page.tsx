@@ -11,6 +11,7 @@ import { PRList } from "@/components/pr/PRList";
 import { PRCreateModal } from "@/components/pr/PRCreateModal";
 import { BranchProvider } from "@/lib/context/BranchContext";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
+import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 
 export default function PullRequestsPage() {
   const { data: session, status } = useSession();
@@ -20,6 +21,7 @@ export default function PullRequestsPage() {
 
   const { project, isLoading, error } = useProject(projectId, session?.accessToken);
   const { canEdit: canCreatePR } = derivePermissions(project, session?.accessToken);
+  const projectHomeHref = useProjectHomeHref(projectId);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   if (isLoading || status === "loading") {
@@ -72,7 +74,7 @@ export default function PullRequestsPage() {
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
-                href={`/projects/${projectId}`}
+                href={projectHomeHref}
                 className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
               >
                 <ArrowLeft className="h-4 w-4" />

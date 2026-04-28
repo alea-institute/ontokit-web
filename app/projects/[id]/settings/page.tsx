@@ -57,6 +57,7 @@ import {
 } from "@/lib/api/joinRequests";
 import { useRemoteSync } from "@/lib/hooks/useRemoteSync";
 import { useProject, projectQueryKeys } from "@/lib/hooks/useProject";
+import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import { useMembers, memberQueryKeys } from "@/lib/hooks/useMembers";
 import { useNormalizationStatus, normalizationQueryKeys } from "@/lib/hooks/useNormalizationStatus";
 import { useIndexStatus, indexQueryKeys } from "@/lib/hooks/useIndexStatus";
@@ -101,6 +102,8 @@ export default function ProjectSettingsPage() {
   const router = useRouter();
   const params = useParams();
   const projectId = params.id as string;
+
+  const projectHomeHref = useProjectHomeHref(projectId);
 
   const queryClient = useQueryClient();
 
@@ -907,7 +910,7 @@ export default function ProjectSettingsPage() {
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
             <Link
-              href={`/projects/${projectId}`}
+              href={projectHomeHref}
               className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -947,7 +950,7 @@ export default function ProjectSettingsPage() {
         <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
           {/* Back link */}
           <Link
-            href={`/projects/${projectId}`}
+            href={projectHomeHref}
             className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
           >
             <ArrowLeft className="h-4 w-4" />
