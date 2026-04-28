@@ -50,6 +50,20 @@ vi.mock("@/lib/hooks/useIriLabels", () => ({
 vi.mock("@/components/editor/LanguageFlag", () => ({
   LanguageFlag: () => null,
 }));
+vi.mock("@/components/editor/LanguagePicker", () => ({
+  LanguagePicker: ({ value, onChange }: { value: string; onChange: (code: string) => void }) => (
+    <select
+      data-testid="lang-picker"
+      aria-label="Language tag"
+      value={value}
+      onChange={(e) => onChange((e.target as HTMLSelectElement).value)}
+    >
+      <option value="en">en</option>
+      <option value="de">de</option>
+      <option value="fr">fr</option>
+    </select>
+  ),
+}));
 
 let capturedAnnotationRowProps: Array<Record<string, unknown>> = [];
 vi.mock("@/components/editor/standard/AnnotationRow", () => ({
@@ -367,7 +381,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("enters edit mode when Edit Item is clicked", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -438,7 +451,6 @@ describe("IndividualDetailPanel", () => {
   // ── Edit mode: label editing ──
 
   it("renders editable label inputs in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -455,7 +467,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("renders editable comment section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -471,7 +482,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("renders editable definition section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -487,7 +497,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("renders types section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -503,7 +512,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("renders same-as section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -519,7 +527,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("renders different-from section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -535,7 +542,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("renders object properties section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -551,7 +557,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("renders data properties section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -567,7 +572,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("renders annotations section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -583,7 +587,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("renders relationships section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -622,7 +625,6 @@ describe("IndividualDetailPanel", () => {
   // ── Cancel edit mode ──
 
   it("shows auto-save bar when in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -741,10 +743,9 @@ describe("IndividualDetailPanel", () => {
 
   // ── Language tag input in edit mode ──
 
-  it("renders language tag inputs in edit mode", async () => {
-    const user = userEvent.setup();
+  it("renders language tag pickers in edit mode", async () => {
     const onUpdateIndividual = vi.fn();
-    const { container } = render(
+    render(
       <IndividualDetailPanel
         {...DEFAULT_PROPS}
         canEdit={true}
@@ -754,8 +755,8 @@ describe("IndividualDetailPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    const langInputs = container.querySelectorAll('input[title="Language tag"]');
-    expect(langInputs.length).toBeGreaterThanOrEqual(1);
+    const langPickers = screen.getAllByLabelText("Language tag");
+    expect(langPickers.length).toBeGreaterThanOrEqual(1);
   });
 
   // ── triggerSave on blur of label input ──
@@ -891,7 +892,6 @@ describe("IndividualDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     const { container } = render(
       <IndividualDetailPanel
@@ -909,10 +909,11 @@ describe("IndividualDetailPanel", () => {
 
   // ── Language tag editing in edit mode ──
 
-  it("allows editing language tag input", async () => {
+  it("allows editing language tag via picker", async () => {
     const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
-    const { container } = render(
+    mockTriggerSave.mockClear();
+    render(
       <IndividualDetailPanel
         {...DEFAULT_PROPS}
         canEdit={true}
@@ -922,11 +923,11 @@ describe("IndividualDetailPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    const langInput = container.querySelector('input[title="Language tag"]') as HTMLInputElement;
-    expect(langInput).not.toBeNull();
-    await user.clear(langInput);
-    await user.type(langInput, "fr");
-    expect(langInput.value).toBe("fr");
+    const langPickers = screen.getAllByLabelText("Language tag");
+    expect(langPickers.length).toBeGreaterThanOrEqual(1);
+    await user.selectOptions(langPickers[0], "fr");
+    expect((langPickers[0] as HTMLSelectElement).value).toBe("fr");
+    expect(mockTriggerSave).toHaveBeenCalled();
   });
 
   // ── Edit mode with no initial comments ──
@@ -935,7 +936,6 @@ describe("IndividualDetailPanel", () => {
     mockExtractIndividualDetail.mockReturnValue(
       makeIndividualDetail({ comments: [] })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -956,7 +956,6 @@ describe("IndividualDetailPanel", () => {
     mockExtractIndividualDetail.mockReturnValue(
       makeIndividualDetail({ definitions: [] })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -977,7 +976,6 @@ describe("IndividualDetailPanel", () => {
     mockExtractIndividualDetail.mockReturnValue(
       makeIndividualDetail({ typeIris: [] })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -998,7 +996,6 @@ describe("IndividualDetailPanel", () => {
     mockExtractIndividualDetail.mockReturnValue(
       makeIndividualDetail({ sameAsIris: [] })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1019,7 +1016,6 @@ describe("IndividualDetailPanel", () => {
     mockExtractIndividualDetail.mockReturnValue(
       makeIndividualDetail({ differentFromIris: [] })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1185,7 +1181,6 @@ describe("IndividualDetailPanel", () => {
   // ── Cancel edit mode via AutoSaveAffordanceBar ──
 
   it("invokes cancelEditMode via AutoSaveAffordanceBar onCancel", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1206,7 +1201,6 @@ describe("IndividualDetailPanel", () => {
   // ── Manual save via AutoSaveAffordanceBar ──
 
   it("invokes saveAndExitEditMode via AutoSaveAffordanceBar onManualSave", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1228,7 +1222,6 @@ describe("IndividualDetailPanel", () => {
   // ── Retry via AutoSaveAffordanceBar ──
 
   it("invokes flushToGit via AutoSaveAffordanceBar onRetry", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1249,7 +1242,6 @@ describe("IndividualDetailPanel", () => {
   // ── AnnotationRow callbacks for comments ──
 
   it("passes comment callbacks to AnnotationRow", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1289,7 +1281,6 @@ describe("IndividualDetailPanel", () => {
   // ── AnnotationRow callbacks for definitions ──
 
   it("passes definition callbacks to AnnotationRow", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1319,7 +1310,6 @@ describe("IndividualDetailPanel", () => {
   // ── AnnotationRow onBlur triggers save ──
 
   it("AnnotationRow onBlur triggers triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1351,7 +1341,6 @@ describe("IndividualDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1387,7 +1376,6 @@ describe("IndividualDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1415,7 +1403,6 @@ describe("IndividualDetailPanel", () => {
   // ── PropertyAssertionSection callbacks ──
 
   it("passes onAdd callback to PropertyAssertionSection for object properties", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1449,7 +1436,6 @@ describe("IndividualDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1473,7 +1459,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("passes onAdd callback to PropertyAssertionSection for data properties", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1507,7 +1492,6 @@ describe("IndividualDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1538,7 +1522,6 @@ describe("IndividualDetailPanel", () => {
         seeAlsoIris: ["http://example.org/ontology#related"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1564,7 +1547,6 @@ describe("IndividualDetailPanel", () => {
         seeAlsoIris: ["http://example.org/ontology#related"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1585,7 +1567,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("invokes changeRelationshipProperty via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1606,7 +1587,6 @@ describe("IndividualDetailPanel", () => {
   });
 
   it("invokes addRelationshipGroup via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1642,7 +1622,6 @@ describe("IndividualDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1693,7 +1672,6 @@ describe("IndividualDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1727,7 +1705,6 @@ describe("IndividualDetailPanel", () => {
         isDefinedByIris: ["http://example.org/ontology#ontology"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1794,7 +1771,6 @@ describe("IndividualDetailPanel", () => {
   // ── PropertyAssertionSection onSaveNeeded callback ──
 
   it("passes onSaveNeeded callback to PropertyAssertionSection", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1818,7 +1794,6 @@ describe("IndividualDetailPanel", () => {
   // ── Manual save stays in edit mode when flushToGit fails ──
 
   it("stays in edit mode when saveAndExitEditMode flush fails", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     mockFlushToGit.mockResolvedValue(false);
     render(
@@ -1854,7 +1829,6 @@ describe("IndividualDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1888,7 +1862,6 @@ describe("IndividualDetailPanel", () => {
     mockExtractIndividualDetail.mockReturnValue(
       makeIndividualDetail({ annotations: [] })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1919,7 +1892,6 @@ describe("IndividualDetailPanel", () => {
   // ── InlineAnnotationAdder onSaveNeeded callback ──
 
   it("InlineAnnotationAdder onSaveNeeded calls triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1944,7 +1916,6 @@ describe("IndividualDetailPanel", () => {
   // ── RelationshipSection onSaveNeeded callback ──
 
   it("RelationshipSection onSaveNeeded calls triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -1984,7 +1955,9 @@ describe("IndividualDetailPanel", () => {
         onUpdateIndividual={onUpdateIndividual}
       />
     );
-    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     // Trigger cancel
     expect(capturedAutoSaveBarProps).not.toBeNull();
@@ -2006,7 +1979,6 @@ describe("IndividualDetailPanel", () => {
         isDefinedByIris: ["http://example.org/ontology#myOntology"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -2049,7 +2021,6 @@ describe("IndividualDetailPanel", () => {
     mockExtractIndividualDetail.mockReturnValue(
       makeIndividualDetail({ labels: [] })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -2088,7 +2059,6 @@ describe("IndividualDetailPanel", () => {
   // ── PropertyAssertionSection data onSaveNeeded callback ──
 
   it("passes onSaveNeeded callback to data PropertyAssertionSection", async () => {
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel
@@ -2122,7 +2092,6 @@ describe("IndividualDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateIndividual = vi.fn();
     render(
       <IndividualDetailPanel

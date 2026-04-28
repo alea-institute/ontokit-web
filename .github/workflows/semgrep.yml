@@ -1,0 +1,48 @@
+name: Semgrep
+
+on:
+  # PRs to dev cover normal feature work. PRs from dev to main are guarded by
+  # pr-target-guard.yml and any code on them has already been scanned, so we
+  # don't need to re-scan there — the push trigger below catches it after merge.
+  pull_request:
+    branches: [dev]
+  push:
+    branches: [main, dev]
+  schedule:
+    # Weekly scan picks up new rules added to published rulesets between PRs.
+    - cron: '0 9 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep
+    # Skip on Dependabot PRs — package bumps shouldn't trigger a security scan
+    # of the whole codebase, and Dependabot can't read repository secrets anyway.
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      # `semgrep ci` is incompatible with explicit --config flags when logged in
+      # (SEMGREP_APP_TOKEN set) — it expects rules from the server-side AppSec
+      # policy. When not logged in, fall back to the explicit local rulesets so
+      # the workflow still runs out-of-the-box without any secrets configured.
+      # `--no-suppress-errors` makes silent misconfiguration fail loudly.
+      - name: Run Semgrep
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+        run: |
+          if [ -n "$SEMGREP_APP_TOKEN" ]; then
+            semgrep ci --no-suppress-errors
+          else
+            semgrep ci --no-suppress-errors \
+              --config p/default \
+              --config p/owasp-top-ten \
+              --config p/javascript \
+              --config p/typescript \
+              --config p/react \
+              --config p/nextjs \
+              --config p/jwt
+          fi

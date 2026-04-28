@@ -59,6 +59,20 @@ vi.mock("@/lib/hooks/useIriLabels", () => ({
 vi.mock("@/components/editor/LanguageFlag", () => ({
   LanguageFlag: () => null,
 }));
+vi.mock("@/components/editor/LanguagePicker", () => ({
+  LanguagePicker: ({ value, onChange }: { value: string; onChange: (code: string) => void }) => (
+    <select
+      data-testid="lang-picker"
+      aria-label="Language tag"
+      value={value}
+      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
+    >
+      <option value="en">en</option>
+      <option value="de">de</option>
+      <option value="fr">fr</option>
+    </select>
+  ),
+}));
 
 let capturedAnnotationRowProps: Array<Record<string, unknown>> = [];
 vi.mock("@/components/editor/standard/AnnotationRow", () => ({
@@ -382,7 +396,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("enters edit mode when Edit Item is clicked", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -455,7 +468,6 @@ describe("PropertyDetailPanel", () => {
   // ── Edit mode: label editing ──
 
   it("renders editable label inputs in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -472,7 +484,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("renders editable comment section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -489,7 +500,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("renders editable definition section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -505,7 +515,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("renders domain section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -521,7 +530,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("renders range section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -537,7 +545,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("renders characteristics checkboxes in edit mode for object property", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -555,7 +562,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("renders inverse-of section in edit mode for object property", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -571,7 +577,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("renders annotations section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -587,7 +592,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("renders relationships section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -626,7 +630,6 @@ describe("PropertyDetailPanel", () => {
   // ── Characteristic toggle in edit mode ──
 
   it("toggles characteristic checkbox in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     const { container } = render(
       <PropertyDetailPanel
@@ -656,7 +659,6 @@ describe("PropertyDetailPanel", () => {
   // ── Cancel edit mode ──
 
   it("exits edit mode and calls discardDraft when cancel flow is triggered", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -686,7 +688,7 @@ describe("PropertyDetailPanel", () => {
 
   // ── Auto-enter edit mode gated by preferEditMode ──
 
-  it("auto-enters edit mode when preferEditMode is on (editor context)", () => {
+  it("auto-enters edit mode when preferEditMode is on (editor context)", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -696,7 +698,9 @@ describe("PropertyDetailPanel", () => {
       />
     );
     // Should auto-enter edit mode and show auto-save bar
-    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
   });
 
   it("does not auto-enter edit mode when preferEditMode is off", async () => {
@@ -818,10 +822,9 @@ describe("PropertyDetailPanel", () => {
 
   // ── Language tag input in edit mode ──
 
-  it("renders language tag inputs in edit mode", async () => {
-    const user = userEvent.setup();
+  it("renders language tag pickers in edit mode", async () => {
     const onUpdateProperty = vi.fn();
-    const { container } = render(
+    render(
       <PropertyDetailPanel
         {...DEFAULT_PROPS}
         canEdit={true}
@@ -831,8 +834,8 @@ describe("PropertyDetailPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    const langInputs = container.querySelectorAll('input[title="Language tag"]');
-    expect(langInputs.length).toBeGreaterThanOrEqual(1);
+    const langPickers = screen.getAllByLabelText("Language tag");
+    expect(langPickers.length).toBeGreaterThanOrEqual(1);
   });
 
   // ── triggerSave on blur of label input ──
@@ -873,7 +876,6 @@ describe("PropertyDetailPanel", () => {
   // ── Parent properties section in edit mode ──
 
   it("renders parent properties section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -925,7 +927,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     const { container } = render(
       <PropertyDetailPanel
@@ -943,10 +944,11 @@ describe("PropertyDetailPanel", () => {
 
   // ── Language tag editing in edit mode ──
 
-  it("allows editing language tag input", async () => {
+  it("allows editing language tag via picker", async () => {
     const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
-    const { container } = render(
+    mockTriggerSave.mockClear();
+    render(
       <PropertyDetailPanel
         {...DEFAULT_PROPS}
         canEdit={true}
@@ -956,11 +958,11 @@ describe("PropertyDetailPanel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    const langInput = container.querySelector('input[title="Language tag"]') as HTMLInputElement;
-    expect(langInput).not.toBeNull();
-    await user.clear(langInput);
-    await user.type(langInput, "fr");
-    expect(langInput.value).toBe("fr");
+    const langPickers = screen.getAllByLabelText("Language tag");
+    expect(langPickers.length).toBeGreaterThanOrEqual(1);
+    await user.selectOptions(langPickers[0], "fr");
+    expect((langPickers[0] as HTMLSelectElement).value).toBe("fr");
+    expect(mockTriggerSave).toHaveBeenCalled();
   });
 
   // ── Edit mode with no initial comments ──
@@ -969,7 +971,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ comments: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -991,7 +992,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ definitions: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1012,7 +1012,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ domainIris: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1031,7 +1030,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ rangeIris: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1052,7 +1050,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ parentIris: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1073,7 +1070,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ inverseOf: null })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1094,7 +1090,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ characteristics: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     const { container } = render(
       <PropertyDetailPanel
@@ -1237,7 +1232,6 @@ describe("PropertyDetailPanel", () => {
   // ── Cancel edit mode via AutoSaveAffordanceBar ──
 
   it("invokes cancelEditMode via AutoSaveAffordanceBar onCancel", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1259,7 +1253,6 @@ describe("PropertyDetailPanel", () => {
   // ── Manual save via AutoSaveAffordanceBar ──
 
   it("invokes saveAndExitEditMode via AutoSaveAffordanceBar onManualSave", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1281,7 +1274,6 @@ describe("PropertyDetailPanel", () => {
   // ── Retry via AutoSaveAffordanceBar ──
 
   it("invokes flushToGit via AutoSaveAffordanceBar onRetry", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1302,7 +1294,6 @@ describe("PropertyDetailPanel", () => {
   // ── AnnotationRow callbacks for comments ──
 
   it("passes comment callbacks to AnnotationRow", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1346,7 +1337,6 @@ describe("PropertyDetailPanel", () => {
   // ── AnnotationRow callbacks for definitions ──
 
   it("passes definition callbacks to AnnotationRow", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1376,7 +1366,6 @@ describe("PropertyDetailPanel", () => {
   // ── AnnotationRow onBlur triggers save ──
 
   it("AnnotationRow onBlur triggers triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1408,7 +1397,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1445,7 +1433,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1478,7 +1465,6 @@ describe("PropertyDetailPanel", () => {
         seeAlsoIris: ["http://example.org/ontology#related"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1506,7 +1492,6 @@ describe("PropertyDetailPanel", () => {
         seeAlsoIris: ["http://example.org/ontology#related"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1527,7 +1512,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("invokes changeRelationshipProperty via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1548,7 +1532,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("invokes addRelationshipGroup via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1584,7 +1567,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1636,7 +1618,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1670,7 +1651,6 @@ describe("PropertyDetailPanel", () => {
         isDefinedByIris: ["http://example.org/ontology#ontology"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1737,7 +1717,6 @@ describe("PropertyDetailPanel", () => {
   // ── Manual save stays in edit mode when flushToGit fails ──
 
   it("stays in edit mode when saveAndExitEditMode flush fails", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     mockFlushToGit.mockResolvedValue(false);
     render(
@@ -1773,7 +1752,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1809,7 +1787,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ annotations: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1840,7 +1817,6 @@ describe("PropertyDetailPanel", () => {
   // ── InlineAnnotationAdder onSaveNeeded callback ──
 
   it("InlineAnnotationAdder onSaveNeeded calls triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1865,7 +1841,6 @@ describe("PropertyDetailPanel", () => {
   // ── RelationshipSection onSaveNeeded callback ──
 
   it("RelationshipSection onSaveNeeded calls triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1905,7 +1880,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     // Trigger cancel
     expect(capturedAutoSaveBarProps).not.toBeNull();
@@ -1931,7 +1908,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1964,7 +1940,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ labels: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1990,7 +1965,6 @@ describe("PropertyDetailPanel", () => {
         isDefinedByIris: ["http://example.org/ontology#myOntology"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel

@@ -1251,4 +1251,117 @@ describe("OntologySourceEditor", () => {
       expect(screen.queryByText("Loading issues...")).toBeNull();
     });
   });
+
+  // ── Problems panel: duplicate_iris rendering ──
+
+  it("renders duplicate_iris as plain spans when not in the IRI index", async () => {
+    // Worker mock returns an empty iriIndex, so all duplicate IRIs fall into
+    // the "unknown" branch and render as non-interactive spans.
+    mockGetIssues.mockResolvedValue({
+      items: [
+        {
+          id: "i1", run_id: "r1", project_id: "proj-1",
+          issue_type: "warning", rule_id: "duplicate-label",
+          message: "Label 'Foo' shared with 1 other resource",
+          subject_iri: "http://example.org/A",
+          subject_type: "class",
+          details: { duplicate_iris: ["http://example.org/B"] },
+          created_at: "2024-01-01T00:00:00Z", resolved_at: null,
+        },
+      ],
+      total: 1, skip: 0, limit: 200,
+    });
+
+    render(<OntologySourceEditor {...DEFAULT_PROPS} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Also:")).toBeDefined();
+    });
+    const dup = screen.getByTitle("http://example.org/B");
+    expect(dup.tagName).toBe("SPAN");
+  });
+
+  it("renders duplicate_iris as buttons when the IRI is indexed in the source", async () => {
+    // Override the global Worker stub for this test so the iriIndex contains
+    // the duplicate IRI — exercising the clickable-button branch.
+    class WorkerWithIndex {
+      onmessage: ((e: MessageEvent) => void) | null = null;
+      onerror: ((e: ErrorEvent) => void) | null = null;
+      private _t: ReturnType<typeof setTimeout> | null = null;
+      postMessage() {
+        this._t = setTimeout(() => {
+          this._t = null;
+          this.onmessage?.({
+            data: {
+              diagnostics: [],
+              positions: [],
+              iriIndex: [["http://example.org/B", { line: 5, col: 1, len: 10 }]],
+              iriLabels: [],
+              stats: { linesProcessed: 0, irisIndexed: 1, localNamesIndexed: 0, issuesMatched: 0, timeMs: 0 },
+            },
+          } as unknown as MessageEvent);
+        }, 0);
+      }
+      terminate() {
+        if (this._t !== null) { clearTimeout(this._t); this._t = null; }
+      }
+    }
+    vi.stubGlobal("Worker", WorkerWithIndex);
+
+    mockGetIssues.mockResolvedValue({
+      items: [
+        {
+          id: "i1", run_id: "r1", project_id: "proj-1",
+          issue_type: "warning", rule_id: "duplicate-label",
+          message: "Label 'Foo' shared with 1 other resource",
+          subject_iri: "http://example.org/A",
+          subject_type: "class",
+          details: { duplicate_iris: ["http://example.org/B"] },
+          created_at: "2024-01-01T00:00:00Z", resolved_at: null,
+        },
+      ],
+      total: 1, skip: 0, limit: 200,
+    });
+
+    try {
+      render(<OntologySourceEditor {...DEFAULT_PROPS} />);
+
+      await waitFor(() => {
+        const dup = screen.getByTitle("http://example.org/B");
+        expect(dup.tagName).toBe("BUTTON");
+      });
+    } finally {
+      vi.stubGlobal("Worker", MockWorker);
+    }
+  });
+
+  it("shows '+N more' when duplicate_iris has more than three entries", async () => {
+    mockGetIssues.mockResolvedValue({
+      items: [
+        {
+          id: "i1", run_id: "r1", project_id: "proj-1",
+          issue_type: "warning", rule_id: "duplicate-label",
+          message: "Label 'Foo' shared with 4 other resources",
+          subject_iri: "http://example.org/A",
+          subject_type: "class",
+          details: {
+            duplicate_iris: [
+              "http://example.org/B",
+              "http://example.org/C",
+              "http://example.org/D",
+              "http://example.org/E",
+            ],
+          },
+          created_at: "2024-01-01T00:00:00Z", resolved_at: null,
+        },
+      ],
+      total: 1, skip: 0, limit: 200,
+    });
+
+    render(<OntologySourceEditor {...DEFAULT_PROPS} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("+1 more")).toBeDefined();
+    });
+  });
 });

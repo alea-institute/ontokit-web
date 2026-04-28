@@ -99,7 +99,7 @@ describe("EntityTreeNodeRow", () => {
         node={makeNode({ hasChildren: true })}
       />,
     );
-    const btn = screen.getByRole("button", { hidden: true });
+    const btn = screen.getByTestId("toggle-chevron");
     expect(btn).toBeDefined();
   });
 
@@ -122,15 +122,9 @@ describe("EntityTreeNodeRow", () => {
         onExpand={onExpand}
       />,
     );
-    // The toggle button is aria-hidden
-    const buttons = screen.getAllByRole("button", { hidden: true });
-    const toggleBtn = buttons.find(
-      (b) => b.getAttribute("aria-hidden") === "true",
-    );
-    if (toggleBtn) {
-      await userEvent.click(toggleBtn);
-      expect(onExpand).toHaveBeenCalledWith("http://example.org/Class1");
-    }
+    const toggleBtn = screen.getByTestId("toggle-chevron");
+    await userEvent.click(toggleBtn);
+    expect(onExpand).toHaveBeenCalledWith("http://example.org/Class1");
   });
 
   it("calls onCollapse when toggle button clicked on expanded node", async () => {
@@ -142,14 +136,9 @@ describe("EntityTreeNodeRow", () => {
         onCollapse={onCollapse}
       />,
     );
-    const buttons = screen.getAllByRole("button", { hidden: true });
-    const toggleBtn = buttons.find(
-      (b) => b.getAttribute("aria-hidden") === "true",
-    );
-    if (toggleBtn) {
-      await userEvent.click(toggleBtn);
-      expect(onCollapse).toHaveBeenCalledWith("http://example.org/Class1");
-    }
+    const toggleBtn = screen.getByTestId("toggle-chevron");
+    await userEvent.click(toggleBtn);
+    expect(onCollapse).toHaveBeenCalledWith("http://example.org/Class1");
   });
 
   it("shows draft indicator when IRI is in draftIris set", () => {

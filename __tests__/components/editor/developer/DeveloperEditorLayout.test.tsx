@@ -287,7 +287,6 @@ function defaultProps(
     accessToken: "token-123",
     activeBranch: "main",
     canEdit: false,
-    canManage: false,
     nodes: [],
     isTreeLoading: false,
     treeError: null,
@@ -316,8 +315,6 @@ function defaultProps(
     onSaveSource: vi.fn().mockResolvedValue(undefined),
     onAddEntity: vi.fn(),
     selectedNodeFallback: null,
-    showHealthCheck: false,
-    onCloseHealthCheck: vi.fn(),
     ...overrides,
   };
 }
@@ -470,16 +467,7 @@ describe("DeveloperEditorLayout", () => {
 
   // --- Health Check ---
 
-  it("shows health check panel when showHealthCheck is true", () => {
-    render(
-      <DeveloperEditorLayout
-        {...defaultProps({ showHealthCheck: true, nodes: [makeNode()] })}
-      />,
-    );
-    expect(screen.getByTestId("health-check-panel")).toBeDefined();
-  });
-
-  it("does not show health check panel by default", () => {
+  it("does not render health check panel (now rendered at page level)", () => {
     render(
       <DeveloperEditorLayout {...defaultProps({ nodes: [makeNode()] })} />,
     );
@@ -1237,22 +1225,7 @@ describe("DeveloperEditorLayout", () => {
     expect(navigateToNode).toHaveBeenCalledWith("http://example.org/IndivNav");
   });
 
-  it("calls navigateToNode via HealthCheckPanel onNavigateToClass", () => {
-    const navigateToNode = vi.fn().mockResolvedValue(undefined);
 
-    render(
-      <DeveloperEditorLayout
-        {...defaultProps({
-          nodes: [makeNode()],
-          showHealthCheck: true,
-          navigateToNode,
-        })}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId("health-navigate-class"));
-    expect(navigateToNode).toHaveBeenCalledWith("http://example.org/HealthTarget");
-  });
 
   it("navigates from graph view back to tree via OntologyGraph callback", () => {
     const navigateToNode = vi.fn().mockResolvedValue(undefined);
@@ -1299,6 +1272,64 @@ describe("DeveloperEditorLayout", () => {
 
     await waitFor(() => {
       expect(navigateToNode).toHaveBeenCalledWith("http://example.org/DynTarget");
+    });
+  });
+
+  describe("entityNavigationRef", () => {
+    it("populates ref on mount and clears on unmount", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      const { unmount } = render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      expect(ref.current).toBeTypeOf("function");
+      unmount();
+      expect(ref.current).toBeNull();
+    });
+
+    it("navigates to class tab for class type", () => {
+      const navigateToNode = vi.fn().mockResolvedValue(undefined);
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
+      ref.current!("http://example.org/MyClass", "class");
+      expect(navigateToNode).toHaveBeenCalledWith("http://example.org/MyClass");
+    });
+
+    it("switches to properties tab for property type", async () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref, nodes: [makeNode()] })} />);
+      ref.current!("http://example.org/hasFoo", "property");
+      await waitFor(() => {
+        expect(screen.getByTestId("property-tree")).toBeDefined();
+        expect(screen.getByTestId("property-detail-panel")).toBeDefined();
+      });
+    });
+
+    it("switches to individuals tab for individual type", async () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref, nodes: [makeNode()] })} />);
+      ref.current!("http://example.org/foo1", "individual");
+      await waitFor(() => {
+        expect(screen.getByTestId("individual-list")).toBeDefined();
+        expect(screen.getByTestId("individual-detail-panel")).toBeDefined();
+      });
+    });
+
+    it("switches to source view for other type", async () => {
+      const setPendingScrollIri = vi.fn();
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref, setPendingScrollIri, sourceContent: "@prefix : <http://ex.org/> ." })} />);
+      ref.current!("http://example.org/Unknown", "other");
+      expect(setPendingScrollIri).toHaveBeenCalledWith("http://example.org/Unknown");
+      // Source view hides the entity tab bar
+      await waitFor(() => {
+        expect(screen.queryByTestId("entity-tab-bar")).toBeNull();
+      });
+    });
+
+    it("defaults to class navigation when type is undefined", () => {
+      const navigateToNode = vi.fn().mockResolvedValue(undefined);
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
+      ref.current!("http://example.org/ClassA");
+      expect(navigateToNode).toHaveBeenCalledWith("http://example.org/ClassA");
     });
   });
 });

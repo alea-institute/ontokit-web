@@ -85,6 +85,9 @@ export interface StandardEditorLayoutProps {
   onReparentClass?: (classIri: string, oldParentIris: string[], newParentIris: string[], mode: DragMode) => Promise<void>;
   reparentOptimistic?: (iri: string, oldParentIri: string | null, newParentIri: string | null) => { previousNodes: ClassTreeNode[] };
   rollbackReparent?: (snapshot: { previousNodes: ClassTreeNode[] }) => void;
+
+  /** Ref populated with a function to navigate to any entity type */
+  entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -93,8 +96,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     accessToken,
     activeBranch,
     canEdit,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    canSuggest = false,
+    canSuggest: _canSuggest = false,
     isSuggestionMode = false,
     nodes,
     isTreeLoading,
@@ -216,6 +218,37 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   // Track selected entity per tab (properties/individuals have their own selection)
   const [selectedPropertyIri, setSelectedPropertyIri] = useState<string | null>(null);
   const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
+
+  // Expose entity navigation to parent via ref
+  const { entityNavigationRef, navigateToNode: navToNode } = props;
+  useEffect(() => {
+    if (!entityNavigationRef) return;
+
+    const handler = (iri: string, type?: string) => {
+      // Always exit graph view first — otherwise the user clicks a lint issue
+      // and stays staring at the graph instead of the entity they navigated to.
+      setShowGraph(false);
+      if (type === "property") {
+        setActiveTab("properties");
+        setSelectedPropertyIri(iri);
+      } else if (type === "individual") {
+        setActiveTab("individuals");
+        setSelectedIndividualIri(iri);
+      } else {
+        // For "other" (untyped) entities, navigate to class tree which
+        // triggers ClassDetailPanel's 404 handler with a helpful message
+        setActiveTab("classes");
+        navToNode(iri);
+      }
+    };
+
+    entityNavigationRef.current = handler;
+    return () => {
+      if (entityNavigationRef.current === handler) {
+        entityNavigationRef.current = null;
+      }
+    };
+  }, [entityNavigationRef, navToNode]);
 
   // Shared search state
   const {

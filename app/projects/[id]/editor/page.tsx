@@ -15,6 +15,7 @@ import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
+import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { useQueryClient } from "@tanstack/react-query";
 import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
@@ -67,6 +68,7 @@ export default function EditorPage() {
     accessToken: session?.accessToken,
     sessionStatus: status,
     activeBranch,
+    enableWebSocket: true,
   });
 
   const {
@@ -98,6 +100,7 @@ export default function EditorPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
+  const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
 
   // Commit dialog
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
@@ -822,7 +825,10 @@ export default function EditorPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
-                href={`/projects/${projectId}${selectedIri ? `?classIri=${encodeURIComponent(selectedIri)}` : ''}`}
+                href={(() => {
+                  const iriToCarry = selectedIri || classIriParam;
+                  return `/projects/${projectId}${iriToCarry ? `?classIri=${encodeURIComponent(iriToCarry)}` : ''}`;
+                })()}
                 className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
               >
                 <Eye className="h-4 w-4" />
@@ -1009,9 +1015,9 @@ export default function EditorPage() {
                   accessToken={session?.accessToken}
                   activeBranch={activeBranch}
                   canEdit={!!canEdit}
+                  entityNavigationRef={entityNavigationRef}
                   canSuggest={!!canSuggest}
                   isSuggestionMode={isSuggestionMode}
-                  canManage={!!canManage}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
                   treeError={treeError}
@@ -1044,8 +1050,6 @@ export default function EditorPage() {
                   selectedNodeFallback={selectedNodeFallback}
                   onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
                   detailRefreshKey={detailRefreshKey}
-                  showHealthCheck={showHealthCheck}
-                  onCloseHealthCheck={() => setShowHealthCheck(false)}
                   onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
                   onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
                   onReparentClass={handleReparentClass}
@@ -1060,6 +1064,7 @@ export default function EditorPage() {
                 activeBranch={activeBranch}
                 canEdit={!!canEdit}
                 canSuggest={!!canSuggest}
+                entityNavigationRef={entityNavigationRef}
                 isSuggestionMode={isSuggestionMode}
                 nodes={nodes}
                 isTreeLoading={isTreeLoading}
@@ -1091,6 +1096,27 @@ export default function EditorPage() {
               />
             )}
           </div>
+
+          {/* Right Panel - Health Check (available in both modes) */}
+          {showHealthCheck && (
+            <div className="w-96 flex-shrink-0">
+              <HealthCheckPanel
+                projectId={projectId}
+                accessToken={session?.accessToken}
+                branch={activeBranch}
+                isOpen={showHealthCheck}
+                onClose={() => setShowHealthCheck(false)}
+                onNavigateToClass={(iri, subjectType) => {
+                  if (entityNavigationRef.current) {
+                    entityNavigationRef.current(iri, subjectType);
+                  } else {
+                    navigateToNode(iri);
+                  }
+                }}
+                canRunLint={!!canManage}
+              />
+            </div>
+          )}
 
           {/* Right Panel - Revision History (available in both modes) */}
           <RevisionHistoryPanel

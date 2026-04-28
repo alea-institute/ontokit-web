@@ -1,0 +1,24 @@
+name: PR target guard
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  check-source-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only allow PRs from dev to main
+        if: github.head_ref != 'dev'
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          echo "::error::PRs targeting main must come from the dev branch."
+          echo "::error::Please retarget this PR to dev, or merge into dev first."
+          echo ""
+          echo "  Source branch: $HEAD_REF"
+          echo "  Target branch: $BASE_REF"
+          exit 1

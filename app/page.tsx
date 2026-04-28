@@ -160,12 +160,20 @@ export default function HomePage() {
             {/* Private tab login prompt for unauthenticated users */}
             {(filter === "mine" || filter === "private") && !isAuthenticated ? (
               <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
-                <User className="mx-auto h-12 w-12 text-slate-400" />
+                {filter === "private" ? (
+                  <Lock className="mx-auto h-12 w-12 text-slate-400" />
+                ) : (
+                  <User className="mx-auto h-12 w-12 text-slate-400" />
+                )}
                 <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
-                  Sign in to see your projects
+                  {filter === "private"
+                    ? "Sign in to see private projects"
+                    : "Sign in to see your projects"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  View all projects you own or are a member of
+                  {filter === "private"
+                    ? "View all private projects you own or are a member of"
+                    : "View all projects you own or are a member of"}
                 </p>
                 <Button className="mt-6" onClick={() => signIn()}>
                   <LogIn className="mr-2 h-4 w-4" />
@@ -199,14 +207,18 @@ export default function HomePage() {
                 <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
                   {debouncedSearch
                     ? "No projects found"
-                    : (filter === "mine" || filter === "private")
+                    : filter === "private"
+                    ? "No private projects yet"
+                    : filter === "mine"
                     ? "No projects yet"
                     : "No projects available"}
                 </h3>
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                   {debouncedSearch
                     ? "Try a different search term"
-                    : (filter === "mine" || filter === "private") && isAuthenticated
+                    : filter === "private" && isAuthenticated
+                    ? "You are not a member of any private projects, and do not own any private projects. Create your first private project to get started."
+                    : filter === "mine" && isAuthenticated
                     ? "Create your first project to get started"
                     : "Check back later for public projects"}
                 </p>
@@ -214,7 +226,7 @@ export default function HomePage() {
                   <Link href="/projects/new" className="mt-4 inline-block">
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
-                      Create Project
+                      {filter === "private" ? "Create Private Project" : "Create Project"}
                     </Button>
                   </Link>
                 )}

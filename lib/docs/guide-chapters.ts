@@ -41,6 +41,13 @@ export const guideChapters: GuideChapter[] = [
     description:
       "Discover standard vocabularies like RDFS, Dublin Core, SKOS, FOAF, and Schema.org.",
   },
+  {
+    slug: "properties",
+    title: "What are Properties?",
+    shortTitle: "Properties",
+    description:
+      "From the base rdf:Property to OWL's three property kinds, characteristic axioms (functional, transitive, …), and disjointness.",
+  },
 ];
 
 export function getAdjacentChapters(currentSlug: string) {

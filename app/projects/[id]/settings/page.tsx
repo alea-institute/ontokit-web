@@ -9,11 +9,12 @@ function isHttpUrl(url: string): boolean {
   }
 }
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, type SyntheticEvent } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useParams } from "next/navigation";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Trash2, Tag, Check, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff, Database, ExternalLink } from "lucide-react";
+import { ArrowLeft, UserPlus, Trash2, Tag, Check, GitPullRequest, AlertCircle, FileText, RefreshCw, History, Play, Inbox, CheckCircle, XCircle, Download, Copy, Eye, EyeOff, Database, ExternalLink, Shield } from "lucide-react";
 import { GithubIcon as Github } from "@/components/icons/github";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import { MemberList } from "@/components/projects/member-list";
 import { UserSearchInput } from "@/components/projects/user-search-input";
 import { LabelPreferences } from "@/components/projects/label-preferences";
 import { ApiError, projectOntologyApi, type IndexStatusResponse, type IndexStatus } from "@/lib/api/client";
+import { IndexWebSocketManager, type IndexWebSocketMessage } from "@/lib/api/indexStatus";
 import {
   projectApi,
   type Project,
@@ -29,6 +31,7 @@ import {
   type ProjectUpdate,
   type MemberCreate,
   type MemberUpdate,
+  type MemberListResponse,
   type TransferOwnership,
 } from "@/lib/api/projects";
 import { TurtleOutputPicker } from "@/components/projects/turtle-output-picker";
@@ -53,6 +56,10 @@ import {
   type JoinRequest as JoinRequestType,
 } from "@/lib/api/joinRequests";
 import { useRemoteSync } from "@/lib/hooks/useRemoteSync";
+import { useProject, projectQueryKeys } from "@/lib/hooks/useProject";
+import { useMembers, memberQueryKeys } from "@/lib/hooks/useMembers";
+import { useNormalizationStatus, normalizationQueryKeys } from "@/lib/hooks/useNormalizationStatus";
+import { useIndexStatus, indexQueryKeys } from "@/lib/hooks/useIndexStatus";
 import type {
   SyncFrequency,
   SyncUpdateMode,
@@ -67,6 +74,12 @@ import {
   type EmbeddingProvider,
   type EmbeddingStatus,
 } from "@/lib/api/embeddings";
+import {
+  lintApi,
+  type LintConfig,
+  type LintLevel,
+  type LintSummary,
+} from "@/lib/api/lint";
 
 // Dynamically import the diff viewer to avoid SSR issues with Monaco
 const NormalizationDiffViewer = dynamic(
@@ -89,13 +102,33 @@ export default function ProjectSettingsPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [members, setMembers] = useState<ProjectMember[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // Keep a ref to the latest accessToken so polling closures never go stale
+  const accessTokenRef = useRef(session?.accessToken);
+  useEffect(() => {
+    accessTokenRef.current = session?.accessToken;
+  }, [session?.accessToken]);
+
+  // React Query hooks for data (single source of truth — no local mirrors)
+  const {
+    project,
+    isLoading: isProjectLoading,
+    error: projectError,
+  } = useProject(projectId, session?.accessToken);
+  const { data: membersData } = useMembers(projectId, session?.accessToken);
+  const members = membersData?.items ?? [];
+
+  // Stable query key for optimistic updates via setQueryData
+  const projectKey = projectQueryKeys.detail(projectId, !!session?.accessToken);
+
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Derive displayed error: local mutation errors take priority, then query errors
+  const error = localError || projectError || null;
 
   // Add member form state
   const [showAddMember, setShowAddMember] = useState(false);
@@ -113,8 +146,18 @@ export default function ProjectSettingsPage() {
   const [isSavingPreferences, setIsSavingPreferences] = useState(false);
   const [preferencesSaved, setPreferencesSaved] = useState(false);
 
-  // Normalization state
+  // Normalization status via React Query
+  const {
+    data: normalizationQueryData,
+  } = useNormalizationStatus(projectId, session?.accessToken, {
+    enabled: !!project?.source_file_path && !!session?.accessToken,
+  });
+  // Local normalization state (for optimistic updates during dry run / normalization)
   const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
+  useEffect(() => {
+    if (normalizationQueryData) setNormalizationStatus(normalizationQueryData);
+  }, [normalizationQueryData]);
+
   const [normalizationHistory, setNormalizationHistory] = useState<NormalizationRunResponse[]>([]);
   const [isCheckingNormalization, setIsCheckingNormalization] = useState(false);
   const [isRunningNormalization, setIsRunningNormalization] = useState(false);
@@ -129,17 +172,57 @@ export default function ProjectSettingsPage() {
   // Background job state
   const [normalizationJobId, setNormalizationJobId] = useState<string | null>(null);
   const [normalizationJobStatus, setNormalizationJobStatus] = useState<string | null>(null);
+  const normalizationPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Ontology index state
+  // Ontology index status via React Query
+  const {
+    data: indexQueryData,
+  } = useIndexStatus(projectId, session?.accessToken, {
+    enabled: !!project?.source_file_path && !!session?.accessToken,
+  });
+  // Local index state (for optimistic updates during reindex)
   const [indexStatus, setIndexStatus] = useState<IndexStatusResponse | null>(null);
-  const [isReindexing, setIsReindexing] = useState(false);
-  const reindexPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    if (indexQueryData) setIndexStatus(indexQueryData);
+  }, [indexQueryData]);
 
-  // Clean up reindex polling on unmount
+  const [isReindexing, setIsReindexing] = useState(false);
+
+  // WebSocket for real-time index status updates
+  useEffect(() => {
+    if (!project?.id || !session?.accessToken) return;
+
+    const manager = new IndexWebSocketManager(
+      project.id,
+      (message: IndexWebSocketMessage) => {
+        if (message.type === "index_started") {
+          setIsReindexing(true);
+          setIndexStatus((prev) =>
+            prev ? { ...prev, status: "indexing" as IndexStatus } : prev
+          );
+        } else if (message.type === "index_complete" || message.type === "index_failed") {
+          setIsReindexing(false);
+          const token = accessTokenRef.current;
+          queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, token) });
+        }
+      },
+      session.accessToken
+    );
+
+    // Small delay to avoid spurious connections during Strict Mode remounts
+    const timeoutId = setTimeout(() => manager.connect(), 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      manager.disconnect();
+    };
+  }, [project?.id, session?.accessToken, projectId, queryClient]);
+
+  // Clean up normalization polling on unmount
   useEffect(() => {
     return () => {
-      if (reindexPollRef.current) {
-        clearInterval(reindexPollRef.current);
+      if (normalizationPollRef.current) {
+        clearInterval(normalizationPollRef.current);
       }
     };
   }, []);
@@ -167,91 +250,69 @@ export default function ProjectSettingsPage() {
   const [githubOutputPath, setGithubOutputPath] = useState<string | null>(null);
 
   const isAuthenticated = status === "authenticated";
+  const isLoading = isProjectLoading || status === "loading";
 
+  const canManage =
+    project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
+  const isOwner = project?.user_role === "owner";
+
+  // Sync label preferences from project data
   useEffect(() => {
-    const fetchData = async () => {
-      if (!session?.accessToken) return;
-
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const [projectData, membersData] = await Promise.all([
-          projectApi.get(projectId, session.accessToken),
-          projectApi.listMembers(projectId, session.accessToken),
-        ]);
-        setProject(projectData);
-        setMembers(membersData.items);
-        setLabelPreferences(projectData.label_preferences || []);
-
-        // Fetch normalization status if project has an ontology file
-        if (projectData.source_file_path) {
-          try {
-            const normStatus = await normalizationApi.getStatus(projectId, session.accessToken);
-            setNormalizationStatus(normStatus);
-          } catch {
-            // Normalization status may not be available, ignore
-          }
-
-          // Fetch ontology index status
-          try {
-            const idxStatus = await projectOntologyApi.getIndexStatus(projectId, session.accessToken);
-            setIndexStatus(idxStatus);
-          } catch {
-            // Index status endpoint may not be available, ignore
-          }
-        }
-
-        // Fetch PR settings and GitHub integration for owners/admins/superadmins
-        if (projectData.user_role === "owner" || projectData.user_role === "admin" || projectData.is_superadmin) {
-          try {
-            const prSettingsData = await prSettingsApi.get(projectId, session.accessToken);
-            setPrSettings(prSettingsData);
-            setGithubIntegration(prSettingsData.github_integration || null);
-            setPrApprovalRequired(prSettingsData.pr_approval_required);
-          } catch {
-            // PR settings may not be available, ignore
-          }
-
-          // Fetch join requests for public projects
-          if (projectData.is_public) {
-            try {
-              const jrData = await joinRequestApi.list(projectId, session.accessToken);
-              setJoinRequests(jrData.items);
-              setJoinRequestCount(jrData.total);
-            } catch {
-              // Join requests may not be available, ignore
-            }
-          }
-
-          // Check if user has a GitHub token (for the repo picker)
-          try {
-            const tokenStatus = await userSettingsApi.getGitHubTokenStatus(session.accessToken);
-            setHasGithubToken(tokenStatus.has_token);
-          } catch {
-            setHasGithubToken(false);
-          }
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
-          setError("You don't have permission to access project settings");
-        } else if (err instanceof Error && err.message.includes("404")) {
-          setError("Project not found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load project");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (status !== "loading" && projectId && isAuthenticated) {
-      fetchData();
-    } else if (status !== "loading" && !isAuthenticated) {
-      setError("You must be signed in to access project settings");
-      setIsLoading(false);
+    if (project) {
+      setLabelPreferences(project.label_preferences || []);
     }
-  }, [projectId, session?.accessToken, status, isAuthenticated]);
+  }, [project]);
+
+  // Admin-only data via React Query (replaces manual useEffect fetch)
+  const isPublic = project?.is_public;
+
+  const prSettingsQuery = useQuery({
+    queryKey: ["prSettings", projectId],
+    queryFn: () => prSettingsApi.get(projectId, session!.accessToken!),
+    enabled: !!canManage && !!session?.accessToken,
+    retry: false,
+  });
+  useEffect(() => {
+    if (prSettingsQuery.data) {
+      setPrSettings(prSettingsQuery.data);
+      setGithubIntegration(prSettingsQuery.data.github_integration || null);
+      setPrApprovalRequired(prSettingsQuery.data.pr_approval_required);
+    }
+  }, [prSettingsQuery.data]);
+
+  const joinRequestsQuery = useQuery({
+    queryKey: ["joinRequests", projectId],
+    queryFn: () => joinRequestApi.list(projectId, session!.accessToken!),
+    enabled: !!isPublic && !!canManage && !!session?.accessToken,
+    retry: false,
+  });
+  useEffect(() => {
+    if (joinRequestsQuery.data) {
+      setJoinRequests(joinRequestsQuery.data.items);
+      setJoinRequestCount(joinRequestsQuery.data.total);
+    }
+  }, [joinRequestsQuery.data]);
+
+  const githubTokenStatusQuery = useQuery({
+    queryKey: ["githubTokenStatus", session?.user?.id],
+    queryFn: () => userSettingsApi.getGitHubTokenStatus(session!.accessToken!),
+    enabled: !!canManage && !!session?.accessToken,
+    retry: false,
+  });
+  useEffect(() => {
+    if (githubTokenStatusQuery.data) {
+      setHasGithubToken(githubTokenStatusQuery.data.has_token);
+    } else if (githubTokenStatusQuery.isError) {
+      setHasGithubToken(false);
+    }
+  }, [githubTokenStatusQuery.data, githubTokenStatusQuery.isError]);
+
+  // Handle unauthenticated state
+  useEffect(() => {
+    if (status !== "loading" && !isAuthenticated) {
+      setLocalError("You must be signed in to access project settings");
+    }
+  }, [status, isAuthenticated]);
 
   // Scroll to hash on page load (for #normalization link from editor)
   useEffect(() => {
@@ -266,10 +327,6 @@ export default function ProjectSettingsPage() {
     }
   }, [isLoading]);
 
-  const canManage =
-    project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
-  const isOwner = project?.user_role === "owner";
-
   // Remote sync hook
   const remoteSync = useRemoteSync({
     projectId,
@@ -281,12 +338,12 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsSaving(true);
-    setError(null);
+    setLocalError(null);
     setSuccessMessage(null);
 
     try {
       const updated = await projectApi.update(project.id, data as ProjectUpdate, session.accessToken);
-      setProject(updated);
+      queryClient.setQueryData<Project>(projectKey, updated);
       setSuccessMessage("Project settings saved successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -296,7 +353,7 @@ export default function ProjectSettingsPage() {
     }
   };
 
-  const handleAddMember = async (e: React.FormEvent) => {
+  const handleAddMember = async (e: SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!session?.accessToken || !project || !newMemberUserId) return;
 
@@ -313,8 +370,12 @@ export default function ProjectSettingsPage() {
         memberData,
         session.accessToken
       );
-      setMembers([...members, newMember]);
-      setProject({ ...project, member_count: project.member_count + 1 });
+      queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+        old ? { ...old, items: [...old.items, newMember], total: old.total + 1 } : { items: [newMember], total: 1 }
+      );
+      queryClient.setQueryData<Project>(projectKey, (old) =>
+        old ? { ...old, member_count: old.member_count + 1 } : undefined
+      );
       setShowAddMember(false);
       setNewMemberUserId("");
       setNewMemberRole("suggester");
@@ -339,9 +400,11 @@ export default function ProjectSettingsPage() {
         data,
         session.accessToken
       );
-      setMembers(members.map((m) => (m.user_id === userId ? updated : m)));
+      queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+        old ? { ...old, items: old.items.map((m: ProjectMember) => m.user_id === userId ? updated : m) } : undefined
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update member role");
+      setLocalError(err instanceof Error ? err.message : "Failed to update member role");
     }
   };
 
@@ -350,15 +413,19 @@ export default function ProjectSettingsPage() {
 
     try {
       await projectApi.removeMember(project.id, userId, session.accessToken);
-      setMembers(members.filter((m) => m.user_id !== userId));
-      setProject({ ...project, member_count: project.member_count - 1 });
+      queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+        old ? { ...old, items: old.items.filter((m: ProjectMember) => m.user_id !== userId), total: old.total - 1 } : undefined
+      );
+      queryClient.setQueryData<Project>(projectKey, (old) =>
+        old ? { ...old, member_count: old.member_count - 1 } : undefined
+      );
 
       // If user removed themselves, redirect to projects
       if (userId === session.user?.id) {
         router.push("/");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove member");
+      setLocalError(err instanceof Error ? err.message : "Failed to remove member");
     }
   };
 
@@ -381,10 +448,12 @@ export default function ProjectSettingsPage() {
         { new_owner_id: userId } as TransferOwnership,
         session.accessToken
       );
-      setMembers(result.items);
+      queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+        old ? { ...old, items: result.items } : { items: result.items, total: result.items.length }
+      );
       // Refresh the project to get updated owner_id and user_role
       const updatedProject = await projectApi.get(project.id, session.accessToken);
-      setProject(updatedProject);
+      queryClient.setQueryData<Project>(projectKey, updatedProject);
       setSuccessMessage("Ownership transferred successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -403,23 +472,25 @@ export default function ProjectSettingsPage() {
             session.accessToken,
             true
           );
-          setMembers(result.items);
+          queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
+            old ? { ...old, items: result.items } : { items: result.items, total: result.items.length }
+          );
           const updatedProject = await projectApi.get(project.id, session.accessToken);
-          setProject(updatedProject);
+          queryClient.setQueryData<Project>(projectKey, updatedProject);
           setGithubIntegration(null);
           setSuccessMessage(
             "Ownership transferred. GitHub integration was disconnected because the new owner has no GitHub token."
           );
           setTimeout(() => setSuccessMessage(null), 5000);
         } catch (retryErr) {
-          setError(
+          setLocalError(
             retryErr instanceof Error ? retryErr.message : "Failed to transfer ownership"
           );
         }
         return;
       }
 
-      setError(
+      setLocalError(
         err instanceof Error ? err.message : "Failed to transfer ownership"
       );
     }
@@ -435,7 +506,7 @@ export default function ProjectSettingsPage() {
       await projectApi.delete(project.id, session.accessToken);
       router.push("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete project");
+      setLocalError(err instanceof Error ? err.message : "Failed to delete project");
       setIsDeleting(false);
     }
   };
@@ -445,7 +516,7 @@ export default function ProjectSettingsPage() {
 
     setIsSavingPreferences(true);
     setPreferencesSaved(false);
-    setError(null);
+    setLocalError(null);
 
     try {
       const updated = await projectApi.update(
@@ -453,11 +524,11 @@ export default function ProjectSettingsPage() {
         { label_preferences: labelPreferences },
         session.accessToken
       );
-      setProject(updated);
+      queryClient.setQueryData<Project>(projectKey, updated);
       setPreferencesSaved(true);
       setTimeout(() => setPreferencesSaved(false), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save label preferences");
+      setLocalError(err instanceof Error ? err.message : "Failed to save label preferences");
     } finally {
       setIsSavingPreferences(false);
     }
@@ -467,7 +538,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project || !selectedRepo) return;
 
     setIsSetupGitHub(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       const integration = await githubIntegrationApi.create(
@@ -490,7 +561,7 @@ export default function ProjectSettingsPage() {
       setSuccessMessage("GitHub repository connected successfully");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect repository");
+      setLocalError(err instanceof Error ? err.message : "Failed to connect repository");
     } finally {
       setIsSetupGitHub(false);
     }
@@ -548,7 +619,7 @@ export default function ProjectSettingsPage() {
       setSuccessMessage("GitHub integration removed");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove GitHub integration");
+      setLocalError(err instanceof Error ? err.message : "Failed to remove GitHub integration");
     }
   };
 
@@ -556,7 +627,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsSavingPrSettings(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       const updated = await prSettingsApi.update(
@@ -568,7 +639,7 @@ export default function ProjectSettingsPage() {
       setSuccessMessage("PR settings saved");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save PR settings");
+      setLocalError(err instanceof Error ? err.message : "Failed to save PR settings");
     } finally {
       setIsSavingPrSettings(false);
     }
@@ -580,17 +651,17 @@ export default function ProjectSettingsPage() {
     setProcessingJoinRequest(requestId);
     try {
       await joinRequestApi.approve(project.id, requestId, session.accessToken);
-      setJoinRequests(joinRequests.filter((jr) => jr.id !== requestId));
-      setJoinRequestCount(Math.max(0, joinRequestCount - 1));
-      // Refresh member list
-      const membersData = await projectApi.listMembers(project.id, session.accessToken);
-      setMembers(membersData.items);
-      setProject({ ...project, member_count: membersData.total });
+      setJoinRequests(prev => prev.filter((jr) => jr.id !== requestId));
+      setJoinRequestCount(prev => Math.max(0, prev - 1));
+      // Refresh member list, project, and join requests via React Query
+      queryClient.invalidateQueries({ queryKey: memberQueryKeys.list(projectId) });
+      queryClient.invalidateQueries({ queryKey: projectKey });
+      queryClient.invalidateQueries({ queryKey: ["joinRequests", projectId] });
       setSuccessMessage("Join request approved — user added as suggester");
       setTimeout(() => setSuccessMessage(null), 3000);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve request");
+      setLocalError(err instanceof Error ? err.message : "Failed to approve request");
     } finally {
       setProcessingJoinRequest(null);
     }
@@ -602,13 +673,14 @@ export default function ProjectSettingsPage() {
     setProcessingJoinRequest(requestId);
     try {
       await joinRequestApi.decline(project.id, requestId, session.accessToken);
-      setJoinRequests(joinRequests.filter((jr) => jr.id !== requestId));
-      setJoinRequestCount(Math.max(0, joinRequestCount - 1));
+      setJoinRequests(prev => prev.filter((jr) => jr.id !== requestId));
+      setJoinRequestCount(prev => Math.max(0, prev - 1));
+      queryClient.invalidateQueries({ queryKey: ["joinRequests", projectId] });
       setSuccessMessage("Join request declined");
       setTimeout(() => setSuccessMessage(null), 3000);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to decline request");
+      setLocalError(err instanceof Error ? err.message : "Failed to decline request");
     } finally {
       setProcessingJoinRequest(null);
     }
@@ -618,7 +690,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsReindexing(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       await projectOntologyApi.reindex(project.id, session.accessToken);
@@ -627,33 +699,9 @@ export default function ProjectSettingsPage() {
       );
       setSuccessMessage("Reindex job queued. The index will update in the background.");
       setTimeout(() => setSuccessMessage(null), 5000);
-
-      // Clear any existing poll before starting a new one
-      if (reindexPollRef.current) {
-        clearInterval(reindexPollRef.current);
-      }
-
-      // Poll for completion
-      reindexPollRef.current = setInterval(async () => {
-        try {
-          const status = await projectOntologyApi.getIndexStatus(
-            project.id,
-            session.accessToken
-          );
-          setIndexStatus(status);
-          if (status.status === "ready" || status.status === "failed") {
-            clearInterval(reindexPollRef.current!);
-            reindexPollRef.current = null;
-            setIsReindexing(false);
-          }
-        } catch {
-          clearInterval(reindexPollRef.current!);
-          reindexPollRef.current = null;
-          setIsReindexing(false);
-        }
-      }, 3000);
+      // WebSocket will handle status updates automatically
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to trigger reindex");
+      setLocalError(err instanceof Error ? err.message : "Failed to trigger reindex");
       setIsReindexing(false);
     }
   };
@@ -662,13 +710,14 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsCheckingNormalization(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       const status = await normalizationApi.getStatus(project.id, session.accessToken);
       setNormalizationStatus(status);
+      queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId, session.accessToken) });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to check normalization status");
+      setLocalError(err instanceof Error ? err.message : "Failed to check normalization status");
     } finally {
       setIsCheckingNormalization(false);
     }
@@ -678,7 +727,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setIsRunningNormalization(true);
-    setError(null);
+    setLocalError(null);
 
     try {
       if (dryRun) {
@@ -728,46 +777,47 @@ export default function ProjectSettingsPage() {
         setNormalizationJobStatus("queued");
         setSuccessMessage("Normalization job queued - processing in background...");
 
-        // Poll for completion
-        const pollInterval = setInterval(async () => {
+        // Poll for completion (ref-based so useEffect cleanup can cancel, token from ref to avoid stale closure)
+        normalizationPollRef.current = setInterval(async () => {
           try {
+            const token = accessTokenRef.current;
             const jobStatus = await normalizationApi.getJobStatus(
               project.id,
               queueResult.job_id,
-              session.accessToken
+              token
             );
 
             setNormalizationJobStatus(jobStatus.status);
 
             if (jobStatus.status === "complete") {
-              clearInterval(pollInterval);
+              clearInterval(normalizationPollRef.current!);
+              normalizationPollRef.current = null;
               setNormalizationJobId(null);
               setNormalizationJobStatus(null);
               setIsRunningNormalization(false);
 
               // Refresh status
-              const newStatus = await normalizationApi.getStatus(project.id, session.accessToken);
+              const newStatus = await normalizationApi.getStatus(project.id, token);
               setNormalizationStatus(newStatus);
+              queryClient.invalidateQueries({ queryKey: normalizationQueryKeys.status(projectId, token) });
               setSuccessMessage("Normalization completed successfully");
               setTimeout(() => setSuccessMessage(null), 3000);
             } else if (jobStatus.status === "failed" || jobStatus.status === "not_found") {
-              clearInterval(pollInterval);
+              clearInterval(normalizationPollRef.current!);
+              normalizationPollRef.current = null;
               setNormalizationJobId(null);
               setNormalizationJobStatus(null);
               setIsRunningNormalization(false);
-              setError(jobStatus.error || "Normalization job failed");
+              setLocalError(jobStatus.error || "Normalization job failed");
             }
           } catch (pollErr) {
             // Continue polling on error
             console.error("Error polling job status:", pollErr);
           }
         }, 2000); // Poll every 2 seconds
-
-        // Cleanup on unmount
-        return () => clearInterval(pollInterval);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to run normalization");
+      setLocalError(err instanceof Error ? err.message : "Failed to run normalization");
       setIsRunningNormalization(false);
     }
   };
@@ -780,11 +830,11 @@ export default function ProjectSettingsPage() {
       setNormalizationHistory(history.items);
       setShowNormalizationHistory(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load normalization history");
+      setLocalError(err instanceof Error ? err.message : "Failed to load normalization history");
     }
   };
 
-  if (isLoading || status === "loading") {
+  if (isLoading) {
     return (
       <>
         <Header />
@@ -827,23 +877,63 @@ export default function ProjectSettingsPage() {
     );
   }
 
-  if (!project || !canManage) {
+  if (!project) {
     return (
       <>
         <Header />
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-8 text-center dark:border-amber-900/50 dark:bg-amber-900/20">
-              <h2 className="text-xl font-semibold text-amber-700 dark:text-amber-400">
-                Access Denied
+            <div className="rounded-lg border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
+              <h2 className="text-xl font-semibold text-slate-700 dark:text-slate-200">
+                Project not found
               </h2>
-              <p className="mt-2 text-amber-600 dark:text-amber-300">
-                Only project owners and admins can access settings.
+              <p className="mt-2 text-slate-600 dark:text-slate-400">
+                This project could not be loaded. It may have been deleted, or you may not have access.
               </p>
-              <Link href={`/projects/${projectId}`} className="mt-4 inline-block">
-                <Button variant="outline">Back to Project</Button>
+              <Link href="/projects" className="mt-4 inline-block">
+                <Button variant="outline">Back to Projects</Button>
               </Link>
             </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  if (!canManage) {
+    return (
+      <>
+        <Header />
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+          <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
+            <Link
+              href={`/projects/${projectId}`}
+              className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to project
+            </Link>
+            <div className="mb-8">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                Project Settings
+              </h1>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                View project configuration (read-only)
+              </p>
+            </div>
+            {project.source_file_path ? (
+              <LintConfigSection
+                projectId={projectId}
+                accessToken={session?.accessToken}
+                canManage={false}
+              />
+            ) : (
+              <div className="rounded-lg border border-slate-200 bg-white p-6 text-center dark:border-slate-700 dark:bg-slate-800">
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  No ontology source file has been configured for this project.
+                </p>
+              </div>
+            )}
           </div>
         </main>
       </>
@@ -1913,6 +2003,15 @@ export default function ProjectSettingsPage() {
             />
           )}
 
+          {/* Lint Rule Configuration - only for projects with an ontology */}
+          {project.source_file_path && (
+            <LintConfigSection
+              projectId={projectId}
+              accessToken={session?.accessToken}
+              canManage={canManage ?? false}
+            />
+          )}
+
           {/* Danger Zone — hidden for exemplar projects unless superadmin */}
           {(isOwner || project?.is_superadmin) && !(project?.is_exemplar && !project?.is_superadmin) && (
             <section className="rounded-lg border border-red-200 bg-white p-6 dark:border-red-900/50 dark:bg-slate-800">
@@ -2004,6 +2103,20 @@ export default function ProjectSettingsPage() {
 
 type WebhookStatus = "unknown" | "checking" | "configured" | "created" | "manual_required" | "no_scope" | "no_token" | "error";
 
+function extractErrorDetail(err: unknown): string {
+  if (err instanceof ApiError) {
+    try {
+      const parsed = JSON.parse(err.message);
+      if (parsed?.detail) return String(parsed.detail);
+      return err.message;
+    } catch {
+      return err.message || "An unexpected error occurred.";
+    }
+  }
+  if (err instanceof Error) return err.message;
+  return String(err) || "An unexpected error occurred.";
+}
+
 function WebhookConfigPanel({
   projectId,
   githubIntegration,
@@ -2016,6 +2129,7 @@ function WebhookConfigPanel({
   onIntegrationUpdate: (integration: GitHubIntegration) => void;
 }) {
   const [isToggling, setIsToggling] = useState(false);
+  const webhookSetupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [webhookSecret, setWebhookSecret] = useState<string | null>(null);
   const [webhookUrl, setWebhookUrl] = useState<string | null>(null);
   const [showSecret, setShowSecret] = useState(false);
@@ -2023,6 +2137,7 @@ function WebhookConfigPanel({
   const [error, setError] = useState<string | null>(null);
   const [webhookStatus, setWebhookStatus] = useState<WebhookStatus>("unknown");
   const [webhookMessage, setWebhookMessage] = useState<string | null>(null);
+  const [showManualFallback, setShowManualFallback] = useState(false);
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -2034,6 +2149,15 @@ function WebhookConfigPanel({
       setWebhookStatus("unknown");
     }
   }, [githubIntegration.webhooks_enabled, githubIntegration.github_hook_id]);
+
+  // Clean up webhook setup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (webhookSetupTimerRef.current) {
+        clearTimeout(webhookSetupTimerRef.current);
+      }
+    };
+  }, []);
 
   const runWebhookSetup = async () => {
     if (!accessToken) return;
@@ -2049,9 +2173,9 @@ function WebhookConfigPanel({
           github_hook_id: result.github_hook_id,
         });
       }
-    } catch {
+    } catch (err) {
       setWebhookStatus("error");
-      setWebhookMessage("Failed to setup webhook.");
+      setWebhookMessage(extractErrorDetail(err));
     }
   };
 
@@ -2066,8 +2190,14 @@ function WebhookConfigPanel({
         accessToken
       );
       onIntegrationUpdate(updated);
+      setShowManualFallback(false);
       // Clear state when disabling
       if (!updated.webhooks_enabled) {
+        // Cancel any pending auto-setup from a prior enable
+        if (webhookSetupTimerRef.current) {
+          clearTimeout(webhookSetupTimerRef.current);
+          webhookSetupTimerRef.current = null;
+        }
         setWebhookSecret(null);
         setWebhookUrl(null);
         setWebhookStatus("unknown");
@@ -2075,8 +2205,8 @@ function WebhookConfigPanel({
       } else {
         // When enabling, attempt auto-setup
         setIsToggling(false);
-        // Small delay to let state settle
-        setTimeout(async () => {
+        // Small delay to let state settle (stored in ref for unmount cleanup)
+        webhookSetupTimerRef.current = setTimeout(async () => {
           try {
             const result = await githubIntegrationApi.setupWebhook(projectId, accessToken);
             setWebhookStatus(result.status as WebhookStatus);
@@ -2087,14 +2217,19 @@ function WebhookConfigPanel({
                 github_hook_id: result.github_hook_id,
               });
             }
-          } catch {
-            setWebhookStatus("unknown");
+          } catch (err) {
+            setWebhookStatus("error");
+            setWebhookMessage(extractErrorDetail(err));
           }
         }, 100);
         return;
       }
-    } catch {
-      setError("Failed to update webhook settings");
+    } catch (err) {
+      setError(extractErrorDetail(err));
+      // Show manual setup only when attempting to enable webhooks
+      if (!githubIntegration.webhooks_enabled) {
+        setShowManualFallback(true);
+      }
     } finally {
       setIsToggling(false);
     }
@@ -2121,8 +2256,9 @@ function WebhookConfigPanel({
 
   const fullWebhookUrl = webhookUrl ? `${apiBaseUrl}${webhookUrl}` : null;
 
-  const showManualSetup = githubIntegration.webhooks_enabled &&
-    !["configured", "created", "checking"].includes(webhookStatus);
+  const showManualSetup = showManualFallback ||
+    (githubIntegration.webhooks_enabled &&
+      !["configured", "created", "checking"].includes(webhookStatus));
 
   return (
     <div className="rounded-lg border border-slate-200 p-4 dark:border-slate-600">
@@ -2147,7 +2283,7 @@ function WebhookConfigPanel({
         </label>
       </div>
 
-      {githubIntegration.webhooks_enabled && (
+      {(githubIntegration.webhooks_enabled || showManualFallback) && (
         <div className="mt-3 space-y-3">
           {/* Webhook auto-setup status */}
           {webhookStatus === "checking" && (
@@ -2169,9 +2305,24 @@ function WebhookConfigPanel({
           )}
 
           {webhookMessage && !["configured", "created"].includes(webhookStatus) && webhookStatus !== "checking" && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {webhookMessage}
-            </p>
+            <div className={cn(
+              "flex items-start gap-2 rounded-lg border p-2.5 text-sm",
+              webhookStatus === "error"
+                ? "border-red-200 bg-red-50 text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-300"
+                : ["no_scope", "no_token", "manual_required"].includes(webhookStatus)
+                  ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/50 dark:bg-amber-900/20 dark:text-amber-300"
+                  : "border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400",
+            )}>
+              <AlertCircle className={cn(
+                "mt-0.5 h-4 w-4 flex-shrink-0",
+                webhookStatus === "error"
+                  ? "text-red-600 dark:text-red-400"
+                  : ["no_scope", "no_token", "manual_required"].includes(webhookStatus)
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-slate-500 dark:text-slate-400",
+              )} />
+              <p className="text-xs">{webhookMessage}</p>
+            </div>
           )}
 
           {/* Manual setup UI */}
@@ -2274,7 +2425,24 @@ function WebhookConfigPanel({
       )}
 
       {error && (
-        <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+        <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2.5 dark:border-red-900/50 dark:bg-red-900/20">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-600 dark:text-red-400" />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium text-red-700 dark:text-red-300">
+                Failed to update webhook settings
+              </p>
+              <details className="mt-1">
+                <summary className="cursor-pointer text-xs text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300">
+                  Show details
+                </summary>
+                <p className="mt-1 break-words text-xs text-red-600 dark:text-red-400">
+                  {error}
+                </p>
+              </details>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -2938,6 +3106,10 @@ function EmbeddingSettingsSection({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const accessTokenRef = useRef(accessToken);
+  useEffect(() => {
+    accessTokenRef.current = accessToken;
+  }, [accessToken]);
 
   // Clean up polling on unmount
   useEffect(() => {
@@ -2981,7 +3153,7 @@ function EmbeddingSettingsSection({
             if (pollTimerRef.current) clearInterval(pollTimerRef.current);
             pollTimerRef.current = setInterval(async () => {
               try {
-                const updated = await embeddingsApi.getStatus(projectId, accessToken!);
+                const updated = await embeddingsApi.getStatus(projectId, accessTokenRef.current!);
                 setStatus(updated);
                 if (!updated.job_in_progress) {
                   if (pollTimerRef.current) {
@@ -3055,7 +3227,7 @@ function EmbeddingSettingsSection({
       if (pollTimerRef.current) clearInterval(pollTimerRef.current);
       pollTimerRef.current = setInterval(async () => {
         try {
-          const updated = await embeddingsApi.getStatus(projectId, accessToken);
+          const updated = await embeddingsApi.getStatus(projectId, accessTokenRef.current!);
           setStatus(updated);
           if (!updated.job_in_progress) {
             if (pollTimerRef.current) {
@@ -3205,6 +3377,521 @@ function EmbeddingSettingsSection({
           )}
           {success && (
             <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// --- Lint Level Presets ---
+
+const SEVERITY_ORDER: Record<string, number> = { error: 0, warning: 1, info: 2 };
+
+export function getSeverityColor(severity: string) {
+  switch (severity) {
+    case "error":
+      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
+    case "warning":
+      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400";
+    case "info":
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+    default:
+      return "bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300";
+  }
+}
+
+export function LintConfigSection({
+  projectId,
+  accessToken,
+  canManage,
+}: {
+  projectId: string;
+  accessToken?: string;
+  canManage: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [isRunningLint, setIsRunningLint] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  // Editable state. `lintLevel === null` means custom mode (explicit rule list).
+  const [lintLevel, setLintLevel] = useState<LintLevel | null>(2); // Default: Standard
+  const [enabledRules, setEnabledRules] = useState<Set<string>>(new Set());
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Track saved state to detect changes
+  const [savedLevel, setSavedLevel] = useState<LintLevel | null>(2);
+  const [savedRules, setSavedRules] = useState<Set<string>>(new Set());
+
+  // Fetch available lint rules
+  const rulesQuery = useQuery({
+    queryKey: ["lintRules"],
+    queryFn: () => lintApi.getRules(),
+    retry: false,
+  });
+
+  // Fetch lint level definitions from backend
+  const levelsQuery = useQuery({
+    queryKey: ["lintLevels"],
+    queryFn: () => lintApi.getLevels(),
+    retry: false,
+  });
+
+  // Build a map of level -> rule_ids from backend definitions
+  const levelRuleMap = useMemo(() => {
+    if (!levelsQuery.data) return new Map<LintLevel, Set<string>>();
+    const map = new Map<LintLevel, Set<string>>();
+    for (const level of levelsQuery.data.levels) {
+      map.set(level.level, new Set(level.rule_ids));
+    }
+    return map;
+  }, [levelsQuery.data]);
+
+  const rules = useMemo(() => {
+    if (!rulesQuery.data) return [];
+    return [...rulesQuery.data.rules].sort(
+      (a, b) => (SEVERITY_ORDER[a.severity] ?? 3) - (SEVERITY_ORDER[b.severity] ?? 3)
+    );
+  }, [rulesQuery.data]);
+
+  // Fetch project lint config (depends on rules being loaded). The access
+  // token is only used inside the queryFn; keeping it out of the queryKey
+  // means a token rotation does not invalidate the cache.
+  const configQuery = useQuery({
+    queryKey: ["lintConfig", projectId],
+    queryFn: () => lintApi.getLintConfig(projectId, accessToken),
+    enabled: !!accessToken && rules.length > 0,
+    retry: false,
+  });
+
+  // Fetch lint status summary
+  const statusQuery = useQuery<LintSummary>({
+    queryKey: ["lintSummary", projectId],
+    queryFn: () => lintApi.getStatus(projectId, accessToken),
+    enabled: !!accessToken,
+  });
+
+  // Sync rules / levels query errors
+  useEffect(() => {
+    if (rulesQuery.isError) {
+      setError("Failed to load lint rules");
+    } else if (levelsQuery.isError) {
+      setError("Failed to load lint levels");
+    }
+  }, [rulesQuery.isError, levelsQuery.isError]);
+
+  // Stable ref for hasChanges so the sync effect can read it without re-running
+  const hasChangesRef = useRef(hasChanges);
+  hasChangesRef.current = hasChanges;
+
+  // Sync config data into local editable state
+  useEffect(() => {
+    if (!configQuery.data && !configQuery.isError) return;
+    // Don't overwrite in-progress edits from background refetches
+    if (hasChangesRef.current) return;
+
+    if (configQuery.data) {
+      const cfg = configQuery.data;
+      const level = cfg.lint_level;
+      // For preset mode, defer until levelsQuery has resolved — otherwise
+      // levelRuleMap.get(level) returns undefined and we'd flash an
+      // all-disabled state until levels load. The effect re-runs when
+      // levelRuleMap changes.
+      if (level !== null && levelRuleMap.size === 0) return;
+      setLintLevel(level);
+      setSavedLevel(level);
+      if (level === null) {
+        const ruleSet = new Set(cfg.enabled_rules ?? []);
+        setEnabledRules(ruleSet);
+        setSavedRules(ruleSet);
+      } else {
+        const presetRules = levelRuleMap.get(level) ?? new Set<string>();
+        setEnabledRules(presetRules);
+        setSavedRules(presetRules);
+      }
+    } else if (configQuery.isError) {
+      setError(
+        configQuery.error instanceof Error
+          ? configQuery.error.message
+          : "Failed to load lint configuration"
+      );
+    }
+  }, [configQuery.data, configQuery.isError, configQuery.error, levelRuleMap]);
+
+  const isLoading = rulesQuery.isLoading || levelsQuery.isLoading || (!!accessToken && rules.length > 0 && configQuery.isLoading);
+
+  // Detect changes
+  useEffect(() => {
+    if (lintLevel !== savedLevel) {
+      setHasChanges(true);
+      return;
+    }
+    if (lintLevel === null) {
+      // Custom mode: compare rule sets
+      const currentIds = [...enabledRules].sort().join(",");
+      const savedIds = [...savedRules].sort().join(",");
+      setHasChanges(currentIds !== savedIds);
+    } else {
+      setHasChanges(false);
+    }
+  }, [lintLevel, enabledRules, savedLevel, savedRules]);
+
+  const handleLevelChange = (level: LintLevel | null) => {
+    setLintLevel(level);
+    setError(null);
+    setSuccess(null);
+    if (level !== null) {
+      setEnabledRules(levelRuleMap.get(level) ?? new Set<string>());
+    }
+  };
+
+  const handleRuleToggle = (ruleId: string) => {
+    if (lintLevel !== null) return; // Only toggle in custom mode
+    setError(null);
+    setSuccess(null);
+    setEnabledRules((prev) => {
+      const next = new Set(prev);
+      if (next.has(ruleId)) {
+        next.delete(ruleId);
+      } else {
+        next.add(ruleId);
+      }
+      return next;
+    });
+  };
+
+  const handleSave = async () => {
+    if (!accessToken) return;
+    setIsSaving(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      // The backend's enforce_xor validator rejects payloads that set both
+      // lint_level AND enabled_rules — preset mode must omit enabled_rules.
+      const config: LintConfig =
+        lintLevel === null
+          ? { lint_level: null, enabled_rules: [...enabledRules] }
+          : { lint_level: lintLevel };
+      await lintApi.updateLintConfig(projectId, config, accessToken);
+      setSavedLevel(lintLevel);
+      setSavedRules(new Set(enabledRules));
+      setHasChanges(false);
+      setSuccess("Lint configuration saved");
+      // Invalidate queries so cache stays fresh
+      queryClient.invalidateQueries({ queryKey: ["lintConfig", projectId] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save lint configuration");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClearResults = async () => {
+    if (!accessToken) return;
+    setIsClearing(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await lintApi.clearResults(projectId, accessToken);
+      setSuccess("Lint results cleared");
+      queryClient.invalidateQueries({ queryKey: ["lintSummary", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["lintIssues", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["lintRuns", projectId] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear lint results");
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  const handleRunLint = async () => {
+    if (!accessToken) return;
+    setIsRunningLint(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      await lintApi.triggerLint(projectId, accessToken);
+      setSuccess("Lint run started");
+      queryClient.invalidateQueries({ queryKey: ["lintSummary", projectId] });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to start lint run");
+    } finally {
+      setIsRunningLint(false);
+    }
+  };
+
+  const isCustom = lintLevel === null;
+  // Mirror HealthCheckPanel: offer Clear only when there's something to clear,
+  // otherwise the action button re-prompts a fresh Run Lint.
+  const lastRunStatus = statusQuery.data?.last_run?.status;
+  const hasResultsToClear =
+    lastRunStatus === "completed" && (statusQuery.data?.total_issues ?? 0) > 0;
+  const isLintInProgress = lastRunStatus === "pending" || lastRunStatus === "running";
+
+  return (
+    <section
+      id="lint-config"
+      className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800"
+    >
+      <div className="mb-4 flex items-center gap-2">
+        <Shield className="h-5 w-5 text-slate-500" />
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+          Lint Rule Configuration
+        </h2>
+      </div>
+      <p className="mb-4 text-sm text-slate-500 dark:text-slate-400">
+        Configure which lint rules are applied during ontology health checks.
+        Choose a preset level or customize individual rules.
+      </p>
+
+      {/* Last run summary */}
+      {statusQuery.data?.last_run && (
+        <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-600 dark:bg-slate-700/50">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              Last run: {new Date(statusQuery.data.last_run.completed_at || statusQuery.data.last_run.started_at).toLocaleString()}
+              {statusQuery.data.last_run.status !== "completed" && (
+                <span className="ml-2 text-amber-600 dark:text-amber-400">
+                  ({statusQuery.data.last_run.status})
+                </span>
+              )}
+            </span>
+            <div className="flex items-center gap-3 text-xs">
+              {statusQuery.data.error_count > 0 && (
+                <span className="font-medium text-red-600 dark:text-red-400">
+                  {statusQuery.data.error_count} error{statusQuery.data.error_count !== 1 && "s"}
+                </span>
+              )}
+              {statusQuery.data.warning_count > 0 && (
+                <span className="font-medium text-amber-600 dark:text-amber-400">
+                  {statusQuery.data.warning_count} warning{statusQuery.data.warning_count !== 1 && "s"}
+                </span>
+              )}
+              {statusQuery.data.info_count > 0 && (
+                <span className="font-medium text-blue-600 dark:text-blue-400">
+                  {statusQuery.data.info_count} info
+                </span>
+              )}
+              {statusQuery.data.total_issues === 0 && (
+                <span className="font-medium text-green-600 dark:text-green-400">
+                  No issues
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="flex h-16 items-center justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {/* Lint Level Selector */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300">
+              Lint Level
+            </label>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {(levelsQuery.data?.levels ?? []).map((lvl) => (
+                <button
+                  key={lvl.level}
+                  type="button"
+                  onClick={() => canManage && handleLevelChange(lvl.level)}
+                  disabled={!canManage}
+                  aria-pressed={lintLevel === lvl.level}
+                  className={cn(
+                    "rounded-lg border p-3 text-left transition-all",
+                    lintLevel === lvl.level
+                      ? "border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:border-primary-400 dark:bg-primary-900/20"
+                      : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
+                    !canManage && "cursor-not-allowed opacity-60"
+                  )}
+                >
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    Level {lvl.level} — {lvl.name}
+                  </p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {lvl.description} ({lvl.rule_ids.length} rules)
+                  </p>
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => canManage && handleLevelChange(null)}
+                disabled={!canManage}
+                aria-pressed={lintLevel === null}
+                className={cn(
+                  "rounded-lg border p-3 text-left transition-all",
+                  lintLevel === null
+                    ? "border-primary-500 bg-primary-50 ring-1 ring-primary-500 dark:border-primary-400 dark:bg-primary-900/20"
+                    : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
+                  !canManage && "cursor-not-allowed opacity-60"
+                )}
+              >
+                <p className="text-sm font-medium text-slate-900 dark:text-white">
+                  Custom
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Choose rules individually
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {/* Rule List */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                Rules ({enabledRules.size} of {rules.length} enabled)
+              </label>
+              {isCustom && canManage && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEnabledRules(new Set(rules.map((r) => r.rule_id)))}
+                    className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                  >
+                    Enable all
+                  </button>
+                  <span className="text-xs text-slate-300 dark:text-slate-600">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setEnabledRules(new Set())}
+                    className="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                  >
+                    Disable all
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="max-h-80 space-y-1 overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-slate-600">
+              {rules.map((rule) => {
+                const enabled = enabledRules.has(rule.rule_id);
+                return (
+                  <div
+                    key={rule.rule_id}
+                    className={cn(
+                      "flex items-center gap-3 rounded-md px-3 py-2 transition-colors",
+                      enabled
+                        ? "bg-slate-50 dark:bg-slate-700/50"
+                        : "bg-transparent opacity-60"
+                    )}
+                  >
+                    {/* Toggle */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={enabled}
+                      onClick={() => handleRuleToggle(rule.rule_id)}
+                      disabled={!canManage || !isCustom}
+                      className={cn(
+                        "relative h-5 w-9 shrink-0 rounded-full transition-colors",
+                        enabled
+                          ? "bg-primary-600 dark:bg-primary-500"
+                          : "bg-slate-300 dark:bg-slate-600",
+                        (!canManage || !isCustom) && "cursor-not-allowed opacity-60"
+                      )}
+                      aria-label={`Toggle ${rule.name}`}
+                    >
+                      <span
+                        className={cn(
+                          "absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform",
+                          enabled && "translate-x-4"
+                        )}
+                      />
+                    </button>
+                    {/* Rule info */}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-slate-900 dark:text-white">
+                          {rule.name}
+                        </span>
+                        <span
+                          className={cn(
+                            "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none",
+                            getSeverityColor(rule.severity)
+                          )}
+                        >
+                          {rule.severity}
+                        </span>
+                        {rule.scope && (
+                          <span className="inline-flex gap-0.5">
+                            {rule.scope.map((s) => (
+                              <span
+                                key={s}
+                                className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-300 text-[8px] font-bold text-slate-500 dark:border-slate-500 dark:text-slate-400"
+                                title={s}
+                              >
+                                {s[0].toUpperCase()}
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {rule.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              {rules.length === 0 && (
+                <p className="py-4 text-center text-sm text-slate-500 dark:text-slate-400">
+                  No lint rules available.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Error/success messages — visible to all users */}
+          {error && (
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+          )}
+
+          {/* Action buttons */}
+          {canManage && (
+            <div className="flex items-center justify-end gap-3">
+              {success && (
+                <p className="text-sm text-green-600 dark:text-green-400">{success}</p>
+              )}
+              {hasResultsToClear ? (
+                <Button
+                  onClick={handleClearResults}
+                  disabled={isClearing}
+                  size="sm"
+                  variant="outline"
+                >
+                  {isClearing ? "Clearing..." : "Clear Results"}
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleRunLint}
+                  disabled={isRunningLint || isLintInProgress}
+                  size="sm"
+                  variant="outline"
+                >
+                  {isRunningLint || isLintInProgress ? "Running..." : "Run Lint"}
+                </Button>
+              )}
+              <Button
+                onClick={handleSave}
+                disabled={isSaving || !hasChanges}
+                size="sm"
+              >
+                {isSaving ? "Saving..." : "Save Lint Configuration"}
+              </Button>
+            </div>
+          )}
+
+          {!canManage && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Only project owners and admins can modify lint configuration.
+            </p>
           )}
         </div>
       )}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { act, render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 
 // Provide localStorage polyfill
@@ -44,18 +44,14 @@ vi.mock("@/components/editor/ClassDetailPanel", () => ({
   },
 }));
 
-let _tabChangeHandler: ((id: string) => void) | undefined;
 vi.mock("@/components/editor/standard/EntityTabBar", () => ({
-  EntityTabBar: (props: Record<string, unknown>) => {
-    _tabChangeHandler = props.onTabChange as (id: string) => void;
-    return (
-      <div data-testid="entity-tab-bar">
-        <button onClick={() => (props.onTabChange as (id: string) => void)?.("classes")}>Classes</button>
-        <button onClick={() => (props.onTabChange as (id: string) => void)?.("properties")}>Properties</button>
-        <button onClick={() => (props.onTabChange as (id: string) => void)?.("individuals")}>Individuals</button>
-      </div>
-    );
-  },
+  EntityTabBar: (props: Record<string, unknown>) => (
+    <div data-testid="entity-tab-bar">
+      <button onClick={() => (props.onTabChange as (id: string) => void)?.("classes")}>Classes</button>
+      <button onClick={() => (props.onTabChange as (id: string) => void)?.("properties")}>Properties</button>
+      <button onClick={() => (props.onTabChange as (id: string) => void)?.("individuals")}>Individuals</button>
+    </div>
+  ),
 }));
 
 let _propertyTreeProps: Record<string, unknown> = {};
@@ -239,7 +235,6 @@ const sampleNodes: ClassTreeNode[] = [
 describe("StandardEditorLayout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    _tabChangeHandler = undefined;
     _useTreeSearchOverride = null;
     _useTreeDragDropOverride = null;
     _lastDragDropOptions = null;
@@ -975,5 +970,75 @@ describe("StandardEditorLayout", () => {
     );
 
     expect(_toastErrorFn).toHaveBeenCalledWith("Failed to reparent class", "Unknown error");
+  });
+
+  describe("entityNavigationRef", () => {
+    it("populates ref with navigation function on mount", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      expect(ref.current).toBeTypeOf("function");
+    });
+
+    it("clears ref on unmount", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      const { unmount } = render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref })} />);
+      expect(ref.current).toBeTypeOf("function");
+      unmount();
+      expect(ref.current).toBeNull();
+    });
+
+    it("navigates to class tab when type is class", () => {
+      const navigateToNode = vi.fn().mockResolvedValue(undefined);
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
+      ref.current!("http://example.org/ClassA", "class");
+      expect(navigateToNode).toHaveBeenCalledWith("http://example.org/ClassA");
+    });
+
+    it("switches to properties tab when type is property", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref, nodes: sampleNodes })} />);
+      // Initially on classes tab
+      expect(screen.getByTestId("class-tree")).toBeDefined();
+
+      act(() => {
+        ref.current!("http://example.org/hasFoo", "property");
+      });
+
+      // Property tree + detail panel should now mount, class tree gone
+      expect(screen.getByTestId("property-tree")).toBeDefined();
+      expect(screen.getByTestId("property-detail-panel")).toBeDefined();
+      expect(screen.queryByTestId("class-tree")).toBeNull();
+    });
+
+    it("switches to individuals tab when type is individual", () => {
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref, nodes: sampleNodes })} />);
+      expect(screen.getByTestId("class-tree")).toBeDefined();
+
+      act(() => {
+        ref.current!("http://example.org/foo1", "individual");
+      });
+
+      expect(screen.getByTestId("individual-list")).toBeDefined();
+      expect(screen.getByTestId("individual-detail-panel")).toBeDefined();
+      expect(screen.queryByTestId("class-tree")).toBeNull();
+    });
+
+    it("defaults to class navigation when type is undefined", () => {
+      const navigateToNode = vi.fn().mockResolvedValue(undefined);
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
+      ref.current!("http://example.org/ClassA");
+      expect(navigateToNode).toHaveBeenCalledWith("http://example.org/ClassA");
+    });
+
+    it("navigates to class tree for 'other' type (triggers 404 error message)", () => {
+      const navigateToNode = vi.fn().mockResolvedValue(undefined);
+      const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+      render(<StandardEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
+      ref.current!("http://example.org/Unknown", "other");
+      expect(navigateToNode).toHaveBeenCalledWith("http://example.org/Unknown");
+    });
   });
 });

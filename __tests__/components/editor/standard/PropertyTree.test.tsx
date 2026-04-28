@@ -118,10 +118,13 @@ describe("PropertyTree", () => {
     });
   });
 
-  it("groups properties into Object Properties based on IRI pattern", async () => {
+  it("groups properties into Object Properties via property_kind=object", async () => {
+    // Note: the IRI here intentionally has no "objectproperty" substring —
+    // grouping must come from the backend-supplied property_kind, not from
+    // pattern-matching the IRI string.
     mockSearchEntities.mockResolvedValue({
       results: [
-        { iri: "http://ex.org/objectproperty/hasPart", label: "hasPart", deprecated: false },
+        { iri: "http://ex.org/hasPart", label: "hasPart", entity_type: "property", property_kind: "object", deprecated: false },
       ],
     });
     render(<PropertyTree {...defaultProps} />);
@@ -131,10 +134,10 @@ describe("PropertyTree", () => {
     });
   });
 
-  it("groups data properties based on IRI pattern", async () => {
+  it("groups data properties via property_kind=data", async () => {
     mockSearchEntities.mockResolvedValue({
       results: [
-        { iri: "http://ex.org/datatypeproperty/hasAge", label: "hasAge", deprecated: false },
+        { iri: "http://ex.org/hasAge", label: "hasAge", entity_type: "property", property_kind: "data", deprecated: false },
       ],
     });
     render(<PropertyTree {...defaultProps} />);
@@ -143,10 +146,10 @@ describe("PropertyTree", () => {
     });
   });
 
-  it("groups annotation properties based on IRI pattern", async () => {
+  it("groups annotation properties via property_kind=annotation", async () => {
     mockSearchEntities.mockResolvedValue({
       results: [
-        { iri: "http://www.w3.org/2000/01/rdf-schema#seeAlso", label: "seeAlso", deprecated: false },
+        { iri: "http://ex.org/seeAlso", label: "seeAlso", entity_type: "property", property_kind: "annotation", deprecated: false },
       ],
     });
     render(<PropertyTree {...defaultProps} />);
@@ -155,23 +158,45 @@ describe("PropertyTree", () => {
     });
   });
 
-  it("falls back to flat 'Properties' group when no type hints", async () => {
+  it("groups properties without property_kind into 'Other Properties'", async () => {
+    // Covers both edge cases (rdf:Property without OWL subtype) and older
+    // backends that haven't started populating property_kind yet.
     mockSearchEntities.mockResolvedValue({
       results: [
-        { iri: "http://ex.org/someProp", label: "someProp", deprecated: false },
+        { iri: "http://ex.org/someProp", label: "someProp", entity_type: "property", deprecated: false },
+        { iri: "http://ex.org/otherProp", label: "otherProp", entity_type: "property", property_kind: null, deprecated: false },
       ],
     });
     render(<PropertyTree {...defaultProps} />);
     await waitFor(() => {
-      // Properties with no IRI type hints default to object group
+      expect(screen.getByText("Other Properties")).toBeDefined();
+      expect(screen.getByText("someProp")).toBeDefined();
+      expect(screen.getByText("otherProp")).toBeDefined();
+    });
+  });
+
+  it("renders all four groups when properties of every kind are present", async () => {
+    mockSearchEntities.mockResolvedValue({
+      results: [
+        { iri: "http://ex.org/hasPart", label: "hasPart", entity_type: "property", property_kind: "object", deprecated: false },
+        { iri: "http://ex.org/hasAge", label: "hasAge", entity_type: "property", property_kind: "data", deprecated: false },
+        { iri: "http://ex.org/seeAlso", label: "seeAlso", entity_type: "property", property_kind: "annotation", deprecated: false },
+        { iri: "http://ex.org/raw", label: "raw", entity_type: "property", deprecated: false },
+      ],
+    });
+    render(<PropertyTree {...defaultProps} />);
+    await waitFor(() => {
       expect(screen.getByText("Object Properties")).toBeDefined();
+      expect(screen.getByText("Data Properties")).toBeDefined();
+      expect(screen.getByText("Annotation Properties")).toBeDefined();
+      expect(screen.getByText("Other Properties")).toBeDefined();
     });
   });
 
   it("uses local name when label is empty", async () => {
     mockSearchEntities.mockResolvedValue({
       results: [
-        { iri: "http://ex.org/objectproperty/myProp", label: "", deprecated: false },
+        { iri: "http://ex.org/myProp", label: "", entity_type: "property", property_kind: "object", deprecated: false },
       ],
     });
     render(<PropertyTree {...defaultProps} />);
@@ -183,7 +208,7 @@ describe("PropertyTree", () => {
   it("supports expand/collapse of property groups", async () => {
     mockSearchEntities.mockResolvedValue({
       results: [
-        { iri: "http://ex.org/objectproperty/hasPart", label: "hasPart", deprecated: false },
+        { iri: "http://ex.org/hasPart", label: "hasPart", entity_type: "property", property_kind: "object", deprecated: false },
       ],
     });
     const onSelect = vi.fn();

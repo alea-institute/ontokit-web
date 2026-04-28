@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
-import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
 import { PropertyTree } from "@/components/editor/standard/PropertyTree";
@@ -64,8 +63,6 @@ export interface DeveloperEditorLayoutProps {
   canEdit: boolean;
   canSuggest?: boolean;
   isSuggestionMode?: boolean;
-  canManage: boolean;
-
   // Tree state (from useOntologyTree)
   nodes: ClassTreeNode[];
   isTreeLoading: boolean;
@@ -108,10 +105,6 @@ export interface DeveloperEditorLayoutProps {
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   detailRefreshKey?: number;
 
-  // Side panels
-  showHealthCheck: boolean;
-  onCloseHealthCheck: () => void;
-
   // Property & Individual editing
   onUpdateProperty?: (propertyIri: string, data: TurtlePropertyUpdateData) => Promise<void>;
   onUpdateIndividual?: (individualIri: string, data: TurtleIndividualUpdateData) => Promise<void>;
@@ -120,6 +113,9 @@ export interface DeveloperEditorLayoutProps {
   onReparentClass?: (classIri: string, oldParentIris: string[], newParentIris: string[], mode: DragMode) => Promise<void>;
   reparentOptimistic?: (iri: string, oldParentIri: string | null, newParentIri: string | null) => { previousNodes: ClassTreeNode[] };
   rollbackReparent?: (snapshot: { previousNodes: ClassTreeNode[] }) => void;
+
+  /** Ref populated with a function to navigate to any entity type */
+  entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
 }
 
 export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
@@ -131,7 +127,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     canSuggest = false,
     isSuggestionMode = false,
-    canManage,
     nodes,
     isTreeLoading,
     treeError,
@@ -164,8 +159,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     selectedNodeFallback,
     onUpdateClass,
     detailRefreshKey,
-    showHealthCheck,
-    onCloseHealthCheck,
     onUpdateProperty,
     onUpdateIndividual,
     onReparentClass,
@@ -261,6 +254,36 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   // Track selected entity per tab (properties/individuals have their own selection)
   const [selectedPropertyIri, setSelectedPropertyIri] = useState<string | null>(null);
   const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
+
+  // Expose entity navigation to parent via ref
+  const { entityNavigationRef, navigateToNode: navToNode, setPendingScrollIri: setScrollIri } = props;
+  useEffect(() => {
+    if (!entityNavigationRef) return;
+
+    const handler = (iri: string, type?: string) => {
+      if (type === "property") {
+        setActiveTab("properties");
+        setSelectedPropertyIri(iri);
+      } else if (type === "individual") {
+        setActiveTab("individuals");
+        setSelectedIndividualIri(iri);
+      } else if (type === "other") {
+        // Untyped entities: switch to source view and scroll to IRI
+        setViewMode("source");
+        setScrollIri(iri);
+      } else {
+        setActiveTab("classes");
+        navToNode(iri);
+      }
+    };
+
+    entityNavigationRef.current = handler;
+    return () => {
+      if (entityNavigationRef.current === handler) {
+        entityNavigationRef.current = null;
+      }
+    };
+  }, [entityNavigationRef, navToNode, setScrollIri]);
 
   // Shared search state
   const {
@@ -548,20 +571,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               )}
             </div>
 
-            {/* Right Panel - Health Check */}
-            {showHealthCheck && (
-              <div className="w-96 flex-shrink-0">
-                <HealthCheckPanel
-                  projectId={projectId}
-                  accessToken={accessToken}
-                  branch={activeBranch}
-                  isOpen={showHealthCheck}
-                  onClose={onCloseHealthCheck}
-                  onNavigateToClass={(iri) => navigateToNode(iri)}
-                  canRunLint={canManage}
-                />
-              </div>
-            )}
           </>
         ) : (
           /* Source View */

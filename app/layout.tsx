@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Noto_Color_Emoji } from "next/font/google";
 
 import "./globals.css";
 import { Providers } from "./providers";
@@ -13,6 +13,12 @@ const inter = Inter({
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains-mono",
+});
+
+const notoColorEmoji = Noto_Color_Emoji({
+  subsets: ["emoji"],
+  weight: "400",
+  variable: "--font-noto-emoji",
 });
 
 export const metadata: Metadata = {
@@ -34,7 +40,7 @@ export default function RootLayout({
           {`(function(){try{var s=JSON.parse(localStorage.getItem("ontokit-editor-preferences")||"{}");var t=(s.state&&s.state.theme)||"system";if(t==="dark")document.documentElement.classList.add("dark");else if(t==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches)document.documentElement.classList.add("dark")}catch(e){}})()`}
         </Script>
       </head>
-      <body className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} ${jetbrainsMono.variable} ${notoColorEmoji.variable} font-sans antialiased`}>
         <a href="#main-content" className="skip-link">Skip to main content</a>
         <Providers>{children}</Providers>
       </body>

@@ -57,6 +57,20 @@ vi.mock("@/lib/stores/editorModeStore", () => ({
 vi.mock("@/components/editor/LanguageFlag", () => ({
   LanguageFlag: () => null,
 }));
+vi.mock("@/components/editor/LanguagePicker", () => ({
+  LanguagePicker: ({ value, onChange }: { value: string; onChange: (code: string) => void }) => (
+    <select
+      data-testid="lang-picker"
+      aria-label="Language tag"
+      value={value}
+      onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
+    >
+      <option value="en">en</option>
+      <option value="de">de</option>
+      <option value="fr">fr</option>
+    </select>
+  ),
+}));
 vi.mock("@/components/editor/ParentClassPicker", () => ({
   ParentClassPicker: () => null,
 }));
@@ -210,7 +224,7 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/is not an OWL Class/)
+        screen.getByText(/Could not load .* as an OWL Class/)
       ).toBeDefined();
     });
   });
@@ -484,7 +498,7 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       // Should show error since fallback IRI doesn't match
-      expect(screen.getByText(/is not an OWL Class/)).toBeDefined();
+      expect(screen.getByText(/Could not load .* as an OWL Class/)).toBeDefined();
     });
   });
 
@@ -568,7 +582,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode entry ──
 
   it("enters edit mode when Edit Item button is clicked", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -634,22 +647,19 @@ describe("ClassDetailPanel", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getAllByTitle("Language tag (e.g. en, de, fr)").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByLabelText("Language tag").length).toBeGreaterThanOrEqual(1);
     });
 
-    // Find the language input (has title "Language tag")
-    const langInputs = screen.getAllByTitle("Language tag (e.g. en, de, fr)");
+    // Find the language picker (mocked as <select>)
+    const langPickers = screen.getAllByLabelText("Language tag");
+    await user.selectOptions(langPickers[0], "de");
 
-    await user.clear(langInputs[0]);
-    await user.type(langInputs[0], "de");
-
-    expect(screen.getByDisplayValue("de")).not.toBeNull();
+    expect((langPickers[0] as HTMLSelectElement).value).toBe("de");
   });
 
   // ── Comment editing ──
 
   it("renders comment textareas in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -726,7 +736,6 @@ describe("ClassDetailPanel", () => {
   // ── Parent editing ──
 
   it("shows parent with remove button in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -892,7 +901,6 @@ describe("ClassDetailPanel", () => {
   // ── Multiple labels with remove ──
 
   it("shows remove button only when there are multiple labels", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -958,7 +966,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode hides Edit Item button ──
 
   it("hides Edit Item button while in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -980,7 +987,6 @@ describe("ClassDetailPanel", () => {
   // ── Definition in edit mode ──
 
   it("renders Definition section with annotation row in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1180,7 +1186,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode with empty labels (no labels from server) ──
 
   it("initializes edit mode with empty label placeholder when server has no labels", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(makeClassDetail({ labels: [] }));
     render(
@@ -1206,7 +1211,6 @@ describe("ClassDetailPanel", () => {
   // ── Comment ghost row (trailing empty placeholder) ──
 
   it("shows ghost comment row with placeholder text in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -1243,14 +1247,13 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Animal/)).not.toBeNull();
-      expect(screen.getByText(/is not an OWL Class/)).not.toBeNull();
+      expect(screen.getByText(/Could not load .* as an OWL Class/)).not.toBeNull();
     });
   });
 
   // ── Edit mode with relationship annotations ──
 
   it("initializes edit mode with relationship annotations and regular annotations", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1312,7 +1315,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode adds Definition section even if not present in server data ──
 
   it("adds empty Definition section in edit mode when not in server data", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({ annotations: [] })
@@ -1477,7 +1479,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode with isDefinedBy relationship ──
 
   it("initializes edit mode with isDefinedBy relationship", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1546,20 +1547,20 @@ describe("ClassDetailPanel", () => {
       expect(screen.getByDisplayValue("A human being")).not.toBeNull();
     });
 
-    // Find language input for comment (title "Language tag")
-    const langInputs = screen.getAllByTitle("Language tag");
-    expect(langInputs.length).toBeGreaterThanOrEqual(1);
+    // Find language pickers (mocked as <select>) — labels come first, then comments
+    const langPickers = screen.getAllByLabelText("Language tag");
+    expect(langPickers.length).toBeGreaterThanOrEqual(2);
 
-    await user.clear(langInputs[0]);
-    await user.type(langInputs[0], "fr");
+    // The comment lang picker is after the label ones
+    const commentLangPicker = langPickers[langPickers.length - 1];
+    await user.selectOptions(commentLangPicker, "fr");
 
-    expect(screen.getByDisplayValue("fr")).not.toBeNull();
+    expect((commentLangPicker as HTMLSelectElement).value).toBe("fr");
   });
 
   // ── Edit mode: definition section with existing values shows annotation rows ──
 
   it("renders definition values in edit mode with annotation rows", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const DEFINITION_IRI = "http://www.w3.org/2004/02/skos/core#definition";
     mockGetClassDetail.mockResolvedValue(
@@ -1671,7 +1672,7 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText(/is not an OWL Class/)).not.toBeNull();
+      expect(screen.getByText(/Could not load .* as an OWL Class/)).not.toBeNull();
     });
     // Error state should be visible
     expect(container.querySelector(".border-red-200")).not.toBeNull();
@@ -1828,7 +1829,6 @@ describe("ClassDetailPanel", () => {
   // ── InlineAnnotationAdder onAdd adds to existing annotation ──
 
   it("InlineAnnotationAdder adds value to existing annotation property", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
@@ -1870,7 +1870,6 @@ describe("ClassDetailPanel", () => {
   // ── InlineAnnotationAdder onAdd creates new annotation property ──
 
   it("InlineAnnotationAdder creates new annotation property when not existing", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({ annotations: [] })
@@ -1902,7 +1901,6 @@ describe("ClassDetailPanel", () => {
   // ── RelationshipSection callbacks in edit mode ──
 
   it("passes relationship callbacks to RelationshipSection in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1940,7 +1938,6 @@ describe("ClassDetailPanel", () => {
   });
 
   it("invokes removeRelationshipTarget via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1977,7 +1974,6 @@ describe("ClassDetailPanel", () => {
   });
 
   it("invokes changeRelationshipProperty via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -2014,7 +2010,6 @@ describe("ClassDetailPanel", () => {
   });
 
   it("invokes addRelationshipGroup via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -2045,7 +2040,6 @@ describe("ClassDetailPanel", () => {
   // ── RelationshipSection onSaveNeeded callback ──
 
   it("invokes triggerSave via RelationshipSection onSaveNeeded", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -2082,7 +2076,6 @@ describe("ClassDetailPanel", () => {
   // ── Annotation value update and remove callbacks in edit mode ──
 
   it("updates annotation value via AnnotationRow callback in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
@@ -2130,7 +2123,6 @@ describe("ClassDetailPanel", () => {
   });
 
   it("removes annotation value via AnnotationRow callback in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
@@ -2181,7 +2173,6 @@ describe("ClassDetailPanel", () => {
   // ── Annotation definition update callback via AnnotationRow ──
 
   it("updates definition annotation via AnnotationRow callback", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const DEFINITION_IRI = "http://www.w3.org/2004/02/skos/core#definition";
     mockGetClassDetail.mockResolvedValue(
@@ -2231,7 +2222,6 @@ describe("ClassDetailPanel", () => {
   // ── Definition AnnotationRow onBlur triggers save ──
 
   it("definition AnnotationRow onBlur triggers triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const DEFINITION_IRI = "http://www.w3.org/2004/02/skos/core#definition";
     mockGetClassDetail.mockResolvedValue(
@@ -2323,7 +2313,6 @@ describe("ClassDetailPanel", () => {
   // ── Annotation language change callback ──
 
   it("updates annotation language via AnnotationRow callback", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
@@ -2373,7 +2362,6 @@ describe("ClassDetailPanel", () => {
   // ── Definition remove callback ──
 
   it("removes definition value via AnnotationRow callback", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const DEFINITION_IRI = "http://www.w3.org/2004/02/skos/core#definition";
     mockGetClassDetail.mockResolvedValue(
@@ -2423,7 +2411,6 @@ describe("ClassDetailPanel", () => {
   // ── Annotation AnnotationRow onBlur triggers save ──
 
   it("annotation AnnotationRow onBlur triggers triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
