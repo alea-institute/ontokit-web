@@ -4,11 +4,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, Pencil, LogIn, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Settings, FileCode, LogIn, LayoutDashboard } from "lucide-react";
 import { ShareButton } from "@/components/editor/ShareButton";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
+import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
+import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchProvider, useBranch } from "@/lib/context/BranchContext";
@@ -159,7 +161,8 @@ function ViewerContent({
   sessionStatus: "loading" | "authenticated" | "unauthenticated";
 }) {
   const searchParams = useSearchParams();
-  const classIriParam = searchParams.get("classIri");
+  const initialSelection = readSelectionFromSearchParams(searchParams);
+  const classIriParam = initialSelection?.iri ?? null;
   const editorMode = useEditorModeStore((s) => s.editorMode);
 
   // Use the default branch from the BranchProvider context
@@ -223,6 +226,7 @@ function ViewerContent({
               <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
               <h1 className="font-semibold text-slate-900 dark:text-white">{project?.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
+              {canSuggest && <ViewerEditorSwitcher projectId={projectId} />}
               <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2">
@@ -240,18 +244,9 @@ function ViewerContent({
                 </Button>
               </Link>
 
-              {/* Open Editor / Sign In */}
-              {canSuggest ? (
-                <Link href={(() => {
-                  const iriToCarry = selectedIri || classIriParam;
-                  return `/projects/${projectId}/editor${iriToCarry ? `?classIri=${encodeURIComponent(iriToCarry)}` : ''}`;
-                })()}>
-                  <Button size="sm" className="gap-2">
-                    <Pencil className="h-4 w-4" />
-                    <span className="hidden sm:inline">Open Editor</span>
-                  </Button>
-                </Link>
-              ) : !hasValidAccess ? (
+              {/* Sign In affordance for unauthenticated users — the Viewer/Editor switcher above
+                  carries authenticated users into the editor. */}
+              {!canSuggest && !hasValidAccess && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -261,7 +256,7 @@ function ViewerContent({
                   <LogIn className="h-3 w-3" />
                   Sign in to edit
                 </Button>
-              ) : null}
+              )}
 
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>

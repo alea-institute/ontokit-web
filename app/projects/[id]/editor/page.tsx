@@ -12,6 +12,8 @@ import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
 import { useToast } from "@/lib/context/ToastContext";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
+import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
+import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
@@ -51,7 +53,8 @@ export default function EditorPage() {
   const projectId = params.id as string;
   const resumeSessionParam = searchParams.get("resumeSession") || undefined;
   const resumeBranchParam = searchParams.get("branch") || undefined;
-  const classIriParam = searchParams.get("classIri");
+  const initialSelection = readSelectionFromSearchParams(searchParams);
+  const classIriParam = initialSelection?.iri ?? null;
   const initialBranch = resumeBranchParam
     || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
@@ -824,20 +827,11 @@ export default function EditorPage() {
         <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link
-                href={(() => {
-                  const iriToCarry = selectedIri || classIriParam;
-                  return `/projects/${projectId}${iriToCarry ? `?classIri=${encodeURIComponent(iriToCarry)}` : ''}`;
-                })()}
-                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                <Eye className="h-4 w-4" />
-                Close Editor
-              </Link>
-              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
               <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
-              {/* Mode Switcher */}
+              {/* Viewer / Editor switcher */}
+              <ViewerEditorSwitcher projectId={projectId} />
+              {/* Standard / Developer mode switcher */}
               <ModeSwitcher />
               {/* Suggestion mode indicator */}
               {isSuggestionMode && (
