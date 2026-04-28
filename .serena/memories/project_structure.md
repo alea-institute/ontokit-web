@@ -1,7 +1,7 @@
 # Codebase Structure — ontokit-web
 
 ## Top-level layout
-```
+```text
 ontokit-web/
 ├── app/                  # Next.js App Router pages
 ├── components/           # React components by domain

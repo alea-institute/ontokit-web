@@ -39,6 +39,5 @@ Both need grassroots collaborative ontology editing tooling.
 Node.js >= 22.13.0 (per package.json). README says >=20.9, package.json is authoritative.
 
 ## Repo Location
-`/home/johnrdorazio/development/CatholicOS_org/ontokit/ontokit-web`
 
 Companion repo: `ontokit-api` (Python FastAPI backend, sibling directory).
