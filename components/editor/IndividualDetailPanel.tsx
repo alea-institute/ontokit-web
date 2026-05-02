@@ -233,17 +233,26 @@ export function IndividualDetailPanel({
     setEditAnnotations(regularAnnotations);
   }, []);
 
-  // Flush the current entity when navigating away (cleanup runs with the old closure)
+  // Flush any pending draft to git when this panel unmounts. The flush
+  // closure captures props that can change between mount and unmount, so
+  // route the call through a ref that we keep up to date in an effect — the
+  // cleanup then sees the latest closure rather than the one captured on
+  // first render. (Mirrors the pattern used in ClassDetailPanel /
+  // PropertyDetailPanel.)
+  const flushToGitRef = useRef(flushToGit);
+  useEffect(() => {
+    flushToGitRef.current = flushToGit;
+  }, [flushToGit]);
   useEffect(() => {
     return () => {
-      flushToGit();
+      flushToGitRef.current();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush must capture the current entity's closure
-  }, [individualIri]);
+  }, []);
 
   // Reset edit state when the selected individual changes
   useEffect(() => {
     editInitializedRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on selection change; matches ClassDetailPanel/PropertyDetailPanel patterns
     setIsEditing(false);
   }, [individualIri]);
 
@@ -272,6 +281,7 @@ export function IndividualDetailPanel({
 
     if (restoredDraft && restoredDraft.entityType === "individual" && individualIri) {
       const d = restoredDraft as IndividualDraftEntry;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring draft state from store; matches PropertyDetailPanel auto-enter pattern
       setEditLabels(d.labels);
       setEditComments(ensureTrailingEmpty(d.comments));
       setEditDefinitions(ensureTrailingEmpty(d.definitions));

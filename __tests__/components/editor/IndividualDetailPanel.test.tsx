@@ -676,19 +676,16 @@ describe("IndividualDetailPanel", () => {
     expect(mockClearRestoredDraft).toHaveBeenCalled();
   });
 
-  // ── flushToGit on IRI change ──
+  // ── flushToGit on unmount ──
 
-  it("calls flushToGit when individualIri changes", async () => {
-    const { rerender } = render(
+  it("flushes pending draft to git on unmount", async () => {
+    // The parent layout remounts the panel on selection change via a key
+    // prop, so the panel's contract for "navigate away" is "unmount and let
+    // the cleanup flush". This test exercises that contract directly.
+    const { unmount } = render(
       <IndividualDetailPanel {...DEFAULT_PROPS} canEdit={false} />
     );
-    rerender(
-      <IndividualDetailPanel
-        {...DEFAULT_PROPS}
-        individualIri="http://example.org/ontology#JaneDoe"
-        canEdit={false}
-      />
-    );
+    unmount();
     await waitFor(() => {
       expect(mockFlushToGit).toHaveBeenCalled();
     });
