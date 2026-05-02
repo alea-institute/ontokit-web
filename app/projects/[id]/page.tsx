@@ -16,6 +16,7 @@ import { StandardEditorLayout } from "@/components/editor/standard/StandardEdito
 import { BranchProvider, useBranch } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { useToast } from "@/lib/context/ToastContext";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
@@ -169,6 +170,14 @@ function ViewerContent({
     [searchParamsString],
   );
   const editorMode = useEditorModeStore((s) => s.editorMode);
+
+  // Mark this surface as the user's most recent project view so side-page
+  // Back-to-project links route them back to the viewer — regardless of
+  // whether their global preferEditMode preference says viewer or editor.
+  const setProjectViewMode = useSelectionStore((s) => s.setMode);
+  useEffect(() => {
+    setProjectViewMode("viewer");
+  }, [setProjectViewMode]);
 
   // Use the default branch from the BranchProvider context
   const { defaultBranch, isLoading: isBranchLoading } = useBranch();

@@ -33,16 +33,32 @@ describe("useSelectionStore", () => {
     });
   });
 
-  it("clear resets back to null/null", () => {
+  it("clear resets selection and mode to null", () => {
     useSelectionStore.getState().setSelection("ex:Person", "class");
+    useSelectionStore.getState().setMode("editor");
     useSelectionStore.getState().clear();
     expect(useSelectionStore.getState().iri).toBeNull();
     expect(useSelectionStore.getState().type).toBeNull();
+    expect(useSelectionStore.getState().mode).toBeNull();
   });
 
   it("supports null iri with null type for an empty active tab", () => {
     useSelectionStore.getState().setSelection(null, null);
     expect(useSelectionStore.getState().iri).toBeNull();
     expect(useSelectionStore.getState().type).toBeNull();
+  });
+
+  it("starts with mode null", () => {
+    expect(useSelectionStore.getState().mode).toBeNull();
+  });
+
+  it("setMode records viewer / editor independently of selection", () => {
+    useSelectionStore.getState().setMode("editor");
+    expect(useSelectionStore.getState().mode).toBe("editor");
+    // Selection untouched
+    expect(useSelectionStore.getState().iri).toBeNull();
+
+    useSelectionStore.getState().setMode("viewer");
+    expect(useSelectionStore.getState().mode).toBe("viewer");
   });
 });

@@ -287,10 +287,16 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   }, [entityNavigationRef, navToNode, setScrollIri]);
 
   // Mirror the active-tab selection into the shared store so cross-page chrome
-  // (e.g. the Viewer/Editor switcher) can synthesize the right ?<type>Iri= key
-  // without having to know about local-state plumbing here.
+  // (e.g. the Viewer/Editor switcher, the side-page Back-to-project link via
+  // useProjectHomeHref) can synthesize the right ?<type>Iri= key without having
+  // to know about local-state plumbing here.
+  //
+  // No unmount cleanup: an unmount-clear races with side-page navigation —
+  // the editor unmounts before settings/PRs/etc render, so reading the store
+  // there returns null and the back-link drops the selection. The next editor
+  // mount (same or different project) overwrites the store from its own URL
+  // params, so stale values are short-lived and harmless.
   const setSelection = useSelectionStore((s) => s.setSelection);
-  const clearSelection = useSelectionStore((s) => s.clear);
   useEffect(() => {
     if (activeTab === "classes") {
       setSelection(selectedIri ?? null, selectedIri ? "class" : null);
@@ -300,7 +306,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
       setSelection(selectedIndividualIri ?? null, selectedIndividualIri ? "individual" : null);
     }
   }, [activeTab, selectedIri, selectedPropertyIri, selectedIndividualIri, setSelection]);
-  useEffect(() => () => clearSelection(), [clearSelection]);
 
   // Shared search state
   const {

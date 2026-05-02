@@ -23,6 +23,7 @@ import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
@@ -70,6 +71,14 @@ export default function EditorPage() {
     || undefined;
 
   const editorMode = useEditorModeStore((s) => s.editorMode);
+
+  // Mark this surface as the user's most recent project view so side-page
+  // Back-to-project links route them back to the editor — regardless of
+  // whether their global preferEditMode preference says viewer or editor.
+  const setProjectViewMode = useSelectionStore((s) => s.setMode);
+  useEffect(() => {
+    setProjectViewMode("editor");
+  }, [setProjectViewMode]);
 
   // Branch state
   const queryClient = useQueryClient();
@@ -693,8 +702,14 @@ export default function EditorPage() {
     }
     setActiveBranch(branchName);
     resetSourceState();
-    router.replace(`${pathname}?branch=${encodeURIComponent(branchName)}`);
-  }, [pathname, router, suggestionSession, resetSourceState]);
+    // Merge into existing search params instead of replacing — BranchSelector
+    // fires this on mount, and replacing would wipe ?classIri= / ?propertyIri=
+    // / ?individualIri= / ?resumeSession= that the page also depends on.
+    const next = new URLSearchParams(searchParamsString);
+    next.set("branch", branchName);
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }, [pathname, router, suggestionSession, resetSourceState, searchParamsString]);
 
   // --- Keyboard shortcuts ---
   const keyboardShortcuts = useMemo((): ShortcutDefinition[] => [

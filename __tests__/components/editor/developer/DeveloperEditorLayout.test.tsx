@@ -2,6 +2,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import React from "react";
 
+import { useSelectionStore } from "@/lib/stores/selectionStore";
+
 // Provide localStorage polyfill
 vi.hoisted(() => {
   if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
@@ -1330,6 +1332,34 @@ describe("DeveloperEditorLayout", () => {
       render(<DeveloperEditorLayout {...defaultProps({ entityNavigationRef: ref, navigateToNode })} />);
       ref.current!("http://example.org/ClassA");
       expect(navigateToNode).toHaveBeenCalledWith("http://example.org/ClassA");
+    });
+  });
+
+  describe("selection store cross-page contract", () => {
+    beforeEach(() => useSelectionStore.getState().clear());
+
+    it("populates the selection store from selectedIri on mount", () => {
+      render(
+        <DeveloperEditorLayout
+          {...defaultProps({ selectedIri: "http://example.org/Foo" })}
+        />,
+      );
+      expect(useSelectionStore.getState().iri).toBe("http://example.org/Foo");
+      expect(useSelectionStore.getState().type).toBe("class");
+    });
+
+    it("preserves the selection store on unmount so side-page Back-to-project links can read it", () => {
+      // Regression: editor used to clear the store on unmount, racing with
+      // side-page navigation — by the time settings/PRs/etc rendered, the
+      // store was empty and useProjectHomeHref dropped the selection.
+      const { unmount } = render(
+        <DeveloperEditorLayout
+          {...defaultProps({ selectedIri: "http://example.org/Foo" })}
+        />,
+      );
+      unmount();
+      expect(useSelectionStore.getState().iri).toBe("http://example.org/Foo");
+      expect(useSelectionStore.getState().type).toBe("class");
     });
   });
 });
