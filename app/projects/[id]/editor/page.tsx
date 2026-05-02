@@ -12,7 +12,8 @@ import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
 import { useToast } from "@/lib/context/ToastContext";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
-import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingToggle";
+import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
+import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
@@ -52,7 +53,18 @@ export default function EditorPage() {
   const projectId = params.id as string;
   const resumeSessionParam = searchParams.get("resumeSession") || undefined;
   const resumeBranchParam = searchParams.get("branch") || undefined;
-  const classIriParam = searchParams.get("classIri");
+  // Memoize the parsed URL selection so its identity is stable across renders
+  // when the URL hasn't changed — otherwise the URL-restore effect would re-fire
+  // every render and risk clobbering the user's in-page selection.
+  const searchParamsString = searchParams.toString();
+  const initialSelection = useMemo(
+    () => readSelectionFromSearchParams(new URLSearchParams(searchParamsString)),
+    [searchParamsString],
+  );
+  // Tracks the URL selection we've already applied. Each unique
+  // `${type}:${iri}` is consumed at most once per page-instance — if the URL
+  // changes mid-session, we apply the new key, but we never re-apply a key.
+  const consumedSelectionRef = useRef<string | null>(null);
   const initialBranch = resumeBranchParam
     || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
@@ -90,18 +102,49 @@ export default function EditorPage() {
     resetSourceState,
   } = viewer;
 
-  // Restore selected class from URL query param once tree is ready
-  useEffect(() => {
-    if (!classIriParam || isTreeLoading || !nodes.length) return;
-    if (selectedIri === classIriParam) return;
-    navigateToNode(classIriParam);
-  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
-
   // UI state (editor-only)
   const [showHistory, setShowHistory] = useState(false);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
   const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
+
+  // Restore selected entity from URL query param. For classes we wait for the
+  // class tree to load; for properties and individuals we dispatch through the
+  // layout's nav handler (entityNavigationRef), which switches the active tab
+  // and selects the entity directly. Each URL-derived selection is applied at
+  // most once via consumedSelectionRef — that way an in-page selection change
+  // (which doesn't update the URL) isn't undone on the next render.
+  useEffect(() => {
+    if (!initialSelection) return;
+    const key = `${initialSelection.type}:${initialSelection.iri}`;
+    if (consumedSelectionRef.current === key) return;
+
+    if (initialSelection.type === "class") {
+      if (isTreeLoading || !nodes.length) return;
+      if (selectedIri === initialSelection.iri) {
+        consumedSelectionRef.current = key;
+        return;
+      }
+      // Await the navigation so we only mark this URL key consumed when the
+      // tree-side restore actually succeeds. If it throws, leave the key
+      // unconsumed so a later render (e.g. once data is healthy) can retry.
+      let cancelled = false;
+      navigateToNode(initialSelection.iri)
+        .then(() => {
+          if (!cancelled) consumedSelectionRef.current = key;
+        })
+        .catch((err) => {
+          if (!cancelled) console.error("Failed to restore selection from URL:", err);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (isLoading) return; // layout not yet mounted
+    if (!entityNavigationRef.current) return; // layout's ref not yet populated
+    entityNavigationRef.current(initialSelection.iri, initialSelection.type);
+    consumedSelectionRef.current = key;
+  }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode, isLoading]);
 
   // Commit dialog
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
@@ -825,20 +868,12 @@ export default function EditorPage() {
         <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link
-                href={`/projects/${projectId}`}
-                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Link>
-              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
               <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
-              {/* Mode Switcher */}
+              {/* Viewer / Editor switcher */}
+              <ViewerEditorSwitcher projectId={projectId} />
+              {/* Standard / Developer mode switcher */}
               <ModeSwitcher />
-              {canSuggest && <ContinuousEditingToggle />}
-
               {/* Suggestion mode indicator */}
               {isSuggestionMode && (
                 <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">

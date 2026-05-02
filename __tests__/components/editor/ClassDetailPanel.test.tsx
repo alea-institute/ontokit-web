@@ -50,7 +50,7 @@ vi.mock("@/lib/hooks/useAutoSave", () => ({
 
 vi.mock("@/lib/stores/editorModeStore", () => ({
   useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ editorMode: "standard", continuousEditing: false, ...editorModeOverrides }),
+    selector({ editorMode: "standard", ...editorModeOverrides }),
 }));
 
 // Stub child components
@@ -353,6 +353,22 @@ describe("ClassDetailPanel", () => {
     });
   });
 
+  it("renders the class detail when lintApi.getIssues rejects", async () => {
+    // The fetch effect tolerates a lint failure (it's wrapped in .catch
+    // that returns an empty issues list) so the rest of the panel still
+    // renders. Cover that branch.
+    mockGetIssues.mockRejectedValue(new Error("lint service down"));
+    render(<ClassDetailPanel {...DEFAULT_PROPS} />);
+
+    await waitFor(() => {
+      expect(mockGetClassDetail).toHaveBeenCalled();
+    });
+    // No lint summary should be shown despite a class being loaded.
+    await waitFor(() => {
+      expect(screen.queryByText(/Health Issues/i)).toBeNull();
+    });
+  });
+
   // ── Lint issues ──
 
   it("shows lint issues for the class", async () => {
@@ -428,39 +444,6 @@ describe("ClassDetailPanel", () => {
       expect(screen.getAllByText("Person").length).toBeGreaterThanOrEqual(1);
     });
     expect(screen.queryByText("Edit Item")).toBeNull();
-  });
-
-  // ── Edit mode (canEdit=true) ──
-
-  it("shows Edit Item button when canEdit is true and onUpdateClass provided", async () => {
-    const onUpdateClass = vi.fn();
-    render(
-      <ClassDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateClass={onUpdateClass}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Edit Item")).toBeDefined();
-    });
-  });
-
-  it("shows 'Suggest Changes' when isSuggestionMode is true", async () => {
-    const onUpdateClass = vi.fn();
-    render(
-      <ClassDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        isSuggestionMode={true}
-        onUpdateClass={onUpdateClass}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText("Suggest Changes")).toBeDefined();
-    });
   });
 
   // ── Tree-node fallback for unsaved entities ──
@@ -581,8 +564,7 @@ describe("ClassDetailPanel", () => {
 
   // ── Edit mode entry ──
 
-  it("enters edit mode when Edit Item button is clicked", async () => {
-    const user = userEvent.setup();
+  it("auto-enters edit mode and renders inputs when onUpdateClass is provided", async () => {
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -593,17 +575,11 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-
-    await user.click(screen.getByText("Edit Item"));
-
-    // In edit mode, label should be rendered in an input
-    await waitFor(() => {
-      const labelInput = screen.getByDisplayValue("Person");
-      expect(labelInput).not.toBeNull();
-      expect(labelInput.tagName).toBe("INPUT");
-    });
+    const labelInput = screen.getByDisplayValue("Person");
+    expect(labelInput).not.toBeNull();
+    expect(labelInput.tagName).toBe("INPUT");
   });
 
   // ── Label editing ──
@@ -620,9 +596,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("Person")).not.toBeNull();
@@ -647,9 +622,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getAllByLabelText("Language tag").length).toBeGreaterThanOrEqual(1);
@@ -665,7 +639,6 @@ describe("ClassDetailPanel", () => {
   // ── Comment editing ──
 
   it("renders comment textareas in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -676,9 +649,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       // Comment value should appear in a textarea
@@ -700,9 +672,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("A human being")).not.toBeNull();
@@ -727,9 +698,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("A human being")).not.toBeNull();
@@ -745,7 +715,6 @@ describe("ClassDetailPanel", () => {
   // ── Parent editing ──
 
   it("shows parent with remove button in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -756,9 +725,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByTitle("Remove parent")).not.toBeNull();
@@ -779,9 +747,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByTitle("Remove parent")).not.toBeNull();
@@ -808,9 +775,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByText("Add parent")).not.toBeNull();
@@ -822,6 +788,36 @@ describe("ClassDetailPanel", () => {
     // (replaced by the picker component)
     await waitFor(() => {
       expect(screen.queryByText("Add parent")).toBeNull();
+    });
+  });
+
+  it("closes the parent picker when the user cancels", async () => {
+    const user = userEvent.setup();
+    const onUpdateClass = vi.fn();
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit={true}
+        onUpdateClass={onUpdateClass}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Add parent")).not.toBeNull();
+    });
+
+    // Open the parent picker
+    await user.click(screen.getByText("Add parent"));
+    await waitFor(() => {
+      expect(screen.queryByText("Add parent")).toBeNull();
+    });
+
+    // Cancel via the AutoSaveAffordanceBar stub
+    await user.click(screen.getByTestId("cancel-edit"));
+
+    // The picker should close — Add parent button reappears
+    await waitFor(() => {
+      expect(screen.getByText("Add parent")).not.toBeNull();
     });
   });
 
@@ -839,9 +835,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("Person")).not.toBeNull();
@@ -856,7 +851,7 @@ describe("ClassDetailPanel", () => {
 
   // ── Cancel flow ──
 
-  it("exits edit mode and discards draft when cancel is invoked", async () => {
+  it("discards draft when cancel is invoked but stays in edit mode", async () => {
     const user = userEvent.setup();
     const onUpdateClass = vi.fn();
 
@@ -869,9 +864,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("Person")).not.toBeNull();
@@ -883,40 +877,36 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       expect(mockDiscardDraft).toHaveBeenCalled();
-      // Verify edit mode exited — "Edit Item" button should be visible again
-      expect(screen.getByText("Edit Item")).not.toBeNull();
     });
+    // Editor is always in edit mode — auto-save bar stays.
+    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
-  it("calls flushToGit when navigating to a different class", async () => {
+  it("flushes pending draft to git on unmount", async () => {
+    // The parent layout remounts the panel on selection change via a key
+    // prop, so the panel's contract for "navigate away" is "unmount and let
+    // the cleanup flush". This test exercises that contract directly.
     const onUpdateClass = vi.fn();
 
-    const { rerender } = render(
+    const { unmount } = render(
       <ClassDetailPanel
         {...DEFAULT_PROPS}
         canEdit={true}
         onUpdateClass={onUpdateClass}
       />
     );
-
-    rerender(
-      <ClassDetailPanel
-        {...DEFAULT_PROPS}
-        classIri="http://example.org/ontology#Animal"
-        canEdit={true}
-        onUpdateClass={onUpdateClass}
-      />
-    );
-
     await waitFor(() => {
-      expect(mockFlushToGit).toHaveBeenCalled();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
+
+    unmount();
+
+    expect(mockFlushToGit).toHaveBeenCalled();
   });
 
   // ── Multiple labels with remove ──
 
   it("shows remove button only when there are multiple labels", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -935,9 +925,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       const removeBtns = screen.getAllByTitle("Remove label");
@@ -965,9 +954,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("Personne")).not.toBeNull();
@@ -981,10 +969,9 @@ describe("ClassDetailPanel", () => {
     });
   });
 
-  // ── Edit mode hides Edit Item button ──
+  // ── No "Edit Item" affordance in editor context ──
 
-  it("hides Edit Item button while in edit mode", async () => {
-    const user = userEvent.setup();
+  it("never renders an Edit Item button in editor context", async () => {
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -995,19 +982,14 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
-
-    await waitFor(() => {
-      expect(screen.queryByText("Edit Item")).toBeNull();
-    });
+    expect(screen.queryByText("Edit Item")).toBeNull();
   });
 
   // ── Definition in edit mode ──
 
   it("renders Definition section with annotation row in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1029,9 +1011,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     // Definition section title should be visible
     await waitFor(() => {
@@ -1208,7 +1189,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode with empty labels (no labels from server) ──
 
   it("initializes edit mode with empty label placeholder when server has no labels", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(makeClassDetail({ labels: [] }));
     render(
@@ -1220,9 +1200,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       // Should have an empty label input placeholder
@@ -1235,7 +1214,6 @@ describe("ClassDetailPanel", () => {
   // ── Comment ghost row (trailing empty placeholder) ──
 
   it("shows ghost comment row with placeholder text in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -1246,9 +1224,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       // The comment "A human being" + a trailing empty ghost row
@@ -1280,7 +1257,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode with relationship annotations ──
 
   it("initializes edit mode with relationship annotations and regular annotations", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1307,9 +1283,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     // The "Relationship(s)" section should appear in edit mode
     await waitFor(() => {
@@ -1343,7 +1318,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode adds Definition section even if not present in server data ──
 
   it("adds empty Definition section in edit mode when not in server data", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({ annotations: [] })
@@ -1357,9 +1331,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByText("Definition")).not.toBeNull();
@@ -1509,7 +1482,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode with isDefinedBy relationship ──
 
   it("initializes edit mode with isDefinedBy relationship", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1531,9 +1503,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByText("Relationship(s)")).not.toBeNull();
@@ -1572,9 +1543,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByDisplayValue("A human being")).not.toBeNull();
@@ -1594,7 +1564,6 @@ describe("ClassDetailPanel", () => {
   // ── Edit mode: definition section with existing values shows annotation rows ──
 
   it("renders definition values in edit mode with annotation rows", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const DEFINITION_IRI = "http://www.w3.org/2004/02/skos/core#definition";
     mockGetClassDetail.mockResolvedValue(
@@ -1620,9 +1589,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     // Definition section should be visible with values in annotation rows (mocked to null but section should render)
     await waitFor(() => {
@@ -1715,7 +1683,7 @@ describe("ClassDetailPanel", () => {
 
   // ── Manual save stays in edit mode when flushToGit fails ──
 
-  it("stays in edit mode when saveAndExitEditMode flush fails", async () => {
+  it("stays in edit mode when flushDraftToGit flush fails", async () => {
     const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockFlushToGit.mockResolvedValue(false);
@@ -1728,9 +1696,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(screen.getByTestId("manual-save")).not.toBeNull();
@@ -1747,28 +1714,9 @@ describe("ClassDetailPanel", () => {
     expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
-  // ── Continuous editing auto-enter ──
+  // ── Cancel keeps the panel in edit mode ──
 
-  it("auto-enters edit mode when continuousEditing is true", async () => {
-    editorModeOverrides = { continuousEditing: true };
-    const onUpdateClass = vi.fn();
-    render(
-      <ClassDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateClass={onUpdateClass}
-      />
-    );
-
-    await waitFor(() => {
-      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
-    });
-  });
-
-  // ── Continuous editing does not auto-enter after cancel ──
-
-  it("does not re-enter edit mode after cancel even with continuousEditing", async () => {
-    editorModeOverrides = { continuousEditing: true };
+  it("stays in edit mode after cancel and discards the draft", async () => {
     const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
@@ -1788,8 +1736,8 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       expect(mockDiscardDraft).toHaveBeenCalled();
-      expect(screen.getByText("Edit Item")).not.toBeNull();
     });
+    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
   // ── Draft restoration auto-enter ──
@@ -1850,7 +1798,6 @@ describe("ClassDetailPanel", () => {
   // ── InlineAnnotationAdder onAdd adds to existing annotation ──
 
   it("InlineAnnotationAdder adds value to existing annotation property", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
@@ -1873,9 +1820,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(capturedInlineAnnotationAdderProps).not.toBeNull();
@@ -1893,7 +1839,6 @@ describe("ClassDetailPanel", () => {
   // ── InlineAnnotationAdder onAdd creates new annotation property ──
 
   it("InlineAnnotationAdder creates new annotation property when not existing", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({ annotations: [] })
@@ -1907,9 +1852,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(capturedInlineAnnotationAdderProps).not.toBeNull();
@@ -1926,7 +1870,6 @@ describe("ClassDetailPanel", () => {
   // ── RelationshipSection callbacks in edit mode ──
 
   it("passes relationship callbacks to RelationshipSection in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1948,9 +1891,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(capturedRelationshipSectionProps).not.toBeNull();
@@ -1965,7 +1907,6 @@ describe("ClassDetailPanel", () => {
   });
 
   it("invokes removeRelationshipTarget via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -1987,9 +1928,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(capturedRelationshipSectionProps).not.toBeNull();
@@ -2003,7 +1943,6 @@ describe("ClassDetailPanel", () => {
   });
 
   it("invokes changeRelationshipProperty via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -2025,9 +1964,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(capturedRelationshipSectionProps).not.toBeNull();
@@ -2041,7 +1979,6 @@ describe("ClassDetailPanel", () => {
   });
 
   it("invokes addRelationshipGroup via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     render(
       <ClassDetailPanel
@@ -2052,9 +1989,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(capturedRelationshipSectionProps).not.toBeNull();
@@ -2073,7 +2009,6 @@ describe("ClassDetailPanel", () => {
   // ── RelationshipSection onSaveNeeded callback ──
 
   it("invokes triggerSave via RelationshipSection onSaveNeeded", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     mockGetClassDetail.mockResolvedValue(
       makeClassDetail({
@@ -2095,9 +2030,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       expect(capturedRelationshipSectionProps).not.toBeNull();
@@ -2111,7 +2045,6 @@ describe("ClassDetailPanel", () => {
   // ── Annotation value update and remove callbacks in edit mode ──
 
   it("updates annotation value via AnnotationRow callback in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
@@ -2134,9 +2067,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       const annRow = capturedAnnotationRowProps.find(
@@ -2160,7 +2092,6 @@ describe("ClassDetailPanel", () => {
   });
 
   it("removes annotation value via AnnotationRow callback in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
@@ -2186,9 +2117,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       const annRows = capturedAnnotationRowProps.filter(
@@ -2212,7 +2142,6 @@ describe("ClassDetailPanel", () => {
   // ── Annotation definition update callback via AnnotationRow ──
 
   it("updates definition annotation via AnnotationRow callback", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const DEFINITION_IRI = "http://www.w3.org/2004/02/skos/core#definition";
     mockGetClassDetail.mockResolvedValue(
@@ -2235,9 +2164,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       const defRow = capturedAnnotationRowProps.find(
@@ -2263,7 +2191,6 @@ describe("ClassDetailPanel", () => {
   // ── Definition AnnotationRow onBlur triggers save ──
 
   it("definition AnnotationRow onBlur triggers triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const DEFINITION_IRI = "http://www.w3.org/2004/02/skos/core#definition";
     mockGetClassDetail.mockResolvedValue(
@@ -2286,9 +2213,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       const defRow = capturedAnnotationRowProps.find(
@@ -2307,10 +2233,9 @@ describe("ClassDetailPanel", () => {
 
   // ── Does not auto-enter edit mode when canEdit is false ──
 
-  it("does not auto-enter edit mode when canEdit is false even with continuousEditing", async () => {
-    editorModeOverrides = { continuousEditing: true };
+  it("does not auto-enter edit mode when canEdit is false even with onUpdateClass", async () => {
     render(
-      <ClassDetailPanel {...DEFAULT_PROPS} canEdit={false} />
+      <ClassDetailPanel {...DEFAULT_PROPS} canEdit={false} onUpdateClass={vi.fn()} />
     );
 
     await waitFor(() => {
@@ -2357,7 +2282,6 @@ describe("ClassDetailPanel", () => {
   // ── Annotation language change callback ──
 
   it("updates annotation language via AnnotationRow callback", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
@@ -2380,9 +2304,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       const annRow = capturedAnnotationRowProps.find(
@@ -2408,7 +2331,6 @@ describe("ClassDetailPanel", () => {
   // ── Definition remove callback ──
 
   it("removes definition value via AnnotationRow callback", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const DEFINITION_IRI = "http://www.w3.org/2004/02/skos/core#definition";
     mockGetClassDetail.mockResolvedValue(
@@ -2434,9 +2356,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       const defRow = capturedAnnotationRowProps.find(
@@ -2459,7 +2380,6 @@ describe("ClassDetailPanel", () => {
   // ── Annotation AnnotationRow onBlur triggers save ──
 
   it("annotation AnnotationRow onBlur triggers triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateClass = vi.fn();
     const PREF_LABEL_IRI = "http://www.w3.org/2004/02/skos/core#prefLabel";
     mockGetClassDetail.mockResolvedValue(
@@ -2482,9 +2402,8 @@ describe("ClassDetailPanel", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Edit Item")).not.toBeNull();
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
     });
-    await user.click(screen.getByText("Edit Item"));
 
     await waitFor(() => {
       const annRow = capturedAnnotationRowProps.find(

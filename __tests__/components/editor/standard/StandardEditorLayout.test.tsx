@@ -442,7 +442,6 @@ describe("StandardEditorLayout", () => {
       />
     );
     expect(_classDetailProps.canEdit).toBe(true);
-    expect(_classDetailProps.isSuggestionMode).toBe(true);
   });
 
   it("forwards detailRefreshKey to ClassDetailPanel", () => {

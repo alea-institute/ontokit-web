@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 
 // Mock next/link to render a plain <a> tag
@@ -7,6 +7,19 @@ vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode; [key: string]: unknown }) => (
     <a href={href} {...props}>{children}</a>
   ),
+}));
+
+// Test-controlled session and preferEditMode mocks.
+let mockSessionAccessToken: string | undefined;
+let mockPreferEditMode = false;
+
+vi.mock("next-auth/react", () => ({
+  useSession: () => ({ data: mockSessionAccessToken ? { accessToken: mockSessionAccessToken } : null }),
+}));
+
+vi.mock("@/lib/stores/editorModeStore", () => ({
+  useEditorModeStore: <T,>(selector: (s: { preferEditMode: boolean }) => T) =>
+    selector({ preferEditMode: mockPreferEditMode }),
 }));
 
 import { ProjectCard } from "@/components/projects/project-card";
@@ -27,6 +40,11 @@ function makeProject(overrides: Partial<Project> = {}): Project {
 }
 
 describe("ProjectCard", () => {
+  beforeEach(() => {
+    mockSessionAccessToken = undefined;
+    mockPreferEditMode = false;
+  });
+
   // ── Basic rendering ─────────────────────────────────────────────
   it("renders the project name", () => {
     render(<ProjectCard project={makeProject()} />);
@@ -44,8 +62,49 @@ describe("ProjectCard", () => {
   });
 
   // ── Link ────────────────────────────────────────────────────────
-  it("links to the correct project URL", () => {
-    render(<ProjectCard project={makeProject()} />);
+  it("links to the viewer when preferEditMode is off", () => {
+    mockPreferEditMode = false;
+    render(<ProjectCard project={makeProject({ user_role: "owner" })} />);
+    const link = screen.getByRole("link", { name: /Open project Test Ontology/ });
+    expect(link.getAttribute("href")).toBe("/projects/proj-123");
+  });
+
+  it("links straight to the editor when preferEditMode is on AND user has edit rights", () => {
+    mockPreferEditMode = true;
+    render(<ProjectCard project={makeProject({ user_role: "owner" })} />);
+    const link = screen.getByRole("link", { name: /Open project Test Ontology/ });
+    expect(link.getAttribute("href")).toBe("/projects/proj-123/editor");
+  });
+
+  it.each(["admin", "editor"] as const)(
+    "links to the editor when preferEditMode is on for %s role",
+    (role) => {
+      mockPreferEditMode = true;
+      render(<ProjectCard project={makeProject({ user_role: role })} />);
+      const link = screen.getByRole("link", { name: /Open project Test Ontology/ });
+      expect(link.getAttribute("href")).toBe("/projects/proj-123/editor");
+    },
+  );
+
+  it("falls back to the viewer when preferEditMode is on but user has only viewer role", () => {
+    mockPreferEditMode = true;
+    render(<ProjectCard project={makeProject({ user_role: "viewer" })} />);
+    const link = screen.getByRole("link", { name: /Open project Test Ontology/ });
+    expect(link.getAttribute("href")).toBe("/projects/proj-123");
+  });
+
+  it("links a public project to the editor for an authenticated visitor with no role (suggester) when preferEditMode is on", () => {
+    mockPreferEditMode = true;
+    mockSessionAccessToken = "token-abc";
+    render(<ProjectCard project={makeProject({ is_public: true, user_role: undefined })} />);
+    const link = screen.getByRole("link", { name: /Open project Test Ontology/ });
+    expect(link.getAttribute("href")).toBe("/projects/proj-123/editor");
+  });
+
+  it("links to the viewer when preferEditMode is on but visitor is unauthenticated", () => {
+    mockPreferEditMode = true;
+    mockSessionAccessToken = undefined;
+    render(<ProjectCard project={makeProject({ is_public: true, user_role: undefined })} />);
     const link = screen.getByRole("link", { name: /Open project Test Ontology/ });
     expect(link.getAttribute("href")).toBe("/projects/proj-123");
   });

@@ -26,6 +26,7 @@ import type { ClassTreeNode } from "@/lib/ontology/types";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 import type { IriPosition } from "@/lib/editor/indexWorker";
 import { useDraftStore } from "@/lib/stores/draftStore";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { getLocalName } from "@/lib/utils";
 import { extractTreeLabelMap } from "@/lib/graph/buildGraphData";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
@@ -285,6 +286,22 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     };
   }, [entityNavigationRef, navToNode, setScrollIri]);
 
+  // Mirror the active-tab selection into the shared store so cross-page chrome
+  // (e.g. the Viewer/Editor switcher) can synthesize the right ?<type>Iri= key
+  // without having to know about local-state plumbing here.
+  const setSelection = useSelectionStore((s) => s.setSelection);
+  const clearSelection = useSelectionStore((s) => s.clear);
+  useEffect(() => {
+    if (activeTab === "classes") {
+      setSelection(selectedIri ?? null, selectedIri ? "class" : null);
+    } else if (activeTab === "properties") {
+      setSelection(selectedPropertyIri ?? null, selectedPropertyIri ? "property" : null);
+    } else {
+      setSelection(selectedIndividualIri ?? null, selectedIndividualIri ? "individual" : null);
+    }
+  }, [activeTab, selectedIri, selectedPropertyIri, selectedIndividualIri, setSelection]);
+  useEffect(() => () => clearSelection(), [clearSelection]);
+
   // Shared search state
   const {
     showSearch,
@@ -527,6 +544,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             <div className="min-w-0 flex-1 bg-white dark:bg-slate-800">
               {activeTab === "classes" ? (
                 <ClassDetailPanel
+                  // Remount on selection change so internal edit-state and
+                  // refs reset cleanly between selections.
+                  key={selectedIri ?? "no-class"}
                   projectId={projectId}
                   classIri={selectedIri}
                   accessToken={accessToken}
@@ -536,12 +556,12 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   onCopyIri={onCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
                   canEdit={canEdit || isSuggestionMode}
-                  isSuggestionMode={isSuggestionMode}
                   onUpdateClass={onUpdateClass}
                   refreshKey={detailRefreshKey}
                 />
               ) : activeTab === "properties" ? (
                 <PropertyDetailPanel
+                  key={selectedPropertyIri ?? "no-property"}
                   projectId={projectId}
                   propertyIri={selectedPropertyIri}
                   sourceContent={sourceContent || ""}
@@ -556,6 +576,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 />
               ) : (
                 <IndividualDetailPanel
+                  key={selectedIndividualIri ?? "no-individual"}
                   projectId={projectId}
                   individualIri={selectedIndividualIri}
                   sourceContent={sourceContent || ""}

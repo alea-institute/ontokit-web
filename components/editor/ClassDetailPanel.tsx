@@ -26,7 +26,6 @@ import {
   StickyNote,
   Hash,
   Link2,
-  Pencil,
 } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail, type ClassUpdatePayload, type AnnotationUpdate } from "@/lib/api/client";
 import type { LocalizedString } from "@/lib/api/client";
@@ -44,7 +43,6 @@ import { CrossReferencesPanel } from "@/components/editor/CrossReferencesPanel";
 import { SimilarConceptsPanel } from "@/components/editor/SimilarConceptsPanel";
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
-import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
@@ -73,7 +71,6 @@ interface ClassDetailPanelProps {
   onCopyIri?: (iri: string) => void;
   selectedNodeFallback?: TreeNodeFallback | null;
   canEdit?: boolean;
-  isSuggestionMode?: boolean;
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   refreshKey?: number;
   /** Extra actions rendered in the header row (e.g. Graph button) */
@@ -90,7 +87,6 @@ export function ClassDetailPanel({
   onCopyIri,
   selectedNodeFallback,
   canEdit,
-  isSuggestionMode = false,
   onUpdateClass,
   refreshKey,
   headerActions,
@@ -113,14 +109,7 @@ export function ClassDetailPanel({
   const [editRelationships, setEditRelationships] = useState<RelationshipGroup[]>([]);
   const [showParentPicker, setShowParentPicker] = useState(false);
 
-  // Track the previous classIri so we can flush on navigate
-  const prevClassIriRef = useRef<string | null>(null);
   const editInitializedRef = useRef(false);
-  // Track if user explicitly cancelled for this classIri (prevents continuous-editing auto-re-entry)
-  const cancelledIriRef = useRef<string | null>(null);
-
-  // Continuous editing from store
-  const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
 
   // Toast for error feedback
   const toast = useToast();
@@ -166,70 +155,27 @@ export function ClassDetailPanel({
     }
   }, [isEditing, editStateRef]);
 
-  // Flush to git when class selection changes, then reset to read-only
+  // Flush any pending draft to git when this panel unmounts (the parent
+  // remounts the panel on classIri change via a key prop, so "navigate
+  // away" maps to "instance unmount" — flushing in the cleanup function is
+  // what carries the user's last edit through to the backend).
+  // The flush function captures closure over canEdit/onUpdateClass/etc. and
+  // can be re-created mid-render; route the unmount call through a ref that
+  // we keep up to date in an effect, so cleanup always sees the latest
+  // closure rather than the one captured on first render.
+  const flushToGitRef = useRef(flushToGit);
   useEffect(() => {
-    if (prevClassIriRef.current && prevClassIriRef.current !== classIri) {
-      flushToGit();
-    }
-    prevClassIriRef.current = classIri;
-    setResolvedTargetLabels({});
-    editInitializedRef.current = false;
-    setIsEditing(false);
-    cancelledIriRef.current = null;
-  }, [classIri]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Enter edit mode: initialize edit state from classDetail
-  const enterEditMode = useCallback(() => {
-    if (!classDetail) return;
-    initEditState(classDetail);
-    editInitializedRef.current = true;
-    setIsEditing(true);
-  }, [classDetail]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Cancel edit mode: discard draft, revert to server state
-  const cancelEditMode = useCallback(() => {
-    discardDraft();
-    if (classDetail) {
-      initEditState(classDetail);
-    }
-    setIsEditing(false);
-    cancelledIriRef.current = classIri;
-  }, [classIri, classDetail, discardDraft]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Manual save: trigger draft save, flush to git, exit edit mode on success
-  const saveAndExitEditMode = useCallback(async () => {
-    triggerSave();
-    const ok = await flushToGit();
-    if (ok) setIsEditing(false);
-  }, [triggerSave, flushToGit]);
-
-  // Auto-enter edit mode based on continuous editing or restored draft
+    flushToGitRef.current = flushToGit;
+  }, [flushToGit]);
   useEffect(() => {
-    if (isEditing || editInitializedRef.current) return;
-    if (!canEdit || !onUpdateClass || !classDetail) return;
+    return () => {
+      flushToGitRef.current();
+    };
+  }, []);
 
-    // Restored draft → always auto-enter
-    if (restoredDraft && classIri) {
-      setEditLabels(restoredDraft.labels.length > 0 ? restoredDraft.labels : [{ value: "", lang: "en" }]);
-      setEditComments(ensureTrailingEmpty(restoredDraft.comments));
-      setEditParentIris(restoredDraft.parentIris);
-      setEditParentLabels(restoredDraft.parentLabels);
-      setEditAnnotations(restoredDraft.annotations);
-      setEditRelationships(restoredDraft.relationships);
-      editInitializedRef.current = true;
-      setIsEditing(true);
-      clearRestoredDraft();
-      return;
-    }
-
-    // Continuous editing → auto-enter (unless user explicitly cancelled for this class)
-    if (continuousEditing && cancelledIriRef.current !== classIri) {
-      enterEditMode();
-      return;
-    }
-  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, continuousEditing, isEditing, enterEditMode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Initialize edit state from OWLClassDetail
+  // Initialize edit state from OWLClassDetail.
+  // Declared before enterEditMode / cancelEditMode so those callbacks can list
+  // it in their dependency arrays without tripping a use-before-declared error.
   const initEditState = useCallback((detail: OWLClassDetail) => {
     setEditLabels(detail.labels.length > 0 ? detail.labels.map((l) => ({ ...l })) : [{ value: "", lang: "en" }]);
     setEditComments(ensureTrailingEmpty(detail.comments.map((c) => ({ ...c }))));
@@ -269,6 +215,58 @@ export function ClassDetailPanel({
     setEditAnnotations(regularAnnotations);
     setEditRelationships(relationships);
   }, [resolvedTargetLabels]);
+
+  // Enter edit mode: initialize edit state from classDetail
+  const enterEditMode = useCallback(() => {
+    if (!classDetail) return;
+    initEditState(classDetail);
+    editInitializedRef.current = true;
+    setIsEditing(true);
+  }, [classDetail, initEditState]);
+
+  // Cancel: discard the in-progress draft and re-init from server state.
+  // The panel stays in edit mode — the editor is always editable.
+  const cancelEditMode = useCallback(() => {
+    discardDraft();
+    // Explicitly clear the autosave ref so an unmount in the same React
+    // batch as this cancel can't resurrect the discarded edit via flushToGit.
+    // The editStateRef-sync effect would refill this ref after the next
+    // commit anyway, but that's too late if unmount happens first.
+    editStateRef.current = null;
+    if (classDetail) {
+      initEditState(classDetail);
+    }
+    setShowParentPicker(false);
+  }, [classDetail, discardDraft, initEditState, editStateRef]);
+
+  // Manual save: flush the current draft to git. Stays in edit mode.
+  const flushDraftToGit = useCallback(async () => {
+    triggerSave();
+    await flushToGit();
+  }, [triggerSave, flushToGit]);
+
+  // Auto-enter edit mode based on continuous editing or restored draft
+  useEffect(() => {
+    if (isEditing || editInitializedRef.current) return;
+    if (!canEdit || !onUpdateClass || !classDetail) return;
+
+    // Restored draft → always auto-enter
+    if (restoredDraft && classIri) {
+      setEditLabels(restoredDraft.labels.length > 0 ? restoredDraft.labels : [{ value: "", lang: "en" }]);
+      setEditComments(ensureTrailingEmpty(restoredDraft.comments));
+      setEditParentIris(restoredDraft.parentIris);
+      setEditParentLabels(restoredDraft.parentLabels);
+      setEditAnnotations(restoredDraft.annotations);
+      setEditRelationships(restoredDraft.relationships);
+      editInitializedRef.current = true;
+      setIsEditing(true);
+      clearRestoredDraft();
+      return;
+    }
+
+    // In editor context (canEdit + onUpdateClass), always auto-enter edit mode.
+    enterEditMode();
+  }, [classDetail, canEdit, restoredDraft, classIri, clearRestoredDraft, onUpdateClass, isEditing, enterEditMode]);
 
   // Fetch class data
   useEffect(() => {
@@ -570,7 +568,6 @@ export function ClassDetailPanel({
   }
 
   const displayLabel = getPreferredLabel(classDetail.labels) || getLocalName(classDetail.iri);
-  const canEnterEdit = !!canEdit && !!onUpdateClass;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -593,16 +590,6 @@ export function ClassDetailPanel({
               </h2>
               <div className="flex shrink-0 items-center gap-1">
                 {headerActions}
-                {canEnterEdit && !isEditing && (
-                  <button
-                    onClick={enterEditMode}
-                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
-                    title="Enter edit mode"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                    {isSuggestionMode ? "Suggest Changes" : "Edit Item"}
-                  </button>
-                )}
               </div>
             </div>
             <div className="mt-1 flex items-center gap-2">
@@ -640,7 +627,7 @@ export function ClassDetailPanel({
           error={saveError}
           validationError={validationError}
           onRetry={() => flushToGit()}
-          onManualSave={saveAndExitEditMode}
+          onManualSave={flushDraftToGit}
           onCancel={cancelEditMode}
         />
       )}

@@ -22,6 +22,7 @@ import {
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
+import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import {
   suggestionsApi,
   type SuggestionSessionSummary,
@@ -159,6 +160,7 @@ export default function SuggestionReviewPage() {
 
   const { project, isLoading: isProjectLoading, error: projectError } = useProject(projectId, session?.accessToken);
   const { canEdit: canReview } = derivePermissions(project, session?.accessToken);
+  const projectHomeHref = useProjectHomeHref(projectId);
 
   const [sessions, setSessions] = useState<SuggestionSessionSummary[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
@@ -322,7 +324,7 @@ export default function SuggestionReviewPage() {
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
             <Link
-              href={`/projects/${projectId}`}
+              href={projectHomeHref}
               className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-4 w-4" />

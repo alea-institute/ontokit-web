@@ -4,22 +4,27 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderWithQueryClient } from "@/__tests__/helpers/renderWithProviders";
 
-// ---- matchMedia polyfill (must be before any import that touches the store) ----
-if (typeof window !== "undefined" && !window.matchMedia) {
+// ---- matchMedia polyfill (must run BEFORE module imports load the editor
+// mode store, whose top-level code calls window.matchMedia(...).addEventListener
+// during module initialization). vi.hoisted runs before ES-module hoisting so
+// the polyfill is in place before any subsequent import resolves. ----
+vi.hoisted(() => {
+  if (typeof globalThis.window === "undefined") return;
+  if (typeof window.matchMedia === "function") return;
   Object.defineProperty(window, "matchMedia", {
     writable: true,
-    value: vi.fn().mockImplementation((query: string) => ({
+    value: (query: string) => ({
       matches: false,
       media: query,
       onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    })),
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }),
   });
-}
+});
 
 // Mock heavy dependencies that the settings page imports but LintConfigSection doesn't use
 vi.mock("@/components/layout/header", () => ({

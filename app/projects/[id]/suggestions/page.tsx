@@ -20,6 +20,7 @@ import {
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { useProject } from "@/lib/hooks/useProject";
+import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import {
   suggestionsApi,
   type SuggestionSessionSummary,
@@ -74,6 +75,7 @@ export default function SuggestionsPage() {
   const projectId = params.id as string;
 
   const { project, isLoading: isProjectLoading, error: projectError } = useProject(projectId, session?.accessToken);
+  const projectHomeHref = useProjectHomeHref(projectId);
   const [sessions, setSessions] = useState<SuggestionSessionSummary[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
@@ -139,7 +141,7 @@ export default function SuggestionsPage() {
           {/* Navigation */}
           <div className="mb-6 flex items-center justify-between">
             <Link
-              href={`/projects/${projectId}`}
+              href={projectHomeHref}
               className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-4 w-4" />

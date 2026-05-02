@@ -27,32 +27,7 @@ describe("useIriLabels", () => {
     expect(mockedGetClassDetail).not.toHaveBeenCalled();
   });
 
-  it("resolves labels via getClassDetail", async () => {
-    mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Person", language: "en" }],
-    });
-
-    const { result } = renderHook(() =>
-      useIriLabels(["http://example.org/Person"], {
-        projectId: "proj-1",
-        accessToken: "token",
-        branch: "main",
-      }),
-    );
-
-    await waitFor(() => {
-      expect(result.current["http://example.org/Person"]).toBe("Person");
-    });
-    expect(mockedGetClassDetail).toHaveBeenCalledWith(
-      "proj-1",
-      "http://example.org/Person",
-      "token",
-      "main",
-    );
-  });
-
-  it("falls back to searchEntities when getClassDetail fails", async () => {
-    mockedGetClassDetail.mockRejectedValue(new Error("Not a class"));
+  it("resolves labels via searchEntities (primary path)", async () => {
     mockedSearchEntities.mockResolvedValue({
       results: [
         { iri: "http://example.org/hasPart", label: "has Part" },
@@ -69,6 +44,55 @@ describe("useIriLabels", () => {
     await waitFor(() => {
       expect(result.current["http://example.org/hasPart"]).toBe("has Part");
     });
+    // Search alone resolved it — no class probe needed.
+    expect(mockedSearchEntities).toHaveBeenCalled();
+    expect(mockedGetClassDetail).not.toHaveBeenCalled();
+  });
+
+  it("falls back to getClassDetail when search returns no match", async () => {
+    // Search returns an empty result set — IRI isn't in the search index.
+    mockedSearchEntities.mockResolvedValue({ results: [] });
+    mockedGetClassDetail.mockResolvedValue({
+      labels: [{ value: "Person", lang: "en" }],
+    });
+
+    const { result } = renderHook(() =>
+      useIriLabels(["http://example.org/Person"], {
+        projectId: "proj-1",
+        accessToken: "token",
+        branch: "main",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current["http://example.org/Person"]).toBe("Person");
+    });
+    expect(mockedSearchEntities).toHaveBeenCalled();
+    expect(mockedGetClassDetail).toHaveBeenCalledWith(
+      "proj-1",
+      "http://example.org/Person",
+      "token",
+      "main",
+    );
+  });
+
+  it("falls back to getClassDetail when search throws", async () => {
+    mockedSearchEntities.mockRejectedValue(new Error("search down"));
+    mockedGetClassDetail.mockResolvedValue({
+      labels: [{ value: "Person", lang: "en" }],
+    });
+
+    const { result } = renderHook(() =>
+      useIriLabels(["http://example.org/Person"], {
+        projectId: "proj-1",
+        accessToken: "token",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current["http://example.org/Person"]).toBe("Person");
+    });
+    expect(mockedGetClassDetail).toHaveBeenCalled();
   });
 
   it("returns labelHints for known IRIs without fetching", () => {
@@ -90,7 +114,7 @@ describe("useIriLabels", () => {
   it("merges labelHints with fetched labels", async () => {
     const hints = { "http://example.org/Known": "Known Label" };
     mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Fetched", language: "en" }],
+      labels: [{ value: "Fetched", lang: "en" }],
     });
 
     const { result } = renderHook(() =>
@@ -122,7 +146,7 @@ describe("useIriLabels", () => {
 
   it("resets cache when projectId changes", async () => {
     mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Label1", language: "en" }],
+      labels: [{ value: "Label1", lang: "en" }],
     });
 
     const { result, rerender } = renderHook(
@@ -139,7 +163,7 @@ describe("useIriLabels", () => {
     });
 
     mockedGetClassDetail.mockResolvedValue({
-      labels: [{ value: "Label2", language: "en" }],
+      labels: [{ value: "Label2", lang: "en" }],
     });
 
     // Change projectId AND iris to trigger both the context reset and the IRI effect
@@ -173,5 +197,71 @@ describe("useIriLabels", () => {
 
     // No label resolved, but no crash
     expect(result.current["http://example.org/Unknown"]).toBeUndefined();
+  });
+
+  it.each([
+    "http://www.w3.org/2004/02/skos/core#prefLabel",
+    "http://www.w3.org/2000/01/rdf-schema#label",
+    "http://www.w3.org/2002/07/owl#topObjectProperty",
+    "http://purl.org/dc/terms/hasVersion",
+    "http://www.w3.org/2001/XMLSchema#string",
+    // https:// variants of the same vocabularies must also be skipped
+    "https://www.w3.org/2004/02/skos/core#prefLabel",
+    "https://purl.org/dc/terms/title",
+    "https://www.w3.org/2002/07/owl#sameAs",
+  ])("skips both class probe and search for external-vocabulary IRI %s", async (iri) => {
+    mockedGetClassDetail.mockResolvedValue({ labels: [{ value: "should-not", lang: "en" }] });
+    mockedSearchEntities.mockResolvedValue({ results: [] });
+
+    const { result } = renderHook(() =>
+      useIriLabels([iri], { projectId: "proj-1", accessToken: "token" }),
+    );
+
+    // Wait for the hook's effect to settle. waitFor's retry interval gives
+    // any would-be probe calls time to issue before we assert their absence.
+    // The result for an external-vocab IRI stays undefined throughout.
+    await waitFor(() => {
+      expect(mockedGetClassDetail).not.toHaveBeenCalled();
+      expect(mockedSearchEntities).not.toHaveBeenCalled();
+    });
+    expect(result.current[iri]).toBeUndefined();
+  });
+
+  it.each([
+    "urn:uuid:550e8400-e29b-41d4-a716-446655440000",
+    "tel:+1-555-0100",
+    "bare-string-no-scheme",
+  ])("does not short-circuit non-http(s) IRIs: %s", async (iri) => {
+    // Non-http(s) IRIs aren't in the external-vocabulary skip-list, so the
+    // hook should fall through to its normal probe path. Configure both
+    // mocks to return empty results — we just want to assert that the hook
+    // ATTEMPTED to resolve (i.e., did not silently skip).
+    mockedSearchEntities.mockResolvedValue({ results: [] });
+    mockedGetClassDetail.mockRejectedValue(new Error("not found"));
+
+    renderHook(() =>
+      useIriLabels([iri], { projectId: "proj-1", accessToken: "token" }),
+    );
+
+    await waitFor(() => {
+      expect(mockedSearchEntities).toHaveBeenCalled();
+    });
+  });
+
+  it("still resolves project-internal IRIs that aren't in the external skip-list", async () => {
+    mockedGetClassDetail.mockResolvedValue({ labels: [{ value: "Person", lang: "en" }] });
+    mockedSearchEntities.mockResolvedValue({ results: [] });
+
+    const { result } = renderHook(() =>
+      useIriLabels(["https://ontology.example.org/Person"], {
+        projectId: "proj-1",
+        accessToken: "token",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(result.current["https://ontology.example.org/Person"]).toBe("Person");
+    });
+    expect(mockedGetClassDetail).toHaveBeenCalled();
   });
 });

@@ -48,7 +48,7 @@ vi.mock("@/lib/hooks/useEntityAutoSave", () => ({
 
 vi.mock("@/lib/stores/editorModeStore", () => ({
   useEditorModeStore: (selector: (s: Record<string, unknown>) => unknown) =>
-    selector({ editorMode: "standard", continuousEditing: false, ...editorModeOverrides }),
+    selector({ editorMode: "standard", ...editorModeOverrides }),
 }));
 
 vi.mock("@/lib/hooks/useIriLabels", () => ({
@@ -381,7 +381,7 @@ describe("PropertyDetailPanel", () => {
 
   // ── Edit mode (canEdit=true) ──
 
-  it("shows Edit Item button when canEdit is true and onUpdateProperty provided", () => {
+  it("auto-enters edit mode when canEdit is true and onUpdateProperty provided", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -390,11 +390,12 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    expect(screen.getByText("Edit Item")).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
   });
 
-  it("enters edit mode when Edit Item is clicked", async () => {
-    const user = userEvent.setup();
+  it("never renders an Edit Item button in editor context", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -403,9 +404,11 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
-    // Auto-save bar should appear
-    expect(screen.getByTestId("auto-save-bar")).toBeDefined();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
+    expect(screen.queryByText("Edit Item")).toBeNull();
   });
 
   // ── API call verification ──
@@ -465,7 +468,6 @@ describe("PropertyDetailPanel", () => {
   // ── Edit mode: label editing ──
 
   it("renders editable label inputs in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -474,13 +476,14 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const labelInputs = screen.getAllByPlaceholderText("Label text");
     expect(labelInputs.length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders editable comment section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -489,13 +492,14 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // The comment section title should be visible
     expect(screen.getByText("Comment(s)")).not.toBeNull();
   });
 
   it("renders editable definition section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -504,12 +508,13 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Definition")).not.toBeNull();
   });
 
   it("renders domain section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -518,12 +523,13 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Domain")).not.toBeNull();
   });
 
   it("renders range section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -532,12 +538,13 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Range")).not.toBeNull();
   });
 
   it("renders characteristics checkboxes in edit mode for object property", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -546,14 +553,15 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Functional")).not.toBeNull();
     expect(screen.getByText("Transitive")).not.toBeNull();
     expect(screen.getByText("Symmetric")).not.toBeNull();
   });
 
   it("renders inverse-of section in edit mode for object property", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -562,12 +570,13 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Inverse Of")).not.toBeNull();
   });
 
   it("renders annotations section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -576,12 +585,13 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Annotations")).not.toBeNull();
   });
 
   it("renders relationships section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -590,7 +600,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Relationships")).not.toBeNull();
   });
 
@@ -606,7 +618,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const labelInput = screen.getAllByPlaceholderText("Label text")[0];
     await user.clear(labelInput);
     await user.type(labelInput, "newLabel");
@@ -616,7 +630,6 @@ describe("PropertyDetailPanel", () => {
   // ── Characteristic toggle in edit mode ──
 
   it("toggles characteristic checkbox in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     const { container } = render(
       <PropertyDetailPanel
@@ -625,7 +638,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Find the "Functional" checkbox (unchecked by default since not in characteristics)
     const functionalCheckbox = container.querySelector(
       'input[type="checkbox"]'
@@ -643,8 +658,7 @@ describe("PropertyDetailPanel", () => {
 
   // ── Cancel edit mode ──
 
-  it("exits edit mode and calls discardDraft when cancel flow is triggered", async () => {
-    const user = userEvent.setup();
+  it("discards draft when cancel is invoked but stays in edit mode", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -653,9 +667,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
-    // Verify we are in edit mode
-    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     // Trigger cancel via the captured AutoSaveAffordanceBar callback
     expect(capturedAutoSaveBarProps).not.toBeNull();
@@ -665,15 +679,14 @@ describe("PropertyDetailPanel", () => {
 
     await waitFor(() => {
       expect(mockDiscardDraft).toHaveBeenCalled();
-      // Verify edit mode exited — "Edit Item" button should be visible again
-      expect(screen.getByText("Edit Item")).not.toBeNull();
     });
+    // Editor is always in edit mode — auto-save bar stays.
+    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
   });
 
-  // ── Continuous editing auto-entry ──
+  // ── Auto-enter edit mode in editor context ──
 
-  it("auto-enters edit mode when continuousEditing is true", () => {
-    editorModeOverrides = { continuousEditing: true };
+  it("auto-enters edit mode when onUpdateProperty is provided", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -682,8 +695,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    // Should auto-enter edit mode and show auto-save bar
-    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
   });
 
   // ── Draft restoration ──
@@ -721,22 +735,16 @@ describe("PropertyDetailPanel", () => {
     expect(mockClearRestoredDraft).toHaveBeenCalled();
   });
 
-  // ── flushToGit on IRI change ──
+  // ── flushToGit on unmount ──
 
-  it("calls flushToGit when propertyIri changes", async () => {
-    const { rerender } = render(
+  it("flushes pending draft to git on unmount", async () => {
+    // The parent layout remounts the panel on selection change via a key
+    // prop, so unmount is what carries pending edits to the backend.
+    const { unmount } = render(
       <PropertyDetailPanel {...DEFAULT_PROPS} canEdit={false} />
     );
-    rerender(
-      <PropertyDetailPanel
-        {...DEFAULT_PROPS}
-        propertyIri="http://example.org/ontology#hasChild"
-        canEdit={false}
-      />
-    );
-    await waitFor(() => {
-      expect(mockFlushToGit).toHaveBeenCalled();
-    });
+    unmount();
+    expect(mockFlushToGit).toHaveBeenCalled();
   });
 
   // ── Does not show characteristics for data properties ──
@@ -771,10 +779,9 @@ describe("PropertyDetailPanel", () => {
 
   // ── Does not auto-enter edit mode when canEdit is false ──
 
-  it("does not auto-enter edit mode when canEdit is false even with continuousEditing", () => {
-    editorModeOverrides = { continuousEditing: true };
+  it("does not auto-enter edit mode when canEdit is false even with onUpdateProperty", () => {
     render(
-      <PropertyDetailPanel {...DEFAULT_PROPS} canEdit={false} />
+      <PropertyDetailPanel {...DEFAULT_PROPS} canEdit={false} onUpdateProperty={vi.fn()} />
     );
     expect(screen.queryByTestId("auto-save-bar")).toBeNull();
   });
@@ -791,7 +798,6 @@ describe("PropertyDetailPanel", () => {
   // ── Language tag input in edit mode ──
 
   it("renders language tag pickers in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -800,7 +806,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const langPickers = screen.getAllByLabelText("Language tag");
     expect(langPickers.length).toBeGreaterThanOrEqual(1);
   });
@@ -817,7 +825,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const labelInput = screen.getAllByPlaceholderText("Label text")[0];
     await user.click(labelInput);
     await user.tab();
@@ -841,7 +851,6 @@ describe("PropertyDetailPanel", () => {
   // ── Parent properties section in edit mode ──
 
   it("renders parent properties section in edit mode", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -850,13 +859,15 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Parent Properties")).not.toBeNull();
   });
 
   // ── Does not enter edit mode on draft restoration when entityType mismatches ──
 
-  it("does not restore draft when entityType does not match property", () => {
+  it("does not restore draft when entityType does not match property", async () => {
     autoSaveOverrides = {
       restoredDraft: {
         entityType: "class",
@@ -872,8 +883,12 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    // Should not auto-enter edit mode since entityType is "class" not "property"
-    expect(screen.queryByTestId("auto-save-bar")).toBeNull();
+    // Edit mode auto-enters (editor context), but the wrong-type draft should not be applied
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
+    // The "Wrong type" label from the class draft should not appear
+    expect(screen.queryByDisplayValue("Wrong type")).toBeNull();
   });
 
   // ── Remove label button in edit mode ──
@@ -887,7 +902,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     const { container } = render(
       <PropertyDetailPanel
@@ -896,7 +910,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const removeButtons = container.querySelectorAll('button[title="Remove"]');
     expect(removeButtons.length).toBeGreaterThanOrEqual(1);
   });
@@ -914,7 +930,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const langPickers = screen.getAllByLabelText("Language tag");
     expect(langPickers.length).toBeGreaterThanOrEqual(1);
     await user.selectOptions(langPickers[0], "fr");
@@ -928,7 +946,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ comments: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -937,7 +954,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Comment section should still render in edit mode
     expect(screen.getByText("Comment(s)")).not.toBeNull();
   });
@@ -948,7 +967,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ definitions: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -957,7 +975,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Definition")).not.toBeNull();
   });
 
@@ -967,7 +987,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ domainIris: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -976,7 +995,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Domain")).not.toBeNull();
   });
 
@@ -984,7 +1005,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ rangeIris: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -993,7 +1013,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Range")).not.toBeNull();
   });
 
@@ -1003,7 +1025,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ parentIris: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1012,7 +1033,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Parent Properties")).not.toBeNull();
   });
 
@@ -1022,7 +1045,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ inverseOf: null })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1031,7 +1053,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(screen.getByText("Inverse Of")).not.toBeNull();
   });
 
@@ -1041,7 +1065,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ characteristics: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     const { container } = render(
       <PropertyDetailPanel
@@ -1050,7 +1073,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const checkboxes = container.querySelectorAll('input[type="checkbox"]');
     // Should have 7 characteristic checkboxes
     expect(checkboxes.length).toBe(7);
@@ -1124,7 +1149,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Click the "Functional" checkbox
     const functionalLabel = screen.getByText("Functional");
     await user.click(functionalLabel);
@@ -1180,7 +1207,6 @@ describe("PropertyDetailPanel", () => {
   // ── Cancel edit mode via AutoSaveAffordanceBar ──
 
   it("invokes cancelEditMode via AutoSaveAffordanceBar onCancel", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1189,7 +1215,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedAutoSaveBarProps).not.toBeNull();
     // Call the onCancel callback from AutoSaveAffordanceBar
     const onCancel = capturedAutoSaveBarProps!.onCancel as () => void;
@@ -1199,8 +1227,7 @@ describe("PropertyDetailPanel", () => {
 
   // ── Manual save via AutoSaveAffordanceBar ──
 
-  it("invokes saveAndExitEditMode via AutoSaveAffordanceBar onManualSave", async () => {
-    const user = userEvent.setup();
+  it("invokes flushDraftToGit via AutoSaveAffordanceBar onManualSave", async () => {
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1209,7 +1236,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedAutoSaveBarProps).not.toBeNull();
     const onManualSave = capturedAutoSaveBarProps!.onManualSave as () => Promise<void>;
     await onManualSave();
@@ -1220,7 +1249,6 @@ describe("PropertyDetailPanel", () => {
   // ── Retry via AutoSaveAffordanceBar ──
 
   it("invokes flushToGit via AutoSaveAffordanceBar onRetry", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1229,7 +1257,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedAutoSaveBarProps).not.toBeNull();
     const onRetry = capturedAutoSaveBarProps!.onRetry as () => void;
     onRetry();
@@ -1239,7 +1269,6 @@ describe("PropertyDetailPanel", () => {
   // ── AnnotationRow callbacks for comments ──
 
   it("passes comment callbacks to AnnotationRow", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1248,7 +1277,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Find the AnnotationRow for comments (COMMENT_IRI)
     const commentRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2000/01/rdf-schema#comment"
@@ -1281,7 +1312,6 @@ describe("PropertyDetailPanel", () => {
   // ── AnnotationRow callbacks for definitions ──
 
   it("passes definition callbacks to AnnotationRow", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1290,7 +1320,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const defRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#definition"
     );
@@ -1309,7 +1341,6 @@ describe("PropertyDetailPanel", () => {
   // ── AnnotationRow onBlur triggers save ──
 
   it("AnnotationRow onBlur triggers triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1318,7 +1349,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const commentRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2000/01/rdf-schema#comment"
     );
@@ -1339,7 +1372,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1348,7 +1380,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const commentRows = capturedAnnotationRowProps.filter(
       (p) => p.propertyIri === "http://www.w3.org/2000/01/rdf-schema#comment"
     );
@@ -1374,7 +1408,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1383,7 +1416,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const defRows = capturedAnnotationRowProps.filter(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#definition"
     );
@@ -1405,7 +1440,6 @@ describe("PropertyDetailPanel", () => {
         seeAlsoIris: ["http://example.org/ontology#related"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1414,7 +1448,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
 
     // Test addTarget
@@ -1431,7 +1467,6 @@ describe("PropertyDetailPanel", () => {
         seeAlsoIris: ["http://example.org/ontology#related"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1440,7 +1475,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     const onRemoveTarget = capturedRelationshipSectionProps!.onRemoveTarget as (groupIdx: number, targetIdx: number) => void;
     onRemoveTarget(0, 0);
@@ -1450,7 +1487,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("invokes changeRelationshipProperty via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1459,7 +1495,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     const onChangeProperty = capturedRelationshipSectionProps!.onChangeProperty as (groupIdx: number, newIri: string, newLabel: string) => void;
     onChangeProperty(0, "http://www.w3.org/2000/01/rdf-schema#isDefinedBy", "Defined By");
@@ -1469,7 +1507,6 @@ describe("PropertyDetailPanel", () => {
   });
 
   it("invokes addRelationshipGroup via RelationshipSection", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1478,7 +1515,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     const groupsBefore = (capturedRelationshipSectionProps!.groups as unknown[]).length;
     const onAddGroup = capturedRelationshipSectionProps!.onAddGroup as () => void;
@@ -1503,7 +1542,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1512,7 +1550,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     // Find annotation row for the custom annotation
     const annRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#prefLabel"
@@ -1553,7 +1593,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1562,7 +1601,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const annRows = capturedAnnotationRowProps.filter(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#prefLabel"
     );
@@ -1585,7 +1626,6 @@ describe("PropertyDetailPanel", () => {
         isDefinedByIris: ["http://example.org/ontology#ontology"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1594,7 +1634,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     expect(capturedRelationshipSectionProps!.isEditing).toBe(true);
   });
@@ -1619,7 +1661,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const removeButtons = container.querySelectorAll('button[title="Remove"]');
     expect(removeButtons.length).toBeGreaterThanOrEqual(1);
     await user.click(removeButtons[0]);
@@ -1647,8 +1691,7 @@ describe("PropertyDetailPanel", () => {
 
   // ── Manual save stays in edit mode when flushToGit fails ──
 
-  it("stays in edit mode when saveAndExitEditMode flush fails", async () => {
-    const user = userEvent.setup();
+  it("stays in edit mode when flushDraftToGit flush fails", async () => {
     const onUpdateProperty = vi.fn();
     mockFlushToGit.mockResolvedValue(false);
     render(
@@ -1658,7 +1701,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedAutoSaveBarProps).not.toBeNull();
     const onManualSave = capturedAutoSaveBarProps!.onManualSave as () => Promise<void>;
     await onManualSave();
@@ -1682,7 +1727,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1691,7 +1735,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     await waitFor(() => {
       expect(capturedInlineAnnotationAdderProps).not.toBeNull();
@@ -1716,7 +1762,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ annotations: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1725,7 +1770,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     await waitFor(() => {
       expect(capturedInlineAnnotationAdderProps).not.toBeNull();
@@ -1745,7 +1792,6 @@ describe("PropertyDetailPanel", () => {
   // ── InlineAnnotationAdder onSaveNeeded callback ──
 
   it("InlineAnnotationAdder onSaveNeeded calls triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1754,7 +1800,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     await waitFor(() => {
       expect(capturedInlineAnnotationAdderProps).not.toBeNull();
@@ -1768,7 +1816,6 @@ describe("PropertyDetailPanel", () => {
   // ── RelationshipSection onSaveNeeded callback ──
 
   it("RelationshipSection onSaveNeeded calls triggerSave", async () => {
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1777,7 +1824,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
 
     await waitFor(() => {
       expect(capturedRelationshipSectionProps).not.toBeNull();
@@ -1795,31 +1844,6 @@ describe("PropertyDetailPanel", () => {
     expect(screen.getByText("Label(s)")).not.toBeNull();
   });
 
-  // ── Cancel after continuous editing prevents re-entry ──
-
-  it("does not re-enter edit mode after cancel even with continuousEditing", async () => {
-    editorModeOverrides = { continuousEditing: true };
-    const onUpdateProperty = vi.fn();
-    render(
-      <PropertyDetailPanel
-        {...DEFAULT_PROPS}
-        canEdit={true}
-        onUpdateProperty={onUpdateProperty}
-      />
-    );
-    expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
-
-    // Trigger cancel
-    expect(capturedAutoSaveBarProps).not.toBeNull();
-    const onCancel = capturedAutoSaveBarProps!.onCancel as () => void;
-    onCancel();
-
-    await waitFor(() => {
-      expect(mockDiscardDraft).toHaveBeenCalled();
-      expect(screen.getByText("Edit Item")).not.toBeNull();
-    });
-  });
-
   // ── Edit mode with existing annotations shows custom annotation editing ──
 
   it("renders annotation language change callback in edit mode", async () => {
@@ -1833,7 +1857,6 @@ describe("PropertyDetailPanel", () => {
         ],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1842,7 +1865,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const annRow = capturedAnnotationRowProps.find(
       (p) => p.propertyIri === "http://www.w3.org/2004/02/skos/core#prefLabel"
     );
@@ -1864,7 +1889,6 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(
       makePropertyDetail({ labels: [] })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1873,7 +1897,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     const labelInputs = screen.getAllByPlaceholderText("Label text");
     expect(labelInputs.length).toBeGreaterThanOrEqual(1);
     expect((labelInputs[0] as HTMLInputElement).value).toBe("");
@@ -1888,7 +1914,6 @@ describe("PropertyDetailPanel", () => {
         isDefinedByIris: ["http://example.org/ontology#myOntology"],
       })
     );
-    const user = userEvent.setup();
     const onUpdateProperty = vi.fn();
     render(
       <PropertyDetailPanel
@@ -1897,7 +1922,9 @@ describe("PropertyDetailPanel", () => {
         onUpdateProperty={onUpdateProperty}
       />
     );
-    await user.click(screen.getByText("Edit Item"));
+    await waitFor(() => {
+      expect(screen.getByTestId("auto-save-bar")).not.toBeNull();
+    });
     expect(capturedRelationshipSectionProps).not.toBeNull();
     const groups = capturedRelationshipSectionProps!.groups as Array<{ property_label: string }>;
     const definedByGroup = groups.find((g) => g.property_label === "Defined By");

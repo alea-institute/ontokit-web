@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, Pencil, LogIn, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Settings, FileCode, LogIn, LayoutDashboard } from "lucide-react";
 import { ShareButton } from "@/components/editor/ShareButton";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
+import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
+import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchProvider, useBranch } from "@/lib/context/BranchContext";
@@ -159,7 +161,13 @@ function ViewerContent({
   sessionStatus: "loading" | "authenticated" | "unauthenticated";
 }) {
   const searchParams = useSearchParams();
-  const classIriParam = searchParams.get("classIri");
+  // Memoize the parsed URL selection so the URL-restore effect doesn't re-fire
+  // (and risk clobbering the user's in-page selection) on every render.
+  const searchParamsString = searchParams.toString();
+  const initialSelection = useMemo(
+    () => readSelectionFromSearchParams(new URLSearchParams(searchParamsString)),
+    [searchParamsString],
+  );
   const editorMode = useEditorModeStore((s) => s.editorMode);
 
   // Use the default branch from the BranchProvider context
@@ -186,13 +194,43 @@ function ViewerContent({
 
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
+  const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
+  // Tracks the URL selection we've already applied — see editor page for the
+  // full rationale. Prevents an in-page selection change from being clobbered
+  // by a re-fire of this effect.
+  const consumedSelectionRef = useRef<string | null>(null);
 
-  // Navigate to classIri from URL query param once tree is ready
+  // Restore selected entity from URL query param. Class navigation goes
+  // through the class tree once it's loaded; properties and individuals are
+  // dispatched through the layout's nav handler so the active tab and
+  // per-tab selection are set correctly.
   useEffect(() => {
-    if (!classIriParam || isTreeLoading || !nodes.length) return;
-    if (selectedIri === classIriParam) return;
-    navigateToNode(classIriParam);
-  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
+    if (!initialSelection) return;
+    const key = `${initialSelection.type}:${initialSelection.iri}`;
+    if (consumedSelectionRef.current === key) return;
+
+    if (initialSelection.type === "class") {
+      if (isTreeLoading || !nodes.length) return;
+      if (selectedIri === initialSelection.iri) {
+        consumedSelectionRef.current = key;
+        return;
+      }
+      let cancelled = false;
+      navigateToNode(initialSelection.iri)
+        .then(() => {
+          if (!cancelled) consumedSelectionRef.current = key;
+        })
+        .catch((err) => {
+          if (!cancelled) console.error("Failed to restore selection from URL:", err);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (!entityNavigationRef.current) return;
+    entityNavigationRef.current(initialSelection.iri, initialSelection.type);
+    consumedSelectionRef.current = key;
+  }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
 
   const toast = useToast();
   const handleCopyIri = useCallback(async (iri: string) => {
@@ -223,6 +261,7 @@ function ViewerContent({
               <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
               <h1 className="font-semibold text-slate-900 dark:text-white">{project?.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
+              {canSuggest && <ViewerEditorSwitcher projectId={projectId} />}
               <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2">
@@ -240,15 +279,9 @@ function ViewerContent({
                 </Button>
               </Link>
 
-              {/* Open Editor / Sign In */}
-              {canSuggest ? (
-                <Link href={`/projects/${projectId}/editor`}>
-                  <Button size="sm" className="gap-2">
-                    <Pencil className="h-4 w-4" />
-                    <span className="hidden sm:inline">Open Editor</span>
-                  </Button>
-                </Link>
-              ) : !hasValidAccess ? (
+              {/* Sign In affordance for unauthenticated users — the Viewer/Editor switcher above
+                  carries authenticated users into the editor. */}
+              {!canSuggest && !hasValidAccess && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -258,7 +291,7 @@ function ViewerContent({
                   <LogIn className="h-3 w-3" />
                   Sign in to edit
                 </Button>
-              ) : null}
+              )}
 
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
@@ -298,6 +331,7 @@ function ViewerContent({
                   hasExpandedNodes={hasExpandedNodes}
                   isExpandingAll={isExpandingAll}
                   navigateToNode={navigateToNode}
+                  entityNavigationRef={entityNavigationRef}
                   sourceContent={sourceContent}
                   setSourceContent={setSourceContent as (content: string | ((prev: string) => string)) => void}
                   isLoadingSource={isLoadingSource}
@@ -338,6 +372,7 @@ function ViewerContent({
                 hasExpandedNodes={hasExpandedNodes}
                 isExpandingAll={isExpandingAll}
                 navigateToNode={navigateToNode}
+                entityNavigationRef={entityNavigationRef}
                 onAddEntity={noop}
                 onCopyIri={handleCopyIri}
                 selectedNodeFallback={selectedNodeFallback}

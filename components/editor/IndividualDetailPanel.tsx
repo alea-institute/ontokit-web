@@ -8,7 +8,6 @@ import {
   Copy,
   Trash2,
   AlertTriangle,
-  Pencil,
   Lightbulb,
   StickyNote,
   Link2,
@@ -29,7 +28,6 @@ import { PropertyAssertionSection } from "@/components/editor/standard/PropertyA
 import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, SEE_ALSO_IRI, getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
 import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar";
 import { useEntityAutoSave } from "@/lib/hooks/useEntityAutoSave";
-import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 import {
   extractIndividualDetail,
@@ -120,8 +118,6 @@ export function IndividualDetailPanel({
 
 
   const editInitializedRef = useRef(false);
-  const cancelledIriRef = useRef<string | null>(null);
-  const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
   const toast = useToast();
 
   const buildDraftEntry = useCallback((): IndividualDraftEntry | null => {
@@ -237,19 +233,27 @@ export function IndividualDetailPanel({
     setEditAnnotations(regularAnnotations);
   }, []);
 
-  // Flush the current entity when navigating away (cleanup runs with the old closure)
+  // Flush any pending draft to git when this panel unmounts. The flush
+  // closure captures props that can change between mount and unmount, so
+  // route the call through a ref that we keep up to date in an effect — the
+  // cleanup then sees the latest closure rather than the one captured on
+  // first render. (Mirrors the pattern used in ClassDetailPanel /
+  // PropertyDetailPanel.)
+  const flushToGitRef = useRef(flushToGit);
+  useEffect(() => {
+    flushToGitRef.current = flushToGit;
+  }, [flushToGit]);
   useEffect(() => {
     return () => {
-      flushToGit();
+      flushToGitRef.current();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush must capture the current entity's closure
-  }, [individualIri]);
+  }, []);
 
   // Reset edit state when the selected individual changes
   useEffect(() => {
     editInitializedRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on selection change; matches ClassDetailPanel/PropertyDetailPanel patterns
     setIsEditing(false);
-    cancelledIriRef.current = null;
   }, [individualIri]);
 
   const enterEditMode = useCallback(() => {
@@ -259,26 +263,25 @@ export function IndividualDetailPanel({
     setIsEditing(true);
   }, [detail, initEditState]);
 
+  // Cancel: discard draft, re-init from server. Stay in edit mode.
   const cancelEditMode = useCallback(() => {
     discardDraft();
     if (detail) initEditState(detail);
-    setIsEditing(false);
-    cancelledIriRef.current = individualIri;
-  }, [individualIri, detail, discardDraft, initEditState]);
+  }, [detail, discardDraft, initEditState]);
 
-  // Manual save: trigger draft save, flush to git, exit edit mode on success
-  const saveAndExitEditMode = useCallback(async () => {
+  // Manual save: flush the current draft to git. Stays in edit mode.
+  const flushDraftToGit = useCallback(async () => {
     triggerSave();
-    const ok = await flushToGit();
-    if (ok) setIsEditing(false);
+    await flushToGit();
   }, [triggerSave, flushToGit]);
 
   useEffect(() => {
     if (isEditing || editInitializedRef.current) return;
-    if (!canEdit || !detail) return;
+    if (!canEdit || !onUpdateIndividual || !detail) return;
 
     if (restoredDraft && restoredDraft.entityType === "individual" && individualIri) {
       const d = restoredDraft as IndividualDraftEntry;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring draft state from store; matches PropertyDetailPanel auto-enter pattern
       setEditLabels(d.labels);
       setEditComments(ensureTrailingEmpty(d.comments));
       setEditDefinitions(ensureTrailingEmpty(d.definitions));
@@ -295,10 +298,8 @@ export function IndividualDetailPanel({
       return;
     }
 
-    if (continuousEditing && cancelledIriRef.current !== individualIri) {
-      enterEditMode();
-    }
-  }, [detail, canEdit, restoredDraft, individualIri, clearRestoredDraft, continuousEditing, isEditing, enterEditMode]);
+    enterEditMode();
+  }, [detail, canEdit, restoredDraft, individualIri, clearRestoredDraft, onUpdateIndividual, isEditing, enterEditMode]);
 
   // ── Edit helpers ──
   const updateLabel = useCallback((index: number, field: "value" | "lang", val: string) => {
@@ -404,7 +405,6 @@ export function IndividualDetailPanel({
   }
 
   const displayLabel = detail.labels.length > 0 ? detail.labels[0].value : getLocalName(individualIri);
-  const canEnterEdit = canEdit && !!onUpdateIndividual;
 
   return (
     <div className="flex h-full w-full flex-col">
@@ -424,11 +424,6 @@ export function IndividualDetailPanel({
                   </span>
                 )}
               </h2>
-              {canEnterEdit && !isEditing && (
-                <div className="shrink-0">
-                  <button onClick={enterEditMode} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"><Pencil className="h-3.5 w-3.5" />Edit Item</button>
-                </div>
-              )}
             </div>
             <div className="mt-1 flex items-center gap-2">
               <span className="rounded-full px-2 py-0.5 text-[10px] font-medium border bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-400">Individual</span>
@@ -450,7 +445,7 @@ export function IndividualDetailPanel({
           error={saveError}
           validationError={validationError}
           onRetry={() => flushToGit()}
-          onManualSave={saveAndExitEditMode}
+          onManualSave={flushDraftToGit}
           onCancel={cancelEditMode}
         />
       )}
