@@ -452,7 +452,6 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onCopyIri={onCopyIri}
             selectedNodeFallback={selectedNodeFallback}
             canEdit={canEdit || isSuggestionMode}
-            isSuggestionMode={isSuggestionMode}
             onUpdateClass={onUpdateClass}
             refreshKey={detailRefreshKey}
             headerActions={selectedIri ? (

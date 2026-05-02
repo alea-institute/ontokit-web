@@ -556,7 +556,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   onCopyIri={onCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
                   canEdit={canEdit || isSuggestionMode}
-                  isSuggestionMode={isSuggestionMode}
                   onUpdateClass={onUpdateClass}
                   refreshKey={detailRefreshKey}
                 />

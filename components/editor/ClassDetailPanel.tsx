@@ -71,7 +71,6 @@ interface ClassDetailPanelProps {
   onCopyIri?: (iri: string) => void;
   selectedNodeFallback?: TreeNodeFallback | null;
   canEdit?: boolean;
-  isSuggestionMode?: boolean;
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   refreshKey?: number;
   /** Extra actions rendered in the header row (e.g. Graph button) */
