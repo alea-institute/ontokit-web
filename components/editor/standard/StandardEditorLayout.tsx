@@ -26,6 +26,7 @@ import { PendingSuggestionBadge } from "@/components/editor/PendingSuggestionBad
 import { BranchNavigator } from "@/components/editor/BranchNavigator";
 import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 
 const OntologyGraph = dynamic(
   () => import("@/components/graph/OntologyGraph").then((mod) => mod.OntologyGraph),
@@ -108,6 +109,9 @@ export interface StandardEditorLayoutProps {
   // LLM suggestion support
   onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => void;
   acceptedSuggestionIris?: Set<string>;
+
+  /** Ref populated with a function to navigate to any entity type */
+  entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -116,8 +120,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     accessToken,
     activeBranch,
     canEdit,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    canSuggest = false,
+    canSuggest: _canSuggest = false,
     isSuggestionMode = false,
     userRole,
     nodes,
@@ -277,6 +280,58 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
 
   // Property node list for BranchNavigator
   const [propertyNodes, setPropertyNodes] = useState<{ iri: string; label: string }[]>([]);
+
+  // Expose entity navigation to parent via ref
+  const { entityNavigationRef, navigateToNode: navToNode } = props;
+  useEffect(() => {
+    if (!entityNavigationRef) return;
+
+    const handler = (iri: string, type?: string) => {
+      // Always exit graph view first — otherwise the user clicks a lint issue
+      // and stays staring at the graph instead of the entity they navigated to.
+      setShowGraph(false);
+      if (type === "property") {
+        setActiveTab("properties");
+        setSelectedPropertyIri(iri);
+      } else if (type === "individual") {
+        setActiveTab("individuals");
+        setSelectedIndividualIri(iri);
+      } else {
+        // For "other" (untyped) entities, navigate to class tree which
+        // triggers ClassDetailPanel's 404 handler with a helpful message
+        setActiveTab("classes");
+        navToNode(iri);
+      }
+    };
+
+    entityNavigationRef.current = handler;
+    return () => {
+      if (entityNavigationRef.current === handler) {
+        entityNavigationRef.current = null;
+      }
+    };
+  }, [entityNavigationRef, navToNode]);
+
+  // Mirror the active-tab selection into the shared store so cross-page chrome
+  // (e.g. the Viewer/Editor switcher, the side-page Back-to-project link via
+  // useProjectHomeHref) can synthesize the right ?<type>Iri= key without having
+  // to know about local-state plumbing here.
+  //
+  // No unmount cleanup: an unmount-clear races with side-page navigation —
+  // the editor unmounts before settings/PRs/etc render, so reading the store
+  // there returns null and the back-link drops the selection. The next editor
+  // mount (same or different project) overwrites the store from its own URL
+  // params, so stale values are short-lived and harmless.
+  const setSelection = useSelectionStore((s) => s.setSelection);
+  useEffect(() => {
+    if (activeTab === "classes") {
+      setSelection(selectedIri ?? null, selectedIri ? "class" : null);
+    } else if (activeTab === "properties") {
+      setSelection(selectedPropertyIri ?? null, selectedPropertyIri ? "property" : null);
+    } else {
+      setSelection(selectedIndividualIri ?? null, selectedIndividualIri ? "individual" : null);
+    }
+  }, [activeTab, selectedIri, selectedPropertyIri, selectedIndividualIri, setSelection]);
 
   // Shared search state
   const {
@@ -483,6 +538,10 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           </div>
         ) : activeTab === "classes" ? (
           <ClassDetailPanel
+            // Remount on selection change so internal edit-state and refs reset
+            // cleanly — prevents the previous class's edit fields from bleeding
+            // into the newly-selected class while the new fetch is in flight.
+            key={selectedIri ?? "no-class"}
             projectId={projectId}
             classIri={selectedIri}
             accessToken={accessToken}
@@ -491,7 +550,6 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onCopyIri={onCopyIri}
             selectedNodeFallback={selectedNodeFallback}
             canEdit={canEdit || isSuggestionMode}
-            isSuggestionMode={isSuggestionMode}
             onUpdateClass={onUpdateClass}
             refreshKey={detailRefreshKey}
             showSignInToEdit={showSignInToEdit}
@@ -525,6 +583,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           />
         ) : activeTab === "properties" ? (
           <PropertyDetailPanel
+            key={selectedPropertyIri ?? "no-property"}
             projectId={projectId}
             propertyIri={selectedPropertyIri}
             sourceContent={sourceContent || ""}
@@ -552,6 +611,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           />
         ) : (
           <IndividualDetailPanel
+            key={selectedIndividualIri ?? "no-individual"}
             projectId={projectId}
             individualIri={selectedIndividualIri}
             sourceContent={sourceContent || ""}

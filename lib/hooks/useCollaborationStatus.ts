@@ -6,6 +6,7 @@ import type { ConnectionState } from "@/components/ui/ConnectionStatus";
 interface UseCollaborationStatusOptions {
   projectId: string;
   enabled?: boolean;
+  token?: string;
 }
 
 /**
@@ -15,6 +16,7 @@ interface UseCollaborationStatusOptions {
 export function useCollaborationStatus({
   projectId,
   enabled = true,
+  token,
 }: UseCollaborationStatusOptions) {
   const [status, setStatus] = useState<ConnectionState>("disconnected");
   const wsRef = useRef<WebSocket | null>(null);
@@ -22,12 +24,14 @@ export function useCollaborationStatus({
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
   const isClosingRef = useRef(false);
+  const connectRef = useRef<() => void>(() => {});
 
   const getWsUrl = useCallback(() => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     const wsUrl = apiUrl.replace(/^http/, "ws");
-    return `${wsUrl}/api/v1/projects/${projectId}/lint/ws`;
-  }, [projectId]);
+    const params = token ? `?token=${encodeURIComponent(token)}` : "";
+    return `${wsUrl}/api/v1/projects/${projectId}/lint/ws${params}`;
+  }, [projectId, token]);
 
   const connect = useCallback(() => {
     if (!enabled || !projectId || isClosingRef.current) return;
@@ -64,7 +68,7 @@ export function useCollaborationStatus({
 
           reconnectTimeoutRef.current = setTimeout(() => {
             setStatus("connecting");
-            connect();
+            connectRef.current();
           }, delay);
         }
       };
@@ -89,6 +93,11 @@ export function useCollaborationStatus({
       setStatus("disconnected");
     }
   }, [enabled, projectId, getWsUrl]);
+
+  // Keep the ref in sync so the onclose callback always calls the latest version
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   const disconnect = useCallback(() => {
     isClosingRef.current = true;

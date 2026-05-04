@@ -17,10 +17,10 @@ import {
   PenLine,
   MessageCircle,
 } from "lucide-react";
-import { ApiError } from "@/lib/api/client";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
-import { projectApi, type Project } from "@/lib/api/projects";
+import { useProject } from "@/lib/hooks/useProject";
+import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import {
   suggestionsApi,
   type SuggestionSessionSummary,
@@ -74,42 +74,27 @@ export default function SuggestionsPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  const [project, setProject] = useState<Project | null>(null);
+  const { project, isLoading: isProjectLoading, error: projectError } = useProject(projectId, session?.accessToken);
+  const projectHomeHref = useProjectHomeHref(projectId);
   const [sessions, setSessions] = useState<SuggestionSessionSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const [proj, sessionList] = await Promise.all([
-          projectApi.get(projectId, session?.accessToken),
-          session?.accessToken
-            ? suggestionsApi.listSessions(projectId, session.accessToken)
-            : Promise.resolve({ items: [] }),
-        ]);
-        setProject(proj);
-        setSessions(sessionList.items);
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 403) {
-          setError("You don't have access to this project");
-        } else if (err instanceof ApiError && err.status === 404) {
-          setError("Project not found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load suggestions");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (status !== "loading" && projectId) {
-      fetchData();
+    if (!session?.accessToken || !projectId) {
+      setIsLoadingSessions(false);
+      return;
     }
-  }, [projectId, session?.accessToken, status]);
+    setIsLoadingSessions(true);
+    setSessionsError(null);
+    suggestionsApi.listSessions(projectId, session.accessToken)
+      .then((res) => setSessions(res.items))
+      .catch((err) => { setSessionsError(err instanceof Error ? err.message : "Failed to load suggestions"); })
+      .finally(() => setIsLoadingSessions(false));
+  }, [projectId, session?.accessToken]);
+
+  const isLoading = isProjectLoading || isLoadingSessions;
+  const error = projectError || sessionsError;
 
   if (isLoading || status === "loading") {
     return (
@@ -156,7 +141,7 @@ export default function SuggestionsPage() {
           {/* Navigation */}
           <div className="mb-6 flex items-center justify-between">
             <Link
-              href={`/projects/${projectId}`}
+              href={projectHomeHref}
               className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-4 w-4" />

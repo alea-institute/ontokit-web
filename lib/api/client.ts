@@ -608,6 +608,14 @@ export interface EntitySearchResult {
   iri: string;
   label: string;
   entity_type: "class" | "property" | "individual";
+  /**
+   * OWL property subtype, populated only when entity_type === "property".
+   * Null/undefined for class / individual results, and also for properties
+   * whose rdf:type resolves to none of OWL.{Object,Datatype,Annotation}Property
+   * (defensive fallback). Lets clients group properties without IRI-substring
+   * guessing — see ontokit-api#117.
+   */
+  property_kind?: "object" | "data" | "annotation" | null;
   deprecated: boolean;
 }
 

@@ -42,6 +42,7 @@ export default function ApiDocsPage() {
         <ApiReferenceReact
           configuration={{
             url: `${API_BASE_URL}/openapi.json`,
+            servers: [{ url: API_BASE_URL }],
             theme: "kepler",
             hideModels: false,
             hideDownloadButton: false,

@@ -1,68 +1,34 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, Pencil, LogIn, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Settings, FileCode, LogIn, LayoutDashboard } from "lucide-react";
+import { ShareButton } from "@/components/editor/ShareButton";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
+import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
+import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
-import { BranchProvider } from "@/lib/context/BranchContext";
+import { BranchProvider, useBranch } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
-import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
+import { useToast } from "@/lib/context/ToastContext";
+import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
 export default function ProjectViewerPage() {
   const { data: session, status } = useSession();
   const params = useParams();
-  const searchParams = useSearchParams();
   const projectId = params.id as string;
-  const classIriParam = searchParams.get("classIri");
 
-  const editorMode = useEditorModeStore((s) => s.editorMode);
-
-  // No branch selection in viewer — locked to default
-  const [activeBranch] = useState<string | undefined>(undefined);
-
-  const viewer = useProjectViewer({
-    projectId,
-    accessToken: session?.accessToken,
-    sessionStatus: status,
-    activeBranch,
-  });
-
-  const {
-    project, isLoading, error, errorKind,
-    canManage, canSuggest, hasValidAccess, hasOntology,
-    nodes, totalClasses, isTreeLoading, treeError,
-    selectedIri, expandNode, collapseNode, selectNode,
-    navigateToNode, collapseAll, collapseOneLevel, expandOneLevel, expandAllFully,
-    hasExpandableNodes, hasExpandedNodes, isExpandingAll,
-    selectedNodeFallback,
-    sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
-    loadSourceContent, sourceIriIndex,
-    connectionStatus, wsEndpoint, wsPurpose,
-  } = viewer;
-
-  // Source editor ref (read-only, but required by DeveloperEditorLayout)
-  const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
-  const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
-
-  // Navigate to classIri from URL query param once tree is ready
-  useEffect(() => {
-    if (!classIriParam || isTreeLoading || !nodes.length) return;
-    if (selectedIri === classIriParam) return;
-    navigateToNode(classIriParam);
-  }, [classIriParam, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
-
-  // No-op handlers for required props (viewer is read-only)
-  const noop = () => {};
-
-  // --- Render ---
+  // Project data from shared React Query cache
+  const { project, isLoading, error, errorKind } = useProject(projectId, session?.accessToken);
+  const { canManage, hasOntology } = derivePermissions(project, session?.accessToken);
 
   if (isLoading || status === "loading") {
     return (
@@ -131,14 +97,15 @@ export default function ProjectViewerPage() {
                 <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               </div>
               <div className="flex items-center gap-2">
+                <ShareButton projectId={projectId} />
                 <Link href={`/projects/${projectId}/dashboard`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project dashboard" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <LayoutDashboard className="h-4 w-4" />
                   </Button>
                 </Link>
                 {canManage && (
                   <Link href={`/projects/${projectId}/settings`}>
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                       <Settings className="h-4 w-4" />
                     </Button>
                   </Link>
@@ -172,6 +139,121 @@ export default function ProjectViewerPage() {
 
   return (
     <BranchProvider projectId={projectId} accessToken={session?.accessToken}>
+      <ViewerContent
+        projectId={projectId}
+        accessToken={session?.accessToken}
+        sessionStatus={status}
+      />
+    </BranchProvider>
+  );
+}
+
+/**
+ * Inner viewer component that lives inside BranchProvider
+ * so it can access the default branch via useBranch().
+ */
+function ViewerContent({
+  projectId,
+  accessToken,
+  sessionStatus,
+}: {
+  projectId: string;
+  accessToken?: string;
+  sessionStatus: "loading" | "authenticated" | "unauthenticated";
+}) {
+  const searchParams = useSearchParams();
+  // Memoize the parsed URL selection so the URL-restore effect doesn't re-fire
+  // (and risk clobbering the user's in-page selection) on every render.
+  const searchParamsString = searchParams.toString();
+  const initialSelection = useMemo(
+    () => readSelectionFromSearchParams(new URLSearchParams(searchParamsString)),
+    [searchParamsString],
+  );
+  const editorMode = useEditorModeStore((s) => s.editorMode);
+
+  // Mark this surface as the user's most recent project view so side-page
+  // Back-to-project links route them back to the viewer — regardless of
+  // whether their global preferEditMode preference says viewer or editor.
+  const setProjectViewMode = useSelectionStore((s) => s.setMode);
+  useEffect(() => {
+    setProjectViewMode("viewer");
+  }, [setProjectViewMode]);
+
+  // Use the default branch from the BranchProvider context
+  const { defaultBranch, isLoading: isBranchLoading } = useBranch();
+  const resolvedBranch = isBranchLoading ? undefined : defaultBranch;
+
+  const viewer = useProjectViewer({
+    projectId,
+    accessToken,
+    sessionStatus,
+    activeBranch: resolvedBranch,
+  });
+
+  const {
+    project, canManage, canSuggest, hasValidAccess,
+    nodes, totalClasses, isTreeLoading, treeError,
+    selectedIri, expandNode, collapseNode, selectNode,
+    navigateToNode, collapseAll, collapseOneLevel, expandOneLevel, expandAllFully,
+    hasExpandableNodes, hasExpandedNodes, isExpandingAll,
+    selectedNodeFallback,
+    sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
+    loadSourceContent, sourceIriIndex,
+  } = viewer;
+
+  const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
+  const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
+  const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
+  // Tracks the URL selection we've already applied — see editor page for the
+  // full rationale. Prevents an in-page selection change from being clobbered
+  // by a re-fire of this effect.
+  const consumedSelectionRef = useRef<string | null>(null);
+
+  // Restore selected entity from URL query param. Class navigation goes
+  // through the class tree once it's loaded; properties and individuals are
+  // dispatched through the layout's nav handler so the active tab and
+  // per-tab selection are set correctly.
+  useEffect(() => {
+    if (!initialSelection) return;
+    const key = `${initialSelection.type}:${initialSelection.iri}`;
+    if (consumedSelectionRef.current === key) return;
+
+    if (initialSelection.type === "class") {
+      if (isTreeLoading || !nodes.length) return;
+      if (selectedIri === initialSelection.iri) {
+        consumedSelectionRef.current = key;
+        return;
+      }
+      let cancelled = false;
+      navigateToNode(initialSelection.iri)
+        .then(() => {
+          if (!cancelled) consumedSelectionRef.current = key;
+        })
+        .catch((err) => {
+          if (!cancelled) console.error("Failed to restore selection from URL:", err);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (!entityNavigationRef.current) return;
+    entityNavigationRef.current(initialSelection.iri, initialSelection.type);
+    consumedSelectionRef.current = key;
+  }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
+
+  const toast = useToast();
+  const handleCopyIri = useCallback(async (iri: string) => {
+    try {
+      await navigator.clipboard.writeText(iri);
+      toast.success("IRI copied to clipboard");
+    } catch {
+      toast.error("Failed to copy IRI");
+    }
+  }, [toast]);
+  const noop = () => {};
+
+  return (
+    <>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {/* Viewer Header */}
@@ -186,41 +268,29 @@ export default function ProjectViewerPage() {
                 Back
               </Link>
               <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
-              <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
+              <h1 className="font-semibold text-slate-900 dark:text-white">{project?.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
+              {canSuggest && <ViewerEditorSwitcher projectId={projectId} />}
               <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2">
-              {/* WebSocket Connection Status */}
-              <div className="flex items-center gap-1">
-                <ConnectionStatus
-                  state="disabled"
-                  purpose="Real-time collaboration (coming soon)"
-                  endpoint="/api/v1/collab/ws"
-                />
-                <ConnectionStatus
-                  state={connectionStatus}
-                  purpose={wsPurpose}
-                  endpoint={wsEndpoint}
-                />
-              </div>
+              {/* Share */}
+              <ShareButton
+                projectId={projectId}
+                selectedIri={selectedIri}
+                selectedLabel={selectedNodeFallback?.label}
+              />
 
               {/* Dashboard link */}
               <Link href={`/projects/${projectId}/dashboard`}>
-                <Button variant="ghost" size="sm" title="Project dashboard">
+                <Button variant="ghost" size="sm" title="Project dashboard" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                   <LayoutDashboard className="h-4 w-4" />
                 </Button>
               </Link>
 
-              {/* Open Editor / Sign In */}
-              {canSuggest ? (
-                <Link href={`/projects/${projectId}/editor`}>
-                  <Button size="sm" className="gap-2">
-                    <Pencil className="h-4 w-4" />
-                    <span className="hidden sm:inline">Open Editor</span>
-                  </Button>
-                </Link>
-              ) : !hasValidAccess ? (
+              {/* Sign In affordance for unauthenticated users — the Viewer/Editor switcher above
+                  carries authenticated users into the editor. */}
+              {!canSuggest && !hasValidAccess && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -230,11 +300,11 @@ export default function ProjectViewerPage() {
                   <LogIn className="h-3 w-3" />
                   Sign in to edit
                 </Button>
-              ) : null}
+              )}
 
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -250,12 +320,11 @@ export default function ProjectViewerPage() {
               <div className="flex-1 flex flex-col">
                 <DeveloperEditorLayout
                   projectId={projectId}
-                  accessToken={session?.accessToken}
-                  activeBranch={activeBranch}
+                  accessToken={accessToken}
+                  activeBranch={resolvedBranch}
                   canEdit={false}
                   canSuggest={false}
                   isSuggestionMode={false}
-                  canManage={false}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
                   treeError={treeError}
@@ -271,6 +340,7 @@ export default function ProjectViewerPage() {
                   hasExpandedNodes={hasExpandedNodes}
                   isExpandingAll={isExpandingAll}
                   navigateToNode={navigateToNode}
+                  entityNavigationRef={entityNavigationRef}
                   sourceContent={sourceContent}
                   setSourceContent={setSourceContent as (content: string | ((prev: string) => string)) => void}
                   isLoadingSource={isLoadingSource}
@@ -283,18 +353,16 @@ export default function ProjectViewerPage() {
                   sourceEditorRef={sourceEditorRef}
                   onSaveSource={async () => {}}
                   onAddEntity={noop}
-                  onCopyIri={noop}
+                  onCopyIri={handleCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
                   detailRefreshKey={0}
-                  showHealthCheck={false}
-                  onCloseHealthCheck={noop}
                 />
               </div>
             ) : (
               <StandardEditorLayout
                 projectId={projectId}
-                accessToken={session?.accessToken}
-                activeBranch={activeBranch}
+                accessToken={accessToken}
+                activeBranch={resolvedBranch}
                 canEdit={false}
                 canSuggest={false}
                 isSuggestionMode={false}
@@ -313,7 +381,9 @@ export default function ProjectViewerPage() {
                 hasExpandedNodes={hasExpandedNodes}
                 isExpandingAll={isExpandingAll}
                 navigateToNode={navigateToNode}
+                entityNavigationRef={entityNavigationRef}
                 onAddEntity={noop}
+                onCopyIri={handleCopyIri}
                 selectedNodeFallback={selectedNodeFallback}
                 sourceContent={sourceContent}
               />
@@ -321,6 +391,6 @@ export default function ProjectViewerPage() {
           </div>
         </div>
       </main>
-    </BranchProvider>
+    </>
   );
 }

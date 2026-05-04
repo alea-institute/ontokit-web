@@ -22,8 +22,8 @@ import {
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
-import { projectApi, type Project } from "@/lib/api/projects";
-import { ApiError } from "@/lib/api/client";
+import { useProject, derivePermissions } from "@/lib/hooks/useProject";
+import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import {
   suggestionsApi,
   type SuggestionSessionSummary,
@@ -227,10 +227,16 @@ export default function SuggestionReviewPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  const [project, setProject] = useState<Project | null>(null);
+  const { project, isLoading: isProjectLoading, error: projectError } = useProject(projectId, session?.accessToken);
+  const { canEdit: canReview } = derivePermissions(project, session?.accessToken);
+  const projectHomeHref = useProjectHomeHref(projectId);
+
   const [sessions, setSessions] = useState<SuggestionSessionSummary[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(true);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
+
+  const isLoading = isProjectLoading || isLoadingSessions;
+  const error = projectError || sessionsError;
 
   // Detail view
   const [selectedSession, setSelectedSession] = useState<SuggestionSessionSummary | null>(null);
@@ -253,40 +259,26 @@ export default function SuggestionReviewPage() {
   const [requestChangesDialogOpen, setRequestChangesDialogOpen] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
 
-  const canReview = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
-
-  const fetchData = useCallback(async () => {
-    if (status === "loading") return;
+  const fetchSessions = useCallback(async () => {
     if (!session?.accessToken) {
-      setIsLoading(false);
+      setIsLoadingSessions(false);
       return;
     }
-    setIsLoading(true);
-    setError(null);
-
+    setIsLoadingSessions(true);
+    setSessionsError(null);
     try {
-      const [proj, pendingList] = await Promise.all([
-        projectApi.get(projectId, session.accessToken),
-        suggestionsApi.listPending(projectId, session.accessToken),
-      ]);
-      setProject(proj);
+      const pendingList = await suggestionsApi.listPending(projectId, session.accessToken);
       setSessions(pendingList.items);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 403) {
-        setError("You don't have access to review suggestions for this project");
-      } else if (err instanceof ApiError && err.status === 404) {
-        setError("Project not found");
-      } else {
-        setError(err instanceof Error ? err.message : "Failed to load suggestions");
-      }
+      setSessionsError(err instanceof Error ? err.message : "Failed to load suggestions");
     } finally {
-      setIsLoading(false);
+      setIsLoadingSessions(false);
     }
-  }, [projectId, session?.accessToken, status]);
+  }, [projectId, session?.accessToken]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchSessions();
+  }, [fetchSessions]);
 
   // Load diff + enriched session detail when selecting a session and switching to files tab
   useEffect(() => {
@@ -344,6 +336,7 @@ export default function SuggestionReviewPage() {
 
   const handleApprove = async () => {
     if (!selectedSession || !session?.accessToken) return;
+    setSessionsError(null);
     setActionInProgress(true);
     try {
       // Send per-shard review marks if any exist (Phase 16: D-09, D-10)
@@ -375,9 +368,9 @@ export default function SuggestionReviewPage() {
       setSelectedSession(null);
       setDiff(null);
       setSessionDetail(null);
-      fetchData();
+      fetchSessions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to approve suggestion");
+      setSessionsError(err instanceof Error ? err.message : "Failed to approve suggestion");
     } finally {
       setActionInProgress(false);
       setShardMarks({}); // Only clear marks after action completes
@@ -386,6 +379,7 @@ export default function SuggestionReviewPage() {
 
   const handleReject = async (reason: string) => {
     if (!selectedSession || !session?.accessToken) return;
+    setSessionsError(null);
     setActionInProgress(true);
     try {
       // Send per-shard review marks if any exist (Phase 16: D-09, D-10)
@@ -417,9 +411,9 @@ export default function SuggestionReviewPage() {
       setSelectedSession(null);
       setDiff(null);
       setSessionDetail(null);
-      fetchData();
+      fetchSessions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reject suggestion");
+      setSessionsError(err instanceof Error ? err.message : "Failed to reject suggestion");
     } finally {
       setActionInProgress(false);
       setShardMarks({}); // Only clear marks after action completes
@@ -428,6 +422,7 @@ export default function SuggestionReviewPage() {
 
   const handleRequestChanges = async (feedback: string) => {
     if (!selectedSession || !session?.accessToken) return;
+    setSessionsError(null);
     setActionInProgress(true);
     try {
       // Send per-shard review marks if any exist (Phase 16: D-09, D-10)
@@ -459,9 +454,9 @@ export default function SuggestionReviewPage() {
       setSelectedSession(null);
       setDiff(null);
       setSessionDetail(null);
-      fetchData();
+      fetchSessions();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to request changes");
+      setSessionsError(err instanceof Error ? err.message : "Failed to request changes");
     } finally {
       setActionInProgress(false);
       setShardMarks({}); // Only clear marks after action completes
@@ -541,7 +536,7 @@ export default function SuggestionReviewPage() {
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
             <Link
-              href={`/projects/${projectId}`}
+              href={projectHomeHref}
               className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -890,7 +885,7 @@ export default function SuggestionReviewPage() {
                               className="gap-1.5"
                               onClick={async () => {
                                 if (!selectedSession || !session?.accessToken) return;
-                                setError(null); // Clear any prior error before starting
+                                setSessionsError(null); // Clear any prior error before starting
                                 const approvedIds = Object.entries(shardMarks)
                                   .filter(([, m]) => m.status === "approved")
                                   .map(([id]) => id);
@@ -908,9 +903,9 @@ export default function SuggestionReviewPage() {
                                   setDiff(null);
                                   setSessionDetail(null);
                                   setShardMarks({});
-                                  fetchData();
+                                  fetchSessions();
                                 } catch (err) {
-                                  setError(err instanceof Error ? err.message : "Failed to create clean PR");
+                                  setSessionsError(err instanceof Error ? err.message : "Failed to create clean PR");
                                 } finally {
                                   setActionInProgress(false);
                                 }

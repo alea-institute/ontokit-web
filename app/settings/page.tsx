@@ -328,9 +328,8 @@ function EditorPreferencesSection() {
   const setEditorMode = useEditorModeStore((s) => s.setEditorMode);
   const theme = useEditorModeStore((s) => s.theme);
   const setTheme = useEditorModeStore((s) => s.setTheme);
-  const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
-  const setContinuousEditing = useEditorModeStore((s) => s.setContinuousEditing);
-
+  const preferEditMode = useEditorModeStore((s) => s.preferEditMode);
+  const setPreferEditMode = useEditorModeStore((s) => s.setPreferEditMode);
   const [highlightedSetting, setHighlightedSetting] = useState<string | null>(null);
 
   // Highlight and scroll to the setting referenced by the URL hash
@@ -427,41 +426,47 @@ function EditorPreferencesSection() {
         </div>
       </div>
 
-      {/* Continuous Editing */}
-      <div className="mt-6">
-        <span id="continuous-editing-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Continuous Editing
+      {/* Prefer Edit Mode */}
+      <div
+        id="prefer-edit-mode"
+        className={cn(
+          "mt-6 scroll-mt-8 rounded-lg p-2 -mx-2 transition-colors duration-1000",
+          highlightedSetting === "prefer-edit-mode" && "bg-amber-100 dark:bg-amber-900/30",
+        )}
+      >
+        <span id="prefer-edit-mode-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Prefer Edit Mode
         </span>
         <button
           type="button"
           role="switch"
-          aria-checked={continuousEditing}
-          aria-labelledby="continuous-editing-label"
-          onClick={() => setContinuousEditing(!continuousEditing)}
+          aria-checked={preferEditMode}
+          aria-labelledby="prefer-edit-mode-label"
+          onClick={() => setPreferEditMode(!preferEditMode)}
           className={cn(
             "flex items-center gap-3 rounded-lg border p-4 text-left transition-colors w-full",
-            continuousEditing
+            preferEditMode
               ? "border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/20"
               : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
           )}
         >
           <Pencil className={cn(
             "h-5 w-5 flex-shrink-0",
-            continuousEditing
+            preferEditMode
               ? "text-primary-600 dark:text-primary-400"
               : "text-slate-400",
           )} />
           <div>
             <p className={cn(
               "font-medium",
-              continuousEditing
+              preferEditMode
                 ? "text-primary-700 dark:text-primary-300"
                 : "text-slate-900 dark:text-white",
             )}>
-              {continuousEditing ? "On" : "Off"}
+              {preferEditMode ? "On" : "Off"}
             </p>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              When enabled, classes open in edit mode automatically. When disabled, classes open read-only until you click &ldquo;Edit Item&rdquo;.
+              When on, opening a project takes you straight to the editor. When off, projects open in the read-only viewer first.
             </p>
           </div>
         </button>

@@ -1,3 +1,6 @@
+import { ChangelogToc } from "@/components/docs/ChangelogToc";
+import { changelogAnchorId } from "@/lib/docs/changelog";
+
 interface ChangelogCategory {
   title: string;
   items: string[];
@@ -10,6 +13,65 @@ interface ChangelogEntry {
 }
 
 const changelog: ChangelogEntry[] = [
+  {
+    version: "0.3.0",
+    date: "2026-04-09",
+    categories: [
+      {
+        title: "New features",
+        items: [
+          "Projects list as landing page with Public, My Projects, Private, and All tabs.",
+          "Separate viewer and editor routes for projects with role-appropriate default views.",
+          "Ontology search index management UI for PostgreSQL-backed entity indexing.",
+          "Multi-page Ontology Guide documentation accessible from the app.",
+          "Upstream source loop prevention UI with informational banners when sync config matches GitHub integration.",
+          "Exemplar ontology support in project UI for template-based project creation.",
+          "Explicit Save button in detail panel edit mode.",
+          "Branch topology visualization in revision history graph.",
+          "Share button to copy project permalink.",
+          "Unfiltered project count shown when search or filter is active.",
+        ],
+      },
+      {
+        title: "Improvements",
+        items: [
+          "Upgraded to Next.js 16, Tailwind CSS 4, Zod 4, and lucide-react 1.7.",
+          "Renamed 'upstream sync' to 'remote sync' / 'Sync from Remote' for clarity.",
+          "Renamed misleading 'Private' tab to 'My Projects'.",
+          "Skip project dashboard — navigate directly to editor.",
+          "Improved auth UX for private projects in the editor.",
+          "Improved import error UX with server-reachability probe.",
+          "Improved lint issue display consistency and prevented UI freeze on large rule sets.",
+          "Replaced window.location.reload() with React Query refetch for smoother navigation.",
+          "Removed accessToken from React Query keys to prevent unnecessary refetches.",
+          "Disabled branch switching for unauthenticated users.",
+          "Moved Tooltip provider to app level for shared usage.",
+          "Docker deployment configuration with multi-stage build.",
+          "Test coverage increased to 80% with 2400+ tests.",
+        ],
+      },
+      {
+        title: "Bug fixes",
+        items: [
+          "Fixed viewer source tab appearing empty in developer mode.",
+          "Fixed total project count not shown with Load More pagination.",
+          "Fixed duplicate BranchBadge in editor header.",
+          "Fixed nullable index fields from API causing runtime errors.",
+          "Fixed manualSave prop renamed to hideSaveButton with correct default behavior.",
+          "Fixed exhaustive-deps false positive in useProjectViewer.",
+          "Resolved Dependabot security alerts and CodeQL findings.",
+        ],
+      },
+      {
+        title: "CI/CD & Quality",
+        items: [
+          "Split CI quality gate into parallel lint, type-check, test, and build jobs.",
+          "Added Codecov bundle analysis and test coverage reporting.",
+          "Upgraded Vite to 8.0.7 for security fix.",
+        ],
+      },
+    ],
+  },
   {
     version: "0.2.0",
     date: "2026-03-09",
@@ -111,45 +173,51 @@ const changelog: ChangelogEntry[] = [
 
 export default function ChangelogPage() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
-        Changelog
-      </h1>
-      <p className="text-slate-600 dark:text-slate-400 mb-8">
-        Summary of changes for each release.
-      </p>
+    <div className="container mx-auto px-4 py-8 flex gap-8">
+      <ChangelogToc
+        entries={changelog.map(({ version, date }) => ({ version, date }))}
+      />
+      <div className="min-w-0 flex-1 max-w-4xl">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
+          Changelog
+        </h1>
+        <p className="text-slate-600 dark:text-slate-400 mb-8">
+          Summary of changes for each release.
+        </p>
 
-      <div className="space-y-8">
-        {changelog.map((entry) => (
-          <div
-            key={entry.version}
-            className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6"
-          >
-            <div className="flex items-baseline gap-3 mb-4">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-                {entry.version}
-              </h2>
-              <span className="text-sm text-slate-500 dark:text-slate-400">
-                {entry.date}
-              </span>
-            </div>
+        <div className="space-y-8">
+          {changelog.map((entry) => (
+            <section
+              key={entry.version}
+              id={changelogAnchorId(entry.version)}
+              className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-6 scroll-mt-4"
+            >
+              <div className="flex items-baseline gap-3 mb-4">
+                <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                  {entry.version}
+                </h2>
+                <span className="text-sm text-slate-500 dark:text-slate-400">
+                  {entry.date}
+                </span>
+              </div>
 
-            <div className="space-y-4">
-              {entry.categories.map((category) => (
-                <div key={category.title}>
-                  <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-2">
-                    {category.title}
-                  </h3>
-                  <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
-                    {category.items.map((item, i) => (
-                      <li key={i}>{item}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+              <div className="space-y-4">
+                {entry.categories.map((category) => (
+                  <div key={category.title}>
+                    <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300 mb-2">
+                      {category.title}
+                    </h3>
+                    <ul className="list-disc list-inside text-slate-600 dark:text-slate-400 text-sm space-y-1">
+                      {category.items.map((item, i) => (
+                        <li key={i}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     </div>
   );

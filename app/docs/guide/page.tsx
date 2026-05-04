@@ -8,7 +8,7 @@ export default function GuideLandingPage() {
         Guide to Ontologies
       </h1>
       <p className="text-slate-600 dark:text-slate-400 mb-8">
-        A beginner-friendly introduction to ontologies, their formats, syntaxes, and the
+        A beginner-friendly introduction to ontologies, their formats, syntaxes, and the{" "}
         vocabularies that power the Semantic Web.
       </p>
 

@@ -13,15 +13,18 @@ import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
 import { useToast } from "@/lib/context/ToastContext";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
-import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingToggle";
+import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
+import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
+import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { useQueryClient } from "@tanstack/react-query";
 import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
@@ -44,6 +47,7 @@ import { CreditModal } from "@/components/suggestions/CreditModal";
 import type { ClusterResponse, ClusterSuggestionItem, BatchSubmitPRResult } from "@/lib/api/suggestions";
 import { suggestionsApi } from "@/lib/api/suggestions";
 import { useSuggestionStore } from "@/lib/stores/suggestionStore";
+import { ShareButton } from "@/components/editor/ShareButton";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
@@ -64,6 +68,18 @@ export default function EditorPage() {
   const projectId = params.id as string;
   const resumeSessionParam = searchParams.get("resumeSession") || undefined;
   const resumeBranchParam = searchParams.get("branch") || undefined;
+  // Memoize the parsed URL selection so its identity is stable across renders
+  // when the URL hasn't changed — otherwise the URL-restore effect would re-fire
+  // every render and risk clobbering the user's in-page selection.
+  const searchParamsString = searchParams.toString();
+  const initialSelection = useMemo(
+    () => readSelectionFromSearchParams(new URLSearchParams(searchParamsString)),
+    [searchParamsString],
+  );
+  // Tracks the URL selection we've already applied. Each unique
+  // `${type}:${iri}` is consumed at most once per page-instance — if the URL
+  // changes mid-session, we apply the new key, but we never re-apply a key.
+  const consumedSelectionRef = useRef<string | null>(null);
   const initialBranch = resumeBranchParam
     || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
@@ -73,6 +89,14 @@ export default function EditorPage() {
   // Auth mode — set at build time by next.config.ts
   const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+
+  // Mark this surface as the user's most recent project view so side-page
+  // Back-to-project links route them back to the editor — regardless of
+  // whether their global preferEditMode preference says viewer or editor.
+  const setProjectViewMode = useSelectionStore((s) => s.setMode);
+  useEffect(() => {
+    setProjectViewMode("editor");
+  }, [setProjectViewMode]);
 
   // Branch state
   const queryClient = useQueryClient();
@@ -84,6 +108,7 @@ export default function EditorPage() {
     accessToken: session?.accessToken,
     sessionStatus: status,
     activeBranch,
+    enableWebSocket: true,
   });
 
   const {
@@ -108,6 +133,45 @@ export default function EditorPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showHealthCheck, setShowHealthCheck] = useState(false);
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
+  const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
+
+  // Restore selected entity from URL query param. For classes we wait for the
+  // class tree to load; for properties and individuals we dispatch through the
+  // layout's nav handler (entityNavigationRef), which switches the active tab
+  // and selects the entity directly. Each URL-derived selection is applied at
+  // most once via consumedSelectionRef — that way an in-page selection change
+  // (which doesn't update the URL) isn't undone on the next render.
+  useEffect(() => {
+    if (!initialSelection) return;
+    const key = `${initialSelection.type}:${initialSelection.iri}`;
+    if (consumedSelectionRef.current === key) return;
+
+    if (initialSelection.type === "class") {
+      if (isTreeLoading || !nodes.length) return;
+      if (selectedIri === initialSelection.iri) {
+        consumedSelectionRef.current = key;
+        return;
+      }
+      // Await the navigation so we only mark this URL key consumed when the
+      // tree-side restore actually succeeds. If it throws, leave the key
+      // unconsumed so a later render (e.g. once data is healthy) can retry.
+      let cancelled = false;
+      navigateToNode(initialSelection.iri)
+        .then(() => {
+          if (!cancelled) consumedSelectionRef.current = key;
+        })
+        .catch((err) => {
+          if (!cancelled) console.error("Failed to restore selection from URL:", err);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (isLoading) return; // layout not yet mounted
+    if (!entityNavigationRef.current) return; // layout's ref not yet populated
+    entityNavigationRef.current(initialSelection.iri, initialSelection.type);
+    consumedSelectionRef.current = key;
+  }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode, isLoading]);
 
   // Track accepted suggestion IRIs for sparkle badges (D-07)
   const [acceptedSuggestionIris, setAcceptedSuggestionIris] = useState<Set<string>>(new Set());
@@ -826,8 +890,14 @@ export default function EditorPage() {
     }
     setActiveBranch(branchName);
     resetSourceState();
-    router.replace(`${pathname}?branch=${encodeURIComponent(branchName)}`);
-  }, [pathname, router, suggestionSession, resetSourceState]);
+    // Merge into existing search params instead of replacing — BranchSelector
+    // fires this on mount, and replacing would wipe ?classIri= / ?propertyIri=
+    // / ?individualIri= / ?resumeSession= that the page also depends on.
+    const next = new URLSearchParams(searchParamsString);
+    next.set("branch", branchName);
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }, [pathname, router, suggestionSession, resetSourceState, searchParamsString]);
 
   // --- Keyboard shortcuts ---
   const keyboardShortcuts = useMemo((): ShortcutDefinition[] => [
@@ -1006,7 +1076,7 @@ export default function EditorPage() {
               </div>
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -1041,20 +1111,12 @@ export default function EditorPage() {
         <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link
-                href={`/projects/${projectId}`}
-                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Link>
-              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
               <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
-              {/* Mode Switcher */}
+              {/* Viewer / Editor switcher */}
+              <ViewerEditorSwitcher projectId={projectId} />
+              {/* Standard / Developer mode switcher */}
               <ModeSwitcher />
-              {canSuggest && <ContinuousEditingToggle />}
-
               {/* Suggestion mode indicator */}
               {isSuggestionMode && (
                 <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
@@ -1174,6 +1236,13 @@ export default function EditorPage() {
               {/* Branch Selector */}
               <BranchSelector onBranchChange={handleBranchChange} canCreateBranch={canEdit} readOnly={!hasValidAccess} />
 
+              {/* Share */}
+              <ShareButton
+                projectId={projectId}
+                selectedIri={selectedIri}
+                selectedLabel={selectedNodeFallback?.label}
+              />
+
               {/* History Button */}
               <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
 
@@ -1246,7 +1315,7 @@ export default function EditorPage() {
 
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -1265,6 +1334,7 @@ export default function EditorPage() {
                   accessToken={session?.accessToken}
                   activeBranch={isAnonymousProposalMode && anonymousSuggestion.branch ? anonymousSuggestion.branch : activeBranch}
                   canEdit={isAnonymousProposalMode ? true : !!canEdit}
+                  entityNavigationRef={entityNavigationRef}
                   canSuggest={!!canSuggest}
                   isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
                   canManage={!!canManage}
@@ -1306,8 +1376,6 @@ export default function EditorPage() {
                       : handleUpdateClass
                   }
                   detailRefreshKey={detailRefreshKey}
-                  showHealthCheck={showHealthCheck}
-                  onCloseHealthCheck={() => setShowHealthCheck(false)}
                   onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
                   onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
                   onReparentClass={handleReparentClass}
@@ -1329,6 +1397,7 @@ export default function EditorPage() {
                 activeBranch={isAnonymousProposalMode && anonymousSuggestion.branch ? anonymousSuggestion.branch : activeBranch}
                 canEdit={isAnonymousProposalMode ? true : !!canEdit}
                 canSuggest={!!canSuggest}
+                entityNavigationRef={entityNavigationRef}
                 isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
                 nodes={nodes}
                 isTreeLoading={isTreeLoading}
@@ -1373,6 +1442,27 @@ export default function EditorPage() {
               />
             )}
           </div>
+
+          {/* Right Panel - Health Check (available in both modes) */}
+          {showHealthCheck && (
+            <div className="w-96 flex-shrink-0">
+              <HealthCheckPanel
+                projectId={projectId}
+                accessToken={session?.accessToken}
+                branch={activeBranch}
+                isOpen={showHealthCheck}
+                onClose={() => setShowHealthCheck(false)}
+                onNavigateToClass={(iri, subjectType) => {
+                  if (entityNavigationRef.current) {
+                    entityNavigationRef.current(iri, subjectType);
+                  } else {
+                    navigateToNode(iri);
+                  }
+                }}
+                canRunLint={!!canManage}
+              />
+            </div>
+          )}
 
           {/* Right Panel - Revision History (available in both modes) */}
           <RevisionHistoryPanel

@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
-import { projectApi, type Project } from "@/lib/api/projects";
-import { pullRequestsApi } from "@/lib/api/pullRequests";
-import { lintApi, type LintSummary } from "@/lib/api/lint";
-import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
+import { useProject, derivePermissions } from "@/lib/hooks/useProject";
+import { useOpenPRCount } from "@/lib/hooks/useOpenPRCount";
+import { useLintSummary } from "@/lib/hooks/useLintSummary";
+import { useNormalizationStatus } from "@/lib/hooks/useNormalizationStatus";
+import { usePendingSuggestionCount } from "@/lib/hooks/usePendingSuggestionCount";
 import { revisionsApi } from "@/lib/api/revisions";
-import { suggestionsApi } from "@/lib/api/suggestions";
 import type { TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import type { IriPosition } from "@/lib/editor/indexWorker";
 
@@ -15,6 +15,8 @@ export interface UseProjectViewerOptions {
   accessToken?: string;
   sessionStatus: "loading" | "authenticated" | "unauthenticated";
   activeBranch?: string;
+  /** Enable WebSocket connections (lint status, collaboration). Defaults to false. */
+  enableWebSocket?: boolean;
 }
 
 export function useProjectViewer({
@@ -22,16 +24,33 @@ export function useProjectViewer({
   accessToken,
   sessionStatus,
   activeBranch,
+  enableWebSocket = false,
 }: UseProjectViewerOptions) {
-  // Project state
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [errorKind, setErrorKind] = useState<"private-403" | "no-access" | "not-found" | "generic" | null>(null);
-  const [openPRCount, setOpenPRCount] = useState(0);
-  const [pendingSuggestionCount, setPendingSuggestionCount] = useState(0);
-  const [lintSummary, setLintSummary] = useState<LintSummary | null>(null);
-  const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
+  // Project data from shared React Query cache
+  const {
+    project, isLoading, error, errorKind,
+  } = useProject(projectId, accessToken);
+  const permissions = derivePermissions(project, accessToken);
+  const {
+    canManage, canEdit, canSuggest, isSuggester, isSuggestionMode,
+    hasValidAccess: _hasValidAccess, hasOntology, hasExplicitRole,
+  } = permissions;
+  // Override hasValidAccess to check session status (not just token presence)
+  const hasValidAccess = sessionStatus === "authenticated" && !!accessToken;
+
+  // Secondary data via React Query hooks
+  const { data: openPRCount = 0 } = useOpenPRCount(projectId, accessToken);
+  const { data: lintSummary = null } = useLintSummary(projectId, accessToken);
+  const { data: normalizationStatus = null } = useNormalizationStatus(
+    projectId,
+    accessToken,
+    { enabled: !!project?.source_file_path },
+  );
+  const { data: pendingSuggestionCount = 0 } = usePendingSuggestionCount(
+    projectId,
+    accessToken,
+    { enabled: !!canEdit },
+  );
 
   // Source state
   const [sourceContent, setSourceContent] = useState<string>("");
@@ -51,94 +70,24 @@ export function useProjectViewer({
     branchKey: activeBranch,
   });
 
-  // WebSocket connection status
+  // WebSocket connection status (editor only)
   const collaboration = useCollaborationStatus({
     projectId,
-    enabled: !!projectId && sessionStatus !== "loading",
+    enabled: enableWebSocket && !!projectId && !!accessToken && sessionStatus === "authenticated",
+    token: accessToken,
   });
 
-  // Load project data
-  useEffect(() => {
-    const fetchProject = async () => {
-      setIsLoading(true);
-      setError(null);
-      setErrorKind(null);
-
-      try {
-        const data = await projectApi.get(projectId, accessToken);
-        setProject(data);
-
-        try {
-          const prResponse = await pullRequestsApi.list(projectId, accessToken, "open", undefined, 0, 1);
-          setOpenPRCount(prResponse.total);
-        } catch { /* ignore */ }
-
-        try {
-          const summary = await lintApi.getStatus(projectId, accessToken);
-          setLintSummary(summary);
-        } catch { /* ignore */ }
-
-        if (data.source_file_path) {
-          try {
-            const normStatus = await normalizationApi.getStatus(projectId, accessToken);
-            setNormalizationStatus(normStatus);
-          } catch { /* ignore */ }
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
-          if (!accessToken) {
-            setError("This is a private project. Sign in to request access.");
-            setErrorKind("private-403");
-          } else {
-            setError("You don't have access to this project");
-            setErrorKind("no-access");
-          }
-        } else if (err instanceof Error && err.message.includes("404")) {
-          setError("Project not found");
-          setErrorKind("not-found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load project");
-          setErrorKind("generic");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (sessionStatus !== "loading" && projectId) {
-      fetchProject();
-    }
-  }, [projectId, accessToken, sessionStatus]);
-
-  // Permission derivation
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
-  const hasExplicitRole = !!project?.user_role;
-  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
-  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!accessToken);
-  const canSuggest = canEdit || isSuggester;
-  const hasValidAccess = sessionStatus === "authenticated" && !!accessToken;
-  const hasOntology = !!project?.source_file_path;
-  const isSuggestionMode = isSuggester && !canEdit;
-
-  // Fetch pending suggestion count for editors/admins
-  useEffect(() => {
-    if (!canEdit || !accessToken) return;
-    suggestionsApi
-      .listPending(projectId, accessToken)
-      .then((res) => setPendingSuggestionCount(res.items.length))
-      .catch(() => { /* ignore — endpoint may not exist yet */ });
-  }, [canEdit, projectId, accessToken]);
-
   // Derive fallback data for the selected node from the tree
+  const { selectedIri, nodes } = tree;
   const selectedNodeFallback = useMemo((): TreeNodeFallback | null => {
-    if (!tree.selectedIri) return null;
+    if (!selectedIri) return null;
     const findInTree = (
-      items: typeof tree.nodes,
+      items: typeof nodes,
       parentIri?: string,
       parentLabel?: string,
     ): TreeNodeFallback | null => {
       for (const node of items) {
-        if (node.iri === tree.selectedIri) {
+        if (node.iri === selectedIri) {
           return { iri: node.iri, label: node.label || "", parentIri, parentLabel };
         }
         const found = findInTree(node.children, node.iri, node.label);
@@ -146,8 +95,8 @@ export function useProjectViewer({
       }
       return null;
     };
-    return findInTree(tree.nodes);
-  }, [tree.selectedIri, tree.nodes]);
+    return findInTree(nodes);
+  }, [selectedIri, nodes]);
 
   // Load source content
   const loadSourceContent = useCallback(async (isPreload = false) => {
