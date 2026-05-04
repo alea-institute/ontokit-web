@@ -278,7 +278,7 @@ export function PRActions({
             onChange={(e) => setReviewBody(e.target.value)}
             placeholder="Leave a comment (optional)"
             rows={3}
-            className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700"
+            className="mb-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-hidden dark:border-slate-600 dark:bg-slate-700"
           />
           <div className="flex flex-wrap gap-2">
             {canReview && (
@@ -392,7 +392,7 @@ export function PRActions({
             type="checkbox"
             checked={deleteSourceBranch}
             onChange={(e) => setDeleteSourceBranch(e.target.checked)}
-            className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+            className="h-4 w-4 rounded-sm border-slate-300 text-primary-600 focus:ring-primary-500"
           />
           <span className="text-sm text-slate-700 dark:text-slate-300">
             Delete source branch &ldquo;{pr.source_branch}&rdquo; after merging

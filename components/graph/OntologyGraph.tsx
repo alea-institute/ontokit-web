@@ -38,7 +38,7 @@ function GraphLegend() {
 
   return (
     <div className="absolute bottom-2 right-2 z-20">
-      <div className="rounded-lg border border-slate-200 bg-white/95 shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-800/95">
+      <div className="rounded-lg border border-slate-200 bg-white/95 shadow-xs backdrop-blur-sm dark:border-slate-700 dark:bg-slate-800/95">
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-medium text-slate-600 dark:text-slate-300"
@@ -92,7 +92,7 @@ function LegendNodeItem({
 }) {
   return (
     <div className="flex items-center gap-1.5">
-      <div className={cn("h-3 w-5 shrink-0 rounded-sm", color)} />
+      <div className={cn("h-3 w-5 shrink-0 rounded-xs", color)} />
       {badge && badgeColor && (
         <span className={cn("flex h-3 w-3 shrink-0 items-center justify-center rounded-full text-[7px] font-bold", badgeColor)}>
           {badge}
@@ -275,7 +275,7 @@ export function OntologyGraph({
         <button
           onClick={toggleDirection}
           className={cn(
-            "flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors",
+            "flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium transition-colors",
             "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700",
           )}
           aria-label={`Switch to ${direction === "TB" ? "left-to-right" : "top-to-bottom"} layout`}
@@ -289,7 +289,7 @@ export function OntologyGraph({
         </button>
         <button
           onClick={resetGraph}
-          className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+          className="flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
           aria-label="Reset graph"
         >
           <RotateCcw className="h-3.5 w-3.5" />
@@ -312,7 +312,7 @@ export function OntologyGraph({
         )}
         {graphData && graphData.nodes.length === 1 && graphData.edges.length === 0 && !isLoading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center">
-            <p className="rounded-lg bg-white/80 px-4 py-2 text-sm text-slate-500 shadow-sm dark:bg-slate-800/80 dark:text-slate-400">
+            <p className="rounded-lg bg-white/80 px-4 py-2 text-sm text-slate-500 shadow-xs dark:bg-slate-800/80 dark:text-slate-400">
               No relationships found for this class
             </p>
           </div>
@@ -346,7 +346,7 @@ export function OntologyGraph({
           <MiniMap
             pannable
             zoomable
-            className="!bg-slate-100 dark:!bg-slate-800"
+            className="bg-slate-100! dark:bg-slate-800!"
           />
         </ReactFlow>
         <GraphLegend />

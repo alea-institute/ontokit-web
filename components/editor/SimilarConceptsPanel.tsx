@@ -75,7 +75,7 @@ export function SimilarConceptsPanel({
       <div id="similar-concepts-panel" className="min-w-0 flex-1">
         {isLoading && (
           <div className="py-1">
-            <div className="h-4 w-24 animate-pulse rounded bg-slate-200 dark:bg-slate-700" />
+            <div className="h-4 w-24 animate-pulse rounded-sm bg-slate-200 dark:bg-slate-700" />
           </div>
         )}
         {isExpanded && noEmbeddings && (
@@ -98,7 +98,7 @@ export function SimilarConceptsPanel({
                   key={entity.iri}
                   onClick={() => onNavigateToClass?.(entity.iri)}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded px-1.5 py-1 text-left text-sm",
+                    "flex w-full items-center gap-2 rounded-sm px-1.5 py-1 text-left text-sm",
                     "text-primary-600 hover:bg-slate-50 hover:text-primary-700",
                     "dark:text-primary-400 dark:hover:bg-slate-800 dark:hover:text-primary-300",
                     entity.deprecated && "opacity-60 line-through"

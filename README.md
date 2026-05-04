@@ -6,17 +6,31 @@
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?logo=typescript)](https://www.typescriptlang.org/)
 [![Docker](https://img.shields.io/badge/Docker-ghcr.io-2496ED?logo=docker)](https://github.com/CatholicOS/ontokit-web/pkgs/container/ontokit-web)
+[![codecov](https://codecov.io/gh/CatholicOS/ontokit-web/graph/badge.svg?token=HIQ9Y8ZWDA)](https://codecov.io/gh/CatholicOS/ontokit-web)
 
-The web frontend for OntoKit - a collaborative OWL ontology curation platform.
+The web frontend for OntoKit — a collaborative OWL ontology curation platform.
+
+## Genesis
+
+OntoKit grew out of a collaboration between two open-source projects that share a common need: making rules and laws accessible through structured, community-driven ontologies.
+
+- **[FOLIO](https://openlegalstandard.org/)** (Free Open Legal Information Ontology) — a structured vocabulary for governmental rules and laws ([GitHub](https://github.com/alea-institute/FOLIO/))
+- **[Catholic Semantic Canon](https://catholicdigitalcommons.org/)** (Catholic Digital Commons) — a structured vocabulary for the rules and laws of faith ([GitHub](https://github.com/CatholicOS/ontology-semantic-canon))
+
+Both projects benefit from grassroots-level collaborative ontology editing — the kind of tooling that didn't exist in a modern, accessible form. That shared need is what drove OntoKit's creation.
 
 ## Features
 
-- Modern React-based UI with Next.js 15
-- Real-time collaborative editing
-- Class hierarchy visualization
-- Multi-language support (i18n)
-- Dark mode support
-- Responsive design
+- **Ontology editor** with three-panel layout (class tree, detail panel, source view)
+- **Monaco editor** with custom Turtle syntax highlighting, hover IRI resolution, and Ctrl+Click navigation
+- **Real-time collaboration** via WebSocket
+- **Pull request workflow** for reviewing and merging ontology changes
+- **Ontology health checks** with 20+ semantic linting rules
+- **Graph visualization** of class hierarchies using D3.js
+- **Git-style revision history** with branch management
+- **Multi-language support** (i18n via next-intl)
+- **Dark mode** and responsive design
+- **API documentation** browser
 
 ## Tech Stack
 
@@ -31,8 +45,8 @@ The web frontend for OntoKit - a collaborative OWL ontology curation platform.
 
 ### Prerequisites
 
-- Node.js 22+
-- npm or pnpm
+- Node.js 20.9+
+- npm
 
 ### Development Setup
 
@@ -71,24 +85,46 @@ docker run -p 3000:3000 ontokit-web
 
 ```
 ontokit-web/
-├── app/                    # Next.js app router pages
-│   ├── [locale]/          # Internationalized routes
-│   ├── api/               # API routes (BFF)
-│   └── globals.css        # Global styles
+├── app/                        # Next.js app router pages
+│   ├── [locale]/               # Internationalized routes
+│   ├── api/                    # API routes (BFF)
+│   ├── api-docs/               # API documentation browser
+│   ├── auth/                   # Authentication pages
+│   ├── docs/                   # Documentation pages
+│   ├── projects/               # Project and editor pages
+│   └── settings/               # User settings
 ├── components/
-│   ├── ui/                # Reusable UI components
-│   ├── editor/            # Ontology editor components
-│   └── collab/            # Collaboration components
+│   ├── ui/                     # Reusable Radix-based UI components
+│   ├── editor/                 # Ontology editor (ClassTree, TurtleEditor, etc.)
+│   ├── pr/                     # Pull request workflow
+│   ├── revision/               # Branch and revision history
+│   ├── graph/                  # Ontology graph visualization
+│   ├── diff/                   # Diff viewer
+│   ├── collab/                 # Collaboration indicators
+│   ├── layout/                 # Layout components (header, sidebar)
+│   ├── projects/               # Project listing and management
+│   ├── suggestions/            # Suggestion components
+│   ├── docs/                   # Documentation components
+│   ├── icons/                  # Custom SVG icons
+│   └── auth/                   # Auth-related components
 ├── lib/
-│   ├── api/               # API client
-│   ├── collab/            # WebSocket collaboration
-│   ├── ontology/          # OWL type definitions
-│   └── i18n/              # Internationalization
-├── messages/              # Translation files
-├── public/                # Static assets
-├── tailwind.config.ts
+│   ├── api/                    # Type-safe API clients
+│   ├── editor/                 # Monaco editor support (Turtle language, LSP, Web Worker)
+│   ├── ontology/               # OWL entity type definitions
+│   ├── collab/                 # WebSocket collaboration client
+│   ├── graph/                  # Graph data structures
+│   ├── git-graph/              # Git history graph
+│   ├── hooks/                  # Custom React hooks
+│   ├── stores/                 # Zustand stores
+│   ├── context/                # React context providers
+│   ├── i18n/                   # Internationalization
+│   └── docs/                   # Documentation utilities
+├── messages/                   # Translation files
+├── public/                     # Static assets
+├── __tests__/                  # Vitest test suites
+├── scripts/                    # Release and version management scripts
 ├── next.config.ts
-└── README.md
+└── tailwind.config.ts
 ```
 
 ## Scripts

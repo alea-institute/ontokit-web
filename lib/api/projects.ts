@@ -47,11 +47,16 @@ export interface Project {
   label_preferences?: string[];
   // Normalization report from initial import
   normalization_report?: NormalizationReport;
+  // Exemplar ontology fields
+  is_exemplar?: boolean;
+  exemplar_slug?: string;
+  exemplar_source_url?: string;
 }
 
 export interface ProjectListResponse {
   items: Project[];
   total: number;
+  unfiltered_total: number;
   skip: number;
   limit: number;
 }
@@ -143,16 +148,16 @@ export const projectApi = {
    * List accessible projects
    * @param skip - Pagination offset
    * @param limit - Maximum results
-   * @param filter - Filter type: 'public', 'mine', or undefined for all accessible
+   * @param filter - Filter type: 'public', 'private', 'mine', or undefined for all accessible
    * @param token - Access token for authentication
    */
-  list: (skip = 0, limit = 20, filter?: "public" | "mine", token?: string) => {
+  list: (skip = 0, limit = 20, filter?: "public" | "private" | "mine", token?: string, search?: string) => {
     const headers: HeadersInit = {};
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
     return api.get<ProjectListResponse>("/api/v1/projects", {
-      params: { skip, limit, filter },
+      params: { skip, limit, filter, search: search || undefined },
       headers,
     });
   },

@@ -17,6 +17,7 @@ import { Share2, ArrowLeft } from "lucide-react";
 import { DraggableTreeWrapper } from "@/components/editor/shared/DraggableTreeWrapper";
 import { useTreeDragDrop, type DragMode } from "@/lib/hooks/useTreeDragDrop";
 import { useToast } from "@/lib/context/ToastContext";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 
 const OntologyGraph = dynamic(
   () => import("@/components/graph/OntologyGraph").then((mod) => mod.OntologyGraph),
@@ -85,6 +86,9 @@ export interface StandardEditorLayoutProps {
   onReparentClass?: (classIri: string, oldParentIris: string[], newParentIris: string[], mode: DragMode) => Promise<void>;
   reparentOptimistic?: (iri: string, oldParentIri: string | null, newParentIri: string | null) => { previousNodes: ClassTreeNode[] };
   rollbackReparent?: (snapshot: { previousNodes: ClassTreeNode[] }) => void;
+
+  /** Ref populated with a function to navigate to any entity type */
+  entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -93,8 +97,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     accessToken,
     activeBranch,
     canEdit,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    canSuggest = false,
+    canSuggest: _canSuggest = false,
     isSuggestionMode = false,
     nodes,
     isTreeLoading,
@@ -216,6 +219,58 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   // Track selected entity per tab (properties/individuals have their own selection)
   const [selectedPropertyIri, setSelectedPropertyIri] = useState<string | null>(null);
   const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
+
+  // Expose entity navigation to parent via ref
+  const { entityNavigationRef, navigateToNode: navToNode } = props;
+  useEffect(() => {
+    if (!entityNavigationRef) return;
+
+    const handler = (iri: string, type?: string) => {
+      // Always exit graph view first — otherwise the user clicks a lint issue
+      // and stays staring at the graph instead of the entity they navigated to.
+      setShowGraph(false);
+      if (type === "property") {
+        setActiveTab("properties");
+        setSelectedPropertyIri(iri);
+      } else if (type === "individual") {
+        setActiveTab("individuals");
+        setSelectedIndividualIri(iri);
+      } else {
+        // For "other" (untyped) entities, navigate to class tree which
+        // triggers ClassDetailPanel's 404 handler with a helpful message
+        setActiveTab("classes");
+        navToNode(iri);
+      }
+    };
+
+    entityNavigationRef.current = handler;
+    return () => {
+      if (entityNavigationRef.current === handler) {
+        entityNavigationRef.current = null;
+      }
+    };
+  }, [entityNavigationRef, navToNode]);
+
+  // Mirror the active-tab selection into the shared store so cross-page chrome
+  // (e.g. the Viewer/Editor switcher, the side-page Back-to-project link via
+  // useProjectHomeHref) can synthesize the right ?<type>Iri= key without having
+  // to know about local-state plumbing here.
+  //
+  // No unmount cleanup: an unmount-clear races with side-page navigation —
+  // the editor unmounts before settings/PRs/etc render, so reading the store
+  // there returns null and the back-link drops the selection. The next editor
+  // mount (same or different project) overwrites the store from its own URL
+  // params, so stale values are short-lived and harmless.
+  const setSelection = useSelectionStore((s) => s.setSelection);
+  useEffect(() => {
+    if (activeTab === "classes") {
+      setSelection(selectedIri ?? null, selectedIri ? "class" : null);
+    } else if (activeTab === "properties") {
+      setSelection(selectedPropertyIri ?? null, selectedPropertyIri ? "property" : null);
+    } else {
+      setSelection(selectedIndividualIri ?? null, selectedIndividualIri ? "individual" : null);
+    }
+  }, [activeTab, selectedIri, selectedPropertyIri, selectedIndividualIri, setSelection]);
 
   // Shared search state
   const {
@@ -367,7 +422,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
               <button
                 onClick={() => setShowGraph(false)}
-                className="flex items-center gap-1 rounded px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
+                className="flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"
                 aria-label="Back to details"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
@@ -390,6 +445,10 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           </div>
         ) : activeTab === "classes" ? (
           <ClassDetailPanel
+            // Remount on selection change so internal edit-state and refs reset
+            // cleanly — prevents the previous class's edit fields from bleeding
+            // into the newly-selected class while the new fetch is in flight.
+            key={selectedIri ?? "no-class"}
             projectId={projectId}
             classIri={selectedIri}
             accessToken={accessToken}
@@ -398,7 +457,6 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onCopyIri={onCopyIri}
             selectedNodeFallback={selectedNodeFallback}
             canEdit={canEdit || isSuggestionMode}
-            isSuggestionMode={isSuggestionMode}
             onUpdateClass={onUpdateClass}
             refreshKey={detailRefreshKey}
             headerActions={selectedIri ? (
@@ -414,6 +472,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           />
         ) : activeTab === "properties" ? (
           <PropertyDetailPanel
+            key={selectedPropertyIri ?? "no-property"}
             projectId={projectId}
             propertyIri={selectedPropertyIri}
             sourceContent={sourceContent || ""}
@@ -428,6 +487,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           />
         ) : (
           <IndividualDetailPanel
+            key={selectedIndividualIri ?? "no-individual"}
             projectId={projectId}
             individualIri={selectedIndividualIri}
             sourceContent={sourceContent || ""}

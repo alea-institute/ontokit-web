@@ -3,6 +3,40 @@ import { projectOntologyApi } from "@/lib/api/client";
 import { getPreferredLabel, getLocalName } from "@/lib/utils";
 
 /**
+ * IRIs whose namespace belongs to a well-known external vocabulary will never
+ * resolve via the project's class/property/individual endpoints — and the
+ * project's own searchEntities endpoint won't find them either. Skipping the
+ * probe for these saves a round-trip and eliminates noisy 404s in the console
+ * while still letting getLocalName provide a sensible default label.
+ *
+ * Prefixes are listed without scheme; the matcher normalizes both http:// and
+ * https:// forms so vocabularies served over either scheme are treated as the
+ * same external namespace.
+ */
+const EXTERNAL_VOCABULARY_AUTHORITIES_AND_PATHS: readonly string[] = [
+  "www.w3.org/1999/02/22-rdf-syntax-ns#",
+  "www.w3.org/2000/01/rdf-schema#",
+  "www.w3.org/2001/XMLSchema#",
+  "www.w3.org/2002/07/owl#",
+  "www.w3.org/2004/02/skos/core#",
+  "purl.org/dc/elements/1.1/",
+  "purl.org/dc/terms/",
+  "xmlns.com/foaf/0.1/",
+  "www.w3.org/ns/prov#",
+];
+
+function isExternalVocabularyIri(iri: string): boolean {
+  let rest: string;
+  if (iri.startsWith("http://")) rest = iri.slice("http://".length);
+  else if (iri.startsWith("https://")) rest = iri.slice("https://".length);
+  else return false;
+  for (const suffix of EXTERNAL_VOCABULARY_AUTHORITIES_AND_PATHS) {
+    if (rest.startsWith(suffix)) return true;
+  }
+  return false;
+}
+
+/**
  * Async-resolve rdfs:labels for a set of IRIs.
  *
  * Returns a stable `Record<string, string>` that maps IRI → human-readable label.
@@ -54,18 +88,17 @@ export function useIriLabels(
         const batch = unresolved.slice(i, i + 10);
         await Promise.all(
           batch.map(async (iri) => {
-            // 1. Try class endpoint (fastest for classes)
-            try {
-              const detail = await projectOntologyApi.getClassDetail(
-                projectId, iri, accessToken, branch,
-              );
-              const label = getPreferredLabel(detail.labels);
-              if (label) { newLabels[iri] = label; return; }
-            } catch {
-              // Not a class — fall through
-            }
+            // External-vocabulary IRIs (skos, rdfs, owl, dcterms, …) live
+            // outside the project ontology, so neither the class endpoint nor
+            // the project search can resolve them. Skip the probe entirely
+            // and let the caller fall back on getLocalName.
+            if (isExternalVocabularyIri(iri)) return;
 
-            // 2. Fallback: entity search by local name
+            // 1. Search by local name. searchEntities returns labels for any
+            //    entity type (class / property / individual) the project knows
+            //    about, so a single call resolves most internal IRIs without
+            //    the 404 noise that the class endpoint produces for properties
+            //    and individuals.
             try {
               const localName = getLocalName(iri);
               const result = await projectOntologyApi.searchEntities(
@@ -76,7 +109,20 @@ export function useIriLabels(
               );
               if (match?.label) { newLabels[iri] = match.label; return; }
             } catch {
-              // Search failed — leave unresolved
+              // Search failed — fall through to class probe
+            }
+
+            // 2. Fallback: try the class endpoint directly. This catches IRIs
+            //    that exist as classes but whose local name doesn't surface in
+            //    a search (e.g. opaque IDs that getLocalName trims to noise).
+            try {
+              const detail = await projectOntologyApi.getClassDetail(
+                projectId, iri, accessToken, branch,
+              );
+              const label = getPreferredLabel(detail.labels);
+              if (label) { newLabels[iri] = label; return; }
+            } catch {
+              // Not a class either — leave unresolved; caller falls back to getLocalName.
             }
           }),
         );

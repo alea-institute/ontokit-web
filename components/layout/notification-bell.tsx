@@ -32,9 +32,9 @@ const iconByType: Record<NotificationType, React.ComponentType<{ className?: str
   pr_opened: GitPullRequest,
   pr_merged: GitMerge,
   pr_review: MessageSquareWarning,
-  upstream_update_applied: RefreshCw,
-  upstream_update_available: Download,
-  upstream_sync_error: AlertCircle,
+  remote_update_applied: RefreshCw,
+  remote_update_available: Download,
+  remote_sync_error: AlertCircle,
 };
 
 const colorByType: Record<NotificationType, string> = {
@@ -47,9 +47,9 @@ const colorByType: Record<NotificationType, string> = {
   pr_opened: "text-indigo-500",
   pr_merged: "text-purple-500",
   pr_review: "text-amber-500",
-  upstream_update_applied: "text-blue-500",
-  upstream_update_available: "text-indigo-500",
-  upstream_sync_error: "text-red-500",
+  remote_update_applied: "text-blue-500",
+  remote_update_available: "text-indigo-500",
+  remote_sync_error: "text-red-500",
 };
 
 function formatTimeAgo(dateStr: string): string {
@@ -88,14 +88,14 @@ function getTargetUrl(notification: { type: NotificationType; project_id: string
       return notification.target_id
         ? `${base}/pull-requests/${notification.target_id}`
         : `${base}/pull-requests`;
-    case "upstream_update_applied":
-      return `${base}/settings#upstream-sync`;
-    case "upstream_update_available":
+    case "remote_update_applied":
+      return `${base}/settings#remote-sync`;
+    case "remote_update_available":
       return notification.target_id
         ? `${base}/pull-requests/${notification.target_id}`
-        : `${base}/settings#upstream-sync`;
-    case "upstream_sync_error":
-      return `${base}/settings#upstream-sync`;
+        : `${base}/settings#remote-sync`;
+    case "remote_sync_error":
+      return `${base}/settings#remote-sync`;
     default:
       return base;
   }
@@ -140,12 +140,12 @@ export function NotificationBell() {
     <div className="relative" ref={menuRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative rounded-full p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
+        className="relative rounded-full p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 focus:outline-hidden focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
         aria-label="Notifications"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}

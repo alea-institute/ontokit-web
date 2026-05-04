@@ -50,6 +50,7 @@ interface ProjectListItem {
 interface ProjectListResponse {
   items: ProjectListItem[];
   total: number;
+  unfiltered_total: number;
 }
 
 function buildUrlEntry(loc: string, lastmod?: string): string {

@@ -8,8 +8,6 @@ import {
   Copy,
   Trash2,
   AlertTriangle,
-  Pencil,
-  X,
   Lightbulb,
   StickyNote,
   Link2,
@@ -22,14 +20,14 @@ import {
 import type { LocalizedString, AnnotationUpdate } from "@/lib/api/client";
 import { cn, getLocalName } from "@/lib/utils";
 import { LanguageFlag } from "@/components/editor/LanguageFlag";
+import { LanguagePicker } from "@/components/editor/LanguagePicker";
 import { AnnotationRow } from "@/components/editor/standard/AnnotationRow";
 import { InlineAnnotationAdder } from "@/components/editor/standard/InlineAnnotationAdder";
 import { RelationshipSection, type RelationshipGroup, type RelationshipTarget } from "@/components/editor/standard/RelationshipSection";
 import { PropertyAssertionSection } from "@/components/editor/standard/PropertyAssertionSection";
 import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, SEE_ALSO_IRI, getAnnotationPropertyInfo } from "@/lib/ontology/annotationProperties";
-import { AutoSaveStatusBar } from "@/components/editor/AutoSaveStatusBar";
+import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar";
 import { useEntityAutoSave } from "@/lib/hooks/useEntityAutoSave";
-import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useToast } from "@/lib/context/ToastContext";
 import {
   extractIndividualDetail,
@@ -120,8 +118,6 @@ export function IndividualDetailPanel({
 
 
   const editInitializedRef = useRef(false);
-  const cancelledIriRef = useRef<string | null>(null);
-  const continuousEditing = useEditorModeStore((s) => s.continuousEditing);
   const toast = useToast();
 
   const buildDraftEntry = useCallback((): IndividualDraftEntry | null => {
@@ -237,19 +233,27 @@ export function IndividualDetailPanel({
     setEditAnnotations(regularAnnotations);
   }, []);
 
-  // Flush the current entity when navigating away (cleanup runs with the old closure)
+  // Flush any pending draft to git when this panel unmounts. The flush
+  // closure captures props that can change between mount and unmount, so
+  // route the call through a ref that we keep up to date in an effect — the
+  // cleanup then sees the latest closure rather than the one captured on
+  // first render. (Mirrors the pattern used in ClassDetailPanel /
+  // PropertyDetailPanel.)
+  const flushToGitRef = useRef(flushToGit);
+  useEffect(() => {
+    flushToGitRef.current = flushToGit;
+  }, [flushToGit]);
   useEffect(() => {
     return () => {
-      flushToGit();
+      flushToGitRef.current();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- flush must capture the current entity's closure
-  }, [individualIri]);
+  }, []);
 
   // Reset edit state when the selected individual changes
   useEffect(() => {
     editInitializedRef.current = false;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional reset on selection change; matches ClassDetailPanel/PropertyDetailPanel patterns
     setIsEditing(false);
-    cancelledIriRef.current = null;
   }, [individualIri]);
 
   const enterEditMode = useCallback(() => {
@@ -259,19 +263,25 @@ export function IndividualDetailPanel({
     setIsEditing(true);
   }, [detail, initEditState]);
 
+  // Cancel: discard draft, re-init from server. Stay in edit mode.
   const cancelEditMode = useCallback(() => {
     discardDraft();
     if (detail) initEditState(detail);
-    setIsEditing(false);
-    cancelledIriRef.current = individualIri;
-  }, [individualIri, detail, discardDraft, initEditState]);
+  }, [detail, discardDraft, initEditState]);
+
+  // Manual save: flush the current draft to git. Stays in edit mode.
+  const flushDraftToGit = useCallback(async () => {
+    triggerSave();
+    await flushToGit();
+  }, [triggerSave, flushToGit]);
 
   useEffect(() => {
     if (isEditing || editInitializedRef.current) return;
-    if (!canEdit || !detail) return;
+    if (!canEdit || !onUpdateIndividual || !detail) return;
 
     if (restoredDraft && restoredDraft.entityType === "individual" && individualIri) {
       const d = restoredDraft as IndividualDraftEntry;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- restoring draft state from store; matches PropertyDetailPanel auto-enter pattern
       setEditLabels(d.labels);
       setEditComments(ensureTrailingEmpty(d.comments));
       setEditDefinitions(ensureTrailingEmpty(d.definitions));
@@ -288,10 +298,8 @@ export function IndividualDetailPanel({
       return;
     }
 
-    if (continuousEditing && cancelledIriRef.current !== individualIri) {
-      enterEditMode();
-    }
-  }, [detail, canEdit, restoredDraft, individualIri, clearRestoredDraft, continuousEditing, isEditing, enterEditMode]);
+    enterEditMode();
+  }, [detail, canEdit, restoredDraft, individualIri, clearRestoredDraft, onUpdateIndividual, isEditing, enterEditMode]);
 
   // ── Edit helpers ──
   const updateLabel = useCallback((index: number, field: "value" | "lang", val: string) => {
@@ -397,50 +405,52 @@ export function IndividualDetailPanel({
   }
 
   const displayLabel = detail.labels.length > 0 ? detail.labels[0].value : getLocalName(individualIri);
-  const canEnterEdit = canEdit && !!onUpdateIndividual;
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="flex-1 overflow-y-auto">
-        {/* Header */}
-        <div className="border-b border-slate-200 p-4 dark:border-slate-700">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border bg-purple-100 border-purple-300 dark:bg-purple-900/30 dark:border-purple-700">
-              <span className="text-sm font-bold text-purple-700 dark:text-purple-400">I</span>
+      {/* Header — pinned, always visible */}
+      <div className="shrink-0 border-b border-slate-200 p-4 dark:border-slate-700">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-full border bg-purple-100 border-purple-300 dark:bg-purple-900/30 dark:border-purple-700">
+            <span className="text-sm font-bold text-purple-700 dark:text-purple-400">I</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
+                {displayLabel}
+                {detail.deprecated && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                    <AlertTriangle className="mr-1 h-3 w-3" />Deprecated
+                  </span>
+                )}
+              </h2>
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
-                  {displayLabel}
-                  {detail.deprecated && (
-                    <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                      <AlertTriangle className="mr-1 h-3 w-3" />Deprecated
-                    </span>
-                  )}
-                </h2>
-                {canEnterEdit && (
-                  <div className="shrink-0">
-                    {isEditing ? (
-                      <button onClick={cancelEditMode} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700"><X className="h-3.5 w-3.5" />Cancel</button>
-                    ) : (
-                      <button onClick={enterEditMode} className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"><Pencil className="h-3.5 w-3.5" />Edit Item</button>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="mt-1 flex items-center gap-2">
-                <span className="rounded-full px-2 py-0.5 text-[10px] font-medium border bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-400">Individual</span>
-                <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={individualIri}>{individualIri}</p>
-                {onCopyIri && (
-                  <button onClick={() => onCopyIri(individualIri)} className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700" title="Copy IRI">
-                    <Copy className="h-3 w-3" />
-                  </button>
-                )}
-              </div>
+            <div className="mt-1 flex items-center gap-2">
+              <span className="rounded-full px-2 py-0.5 text-[10px] font-medium border bg-purple-100 border-purple-300 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700 dark:text-purple-400">Individual</span>
+              <p className="truncate text-xs text-slate-500 dark:text-slate-400" title={individualIri}>{individualIri}</p>
+              {onCopyIri && (
+                <button onClick={() => onCopyIri(individualIri)} className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700" title="Copy IRI">
+                  <Copy className="h-3 w-3" />
+                </button>
+              )}
             </div>
           </div>
         </div>
+      </div>
 
+      {/* Auto-save affordance bar — pinned edit toolbar */}
+      {isEditing && (
+        <AutoSaveAffordanceBar
+          status={saveStatus}
+          error={saveError}
+          validationError={validationError}
+          onRetry={() => flushToGit()}
+          onManualSave={flushDraftToGit}
+          onCancel={cancelEditMode}
+        />
+      )}
+
+      <div className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-3">
           {/* Labels */}
           {isEditing ? (
@@ -448,12 +458,11 @@ export function IndividualDetailPanel({
               <div className="space-y-2">
                 {editLabels.map((label, index) => (
                   <div key={index} className="flex items-center gap-2">
-                    <input type="text" value={label.value} onChange={(e) => updateLabel(index, "value", e.target.value)} onBlur={() => triggerSave()} placeholder="Label text" className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
-                    <LanguageFlag lang={label.lang} />
-                    <input type="text" value={label.lang} onChange={(e) => updateLabel(index, "lang", e.target.value)} onBlur={() => triggerSave()} className="w-14 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" title="Language tag" />
+                    <input type="text" value={label.value} onChange={(e) => updateLabel(index, "value", e.target.value)} onBlur={() => triggerSave()} placeholder="Label text" className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white" />
+                    <LanguagePicker value={label.lang} onChange={(code) => { updateLabel(index, "lang", code); triggerSave(); }} />
                     {editLabels.length > 1 ? (
-                      <button onClick={() => removeLabel(index)} className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></button>
-                    ) : <div className="rounded p-1"><div className="h-3.5 w-3.5" /></div>}
+                      <button onClick={() => removeLabel(index)} className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"><Trash2 className="h-3.5 w-3.5" /></button>
+                    ) : <div className="rounded-sm p-1"><div className="h-3.5 w-3.5" /></div>}
                   </div>
                 ))}
               </div>
@@ -600,7 +609,7 @@ export function IndividualDetailPanel({
               {detail.objectPropertyAssertions.map((a, idx) => (
                 <div key={idx} className="flex gap-4">
                   <div className="w-40 shrink-0 flex items-center">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={a.propertyIri}>
+                    <span className="rounded-sm bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={a.propertyIri}>
                       {resolvedLabels?.[a.propertyIri] || getLocalName(a.propertyIri)}
                     </span>
                   </div>
@@ -647,7 +656,7 @@ export function IndividualDetailPanel({
               {detail.dataPropertyAssertions.map((a, idx) => (
                 <div key={idx} className="flex gap-4">
                   <div className="w-40 shrink-0 flex items-center">
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={a.propertyIri}>
+                    <span className="rounded-sm bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={a.propertyIri}>
                       {resolvedLabels?.[a.propertyIri] || getLocalName(a.propertyIri)}
                     </span>
                   </div>
@@ -655,7 +664,7 @@ export function IndividualDetailPanel({
                     {a.lang && <LanguageFlag lang={a.lang} />}
                     <span className="text-sm text-slate-700 dark:text-slate-300">{a.value}</span>
                     {a.datatype && (
-                      <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>{getLocalName(a.datatype)}</span>
+                      <span className="shrink-0 rounded-sm bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500 dark:bg-slate-800 dark:text-slate-400" title={a.datatype}>{getLocalName(a.datatype)}</span>
                     )}
                   </div>
                 </div>
@@ -710,7 +719,7 @@ export function IndividualDetailPanel({
                   return (
                     <div key={`${ann.property_iri}-${vi}`} className="flex gap-4">
                       <div className="w-40 shrink-0 flex items-center">
-                        <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={curie}>{effectiveLabel}</span>
+                        <span className="rounded-sm bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={curie}>{effectiveLabel}</span>
                       </div>
                       <div className="min-w-0 flex-1 flex items-center gap-2">
                         {v.lang && <LanguageFlag lang={v.lang} />}
@@ -740,9 +749,6 @@ export function IndividualDetailPanel({
         </div>
       </div>
 
-      {isEditing && (
-        <AutoSaveStatusBar status={saveStatus} error={saveError} validationError={validationError} onRetry={() => flushToGit()} />
-      )}
     </div>
   );
 }
@@ -817,12 +823,12 @@ function IriList({ iris, onRemove, onAdd, onNavigate, projectId, accessToken, br
       {iris.map((iri) => (
         <div key={iri} className="flex items-center gap-2">
           <button onClick={() => onNavigate?.(iri)} className="flex-1 truncate text-sm text-primary-600 hover:underline dark:text-primary-400" title={iri}>{resolvedLabels?.[iri] || getLocalName(iri)}</button>
-          <button onClick={() => onRemove(iri)} className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" title="Remove"><Trash2 className="h-3.5 w-3.5" /></button>
+          <button onClick={() => onRemove(iri)} className="shrink-0 rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" title="Remove"><Trash2 className="h-3.5 w-3.5" /></button>
         </div>
       ))}
       <div ref={containerRef} className="relative">
         <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} onFocus={() => setIsFocused(true)} placeholder={placeholder || "Search to add..."}
-          className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500" />
+          className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500" />
         {isFocused && query.trim() && (
           <div className="absolute left-0 top-full z-50 mt-1 w-full rounded-lg border border-slate-200 bg-white shadow-lg dark:border-slate-600 dark:bg-slate-700">
             <div className="max-h-48 overflow-y-auto">

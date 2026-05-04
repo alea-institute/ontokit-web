@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
-import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
 import { PropertyTree } from "@/components/editor/standard/PropertyTree";
@@ -27,6 +26,7 @@ import type { ClassTreeNode } from "@/lib/ontology/types";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 import type { IriPosition } from "@/lib/editor/indexWorker";
 import { useDraftStore } from "@/lib/stores/draftStore";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { getLocalName } from "@/lib/utils";
 import { extractTreeLabelMap } from "@/lib/graph/buildGraphData";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
@@ -64,8 +64,6 @@ export interface DeveloperEditorLayoutProps {
   canEdit: boolean;
   canSuggest?: boolean;
   isSuggestionMode?: boolean;
-  canManage: boolean;
-
   // Tree state (from useOntologyTree)
   nodes: ClassTreeNode[];
   isTreeLoading: boolean;
@@ -108,10 +106,6 @@ export interface DeveloperEditorLayoutProps {
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   detailRefreshKey?: number;
 
-  // Side panels
-  showHealthCheck: boolean;
-  onCloseHealthCheck: () => void;
-
   // Property & Individual editing
   onUpdateProperty?: (propertyIri: string, data: TurtlePropertyUpdateData) => Promise<void>;
   onUpdateIndividual?: (individualIri: string, data: TurtleIndividualUpdateData) => Promise<void>;
@@ -120,6 +114,9 @@ export interface DeveloperEditorLayoutProps {
   onReparentClass?: (classIri: string, oldParentIris: string[], newParentIris: string[], mode: DragMode) => Promise<void>;
   reparentOptimistic?: (iri: string, oldParentIri: string | null, newParentIri: string | null) => { previousNodes: ClassTreeNode[] };
   rollbackReparent?: (snapshot: { previousNodes: ClassTreeNode[] }) => void;
+
+  /** Ref populated with a function to navigate to any entity type */
+  entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
 }
 
 export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
@@ -131,7 +128,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     canSuggest = false,
     isSuggestionMode = false,
-    canManage,
     nodes,
     isTreeLoading,
     treeError,
@@ -164,8 +160,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     selectedNodeFallback,
     onUpdateClass,
     detailRefreshKey,
-    showHealthCheck,
-    onCloseHealthCheck,
     onUpdateProperty,
     onUpdateIndividual,
     onReparentClass,
@@ -262,6 +256,57 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   const [selectedPropertyIri, setSelectedPropertyIri] = useState<string | null>(null);
   const [selectedIndividualIri, setSelectedIndividualIri] = useState<string | null>(null);
 
+  // Expose entity navigation to parent via ref
+  const { entityNavigationRef, navigateToNode: navToNode, setPendingScrollIri: setScrollIri } = props;
+  useEffect(() => {
+    if (!entityNavigationRef) return;
+
+    const handler = (iri: string, type?: string) => {
+      if (type === "property") {
+        setActiveTab("properties");
+        setSelectedPropertyIri(iri);
+      } else if (type === "individual") {
+        setActiveTab("individuals");
+        setSelectedIndividualIri(iri);
+      } else if (type === "other") {
+        // Untyped entities: switch to source view and scroll to IRI
+        setViewMode("source");
+        setScrollIri(iri);
+      } else {
+        setActiveTab("classes");
+        navToNode(iri);
+      }
+    };
+
+    entityNavigationRef.current = handler;
+    return () => {
+      if (entityNavigationRef.current === handler) {
+        entityNavigationRef.current = null;
+      }
+    };
+  }, [entityNavigationRef, navToNode, setScrollIri]);
+
+  // Mirror the active-tab selection into the shared store so cross-page chrome
+  // (e.g. the Viewer/Editor switcher, the side-page Back-to-project link via
+  // useProjectHomeHref) can synthesize the right ?<type>Iri= key without having
+  // to know about local-state plumbing here.
+  //
+  // No unmount cleanup: an unmount-clear races with side-page navigation —
+  // the editor unmounts before settings/PRs/etc render, so reading the store
+  // there returns null and the back-link drops the selection. The next editor
+  // mount (same or different project) overwrites the store from its own URL
+  // params, so stale values are short-lived and harmless.
+  const setSelection = useSelectionStore((s) => s.setSelection);
+  useEffect(() => {
+    if (activeTab === "classes") {
+      setSelection(selectedIri ?? null, selectedIri ? "class" : null);
+    } else if (activeTab === "properties") {
+      setSelection(selectedPropertyIri ?? null, selectedPropertyIri ? "property" : null);
+    } else {
+      setSelection(selectedIndividualIri ?? null, selectedIndividualIri ? "individual" : null);
+    }
+  }, [activeTab, selectedIri, selectedPropertyIri, selectedIndividualIri, setSelection]);
+
   // Shared search state
   const {
     showSearch,
@@ -333,7 +378,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               viewMode === "tree"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
             )}
           >
@@ -346,7 +391,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               viewMode === "source"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
             )}
           >
@@ -361,7 +406,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               viewMode === "graph"
-                ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                 : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white",
             )}
           >
@@ -504,6 +549,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             <div className="min-w-0 flex-1 bg-white dark:bg-slate-800">
               {activeTab === "classes" ? (
                 <ClassDetailPanel
+                  // Remount on selection change so internal edit-state and
+                  // refs reset cleanly between selections.
+                  key={selectedIri ?? "no-class"}
                   projectId={projectId}
                   classIri={selectedIri}
                   accessToken={accessToken}
@@ -513,12 +561,12 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   onCopyIri={onCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
                   canEdit={canEdit || isSuggestionMode}
-                  isSuggestionMode={isSuggestionMode}
                   onUpdateClass={onUpdateClass}
                   refreshKey={detailRefreshKey}
                 />
               ) : activeTab === "properties" ? (
                 <PropertyDetailPanel
+                  key={selectedPropertyIri ?? "no-property"}
                   projectId={projectId}
                   propertyIri={selectedPropertyIri}
                   sourceContent={sourceContent || ""}
@@ -533,6 +581,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 />
               ) : (
                 <IndividualDetailPanel
+                  key={selectedIndividualIri ?? "no-individual"}
                   projectId={projectId}
                   individualIri={selectedIndividualIri}
                   sourceContent={sourceContent || ""}
@@ -548,20 +597,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               )}
             </div>
 
-            {/* Right Panel - Health Check */}
-            {showHealthCheck && (
-              <div className="w-96 flex-shrink-0">
-                <HealthCheckPanel
-                  projectId={projectId}
-                  accessToken={accessToken}
-                  branch={activeBranch}
-                  isOpen={showHealthCheck}
-                  onClose={onCloseHealthCheck}
-                  onNavigateToClass={(iri) => navigateToNode(iri)}
-                  canRunLint={canManage}
-                />
-              </div>
-            )}
           </>
         ) : (
           /* Source View */

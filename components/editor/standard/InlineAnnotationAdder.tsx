@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LanguageFlag } from "@/components/editor/LanguageFlag";
+import { LanguagePicker } from "@/components/editor/LanguagePicker";
 import {
   ANNOTATION_PROPERTIES,
   getAnnotationPropertiesByVocabulary,
@@ -118,7 +118,7 @@ export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: Inli
                 }}
                 placeholder="Select property..."
                 aria-label="Select annotation property"
-                className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:placeholder:text-slate-500"
+                className="w-full rounded-md border border-dashed border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 placeholder:text-slate-400 focus:border-primary-500 focus:border-solid focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:placeholder:text-slate-500"
               />
             </div>
           )}
@@ -136,7 +136,7 @@ export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: Inli
                       if (e.key === "Escape") setIsDropdownOpen(false);
                     }}
                     placeholder="Filter properties..."
-                    className="flex-1 bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-slate-500"
+                    className="flex-1 bg-transparent text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden dark:text-white dark:placeholder:text-slate-500"
                     autoFocus
                   />
                 </div>
@@ -191,26 +191,15 @@ export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: Inli
             disabled={!selectedProperty}
             aria-label="Annotation value"
             className={cn(
-              "flex-1 rounded-md border px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500",
+              "flex-1 rounded-md border px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500",
               selectedProperty
                 ? "border-dashed border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-700 dark:text-white"
                 : "border-dashed border-slate-200 bg-slate-50 text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-500"
             )}
           />
-          <div className="mt-1 shrink-0">
-            <LanguageFlag lang={lang} />
-          </div>
-          <input
-            type="text"
-            value={lang}
-            onChange={(e) => setLang(e.target.value)}
-            className="w-14 shrink-0 rounded-md border border-dashed border-slate-300 bg-white px-2 py-1.5 text-center text-xs focus:border-primary-500 focus:border-solid focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-            aria-label="Language tag"
-            placeholder="lang"
-            disabled={!selectedProperty}
-          />
+          <LanguagePicker value={lang} onChange={setLang} disabled={!selectedProperty} />
           {/* Invisible placeholder to align with delete buttons above */}
-          <div className="shrink-0 rounded p-1">
+          <div className="shrink-0 rounded-sm p-1">
             <div className="h-3.5 w-3.5" />
           </div>
         </div>

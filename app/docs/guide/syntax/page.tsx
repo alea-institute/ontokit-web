@@ -7,7 +7,7 @@ export default function SyntaxPage() {
         What is an Ontology Syntax?
       </h1>
       <p className="text-slate-600 dark:text-slate-400 mb-8">
-        While formats determine how RDF triples are serialized, <em>ontology syntaxes</em> are
+        While formats determine how RDF triples are serialized, <em>ontology syntaxes</em> are{" "}
         purpose-built notations for expressing OWL axioms and class expressions.
       </p>
 
@@ -19,10 +19,10 @@ export default function SyntaxPage() {
           </h2>
           <div className="prose prose-slate dark:prose-invert max-w-none">
             <p className="text-slate-600 dark:text-slate-400">
-              OWL is a logical language with complex expressions like &ldquo;the class of things
-              that have at least 3 wheels and are made by a European manufacturer.&rdquo; Different
-              communities need different notations: logicians prefer Description Logic notation,
-              ontology editors often use Manchester Syntax, and web developers prefer Turtle/RDF.
+              OWL is a logical language with complex expressions like &ldquo;the class of things{" "}
+              that have at least 3 wheels and are made by a European manufacturer.&rdquo; Different{" "}
+              communities need different notations: logicians prefer Description Logic notation,{" "}
+              ontology editors often use Manchester Syntax, and web developers prefer Turtle/RDF.{" "}
               All these syntaxes express the same OWL semantics.
             </p>
           </div>
@@ -36,13 +36,13 @@ export default function SyntaxPage() {
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
               Designed for readability by ontology authors. Uses English-like keywords
-              (<code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">some</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">only</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">and</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">or</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">min</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">max</code>,
-              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">exactly</code>)
+              (<code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">some</code>,{" "}
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">only</code>,{" "}
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">and</code>,{" "}
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">or</code>,{" "}
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">min</code>,{" "}
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">max</code>,{" "}
+              <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">exactly</code>){" "}
               and is widely used in tools like Prot&eacute;g&eacute;.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
@@ -70,7 +70,7 @@ Class: MargheritaPizza
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              The normative syntax in the OWL 2 specification. Uses nested function-call notation
+              The normative syntax in the OWL 2 specification. Uses nested function-call notation{" "}
               that maps directly to the OWL 2 structural specification. Precise but less readable.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
@@ -105,7 +105,7 @@ SubClassOf(
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              An XML serialization that mirrors the OWL 2 structural specification element by
+              An XML serialization that mirrors the OWL 2 structural specification element by{" "}
               element. Useful when XML tooling is required but very verbose.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
@@ -133,8 +133,8 @@ SubClassOf(
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              OWL axioms can also be expressed in Turtle using the OWL RDF mapping. This is the
-              format OntoKit uses internally. Complex class expressions use blank nodes and
+              OWL axioms can also be expressed in Turtle using the OWL RDF mapping. This is the{" "}
+              format OntoKit uses internally. Complex class expressions use blank nodes and{" "}
               RDF collections.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
@@ -161,7 +161,7 @@ ex:Pizza owl:disjointWith ex:Pasta .`}</pre>
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              The mathematical notation used in academic papers. OWL 2 DL corresponds to the
+              The mathematical notation used in academic papers. OWL 2 DL corresponds to the{" "}
               Description Logic SROIQ(D). Compact but requires familiarity with logical symbols.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">

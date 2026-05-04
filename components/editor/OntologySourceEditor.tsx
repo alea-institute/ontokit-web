@@ -7,6 +7,7 @@ import { TurtleEditor, type TurtleDiagnostic } from "./TurtleEditor";
 import { Button } from "@/components/ui/button";
 import { lintApi, type LintIssue } from "@/lib/api/lint";
 import type { IndexWorkerResult, IriPosition } from "@/lib/editor/indexWorker";
+import { getLocalName } from "@/lib/utils";
 
 export interface OntologySourceEditorProps {
   /** Project ID for lint integration */
@@ -233,7 +234,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
       try {
         const response = await lintApi.getIssues(projectId, accessToken, {
           include_resolved: false,
-          limit: 100, // Limit to avoid performance issues
+          limit: 200, // Fetch a larger pool so navigated-to issues are more likely included
         });
         setLintIssues(response.items);
       } catch (error) {
@@ -264,7 +265,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
 
     // Create Web Worker for indexing
     const worker = new Worker(
-      new URL('@/lib/editor/indexWorker.ts', import.meta.url)
+      new URL('../../lib/editor/indexWorker.ts', import.meta.url)
     );
     workerRef.current = worker;
 
@@ -454,7 +455,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
           </div>
 
           {hasChanges && (
-            <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+            <span className="rounded-sm bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
               Unsaved changes
             </span>
           )}
@@ -538,7 +539,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                 if (posA && posB) return posA.line - posB.line;
                 return 0;
               })
-              .slice(0, 20)
+              .slice(0, 50)
               .map((issue) => (
               <button
                 key={issue.id}
@@ -572,15 +573,39 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                       </span>
                     )}
                   </div>
+                  {issue.details?.duplicate_iris && issue.details.duplicate_iris.length > 0 && (
+                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1 text-xs text-slate-400 dark:text-slate-500">
+                      <span>Also:</span>
+                      {issue.details.duplicate_iris.slice(0, 3).map((iri) => {
+                        const pos = iriIndex.get(iri);
+                        return pos ? (
+                          <button
+                            key={iri}
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); scrollToLine(pos.line, pos.col); }}
+                            className="text-primary-600 hover:underline dark:text-primary-400"
+                            title={iri}
+                          >
+                            {getLocalName(iri)}
+                          </button>
+                        ) : (
+                          <span key={iri} title={iri}>{getLocalName(iri)}</span>
+                        );
+                      })}
+                      {issue.details.duplicate_iris.length > 3 && (
+                        <span>+{issue.details.duplicate_iris.length - 3} more</span>
+                      )}
+                    </div>
+                  )}
                 </div>
-                <span className="flex-shrink-0 rounded bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                <span className="flex-shrink-0 rounded-sm bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
                   {issue.rule_id}
                 </span>
               </button>
             ))}
-            {lintIssues.length > 20 && (
+            {lintIssues.length > 50 && (
               <div className="px-4 py-2 text-center text-xs text-slate-500">
-                And {lintIssues.length - 20} more issues...
+                And {lintIssues.length - 50} more issues...
               </div>
             )}
           </div>

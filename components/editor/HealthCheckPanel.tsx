@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   XCircle,
   AlertTriangle,
@@ -22,9 +22,15 @@ import {
   type LintIssueType,
   type LintSummary,
   type LintWebSocketMessage,
+  type SubjectType,
 } from "@/lib/api/lint";
-import { qualityApi } from "@/lib/api/quality";
-import type { ConsistencyIssue, DuplicateCluster } from "@/lib/ontology/qualityTypes";
+import {
+  qualityApi,
+  createQualityWebSocket,
+  type QualityWebSocketMessage,
+} from "@/lib/api/quality";
+import type { ConsistencyCheckResult, ConsistencyIssue, DuplicateCluster, DuplicateDetectionResult } from "@/lib/ontology/qualityTypes";
+import Link from "next/link";
 import { cn, formatDateTime, getLocalName } from "@/lib/utils";
 
 interface HealthCheckPanelProps {
@@ -33,7 +39,7 @@ interface HealthCheckPanelProps {
   branch?: string;
   isOpen: boolean;
   onClose: () => void;
-  onNavigateToClass?: (iri: string) => void;
+  onNavigateToClass?: (iri: string, subjectType?: string) => void;
   /** Whether the current user can trigger a lint run (requires admin/manager role) */
   canRunLint?: boolean;
 }
@@ -78,6 +84,26 @@ export function HealthCheckPanel({
   // Duplicate detection state
   const [duplicateClusters, setDuplicateClusters] = useState<DuplicateCluster[]>([]);
   const [isDetectingDuplicates, setIsDetectingDuplicates] = useState(false);
+  const [duplicatesError, setDuplicatesError] = useState<string | null>(null);
+
+  // Loading flags for cached data fetches (distinct from the check/detect flags
+  // so the tab switches immediately and the button stays enabled)
+  const [isLoadingCachedConsistency, setIsLoadingCachedConsistency] = useState(false);
+  const [isLoadingCachedDuplicates, setIsLoadingCachedDuplicates] = useState(false);
+
+  // Lint config hint (level name + rule count)
+  const [lintConfigHint, setLintConfigHint] = useState<string | null>(null);
+
+  // Clear lint results
+  const [isClearing, setIsClearing] = useState(false);
+
+  // Track whether the quality WebSocket is connected
+  const qualityWsConnected = useRef(false);
+  // Cancellation flag for the polling fallback loop
+  const pollCancelled = useRef(false);
+  // Safety timeout refs for WS path (so they can be cleared on completion/unmount)
+  const consistencyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const duplicatesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch lint status and issues
   const fetchData = useCallback(async (issueFilter?: IssueFilter) => {
@@ -119,6 +145,43 @@ export function HealthCheckPanel({
     }
   }, [projectId, accessToken, isOpen, filter]);
 
+  // Stable ref for fetchData so the WebSocket effect can call it without re-running
+  const fetchDataRef = useRef(fetchData);
+  useEffect(() => { fetchDataRef.current = fetchData; }, [fetchData]);
+
+  // Fetch lint config hint (level name + rule count)
+  useEffect(() => {
+    if (!isOpen || !accessToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [config, levels] = await Promise.all([
+          lintApi.getLintConfig(projectId, accessToken),
+          lintApi.getLevels(),
+        ]);
+        if (cancelled) return;
+        if (config.lint_level != null) {
+          const level = levels.levels.find((l) => l.level === config.lint_level);
+          if (level) {
+            setLintConfigHint(`Level ${level.level} — ${level.name} (${level.rule_ids.length} rules)`);
+          } else {
+            setLintConfigHint(`Level ${config.lint_level} (${config.effective_rules.length} rules)`);
+          }
+        } else if (config.enabled_rules) {
+          setLintConfigHint(`Custom (${config.enabled_rules.length} rules)`);
+        } else {
+          // No explicit config — backend's effective_rules is the authoritative
+          // count of what the linter will actually run for this project.
+          setLintConfigHint(`All rules (${config.effective_rules.length})`);
+        }
+      } catch (err) {
+        // Hint is non-critical UI, but the failure must be observable.
+        console.error("Failed to fetch lint config hint:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, projectId, accessToken]);
+
   // Initial load
   useEffect(() => {
     if (isOpen) {
@@ -128,7 +191,7 @@ export function HealthCheckPanel({
 
   // WebSocket for real-time updates
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || !accessToken) return;
 
     // Track if this effect is still active (handles React Strict Mode double-invoke)
     let isActive = true;
@@ -140,15 +203,29 @@ export function HealthCheckPanel({
         setIsRunning(true);
       } else if (message.type === "lint_complete" || message.type === "lint_failed") {
         setIsRunning(false);
-        // Refresh data
-        fetchData();
+        fetchDataRef.current();
       }
     };
 
     // Small delay to avoid spurious connections during Strict Mode remounts
     const timeoutId = setTimeout(() => {
       if (isActive) {
-        ws = createLintWebSocket(projectId, handleMessage);
+        ws = createLintWebSocket(
+          projectId,
+          handleMessage,
+          () => {
+            if (isActive) {
+              setIsRunning(false);
+              setError("Lint WebSocket connection failed");
+            }
+          },
+          (event) => {
+            if (isActive && event.code !== 1000) {
+              setIsRunning(false);
+            }
+          },
+          accessToken
+        );
       }
     }, 100);
 
@@ -159,7 +236,28 @@ export function HealthCheckPanel({
         ws.close();
       }
     };
-  }, [isOpen, projectId, fetchData]);
+  }, [isOpen, projectId, accessToken]);
+
+  const handleClearResults = async () => {
+    if (!accessToken) return;
+    setIsClearing(true);
+    try {
+      await lintApi.clearResults(projectId, accessToken);
+      setSummary((prev) => prev ? {
+        ...prev,
+        last_run: null,
+        error_count: 0,
+        warning_count: 0,
+        info_count: 0,
+        total_issues: 0,
+      } : null);
+      setIssues([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to clear results");
+    } finally {
+      setIsClearing(false);
+    }
+  };
 
   // Trigger a new lint run
   const handleRunLint = async () => {
@@ -181,45 +279,278 @@ export function HealthCheckPanel({
     }
   };
 
-  // Fetch consistency issues
+  // Trigger consistency check as a background job.
+  // Same WS-first / polling-fallback pattern as duplicate detection.
   const handleRunConsistencyCheck = async () => {
     if (!accessToken) return;
     setIsCheckingConsistency(true);
     setConsistencyError(null);
+    pollCancelled.current = false;
+
+    let jobId: string;
     try {
-      await qualityApi.triggerConsistencyCheck(projectId, accessToken, branch);
-      // Fetch results after triggering
-      const result = await qualityApi.getConsistencyIssues(projectId, accessToken, branch);
-      setConsistencyIssues(result.issues);
+      ({ job_id: jobId } = await qualityApi.triggerConsistencyCheck(
+        projectId,
+        accessToken,
+        branch
+      ));
     } catch (err) {
-      setConsistencyError(err instanceof Error ? err.message : "Consistency check failed");
-    } finally {
+      setConsistencyError(
+        err instanceof Error ? err.message : "Consistency check failed"
+      );
       setIsCheckingConsistency(false);
+      return;
+    }
+
+    // When WS is connected the effect handler manages loading state
+    if (qualityWsConnected.current) {
+      if (consistencyTimeoutRef.current) clearTimeout(consistencyTimeoutRef.current);
+      consistencyTimeoutRef.current = setTimeout(() => {
+        consistencyTimeoutRef.current = null;
+        setIsCheckingConsistency((prev) => {
+          if (prev) setConsistencyError("Consistency check timed out — try again later");
+          return false;
+        });
+      }, 60_000);
+      return;
+    }
+
+    // Fallback: poll for job result with exponential backoff
+    try {
+      let delay = 1000;
+      const maxDelay = 5000;
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (pollCancelled.current) return;
+        await new Promise((r) => setTimeout(r, delay));
+        if (pollCancelled.current) return;
+        const result = await qualityApi.getConsistencyJobResult(
+          projectId,
+          jobId,
+          accessToken
+        );
+        if ("status" in result && result.status === "pending") {
+          delay = Math.min(delay * 1.5, maxDelay);
+          continue;
+        }
+        const completed = result as ConsistencyCheckResult;
+        setConsistencyIssues(completed.issues);
+        return;
+      }
+      setConsistencyError("Consistency check timed out — try again later");
+    } catch (err) {
+      if (!pollCancelled.current) {
+        setConsistencyError(
+          err instanceof Error ? err.message : "Consistency check failed"
+        );
+      }
+    } finally {
+      if (!pollCancelled.current) {
+        setIsCheckingConsistency(false);
+      }
     }
   };
 
-  // Fetch duplicate candidates
+  // Trigger duplicate detection as a background job.
+  // If the quality WebSocket is connected, it will deliver the result via
+  // duplicates_complete/duplicates_failed events. Otherwise, fall back to
+  // polling the job-result endpoint.
   const handleDetectDuplicates = async () => {
     if (!accessToken) return;
     setIsDetectingDuplicates(true);
+    setDuplicatesError(null);
+    pollCancelled.current = false;
+
+    let jobId: string;
     try {
-      const result = await qualityApi.getDuplicateCandidates(projectId, accessToken, branch);
-      setDuplicateClusters(result.clusters);
-    } catch {
-      // Duplicates detection may not be available
-    } finally {
+      ({ job_id: jobId } = await qualityApi.triggerDuplicateDetection(
+        projectId,
+        accessToken,
+        branch
+      ));
+    } catch (err) {
+      setDuplicatesError(
+        err instanceof Error ? err.message : "Duplicate detection failed"
+      );
       setIsDetectingDuplicates(false);
+      return;
+    }
+
+    // When WS is connected the effect handler manages loading state.
+    // Add a safety timeout so the spinner doesn't stay forever if the
+    // WS message is lost (network hiccup, Redis pubsub gap, etc.).
+    if (qualityWsConnected.current) {
+      if (duplicatesTimeoutRef.current) clearTimeout(duplicatesTimeoutRef.current);
+      duplicatesTimeoutRef.current = setTimeout(() => {
+        duplicatesTimeoutRef.current = null;
+        setIsDetectingDuplicates((prev) => {
+          if (prev) setDuplicatesError("Duplicate detection timed out — try again later");
+          return false;
+        });
+      }, 60_000);
+      return;
+    }
+
+    // Fallback: poll for job result with exponential backoff
+    try {
+      let delay = 1000;
+      const maxDelay = 5000;
+      const maxAttempts = 20;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (pollCancelled.current) return;
+        await new Promise((r) => setTimeout(r, delay));
+        if (pollCancelled.current) return;
+        const result = await qualityApi.getDuplicateJobResult(
+          projectId,
+          jobId,
+          accessToken
+        );
+        // 202 Accepted: job still pending — keep polling
+        if ("status" in result && result.status === "pending") {
+          delay = Math.min(delay * 1.5, maxDelay);
+          continue;
+        }
+        // 200 OK: job complete — narrow to DuplicateDetectionResult
+        const completed = result as DuplicateDetectionResult;
+        setDuplicateClusters(completed.clusters);
+        return;
+      }
+      setDuplicatesError("Duplicate detection timed out — try again later");
+    } catch (err) {
+      if (!pollCancelled.current) {
+        setDuplicatesError(
+          err instanceof Error ? err.message : "Duplicate detection failed"
+        );
+      }
+    } finally {
+      if (!pollCancelled.current) {
+        setIsDetectingDuplicates(false);
+      }
     }
   };
 
-  // Load consistency data when tab changes
+  // Load cached data when tab changes.
+  // Use requestAnimationFrame so the tab switch paints before the loading
+  // state is set, preventing the UI from appearing frozen.
   useEffect(() => {
+    let cancelled = false;
     if (activeTab === "consistency" && consistencyIssues.length === 0 && !isCheckingConsistency) {
-      qualityApi.getConsistencyIssues(projectId, accessToken, branch)
-        .then((r) => setConsistencyIssues(r.issues))
-        .catch(() => {});
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setIsLoadingCachedConsistency(true);
+        qualityApi.getConsistencyIssues(projectId, accessToken, branch)
+          .then((r) => { if (!cancelled) setConsistencyIssues(r.issues); })
+          .catch((err) => { console.error("Failed to load cached consistency issues", { projectId, err }); })
+          .finally(() => { if (!cancelled) setIsLoadingCachedConsistency(false); });
+      });
     }
+    if (activeTab === "duplicates" && duplicateClusters.length === 0 && !isDetectingDuplicates) {
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setIsLoadingCachedDuplicates(true);
+        qualityApi.getLatestDuplicates(projectId, accessToken, branch)
+          .then((r) => { if (!cancelled) setDuplicateClusters(r.clusters); })
+          .catch((err) => { console.error("Failed to load cached duplicates", { projectId, err }); })
+          .finally(() => { if (!cancelled) setIsLoadingCachedDuplicates(false); });
+      });
+    }
+    return () => { cancelled = true; };
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear stale quality data when project or branch changes
+  useEffect(() => {
+    setConsistencyIssues([]);
+    setConsistencyError(null);
+    setDuplicateClusters([]);
+    setDuplicatesError(null);
+  }, [projectId, branch]);
+
+  // Quality WebSocket for real-time consistency / duplicates updates
+  useEffect(() => {
+    if (!isOpen || !accessToken) return;
+
+    let isActive = true;
+    let ws: WebSocket | null = null;
+
+    const resolvedBranch = branch ?? "main";
+
+    const handleQualityMessage = (message: QualityWebSocketMessage) => {
+      if (!isActive) return;
+      // Ignore events for other branches (backend filters by project, not branch)
+      if (message.branch !== resolvedBranch) return;
+
+      if (message.type === "consistency_started") {
+        setIsCheckingConsistency(true);
+      } else if (message.type === "consistency_complete") {
+        if (consistencyTimeoutRef.current) {
+          clearTimeout(consistencyTimeoutRef.current);
+          consistencyTimeoutRef.current = null;
+        }
+        qualityApi.getConsistencyIssues(projectId, accessToken, branch)
+          .then((r) => { if (isActive) setConsistencyIssues(r.issues); })
+          .catch((err) => {
+            if (isActive) setConsistencyError(err instanceof Error ? err.message : "Failed to load consistency results");
+          })
+          .finally(() => { if (isActive) setIsCheckingConsistency(false); });
+      } else if (message.type === "consistency_failed") {
+        if (consistencyTimeoutRef.current) {
+          clearTimeout(consistencyTimeoutRef.current);
+          consistencyTimeoutRef.current = null;
+        }
+        setIsCheckingConsistency(false);
+        setConsistencyError(message.error ?? "Consistency check failed");
+      } else if (message.type === "duplicates_started") {
+        setIsDetectingDuplicates(true);
+      } else if (message.type === "duplicates_complete") {
+        if (duplicatesTimeoutRef.current) {
+          clearTimeout(duplicatesTimeoutRef.current);
+          duplicatesTimeoutRef.current = null;
+        }
+        qualityApi.getLatestDuplicates(projectId, accessToken, branch)
+          .then((r) => { if (isActive) setDuplicateClusters(r.clusters); })
+          .catch((err) => {
+            if (isActive) setDuplicatesError(err instanceof Error ? err.message : "Failed to load duplicate results");
+          })
+          .finally(() => { if (isActive) setIsDetectingDuplicates(false); });
+      } else if (message.type === "duplicates_failed") {
+        if (duplicatesTimeoutRef.current) {
+          clearTimeout(duplicatesTimeoutRef.current);
+          duplicatesTimeoutRef.current = null;
+        }
+        setIsDetectingDuplicates(false);
+        setDuplicatesError(message.error ?? "Duplicate detection failed");
+      }
+    };
+
+    const timeoutId = setTimeout(() => {
+      if (isActive) {
+        ws = createQualityWebSocket(
+          projectId,
+          handleQualityMessage,
+          () => { qualityWsConnected.current = false; },
+          () => { qualityWsConnected.current = false; },
+          accessToken,
+          () => { qualityWsConnected.current = true; }
+        );
+      }
+    }, 100);
+
+    return () => {
+      isActive = false;
+      qualityWsConnected.current = false;
+      pollCancelled.current = true;
+      if (consistencyTimeoutRef.current) {
+        clearTimeout(consistencyTimeoutRef.current);
+        consistencyTimeoutRef.current = null;
+      }
+      if (duplicatesTimeoutRef.current) {
+        clearTimeout(duplicatesTimeoutRef.current);
+        duplicatesTimeoutRef.current = null;
+      }
+      clearTimeout(timeoutId);
+      if (ws) ws.close();
+    };
+  }, [isOpen, projectId, accessToken, branch]);
 
   // Dismiss an issue
   const handleDismissIssue = async (issueId: string) => {
@@ -285,16 +616,31 @@ export function HealthCheckPanel({
           </div>
           <div className="flex items-center gap-2">
             {activeTab === "lint" && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRunLint}
-                disabled={isRunning || !accessToken || !canRunLint}
-                className="gap-1"
-              >
-                <RefreshCw className={cn("h-4 w-4", isRunning && "animate-spin")} />
-                {isRunning ? "Running..." : "Run Lint"}
-              </Button>
+              // Only offer Clear when there's actually something to clear.
+              // A completed run with zero issues should re-prompt Run Lint.
+              summary?.last_run?.status === "completed" && !isRunning && summary.total_issues > 0 ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClearResults}
+                  disabled={isClearing || !accessToken || !canRunLint}
+                  className="gap-1"
+                >
+                  <X className="h-4 w-4" />
+                  {isClearing ? "Clearing..." : "Clear"}
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRunLint}
+                  disabled={isRunning || !accessToken || !canRunLint}
+                  className="gap-1"
+                >
+                  <RefreshCw className={cn("h-4 w-4", isRunning && "animate-spin")} />
+                  {isRunning ? "Running..." : "Run Lint"}
+                </Button>
+              )
             )}
             {activeTab === "consistency" && (
               <Button
@@ -320,7 +666,7 @@ export function HealthCheckPanel({
                 {isDetectingDuplicates ? "Detecting..." : "Find Duplicates"}
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0" aria-label="Close">
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -380,18 +726,33 @@ export function HealthCheckPanel({
               onClick={() => handleFilterChange("all")}
             />
           </div>
-          {summary.last_run && (
-            <div className="mt-2 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-              <Clock className="h-3 w-3" />
-              Last run: {formatDateTime(summary.last_run.started_at)}
-              {summary.last_run.status === "completed" && (
-                <CheckCircle2 className="ml-1 h-3 w-3 text-green-500" />
-              )}
-              {summary.last_run.status === "failed" && (
-                <XCircle className="ml-1 h-3 w-3 text-red-500" />
-              )}
-            </div>
-          )}
+          <div className="mt-2 space-y-0.5">
+            {summary.last_run && (
+              <div className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <Clock className="h-3 w-3" />
+                Last run: {formatDateTime(summary.last_run.started_at)}
+                {summary.last_run.status === "completed" && (
+                  <CheckCircle2 className="ml-1 h-3 w-3 text-green-500" />
+                )}
+                {summary.last_run.status === "failed" && (
+                  <XCircle className="ml-1 h-3 w-3 text-red-500" />
+                )}
+              </div>
+            )}
+            {lintConfigHint && (
+              <div className="flex items-center gap-1 text-xs text-slate-400 dark:text-slate-500">
+                <Info className="h-3 w-3" />
+                {lintConfigHint}
+                <span className="mx-0.5">&mdash;</span>
+                <Link
+                  href={`/projects/${projectId}/settings#lint-config`}
+                  className="text-primary-600 hover:underline dark:text-primary-400"
+                >
+                  configure
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -409,8 +770,8 @@ export function HealthCheckPanel({
         </div>
       )}
 
-      {/* No issues */}
-      {!isLoading && summary && summary.total_issues === 0 && (
+      {/* No issues (only after a completed run) */}
+      {!isLoading && summary?.last_run?.status === "completed" && summary.total_issues === 0 && (
         <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
           <CheckCircle2 className="h-12 w-12 text-green-500" />
           <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -461,12 +822,12 @@ export function HealthCheckPanel({
               {consistencyError}
             </div>
           )}
-          {isCheckingConsistency && (
+          {(isCheckingConsistency || isLoadingCachedConsistency) && (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
             </div>
           )}
-          {!isCheckingConsistency && consistencyIssues.length === 0 && (
+          {!isCheckingConsistency && !isLoadingCachedConsistency && consistencyIssues.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <ShieldCheck className="h-12 w-12 text-green-500" />
               <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -494,7 +855,7 @@ export function HealthCheckPanel({
                     {issue.severity === "warning" && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" />}
                     {issue.severity === "info" && <Info className="h-4 w-4 shrink-0 text-blue-500" />}
                     <div className="min-w-0 flex-1">
-                      <span className="rounded bg-slate-200/50 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
+                      <span className="rounded-sm bg-slate-200/50 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
                         {issue.rule_id}
                       </span>
                       <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
@@ -502,7 +863,7 @@ export function HealthCheckPanel({
                       </p>
                       {issue.entity_iri && (
                         <button
-                          onClick={() => onNavigateToClass?.(issue.entity_iri)}
+                          onClick={() => onNavigateToClass?.(issue.entity_iri, issue.entity_type)}
                           className="mt-1 text-xs text-primary-600 hover:underline dark:text-primary-400"
                         >
                           {getLocalName(issue.entity_iri)}
@@ -520,12 +881,17 @@ export function HealthCheckPanel({
       {/* Duplicates Tab */}
       {activeTab === "duplicates" && (
         <div className="flex-1 overflow-y-auto p-4">
-          {isDetectingDuplicates && (
+          {duplicatesError && (
+            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+              {duplicatesError}
+            </div>
+          )}
+          {(isDetectingDuplicates || isLoadingCachedDuplicates) && (
             <div className="flex items-center justify-center py-8">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
             </div>
           )}
-          {!isDetectingDuplicates && duplicateClusters.length === 0 && (
+          {!isDetectingDuplicates && !isLoadingCachedDuplicates && duplicateClusters.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <CheckCircle2 className="h-12 w-12 text-green-500" />
               <p className="mt-4 text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -550,7 +916,7 @@ export function HealthCheckPanel({
                     {cluster.entities.map((entity) => (
                       <button
                         key={entity.iri}
-                        onClick={() => onNavigateToClass?.(entity.iri)}
+                        onClick={() => onNavigateToClass?.(entity.iri, entity.entity_type)}
                         className="flex w-full items-center gap-2 text-left text-sm text-primary-600 hover:underline dark:text-primary-400"
                       >
                         <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-owl-class/10 border border-owl-class/50">
@@ -612,11 +978,31 @@ function SummaryCard({ label, count, color, active, onClick }: SummaryCardProps)
 
 interface IssueCardProps {
   issue: LintIssue;
-  onNavigate?: (iri: string) => void;
+  onNavigate?: (iri: string, subjectType?: string) => void;
   onDismiss?: () => void;
 }
 
+const SUBJECT_TYPE_BADGE: Record<SubjectType, { letter: string; colorClass: string }> = {
+  class: { letter: "C", colorClass: "text-owl-class bg-owl-class/10 border-owl-class/50" },
+  property: { letter: "P", colorClass: "text-emerald-600 bg-emerald-100/50 border-emerald-500/50 dark:text-emerald-400 dark:bg-emerald-900/20 dark:border-emerald-400/50" },
+  individual: { letter: "I", colorClass: "text-violet-600 bg-violet-100/50 border-violet-500/50 dark:text-violet-400 dark:bg-violet-900/20 dark:border-violet-400/50" },
+  other: { letter: "?", colorClass: "text-slate-500 bg-slate-100/50 border-slate-400/50 dark:text-slate-400 dark:bg-slate-700/50 dark:border-slate-500/50" },
+};
+
+function resolveBadgeKey(subjectType: SubjectType | null): SubjectType {
+  if (subjectType === null) return "other";
+  if (subjectType in SUBJECT_TYPE_BADGE) return subjectType;
+  // Unknown SubjectType from backend (schema drift) — surface for observability.
+  console.error("Unknown lint issue subject_type:", subjectType);
+  return "other";
+}
+
 function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
+  // Resolved once so the subject button and the related-entity buttons agree
+  // on the entity type when navigating. duplicate-label and similar rules
+  // emit `duplicate_iris` for entities of the same kind as `subject_type`.
+  const subjectTypeKey = resolveBadgeKey(issue.subject_type);
+  const subjectBadge = SUBJECT_TYPE_BADGE[subjectTypeKey];
   return (
     <div
       className={cn(
@@ -628,7 +1014,7 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
         {issueIcons[issue.issue_type]}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="rounded bg-slate-200/50 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
+            <span className="rounded-sm bg-slate-200/50 px-1.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700/50 dark:text-slate-400">
               {issue.rule_id}
             </span>
           </div>
@@ -637,22 +1023,57 @@ function IssueCard({ issue, onNavigate, onDismiss }: IssueCardProps) {
           </p>
           {issue.subject_iri && (
             <button
-              onClick={() => onNavigate?.(issue.subject_iri!)}
+              onClick={() => onNavigate?.(issue.subject_iri!, subjectTypeKey)}
               className="mt-2 flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
               title={issue.subject_iri}
             >
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-owl-class/10 border border-owl-class/50">
-                <span className="text-[8px] font-bold text-owl-class">C</span>
+              <span
+                aria-label={`subject type: ${subjectTypeKey}`}
+                data-testid={`subject-type-badge-${subjectTypeKey}`}
+                className={cn("flex h-4 w-4 items-center justify-center rounded-full border", subjectBadge.colorClass)}
+              >
+                <span className="text-[8px] font-bold">{subjectBadge.letter}</span>
               </span>
               {getLocalName(issue.subject_iri)}
               <ExternalLink className="h-3 w-3 opacity-50" />
             </button>
           )}
+          {/* Related entities from issue details */}
+          {issue.details?.duplicate_iris && issue.details.duplicate_iris.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
+              <span>Also:</span>
+              {issue.details.duplicate_iris.slice(0, 3).map((iri) => (
+                <button
+                  key={iri}
+                  onClick={() => onNavigate?.(iri, subjectTypeKey)}
+                  className="text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400"
+                  title={iri}
+                >
+                  {getLocalName(iri)}
+                </button>
+              ))}
+              {issue.details.duplicate_iris.length > 3 && (
+                <span>+{issue.details.duplicate_iris.length - 3} more</span>
+              )}
+            </div>
+          )}
+          {/* Conflicting values from label-per-language */}
+          {issue.details?.labels && issue.details.labels.length > 1 && (
+            <div className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <span>Values: </span>
+              {issue.details.labels.map((label, i) => (
+                <span key={i}>
+                  {i > 0 && ", "}
+                  <span className="font-mono text-slate-600 dark:text-slate-300">&ldquo;{label}&rdquo;</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         {onDismiss && (
           <button
             onClick={onDismiss}
-            className="rounded p-1 text-slate-400 hover:bg-slate-200/50 hover:text-slate-600 dark:hover:bg-slate-700/50 dark:hover:text-slate-300"
+            className="rounded-sm p-1 text-slate-400 hover:bg-slate-200/50 hover:text-slate-600 dark:hover:bg-slate-700/50 dark:hover:text-slate-300"
             title="Dismiss issue"
           >
             <X className="h-4 w-4" />

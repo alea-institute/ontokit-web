@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { PRList } from "@/components/pr/PRList";
 import { PRCreateModal } from "@/components/pr/PRCreateModal";
 import { BranchProvider } from "@/lib/context/BranchContext";
-import { projectApi, type Project } from "@/lib/api/projects";
+import { useProject, derivePermissions } from "@/lib/hooks/useProject";
+import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 
 export default function PullRequestsPage() {
   const { data: session, status } = useSession();
@@ -18,41 +19,10 @@ export default function PullRequestsPage() {
   const router = useRouter();
   const projectId = params.id as string;
 
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { project, isLoading, error } = useProject(projectId, session?.accessToken);
+  const { canEdit: canCreatePR } = derivePermissions(project, session?.accessToken);
+  const projectHomeHref = useProjectHomeHref(projectId);
   const [showCreateModal, setShowCreateModal] = useState(false);
-
-  useEffect(() => {
-    const fetchProject = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const data = await projectApi.get(projectId, session?.accessToken);
-        setProject(data);
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
-          setError("You don't have access to this project");
-        } else if (err instanceof Error && err.message.includes("404")) {
-          setError("Project not found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load project");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (status !== "loading" && projectId) {
-      fetchProject();
-    }
-  }, [projectId, session?.accessToken, status]);
-
-  const canCreatePR =
-    project?.user_role === "owner" ||
-    project?.user_role === "admin" ||
-    project?.user_role === "editor";
 
   if (isLoading || status === "loading") {
     return (
@@ -74,7 +44,7 @@ export default function PullRequestsPage() {
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
             <Link
-              href="/projects"
+              href="/"
               className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -85,7 +55,7 @@ export default function PullRequestsPage() {
               <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">
                 {error || "Project not found"}
               </h2>
-              <Link href="/projects" className="mt-4 inline-block">
+              <Link href="/" className="mt-4 inline-block">
                 <Button variant="outline">Back to Projects</Button>
               </Link>
             </div>
@@ -104,7 +74,7 @@ export default function PullRequestsPage() {
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
-                href={`/projects/${projectId}/editor`}
+                href={projectHomeHref}
                 className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
               >
                 <ArrowLeft className="h-4 w-4" />

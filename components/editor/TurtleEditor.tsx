@@ -522,7 +522,27 @@ export function TurtleEditor({
     const timeoutId = setTimeout(() => {
       if (model.isDisposed()) return;
 
-      const markers: editor.IMarkerData[] = diagnostics.map((d) => ({
+      // Cap the number of markers to prevent UI freezing with large ontologies.
+      // Prioritize by severity: errors first, then warnings, then info/hints.
+      const MAX_MARKERS = 200;
+      const severityOrder: Record<string, number> = {
+        error: 0,
+        warning: 1,
+        info: 2,
+        hint: 3,
+      };
+      const sortedDiagnostics =
+        diagnostics.length > MAX_MARKERS
+          ? [...diagnostics]
+              .sort(
+                (a, b) =>
+                  (severityOrder[a.severity] ?? 3) -
+                  (severityOrder[b.severity] ?? 3)
+              )
+              .slice(0, MAX_MARKERS)
+          : diagnostics;
+
+      const markers: editor.IMarkerData[] = sortedDiagnostics.map((d) => ({
         startLineNumber: d.startLineNumber,
         startColumn: d.startColumn,
         endLineNumber: d.endLineNumber,

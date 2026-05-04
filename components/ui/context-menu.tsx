@@ -34,7 +34,7 @@ const ContextMenuItem = React.forwardRef<
   <ContextMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors focus:bg-slate-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 dark:focus:bg-slate-700",
+      "relative flex cursor-default select-none items-center gap-2 rounded-xs px-2 py-1.5 text-sm outline-hidden transition-colors focus:bg-slate-100 data-disabled:pointer-events-none data-disabled:opacity-50 dark:focus:bg-slate-700",
       destructive
         ? "text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
         : "text-slate-700 dark:text-slate-300",

@@ -149,6 +149,9 @@ function uploadFileWithProgress<T>(
     const xhr = new XMLHttpRequest();
     const url = `${API_BASE}${endpoint}`;
 
+    // 5-minute timeout for large file uploads + server-side processing
+    xhr.timeout = 300000;
+
     // Track upload progress
     xhr.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable && options.onProgress) {
@@ -186,8 +189,37 @@ function uploadFileWithProgress<T>(
       }
     });
 
-    xhr.addEventListener("error", () => {
-      reject(new ApiError(0, "Network Error", "Failed to upload file"));
+    xhr.addEventListener("error", async () => {
+      // XHR "error" fires for both true network failures and CORS-blocked
+      // server errors (e.g. a 500 without CORS headers). Probe the API root
+      // to distinguish the two cases so the user gets an actionable message.
+      let serverReachable = false;
+      try {
+        await fetch(`${API_BASE}/`, { method: "HEAD", mode: "cors" });
+        serverReachable = true;
+      } catch {
+        // probe failed — server truly unreachable
+      }
+
+      reject(
+        new ApiError(
+          0,
+          "Network Error",
+          serverReachable
+            ? "The server encountered an error processing your upload. Please try again or check the server logs."
+            : "Could not reach the server. Please check that the API server is running and accessible."
+        )
+      );
+    });
+
+    xhr.addEventListener("timeout", () => {
+      reject(
+        new ApiError(
+          0,
+          "Timeout",
+          "The upload timed out. The file may be too large for the server to process, or the server is not responding."
+        )
+      );
     });
 
     xhr.addEventListener("abort", () => {
@@ -331,7 +363,7 @@ export interface OWLClass {
   deprecated: boolean;
   parent_iris: string[];
   child_count: number;
-  instance_count: number;
+  instance_count: number | null;
 }
 
 export interface OWLClassListResponse {
@@ -390,10 +422,10 @@ export interface OWLClassDetail {
   deprecated: boolean;
   parent_iris: string[];
   parent_labels: Record<string, string>;  // Map of IRI to resolved label
-  equivalent_iris: string[];
-  disjoint_iris: string[];
+  equivalent_iris: string[] | null;
+  disjoint_iris: string[] | null;
   child_count: number;
-  instance_count: number;
+  instance_count: number | null;
   is_defined: boolean;
   source_ontology?: string;
   annotations: AnnotationProperty[];  // DC, SKOS, and other annotation properties
@@ -500,6 +532,33 @@ export const projectOntologyApi = {
     }),
 
   /**
+   * Trigger a reindex of the ontology's PostgreSQL search index.
+   * Only available to project owners and admins.
+   * Returns 202 Accepted when the reindex job is queued.
+   */
+  reindex: (projectId: string, token: string, branch?: string) =>
+    api.post<ReindexResponse>(
+      `/api/v1/projects/${projectId}/ontology/reindex`,
+      undefined,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { branch },
+      }
+    ),
+
+  /**
+   * Get the current index status for a project branch.
+   */
+  getIndexStatus: (projectId: string, token?: string, branch?: string) =>
+    api.get<IndexStatusResponse>(
+      `/api/v1/projects/${projectId}/ontology/index-status`,
+      {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        params: { branch },
+      }
+    ),
+
+  /**
    * Save ontology source content
    */
   saveSource: (
@@ -519,11 +578,11 @@ export const projectOntologyApi = {
     ),
 };
 
-// Re-export semantic search / quality / analytics / upstream sync APIs for convenience
+// Re-export semantic search / quality / analytics / remote sync APIs for convenience
 export { embeddingsApi } from "./embeddings";
 export { qualityApi } from "./quality";
 export { analyticsApi } from "./analytics";
-export { upstreamSyncApi } from "./upstreamSync";
+export { remoteSyncApi } from "./remoteSync";
 
 // Annotation update — a single annotation property with its values
 export interface AnnotationUpdate {
@@ -548,12 +607,38 @@ export interface EntitySearchResult {
   iri: string;
   label: string;
   entity_type: "class" | "property" | "individual";
+  /**
+   * OWL property subtype, populated only when entity_type === "property".
+   * Null/undefined for class / individual results, and also for properties
+   * whose rdf:type resolves to none of OWL.{Object,Datatype,Annotation}Property
+   * (defensive fallback). Lets clients group properties without IRI-substring
+   * guessing — see ontokit-api#117.
+   */
+  property_kind?: "object" | "data" | "annotation" | null;
   deprecated: boolean;
 }
 
 export interface EntitySearchResponse {
   results: EntitySearchResult[];
   total: number;
+}
+
+// Ontology index types
+export interface ReindexResponse {
+  status: "accepted";
+  branch: string;
+}
+
+export type IndexStatus = "pending" | "indexing" | "ready" | "failed";
+
+export interface IndexStatusResponse {
+  project_id: string;
+  branch: string;
+  status: IndexStatus;
+  entity_count: number | null;
+  commit_hash: string | null;
+  error_message: string | null;
+  indexed_at: string | null;
 }
 
 // Source content types

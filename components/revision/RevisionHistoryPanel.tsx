@@ -6,10 +6,12 @@ import { cn } from "@/lib/utils";
 import {
   History,
   GitMerge,
+  GitBranch,
   User,
   Calendar,
   X,
 } from "lucide-react";
+import { useBranch } from "@/lib/context/BranchContext";
 import { Button } from "@/components/ui/button";
 import { GitGraph } from "./GitGraph";
 import { CommitDetailView } from "./CommitDetailView";
@@ -35,10 +37,12 @@ export function RevisionHistoryPanel({
   className,
 }: RevisionHistoryPanelProps) {
   const [commits, setCommits] = useState<RevisionCommit[]>([]);
+  const [refs, setRefs] = useState<Record<string, string[]> | undefined>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
   const [selectedCommit, setSelectedCommit] = useState<RevisionCommit | null>(null);
+  const { defaultBranch } = useBranch();
 
   const loadHistory = useCallback(async () => {
     if (!projectId) return;
@@ -49,6 +53,7 @@ export function RevisionHistoryPanel({
     try {
       const response = await revisionsApi.getHistory(projectId, accessToken);
       setCommits(response.commits);
+      setRefs(response.refs);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to load history";
@@ -123,7 +128,7 @@ export function RevisionHistoryPanel({
         </div>
         <button
           onClick={onClose}
-          className="rounded p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
+          className="rounded-sm p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
         >
           <X className="h-5 w-5" />
         </button>
@@ -161,6 +166,8 @@ export function RevisionHistoryPanel({
                     commits={commits}
                     selectedHash={selectedHash}
                     onSelectCommit={handleGraphSelect}
+                    refs={refs}
+                    defaultBranch={defaultBranch}
                     className="pt-0"
                   />
                 </div>
@@ -184,6 +191,22 @@ export function RevisionHistoryPanel({
                           <p className="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
                             {commit.message}
                           </p>
+
+                          {/* Branch ref badges */}
+                          {(refs?.[commit.hash] ?? []).length > 0 && (
+                            <div className="mt-0.5 flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap">
+                              {(refs?.[commit.hash] ?? []).map((ref) => (
+                                <span
+                                  key={ref}
+                                  title={ref}
+                                  className="inline-flex max-w-[160px] items-center gap-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+                                >
+                                  <GitBranch className="h-2.5 w-2.5 shrink-0" />
+                                  <span className="truncate">{ref}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
 
                           {/* Merge badge */}
                           {commit.is_merge && commit.merged_branch && (

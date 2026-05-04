@@ -1,34 +1,32 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard } from "lucide-react";
+import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
 import { useToast } from "@/lib/context/ToastContext";
-import type { TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
-import { ContinuousEditingToggle } from "@/components/editor/ContinuousEditingToggle";
+import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
+import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
-import { BranchSelector, BranchBadge, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
-import { BranchProvider } from "@/lib/context/BranchContext";
-import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
-import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
+import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/components/revision";
+import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
+import { useQueryClient } from "@tanstack/react-query";
+import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
+import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
-import { projectApi, type Project } from "@/lib/api/projects";
-import { pullRequestsApi } from "@/lib/api/pullRequests";
-import { lintApi, type LintSummary } from "@/lib/api/lint";
+import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
-import { normalizationApi, type NormalizationStatusResponse } from "@/lib/api/normalization";
 import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
 import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
@@ -41,12 +39,11 @@ import { KeyboardShortcutDialog } from "@/components/editor/KeyboardShortcutDial
 import { SuggestionSubmitDialog } from "@/components/editor/SuggestionSubmitDialog";
 import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
-import { suggestionsApi } from "@/lib/api/suggestions";
 import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
-import { UpstreamSyncIndicator } from "@/components/editor/UpstreamSyncIndicator";
+import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
+import { ShareButton } from "@/components/editor/ShareButton";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
-import type { IriPosition } from "@/lib/editor/indexWorker";
 
 export default function EditorPage() {
   const { data: session, status } = useSession();
@@ -57,37 +54,106 @@ export default function EditorPage() {
   const projectId = params.id as string;
   const resumeSessionParam = searchParams.get("resumeSession") || undefined;
   const resumeBranchParam = searchParams.get("branch") || undefined;
+  // Memoize the parsed URL selection so its identity is stable across renders
+  // when the URL hasn't changed — otherwise the URL-restore effect would re-fire
+  // every render and risk clobbering the user's in-page selection.
+  const searchParamsString = searchParams.toString();
+  const initialSelection = useMemo(
+    () => readSelectionFromSearchParams(new URLSearchParams(searchParamsString)),
+    [searchParamsString],
+  );
+  // Tracks the URL selection we've already applied. Each unique
+  // `${type}:${iri}` is consumed at most once per page-instance — if the URL
+  // changes mid-session, we apply the new key, but we never re-apply a key.
+  const consumedSelectionRef = useRef<string | null>(null);
   const initialBranch = resumeBranchParam
     || (() => { try { return sessionStorage.getItem(`ontokit:branch:${projectId}`); } catch { return null; } })()
     || undefined;
 
   const editorMode = useEditorModeStore((s) => s.editorMode);
 
-  // Project state
-  const [project, setProject] = useState<Project | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
-  const [showHealthCheck, setShowHealthCheck] = useState(false);
-  const [openPRCount, setOpenPRCount] = useState(0);
-  const [pendingSuggestionCount, setPendingSuggestionCount] = useState(0);
-  const [lintSummary, setLintSummary] = useState<LintSummary | null>(null);
-  const [normalizationStatus, setNormalizationStatus] = useState<NormalizationStatusResponse | null>(null);
+  // Mark this surface as the user's most recent project view so side-page
+  // Back-to-project links route them back to the editor — regardless of
+  // whether their global preferEditMode preference says viewer or editor.
+  const setProjectViewMode = useSelectionStore((s) => s.setMode);
+  useEffect(() => {
+    setProjectViewMode("editor");
+  }, [setProjectViewMode]);
 
   // Branch state
+  const queryClient = useQueryClient();
   const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
 
-  // Source state (shared across modes)
-  const [sourceContent, setSourceContent] = useState<string>("");
-  const [isLoadingSource, setIsLoadingSource] = useState(false);
-  const [sourceError, setSourceError] = useState<string | null>(null);
-  const [isPreloading, setIsPreloading] = useState(false);
-  const preloadStartedRef = useRef(false);
-  const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
+  // Shared project/tree/source state from hook
+  const viewer = useProjectViewer({
+    projectId,
+    accessToken: session?.accessToken,
+    sessionStatus: status,
+    activeBranch,
+    enableWebSocket: true,
+  });
 
-  // IRI indexing
-  const [sourceIriIndex, setSourceIriIndex] = useState<Map<string, IriPosition>>(new Map());
-  const [isIndexing, setIsIndexing] = useState(false);
+  const {
+    project, isLoading, error, errorKind,
+    openPRCount, pendingSuggestionCount, lintSummary, normalizationStatus,
+    canManage, canEdit, canSuggest, isSuggestionMode,
+    hasValidAccess, hasOntology,
+    nodes, totalClasses, isTreeLoading, treeError,
+    selectedIri, loadRootClasses, expandNode, collapseNode, selectNode,
+    navigateToNode, addOptimisticNode, removeOptimisticNode, updateNodeLabel,
+    collapseAll, collapseOneLevel, expandOneLevel, expandAllFully,
+    hasExpandableNodes, hasExpandedNodes, isExpandingAll,
+    reparentOptimistic, rollbackReparent,
+    selectedNodeFallback,
+    sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
+    loadSourceContent, sourceIriIndex, setSourceIriIndex,
+    connectionStatus, wsEndpoint, wsPurpose,
+    resetSourceState,
+  } = viewer;
+
+  // UI state (editor-only)
+  const [showHistory, setShowHistory] = useState(false);
+  const [showHealthCheck, setShowHealthCheck] = useState(false);
+  const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
+  const entityNavigationRef = useRef<((iri: string, type?: string) => void) | null>(null);
+
+  // Restore selected entity from URL query param. For classes we wait for the
+  // class tree to load; for properties and individuals we dispatch through the
+  // layout's nav handler (entityNavigationRef), which switches the active tab
+  // and selects the entity directly. Each URL-derived selection is applied at
+  // most once via consumedSelectionRef — that way an in-page selection change
+  // (which doesn't update the URL) isn't undone on the next render.
+  useEffect(() => {
+    if (!initialSelection) return;
+    const key = `${initialSelection.type}:${initialSelection.iri}`;
+    if (consumedSelectionRef.current === key) return;
+
+    if (initialSelection.type === "class") {
+      if (isTreeLoading || !nodes.length) return;
+      if (selectedIri === initialSelection.iri) {
+        consumedSelectionRef.current = key;
+        return;
+      }
+      // Await the navigation so we only mark this URL key consumed when the
+      // tree-side restore actually succeeds. If it throws, leave the key
+      // unconsumed so a later render (e.g. once data is healthy) can retry.
+      let cancelled = false;
+      navigateToNode(initialSelection.iri)
+        .then(() => {
+          if (!cancelled) consumedSelectionRef.current = key;
+        })
+        .catch((err) => {
+          if (!cancelled) console.error("Failed to restore selection from URL:", err);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (isLoading) return; // layout not yet mounted
+    if (!entityNavigationRef.current) return; // layout's ref not yet populated
+    entityNavigationRef.current(initialSelection.iri, initialSelection.type);
+    consumedSelectionRef.current = key;
+  }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode, isLoading]);
 
   // Commit dialog
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
@@ -120,132 +186,10 @@ export default function EditorPage() {
   // Pending scroll IRI for source navigation
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
 
-  // Ontology tree
-  const {
-    nodes,
-    totalClasses,
-    isLoading: isTreeLoading,
-    error: treeError,
-    selectedIri,
-    loadRootClasses,
-    expandNode,
-    collapseNode,
-    selectNode,
-    navigateToNode,
-    addOptimisticNode,
-    removeOptimisticNode,
-    updateNodeLabel,
-    collapseAll,
-    collapseOneLevel,
-    expandOneLevel,
-    expandAllFully,
-    hasExpandableNodes,
-    hasExpandedNodes,
-    isExpandingAll,
-    reparentOptimistic,
-    rollbackReparent,
-  } = useOntologyTree({
-    projectId,
-    accessToken: session?.accessToken,
-    branchKey: activeBranch,
-  });
-
-  // Derive fallback data for the selected node from the tree
-  const selectedNodeFallback = useMemo((): TreeNodeFallback | null => {
-    if (!selectedIri) return null;
-    const findInTree = (
-      items: typeof nodes,
-      parentIri?: string,
-      parentLabel?: string,
-    ): TreeNodeFallback | null => {
-      for (const node of items) {
-        if (node.iri === selectedIri) {
-          return { iri: node.iri, label: node.label || "", parentIri, parentLabel };
-        }
-        const found = findInTree(node.children, node.iri, node.label);
-        if (found) return found;
-      }
-      return null;
-    };
-    return findInTree(nodes);
-  }, [selectedIri, nodes]);
-
-  // WebSocket connection status
-  const {
-    status: connectionStatus,
-    endpoint: wsEndpoint,
-    purpose: wsPurpose,
-  } = useCollaborationStatus({
-    projectId,
-    enabled: !!projectId && status !== "loading",
-  });
-
-  // Load project data
-  useEffect(() => {
-    const fetchProject = async () => {
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const data = await projectApi.get(projectId, session?.accessToken);
-        setProject(data);
-
-        try {
-          const prResponse = await pullRequestsApi.list(projectId, session?.accessToken, "open", undefined, 0, 1);
-          setOpenPRCount(prResponse.total);
-        } catch { /* ignore */ }
-
-        try {
-          const summary = await lintApi.getStatus(projectId, session?.accessToken);
-          setLintSummary(summary);
-        } catch { /* ignore */ }
-
-        if (data.source_file_path) {
-          try {
-            const normStatus = await normalizationApi.getStatus(projectId, session?.accessToken);
-            setNormalizationStatus(normStatus);
-          } catch { /* ignore */ }
-        }
-      } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
-          setError("You don't have access to this project");
-        } else if (err instanceof Error && err.message.includes("404")) {
-          setError("Project not found");
-        } else {
-          setError(err instanceof Error ? err.message : "Failed to load project");
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (status !== "loading" && projectId) {
-      fetchProject();
-    }
-  }, [projectId, session?.accessToken, status]);
-
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
-  // If user_role is null but user has access to the project, default to edit (backend enforces actual perms)
-  const hasExplicitRole = !!project?.user_role;
-  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || project?.is_superadmin;
-  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!session?.accessToken);
-  const canSuggest = canEdit || isSuggester;
-  const hasOntology = project?.source_file_path;
-
-  // Fetch pending suggestion count for editors/admins
-  useEffect(() => {
-    if (!canEdit || !session?.accessToken) return;
-    suggestionsApi
-      .listPending(projectId, session.accessToken)
-      .then((res) => setPendingSuggestionCount(res.items.length))
-      .catch(() => { /* ignore — endpoint may not exist yet */ });
-  }, [canEdit, projectId, session?.accessToken]);
-
   // Keyboard shortcut help dialog
   const [shortcutDialogOpen, setShortcutDialogOpen] = useState(false);
 
   // Suggestion session (only active for suggesters who can't directly edit)
-  const isSuggestionMode = isSuggester && !canEdit;
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
   const suggestionSession = useSuggestionSession({
@@ -267,40 +211,6 @@ export default function EditorPage() {
     getCurrentContent: () => sourceContent || null,
     enabled: isSuggestionMode && suggestionSession.isActive,
   });
-
-  // Load source content
-  const loadSourceContent = useCallback(async (isPreload = false) => {
-    if (!projectId || !session?.accessToken || !activeBranch) return;
-    if (sourceContent) return;
-
-    if (isPreload) {
-      setIsPreloading(true);
-    } else {
-      setIsLoadingSource(true);
-    }
-    setSourceError(null);
-
-    try {
-      const response = await revisionsApi.getFileAtVersion(
-        projectId,
-        activeBranch,
-        session.accessToken,
-        project?.git_ontology_path
-      );
-      setSourceContent(response.content);
-    } catch (err) {
-      console.error("Failed to load source:", err);
-      if (!isPreload) {
-        setSourceError(err instanceof Error ? err.message : "Failed to load source content");
-      }
-    } finally {
-      if (isPreload) {
-        setIsPreloading(false);
-      } else {
-        setIsLoadingSource(false);
-      }
-    }
-  }, [projectId, session?.accessToken, sourceContent, activeBranch, project?.git_ontology_path]);
 
   // Save refs for commit promise
   const pendingSaveResolveRef = useRef<(() => void) | null>(null);
@@ -335,12 +245,13 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     loadRootClasses();
     iriPatternDetectedRef.current = false;
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
 
     pendingSaveResolveRef.current?.();
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session?.accessToken, pendingSaveContent, activeBranch, loadRootClasses]);
+  }, [projectId, session, pendingSaveContent, activeBranch, loadRootClasses, queryClient, setSourceContent, setSourceIriIndex]);
 
   const handleCommitDialogClose = useCallback((open: boolean) => {
     setCommitDialogOpen(open);
@@ -351,104 +262,6 @@ export default function EditorPage() {
       setPendingSaveContent(null);
     }
   }, [pendingSaveContent]);
-
-  // Background preload source content after initial page load
-  useEffect(() => {
-    if (!sourceContent && !isLoadingSource && !isPreloading && !preloadStartedRef.current && hasOntology) {
-      const timer = setTimeout(() => {
-        if (!preloadStartedRef.current) {
-          preloadStartedRef.current = true;
-          loadSourceContent(true);
-        }
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [sourceContent, isLoadingSource, isPreloading, loadSourceContent, hasOntology]);
-
-  // Build IRI index in background
-  useEffect(() => {
-    if (!sourceContent || sourceIriIndex.size > 0 || isIndexing) return;
-
-    setIsIndexing(true);
-
-    const buildIriIndexAsync = async (content: string): Promise<Map<string, IriPosition>> => {
-      const index = new Map<string, IriPosition>();
-      const lines = content.split("\n");
-
-      const prefixes = new Map<string, string>();
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const prefixMatch = line.match(/@?prefix\s+(\w*):\s*<([^>]+)>/i);
-        if (prefixMatch) {
-          prefixes.set(prefixMatch[1], prefixMatch[2]);
-        }
-      }
-
-      const chunkSize = 5000;
-      for (let start = 0; start < lines.length; start += chunkSize) {
-        const end = Math.min(start + chunkSize, lines.length);
-
-        for (let i = start; i < end; i++) {
-          const line = lines[i];
-          const trimmed = line.trim();
-
-          if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("@") || trimmed.toUpperCase().startsWith("PREFIX")) continue;
-
-          let isContinuation = false;
-          for (let j = i - 1; j >= 0; j--) {
-            const prevTrimmed = lines[j].trim();
-            if (!prevTrimmed || prevTrimmed.startsWith("#")) continue;
-            if (prevTrimmed.endsWith(",") || prevTrimmed.endsWith(";")) {
-              isContinuation = true;
-            }
-            break;
-          }
-
-          if (isContinuation) continue;
-
-          const fullIriMatch = trimmed.match(/^<([^>\s]+)>/);
-          if (fullIriMatch) {
-            const iri = fullIriMatch[1];
-            if (!index.has(iri)) {
-              const col = line.indexOf('<') + 1;
-              index.set(iri, { line: i + 1, col, len: fullIriMatch[0].length });
-            }
-          }
-
-          const prefixedMatch = trimmed.match(/^(\w*):([A-Za-z_][A-Za-z0-9_\-]*)/);
-          if (prefixedMatch) {
-            const prefix = prefixedMatch[1];
-            const localName = prefixedMatch[2];
-            const namespace = prefixes.get(prefix);
-            if (namespace) {
-              const fullIri = namespace + localName;
-              if (!index.has(fullIri)) {
-                const prefixedName = `${prefix}:${localName}`;
-                const col = line.indexOf(prefixedName) + 1;
-                index.set(fullIri, { line: i + 1, col, len: prefixedName.length });
-              }
-            }
-          }
-        }
-
-        if (end < lines.length) {
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-      }
-
-      return index;
-    };
-
-    buildIriIndexAsync(sourceContent)
-      .then((newIndex) => {
-        setSourceIriIndex(newIndex);
-        setIsIndexing(false);
-      })
-      .catch((error) => {
-        console.error("[ViewInSource] Indexing error:", error);
-        setIsIndexing(false);
-      });
-  }, [sourceContent, sourceIriIndex.size, isIndexing]);
 
   // Detect IRI pattern
   useEffect(() => {
@@ -514,6 +327,7 @@ export default function EditorPage() {
 
   const handleEntityConfirm = useCallback(
     async (entity: NewEntityInfo) => {
+      if (!canSuggest) return;
       const snippet = generateTurtleSnippet({
         iri: entity.iri,
         label: entity.label,
@@ -549,7 +363,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session?.accessToken, activeBranch, project?.git_ontology_path, toast],
+    [canSuggest, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
   );
 
   // Handle copy IRI
@@ -588,6 +402,7 @@ export default function EditorPage() {
       setSourceContent("");
       // Reload tree to ensure consistency
       loadRootClasses();
+      queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
     } catch (err) {
       toast.error(
         "Failed to delete class",
@@ -596,7 +411,7 @@ export default function EditorPage() {
       // Reload tree to restore state
       loadRootClasses();
     }
-  }, [deleteTargetIri, deleteTargetLabel, session?.accessToken, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses]);
+  }, [deleteTargetIri, deleteTargetLabel, session, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, setSourceContent]);
 
   // Handle update class (form-based editing)
   // Routes through source save: modifies the Turtle text and commits via PUT /source
@@ -646,7 +461,8 @@ export default function EditorPage() {
     // Re-index source IRIs
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel]);
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
+  }, [session, projectId, activeBranch, project, sourceContent, toast, updateNodeLabel, queryClient, setSourceContent, setSourceIriIndex]);
 
   // Handle update property (form-based editing)
   const handleUpdateProperty = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
@@ -685,7 +501,8 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast]);
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
+  }, [session, projectId, activeBranch, project, sourceContent, toast, queryClient, setSourceContent, setSourceIriIndex]);
 
   // Handle update individual (form-based editing)
   const handleUpdateIndividual = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
@@ -724,7 +541,8 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast]);
+    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
+  }, [session, projectId, activeBranch, project, sourceContent, toast, queryClient, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode class update
   // Instead of directly committing, sends modified source to the suggestion branch
@@ -759,7 +577,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, suggestionSession]);
+  }, [session, projectId, activeBranch, project, sourceContent, toast, updateNodeLabel, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode property update
   const handleSuggestPropertyUpdate = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
@@ -788,7 +606,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, suggestionSession]);
+  }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode individual update
   const handleSuggestIndividualUpdate = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
@@ -817,7 +635,7 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session?.accessToken, projectId, activeBranch, project?.git_ontology_path, sourceContent, toast, suggestionSession]);
+  }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle drag-and-drop reparent class
   // Fetches full class detail, modifies parent_iris, then routes through the appropriate save handler
@@ -867,14 +685,14 @@ export default function EditorPage() {
         values: a.values,
       })),
       deprecated: detail.deprecated,
-      equivalent_iris: detail.equivalent_iris,
-      disjoint_iris: detail.disjoint_iris,
+      equivalent_iris: detail.equivalent_iris ?? undefined,
+      disjoint_iris: detail.disjoint_iris ?? undefined,
     };
 
     // Route through the appropriate save handler
     const saveHandler = isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass;
     await saveHandler(classIri, payload);
-  }, [session?.accessToken, projectId, activeBranch, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate]);
+  }, [session, projectId, activeBranch, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate]);
 
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
@@ -883,12 +701,15 @@ export default function EditorPage() {
       suggestionSession.discardSession();
     }
     setActiveBranch(branchName);
-    setSourceContent("");
-    setSourceError(null);
-    setSourceIriIndex(new Map());
-    preloadStartedRef.current = false;
-    router.replace(`${pathname}?branch=${encodeURIComponent(branchName)}`);
-  }, [pathname, router, suggestionSession]);
+    resetSourceState();
+    // Merge into existing search params instead of replacing — BranchSelector
+    // fires this on mount, and replacing would wipe ?classIri= / ?propertyIri=
+    // / ?individualIri= / ?resumeSession= that the page also depends on.
+    const next = new URLSearchParams(searchParamsString);
+    next.set("branch", branchName);
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+  }, [pathname, router, suggestionSession, resetSourceState, searchParamsString]);
 
   // --- Keyboard shortcuts ---
   const keyboardShortcuts = useMemo((): ShortcutDefinition[] => [
@@ -907,7 +728,7 @@ export default function EditorPage() {
       global: true,
       ignoreWhenEditorFocused: true,
     },
-    {
+    ...(canSuggest ? [{
       id: "add-entity",
       key: "n",
       modifiers: { ctrl: true },
@@ -915,7 +736,7 @@ export default function EditorPage() {
       category: "Editing",
       action: () => handleAddEntity(),
       global: true,
-    },
+    }] : []),
     {
       id: "help",
       key: "?",
@@ -938,7 +759,7 @@ export default function EditorPage() {
       global: true,
       ignoreWhenEditorFocused: false,
     },
-  ], [handleAddEntity, shortcutDialogOpen, showHistory]);
+  ], [handleAddEntity, shortcutDialogOpen, showHistory, canSuggest]);
 
   useKeyboardShortcuts(keyboardShortcuts);
 
@@ -964,7 +785,7 @@ export default function EditorPage() {
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
             <Link
-              href="/projects"
+              href="/"
               className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -974,10 +795,33 @@ export default function EditorPage() {
               <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">
                 {error || "Project not found"}
               </h2>
-              <Link href="/projects" className="mt-4 inline-block">
-                <Button variant="outline">Back to Projects</Button>
-              </Link>
+              <div className="mt-4 flex items-center justify-center gap-3">
+                {errorKind === "private-403" && (
+                  <Button onClick={() => signIn("zitadel")} className="gap-2">
+                    <LogIn className="h-4 w-4" />
+                    Sign In
+                  </Button>
+                )}
+                <Link href="/">
+                  <Button variant="outline">Back to Projects</Button>
+                </Link>
+              </div>
             </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
+  // Auth guard: redirect unauthenticated or unauthorized users to the viewer
+  if (status === "unauthenticated" || (project && !canSuggest)) {
+    router.replace(`/projects/${projectId}`);
+    return (
+      <>
+        <Header />
+        <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
+          <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
           </div>
         </main>
       </>
@@ -1004,7 +848,7 @@ export default function EditorPage() {
               </div>
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -1039,28 +883,31 @@ export default function EditorPage() {
         <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link
-                href={`/projects/${projectId}`}
-                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Link>
-              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
               <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
-              <BranchBadge />
-
-              {/* Mode Switcher */}
+              {/* Viewer / Editor switcher */}
+              <ViewerEditorSwitcher projectId={projectId} />
+              {/* Standard / Developer mode switcher */}
               <ModeSwitcher />
-              {canSuggest && <ContinuousEditingToggle />}
-
               {/* Suggestion mode indicator */}
               {isSuggestionMode && (
                 <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
                   <Lightbulb className="h-3 w-3" />
                   Suggesting
                 </span>
+              )}
+
+              {/* Sign-in CTA for unauthenticated users */}
+              {!hasValidAccess && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => signIn("zitadel")}
+                  className="gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                >
+                  <LogIn className="h-3 w-3" />
+                  Sign in to suggest edits
+                </Button>
               )}
             </div>
             <div className="flex items-center gap-2">
@@ -1118,19 +965,28 @@ export default function EditorPage() {
               </div>
 
               {/* Branch Selector */}
-              <BranchSelector onBranchChange={handleBranchChange} canCreateBranch={canEdit} />
+              <BranchSelector onBranchChange={handleBranchChange} canCreateBranch={canEdit} readOnly={!hasValidAccess} />
+
+              {/* Share */}
+              <ShareButton
+                projectId={projectId}
+                selectedIri={selectedIri}
+                selectedLabel={selectedNodeFallback?.label}
+              />
 
               {/* History Button */}
               <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
 
-              {/* Upstream Sync Status */}
-              <UpstreamSyncIndicator
-                projectId={projectId}
-                accessToken={session?.accessToken}
-              />
+              {/* Remote Sync Status (auth-only) */}
+              {hasValidAccess && (
+                <RemoteSyncIndicator
+                  projectId={projectId}
+                  accessToken={session?.accessToken}
+                />
+              )}
 
-              {/* Normalization Status */}
-              {normalizationStatus?.needs_normalization && (
+              {/* Normalization Status (auth-only) */}
+              {hasValidAccess && normalizationStatus?.needs_normalization && (
                 <Link href={`/projects/${projectId}/settings#normalization`}>
                   <Button
                     variant="ghost"
@@ -1190,7 +1046,7 @@ export default function EditorPage() {
 
               {canManage && (
                 <Link href={`/projects/${projectId}/settings`}>
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -1209,9 +1065,9 @@ export default function EditorPage() {
                   accessToken={session?.accessToken}
                   activeBranch={activeBranch}
                   canEdit={!!canEdit}
+                  entityNavigationRef={entityNavigationRef}
                   canSuggest={!!canSuggest}
                   isSuggestionMode={isSuggestionMode}
-                  canManage={!!canManage}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
                   treeError={treeError}
@@ -1244,8 +1100,6 @@ export default function EditorPage() {
                   selectedNodeFallback={selectedNodeFallback}
                   onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
                   detailRefreshKey={detailRefreshKey}
-                  showHealthCheck={showHealthCheck}
-                  onCloseHealthCheck={() => setShowHealthCheck(false)}
                   onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
                   onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
                   onReparentClass={handleReparentClass}
@@ -1260,6 +1114,7 @@ export default function EditorPage() {
                 activeBranch={activeBranch}
                 canEdit={!!canEdit}
                 canSuggest={!!canSuggest}
+                entityNavigationRef={entityNavigationRef}
                 isSuggestionMode={isSuggestionMode}
                 nodes={nodes}
                 isTreeLoading={isTreeLoading}
@@ -1292,6 +1147,27 @@ export default function EditorPage() {
             )}
           </div>
 
+          {/* Right Panel - Health Check (available in both modes) */}
+          {showHealthCheck && (
+            <div className="w-96 flex-shrink-0">
+              <HealthCheckPanel
+                projectId={projectId}
+                accessToken={session?.accessToken}
+                branch={activeBranch}
+                isOpen={showHealthCheck}
+                onClose={() => setShowHealthCheck(false)}
+                onNavigateToClass={(iri, subjectType) => {
+                  if (entityNavigationRef.current) {
+                    entityNavigationRef.current(iri, subjectType);
+                  } else {
+                    navigateToNode(iri);
+                  }
+                }}
+                canRunLint={!!canManage}
+              />
+            </div>
+          )}
+
           {/* Right Panel - Revision History (available in both modes) */}
           <RevisionHistoryPanel
             projectId={projectId}
@@ -1310,17 +1186,19 @@ export default function EditorPage() {
         defaultMessage="Update ontology"
       />
 
-      {/* Add Entity Dialog */}
-      <AddEntityDialog
-        open={addEntityDialogOpen}
-        onOpenChange={setAddEntityDialogOpen}
-        onConfirm={handleEntityConfirm}
-        iriPattern={iriPattern}
-        nextNumeric={nextNumeric}
-        ontologyNamespace={ontologyNamespace}
-        parentIri={addEntityParentIri}
-        parentLabel={addEntityParentLabel}
-      />
+      {/* Add Entity Dialog (only for users with edit/suggest permissions) */}
+      {canSuggest && (
+        <AddEntityDialog
+          open={addEntityDialogOpen}
+          onOpenChange={setAddEntityDialogOpen}
+          onConfirm={handleEntityConfirm}
+          iriPattern={iriPattern}
+          nextNumeric={nextNumeric}
+          ontologyNamespace={ontologyNamespace}
+          parentIri={addEntityParentIri}
+          parentLabel={addEntityParentLabel}
+        />
+      )}
 
       {/* Delete Class Confirmation Dialog */}
       <ConfirmDialog

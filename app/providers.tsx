@@ -6,6 +6,7 @@ import { useState, type ReactNode } from "react";
 import { ToastProvider } from "@/lib/context/ToastContext";
 import { ToastContainer } from "@/components/ui/toast-container";
 import { ScreenReaderAnnouncerProvider } from "@/components/ui/ScreenReaderAnnouncer";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { SessionGuard } from "@/components/auth/SessionGuard";
 
 // Import the store module to ensure module-level theme sync runs
@@ -34,8 +35,10 @@ export function Providers({ children }: ProvidersProps) {
       <QueryClientProvider client={queryClient}>
         <ScreenReaderAnnouncerProvider>
           <ToastProvider>
-            {children}
-            <ToastContainer />
+            <TooltipPrimitive.Provider delayDuration={200}>
+              {children}
+              <ToastContainer />
+            </TooltipPrimitive.Provider>
           </ToastProvider>
         </ScreenReaderAnnouncerProvider>
       </QueryClientProvider>

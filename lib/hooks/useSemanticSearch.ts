@@ -12,7 +12,7 @@ export function useSemanticSearch(
   limit = 20
 ) {
   return useQuery({
-    queryKey: ["search", mode, projectId, query, accessToken, branch, limit],
+    queryKey: ["search", mode, projectId, query, !!accessToken, branch, limit],
     queryFn: async () => {
       if (mode === "text") {
         const response = await projectOntologyApi.searchEntities(

@@ -144,12 +144,12 @@ export function EntitySearchCombobox({
             if (e.key === "Escape") onClose();
           }}
           placeholder={placeholder}
-          className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none dark:text-white dark:placeholder:text-slate-500"
+          className="flex-1 bg-transparent text-sm text-slate-900 placeholder:text-slate-400 focus:outline-hidden dark:text-white dark:placeholder:text-slate-500"
         />
         <button
           onClick={() => setSearchMode((m) => (m === "text" ? "semantic" : "text"))}
           className={cn(
-            "rounded p-1 transition-colors",
+            "rounded-sm p-1 transition-colors",
             searchMode === "semantic"
               ? "bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-400"
               : "text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-600"
@@ -159,7 +159,7 @@ export function EntitySearchCombobox({
         >
           <Brain className="h-3.5 w-3.5" />
         </button>
-        <button onClick={onClose} className="rounded p-0.5 hover:bg-slate-100 dark:hover:bg-slate-600">
+        <button onClick={onClose} className="rounded-sm p-0.5 hover:bg-slate-100 dark:hover:bg-slate-600">
           <X className="h-3.5 w-3.5 text-slate-400" />
         </button>
       </div>

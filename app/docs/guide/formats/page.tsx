@@ -7,7 +7,7 @@ export default function FormatsPage() {
         What are the Ontology Formats?
       </h1>
       <p className="text-slate-600 dark:text-slate-400 mb-8">
-        RDF is the underlying data model, but there are several serialization formats for writing
+        RDF is the underlying data model, but there are several serialization formats for writing{" "}
         it down. Each has trade-offs in readability, verbosity, and tool support.
       </p>
 
@@ -19,14 +19,14 @@ export default function FormatsPage() {
           </h2>
           <div className="prose prose-slate dark:prose-invert max-w-none space-y-4">
             <p className="text-slate-600 dark:text-slate-400">
-              The Resource Description Framework (RDF) represents knowledge as a set
-              of <strong>triples</strong>: subject &ndash; predicate &ndash; object. Subjects and
-              predicates are IRIs; objects can be IRIs or literal values (strings, numbers, dates).
+              The Resource Description Framework (RDF) represents knowledge as a set{" "}
+              of <strong>triples</strong>: subject &ndash; predicate &ndash; object. Subjects and{" "}
+              predicates are IRIs; objects can be IRIs or literal values (strings, numbers, dates).{" "}
               A collection of triples forms a directed graph.
             </p>
             <p className="text-slate-600 dark:text-slate-400">
-              The <em>format</em> (or serialization) determines how those triples are written in a
-              file. The same graph can be serialized in Turtle, RDF/XML, JSON-LD, or any other RDF
+              The <em>format</em> (or serialization) determines how those triples are written in a{" "}
+              file. The same graph can be serialized in Turtle, RDF/XML, JSON-LD, or any other RDF{" "}
               format &mdash; the information content is identical.
             </p>
           </div>
@@ -39,8 +39,8 @@ export default function FormatsPage() {
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              Turtle (Terse RDF Triple Language) is the most popular human-readable RDF format. It
-              supports prefix abbreviations, multi-value shorthand with commas, and multi-predicate
+              Turtle (Terse RDF Triple Language) is the most popular human-readable RDF format. It{" "}
+              supports prefix abbreviations, multi-value shorthand with commas, and multi-predicate{" "}
               shorthand with semicolons. OntoKit uses Turtle as its canonical format.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
@@ -66,7 +66,7 @@ ex:Dog a owl:Class ;
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              The original W3C serialization from 1999. Verbose but widely supported by XML
+              The original W3C serialization from 1999. Verbose but widely supported by XML{" "}
               toolchains. Harder for humans to read but excellent for machine-to-machine exchange.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
@@ -92,8 +92,8 @@ ex:Dog a owl:Class ;
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              A line-based format where each line is exactly one triple with full IRIs (no
-              prefixes). Extremely simple to parse and ideal for streaming or bulk loading, but
+              A line-based format where each line is exactly one triple with full IRIs (no{" "}
+              prefixes). Extremely simple to parse and ideal for streaming or bulk loading, but{" "}
               very verbose.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
@@ -113,9 +113,9 @@ ex:Dog a owl:Class ;
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400 mb-4">
-              JSON-LD embeds RDF data in standard JSON using
-              a <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded text-xs">@context</code> block.
-              Popular with web developers because it integrates directly with JavaScript and REST
+              JSON-LD embeds RDF data in standard JSON using{" "}
+              a <code className="bg-slate-200 dark:bg-slate-600 px-1 rounded-sm text-xs">@context</code> block.{" "}
+              Popular with web developers because it integrates directly with JavaScript and REST{" "}
               APIs. Used by Schema.org for structured data in web pages.
             </p>
             <div className="bg-slate-900 text-slate-100 p-4 rounded-lg text-sm font-mono overflow-x-auto">
@@ -150,8 +150,8 @@ ex:Dog a owl:Class ;
           </h2>
           <div className="bg-white dark:bg-slate-800 rounded-lg p-6 border border-slate-200 dark:border-slate-700">
             <p className="text-slate-600 dark:text-slate-400">
-              N3 is a superset of Turtle that adds formulas, variables, and built-in predicates for
-              expressing rules. While less common for publishing ontologies, it is used in reasoning
+              N3 is a superset of Turtle that adds formulas, variables, and built-in predicates for{" "}
+              expressing rules. While less common for publishing ontologies, it is used in reasoning{" "}
               and logic programming contexts.
             </p>
           </div>

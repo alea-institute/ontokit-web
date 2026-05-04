@@ -9,7 +9,7 @@ export function useEntityHistory(
   limit = 50
 ) {
   return useQuery({
-    queryKey: ["entityHistory", projectId, entityIri, accessToken, branch, limit],
+    queryKey: ["entityHistory", projectId, entityIri, !!accessToken, branch, limit],
     queryFn: () =>
       analyticsApi.getEntityHistory(projectId, entityIri!, accessToken, branch, limit),
     enabled: !!entityIri && !!projectId,

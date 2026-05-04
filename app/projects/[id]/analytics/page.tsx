@@ -10,6 +10,7 @@ import {
   useHotEntities,
   useContributors,
 } from "@/lib/hooks/useProjectAnalytics";
+import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import { cn, getLocalName } from "@/lib/utils";
 
 export default function ProjectAnalyticsPage() {
@@ -18,6 +19,7 @@ export default function ProjectAnalyticsPage() {
   const router = useRouter();
   const projectId = params.id as string;
   const token = session?.accessToken;
+  const projectHomeHref = useProjectHomeHref(projectId);
 
   const { data: activity, isLoading: loadingActivity, error: activityError } = useProjectActivity(
     projectId,
@@ -45,7 +47,7 @@ export default function ProjectAnalyticsPage() {
       <main id="main-content" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <div className="mb-6 flex items-center gap-3">
           <Link
-            href={`/projects/${projectId}`}
+            href={projectHomeHref}
             className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -89,7 +91,7 @@ export default function ProjectAnalyticsPage() {
                       minHeight: day.count > 0 ? 4 : 1,
                     }}
                   />
-                  <div className="pointer-events-none absolute -top-8 hidden rounded bg-slate-800 px-2 py-1 text-xs text-white group-hover:block dark:bg-slate-600">
+                  <div className="pointer-events-none absolute -top-8 hidden rounded-sm bg-slate-800 px-2 py-1 text-xs text-white group-hover:block dark:bg-slate-600">
                     {day.date}: {day.count}
                   </div>
                 </div>
@@ -127,7 +129,7 @@ export default function ProjectAnalyticsPage() {
                     key={entity.entity_iri}
                     onClick={() =>
                       router.push(
-                        `/projects/${projectId}/editor?classIri=${encodeURIComponent(entity.entity_iri)}`
+                        `/projects/${projectId}?classIri=${encodeURIComponent(entity.entity_iri)}`
                       )
                     }
                     className="flex w-full items-center gap-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"

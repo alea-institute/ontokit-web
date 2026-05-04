@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Upload, Github } from "lucide-react";
+import { ArrowLeft, Plus, Upload, AlertCircle } from "lucide-react";
+import { GithubIcon as Github } from "@/components/icons/github";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { FileUpload } from "@/components/ui/file-upload";
@@ -127,7 +128,6 @@ export default function NewProjectPage() {
       } else {
         setImportError("An error occurred while importing the file");
       }
-      throw err;
     } finally {
       setIsSubmitting(false);
       setUploadProgress(null);
@@ -182,7 +182,7 @@ export default function NewProjectPage() {
   };
 
   const handleCancel = () => {
-    router.push("/projects");
+    router.push("/");
   };
 
   // Show loading state while checking auth
@@ -232,7 +232,7 @@ export default function NewProjectPage() {
         <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
           {/* Back link */}
           <Link
-            href="/projects"
+            href="/"
             className="mb-6 inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -257,7 +257,7 @@ export default function NewProjectPage() {
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
                 activeTab === "create"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                  ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               )}
             >
@@ -270,7 +270,7 @@ export default function NewProjectPage() {
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
                 activeTab === "import"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                  ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               )}
             >
@@ -283,7 +283,7 @@ export default function NewProjectPage() {
               className={cn(
                 "flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
                 activeTab === "github"
-                  ? "bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white"
+                  ? "bg-white text-slate-900 shadow-xs dark:bg-slate-700 dark:text-white"
                   : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
               )}
             >
@@ -311,11 +311,22 @@ export default function NewProjectPage() {
                     Ontology File <span className="text-red-500">*</span>
                   </label>
                   <FileUpload
-                    onFileSelect={setSelectedFile}
+                    onFileSelect={(file) => {
+                      setSelectedFile(file);
+                      setImportError(null);
+                    }}
                     selectedFile={selectedFile}
                     disabled={isSubmitting}
-                    error={importError}
                   />
+                  {importError && (
+                    <div role="alert" className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
+                      <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium">Import failed</p>
+                        <p className="mt-0.5">{importError}</p>
+                      </div>
+                    </div>
+                  )}
                   <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                     The project name and description will be extracted from the ontology metadata.
                     You can override them below.

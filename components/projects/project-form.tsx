@@ -24,6 +24,7 @@ interface ProjectFormProps {
   nameRequired?: boolean;
   namePlaceholder?: string;
   descriptionPlaceholder?: string;
+  disableVisibility?: boolean;
 }
 
 export function ProjectForm({
@@ -35,6 +36,7 @@ export function ProjectForm({
   nameRequired = true,
   namePlaceholder = "My Ontology Project",
   descriptionPlaceholder = "A brief description of your project...",
+  disableVisibility = false,
 }: ProjectFormProps) {
   const [name, setName] = useState(initialData?.name || "");
   const [description, setDescription] = useState(initialData?.description || "");
@@ -82,7 +84,7 @@ export function ProjectForm({
           value={name}
           onChange={(e) => setName(e.target.value)}
           className={cn(
-            "mt-1 block w-full rounded-md border px-3 py-2 text-sm shadow-sm",
+            "mt-1 block w-full rounded-md border px-3 py-2 text-sm shadow-xs",
             "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
             "dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           )}
@@ -106,7 +108,7 @@ export function ProjectForm({
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
           className={cn(
-            "mt-1 block w-full rounded-md border px-3 py-2 text-sm shadow-sm",
+            "mt-1 block w-full rounded-md border px-3 py-2 text-sm shadow-xs",
             "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
             "dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
           )}
@@ -123,7 +125,7 @@ export function ProjectForm({
           <button
             type="button"
             onClick={() => setIsPublic(false)}
-            disabled={isLoading}
+            disabled={isLoading || disableVisibility}
             className={cn(
               "flex flex-1 items-center gap-3 rounded-lg border p-4 text-left transition-all",
               !isPublic
@@ -152,7 +154,7 @@ export function ProjectForm({
           <button
             type="button"
             onClick={() => setIsPublic(true)}
-            disabled={isLoading}
+            disabled={isLoading || disableVisibility}
             className={cn(
               "flex flex-1 items-center gap-3 rounded-lg border p-4 text-left transition-all",
               isPublic

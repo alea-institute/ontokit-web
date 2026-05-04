@@ -177,7 +177,7 @@ export function UserSearchInput({
           disabled={disabled}
           className={cn(
             "w-full rounded-md border py-2 pl-9 pr-8 text-sm",
-            "focus:outline-none focus:ring-1",
+            "focus:outline-hidden focus:ring-1",
             isSelected
               ? "border-green-500 bg-green-50 focus:border-green-500 focus:ring-green-500 dark:border-green-600 dark:bg-green-900/20"
               : "border-slate-300 focus:border-primary-500 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-800",

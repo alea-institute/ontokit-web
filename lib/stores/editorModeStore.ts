@@ -7,10 +7,13 @@ export type ThemePreference = "light" | "dark" | "system";
 interface EditorModeState {
   editorMode: EditorMode;
   theme: ThemePreference;
-  continuousEditing: boolean;
+  hideSaveButton: boolean;
+  /** When true, opening an entity in the editor auto-enters edit mode (no extra "Edit Item" click). */
+  preferEditMode: boolean;
   setEditorMode: (mode: EditorMode) => void;
   setTheme: (theme: ThemePreference) => void;
-  setContinuousEditing: (on: boolean) => void;
+  setHideSaveButton: (on: boolean) => void;
+  setPreferEditMode: (on: boolean) => void;
 }
 
 /**
@@ -37,7 +40,8 @@ export const useEditorModeStore = create<EditorModeState>()(
     (set) => ({
       editorMode: "standard",
       theme: "system",
-      continuousEditing: false,
+      hideSaveButton: false,
+      preferEditMode: false,
 
       setEditorMode: (mode) => set({ editorMode: mode }),
 
@@ -46,7 +50,9 @@ export const useEditorModeStore = create<EditorModeState>()(
         set({ theme });
       },
 
-      setContinuousEditing: (on) => set({ continuousEditing: on }),
+      setHideSaveButton: (on) => set({ hideSaveButton: on }),
+
+      setPreferEditMode: (on) => set({ preferEditMode: on }),
     }),
     {
       name: "ontokit-editor-preferences",

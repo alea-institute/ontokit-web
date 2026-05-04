@@ -29,12 +29,15 @@ interface BranchSelectorProps {
   onBranchChange?: (branchName: string) => void;
   /** Whether the current user can create new branches (requires editor+ role) */
   canCreateBranch?: boolean;
+  /** Whether the selector is read-only (e.g. unauthenticated users) */
+  readOnly?: boolean;
 }
 
 export function BranchSelector({
   className,
   onBranchChange,
   canCreateBranch = false,
+  readOnly = false,
 }: BranchSelectorProps) {
   const {
     branches,
@@ -123,18 +126,18 @@ export function BranchSelector({
           "gap-2",
           isFeatureBranch && "border-amber-500 text-amber-600 dark:text-amber-400"
         )}
-        onClick={() => setIsOpen(!isOpen)}
-        disabled={isLoading}
+        onClick={() => !readOnly && setIsOpen(!isOpen)}
+        disabled={isLoading || readOnly}
       >
         <GitBranch className="h-4 w-4" />
         <span className="max-w-32 truncate">{currentBranch}</span>
         {currentBranchInfo?.commit_hash && (
-          <code className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
+          <code className="rounded-sm bg-slate-100 px-1.5 py-0.5 font-mono text-xs text-slate-500 dark:bg-slate-700 dark:text-slate-400">
             {currentBranchInfo.commit_hash.slice(0, 7)}
           </code>
         )}
         {currentBranchInfo && currentBranchInfo.commits_ahead > 0 && (
-          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+          <span className="rounded-sm bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
             +{currentBranchInfo.commits_ahead}
           </span>
         )}
@@ -143,7 +146,7 @@ export function BranchSelector({
           currentBranchInfo.remote_commits_behind !== null
         ) && (currentBranchInfo.remote_commits_ahead! > 0 || currentBranchInfo.remote_commits_behind! > 0) && (
           <span
-            className="rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+            className="rounded-sm bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
             title="Ahead/behind remote"
           >
             {currentBranchInfo.remote_commits_ahead! > 0 && `\u2191${currentBranchInfo.remote_commits_ahead}`}
@@ -151,7 +154,7 @@ export function BranchSelector({
             {currentBranchInfo.remote_commits_behind! > 0 && `\u2193${currentBranchInfo.remote_commits_behind}`}
           </span>
         )}
-        <ChevronDown className="h-4 w-4" />
+        {!readOnly && <ChevronDown className="h-4 w-4" />}
       </Button>
 
       {/* Dropdown */}
@@ -188,7 +191,7 @@ export function BranchSelector({
                     }
                   }}
                   placeholder="feature/my-changes"
-                  className="w-full rounded border border-slate-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none dark:border-slate-600 dark:bg-slate-700"
+                  className="w-full rounded-sm border border-slate-300 px-2 py-1 text-sm focus:border-primary-500 focus:outline-hidden dark:border-slate-600 dark:bg-slate-700"
                   autoFocus
                 />
                 <div className="mt-2 flex gap-2">
@@ -245,7 +248,7 @@ export function BranchSelector({
                     )}
                     <span className="truncate">{branch.name}</span>
                     {branch.is_default && (
-                      <span className="rounded bg-slate-200 px-1 py-0.5 text-xs text-slate-600 dark:bg-slate-600 dark:text-slate-300">
+                      <span className="rounded-sm bg-slate-200 px-1 py-0.5 text-xs text-slate-600 dark:bg-slate-600 dark:text-slate-300">
                         default
                       </span>
                     )}
@@ -272,7 +275,7 @@ export function BranchSelector({
                       branch.remote_commits_behind !== null
                     ) && (branch.remote_commits_ahead! > 0 || branch.remote_commits_behind! > 0) && (
                       <span
-                        className="rounded bg-blue-100 px-1 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                        className="rounded-sm bg-blue-100 px-1 py-0.5 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                         title="Ahead/behind remote"
                       >
                         {branch.remote_commits_ahead! > 0 && `\u2191${branch.remote_commits_ahead}`}
@@ -285,7 +288,7 @@ export function BranchSelector({
                       branch.has_delete_permission && (
                         <button
                           className={cn(
-                            "rounded p-1",
+                            "rounded-sm p-1",
                             branch.can_delete
                               ? "text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
                               : "cursor-not-allowed text-slate-300 dark:text-slate-600"

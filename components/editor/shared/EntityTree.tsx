@@ -97,6 +97,12 @@ export function EntityTree({
 
   const visibleIris = useMemo(() => flattenVisible(nodes), [nodes]);
 
+  const scrollToIri = useCallback((iri: string) => {
+    if (!containerRef.current) return;
+    const el = containerRef.current.querySelector(`[data-iri="${CSS.escape(iri)}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (!enableKeyboardNav) return;
@@ -166,14 +172,8 @@ export function EntityTree({
         }
       }
     },
-    [enableKeyboardNav, focusedIri, selectedIri, visibleIris, nodes, onExpand, onCollapse, onSelect],
+    [enableKeyboardNav, focusedIri, selectedIri, visibleIris, nodes, onExpand, onCollapse, onSelect, scrollToIri],
   );
-
-  const scrollToIri = (iri: string) => {
-    if (!containerRef.current) return;
-    const el = containerRef.current.querySelector(`[data-iri="${CSS.escape(iri)}"]`);
-    el?.scrollIntoView({ block: "nearest" });
-  };
 
   const activeDescendantId = focusedIri
     ? `tree-item-${focusedIri.replace(/[^a-zA-Z0-9-_]/g, "_")}`
@@ -188,7 +188,7 @@ export function EntityTree({
       tabIndex={enableKeyboardNav ? 0 : undefined}
       onKeyDown={enableKeyboardNav ? handleKeyDown : undefined}
       onBlur={() => setFocusedIri(null)}
-      className="py-2 outline-none"
+      className="py-2 outline-hidden"
     >
       {nodes.map((node, index) => (
         <EntityTreeNodeRow
