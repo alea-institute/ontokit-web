@@ -91,6 +91,8 @@ interface ClassDetailPanelProps {
   onProposeEdit?: () => void;
   /** True when anonymous proposal mode is active (editing is allowed) */
   isAnonymousProposalMode?: boolean;
+  /** When true, render the "Suggest Changes" label on the Edit button */
+  isSuggestionMode?: boolean;
 
   // LLM suggestion support
   canUseLLM?: boolean;
@@ -119,6 +121,7 @@ export function ClassDetailPanel({
   canPropose,
   onProposeEdit,
   isAnonymousProposalMode: _isAnonymousProposalMode,
+  isSuggestionMode = false,
   canUseLLM,
   byoKey,
   userRole: _userRole,
@@ -257,6 +260,10 @@ export function ClassDetailPanel({
     editInitializedRef.current = true;
     setIsEditing(true);
   }, [classDetail, initEditState]);
+
+  // True when the user has the ability to enter edit mode for this class.
+  // The Edit Item / Suggest Changes button only renders when this is true.
+  const canEnterEdit = !!canEdit && !!onUpdateClass && !!classDetail;
 
   // Cancel: discard the in-progress draft and re-init from server state.
   // The panel stays in edit mode — the editor is always editable.

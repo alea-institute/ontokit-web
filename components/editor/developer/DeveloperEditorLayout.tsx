@@ -72,7 +72,7 @@ export interface DeveloperEditorLayoutProps {
   canEdit: boolean;
   canSuggest?: boolean;
   isSuggestionMode?: boolean;
-  canManage: boolean;
+  canManage?: boolean;
   userRole?: ProjectRole | null;
 
   // Tree state (from useOntologyTree)
