@@ -445,6 +445,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                 focusIri={selectedIri}
                 projectId={projectId}
                 branch={activeBranch}
+                accessToken={accessToken}
                 onNavigateToClass={(iri) => {
                   setShowGraph(false);
                   navigateToNode(iri);
@@ -519,6 +520,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           label={getLocalName(selectedIri)}
           projectId={projectId}
           branch={activeBranch}
+          accessToken={accessToken}
           onNavigateToClass={(iri) => {
             setShowGraphModal(false);
             setShowGraph(false);

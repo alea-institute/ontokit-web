@@ -48,10 +48,16 @@ export const graphApi = {
     projectId: string,
     classIri: string,
     options: FetchGraphOptions = {},
+    token?: string,
   ) =>
     api.get<EntityGraphResponse>(
       `/api/v1/projects/${projectId}/ontology/graph/${encodeURIComponent(classIri)}`,
       {
+        // The graph endpoint is OptionalUser: public projects resolve without a
+        // token, but private-project graphs require the Bearer token or the API
+        // returns 401/403. Thread it through like every other projectOntologyApi
+        // call so authenticated graphs load. Omitted header keeps public reads working.
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         params: {
           branch: options.branch,
           ancestors_depth: options.ancestorsDepth,

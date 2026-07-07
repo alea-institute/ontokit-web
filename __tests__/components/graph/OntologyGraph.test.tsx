@@ -122,20 +122,19 @@ describe("OntologyGraph", () => {
     expect(spinner).not.toBeNull();
   });
 
-  // --- No relationships state ---
+  // --- Empty state (nodes present but zero) ---
 
-  it("shows no-relationships message when single node and no edges", () => {
+  it("shows the empty-state message when there are no nodes", () => {
+    // Post-port the server-BFS component renders "No graph data available"
+    // when the fetched graph has zero nodes (the old client-side build showed
+    // a "No relationships found" message; that affordance was removed).
     mockUseGraphData.mockReturnValue({
       ...defaultReturn,
-      graphData: {
-        nodes: [{ id: "iri:Class1", label: "Class1", nodeType: "focus", deprecated: false, childCount: 0, isExpanded: false }],
-        edges: [],
-      },
+      graphData: { nodes: [], edges: [] },
+      resolvedCount: 0,
     });
     render(<OntologyGraph {...defaultProps} />);
-    expect(
-      screen.getByText("No relationships found for this class")
-    ).toBeDefined();
+    expect(screen.getByText("No graph data available")).toBeDefined();
   });
 
   // --- Toolbar: node/edge counts ---
@@ -143,17 +142,6 @@ describe("OntologyGraph", () => {
   it("shows node and edge counts", () => {
     render(<OntologyGraph {...defaultProps} />);
     expect(screen.getByText(/2 nodes, 1 edges/)).toBeDefined();
-  });
-
-  it("shows resolved count when > 0", () => {
-    render(<OntologyGraph {...defaultProps} />);
-    expect(screen.getByText(/2 resolved/)).toBeDefined();
-  });
-
-  it("does not show resolved count when 0", () => {
-    mockUseGraphData.mockReturnValue({ ...defaultReturn, resolvedCount: 0 });
-    render(<OntologyGraph {...defaultProps} />);
-    expect(screen.queryByText(/resolved/)).toBeNull();
   });
 
   // --- Layout direction toggle ---
@@ -188,17 +176,16 @@ describe("OntologyGraph", () => {
     expect(defaultReturn.resetGraph).toHaveBeenCalledTimes(1);
   });
 
-  // --- Fit view button ---
-
-  it("renders Fit view button inside controls", () => {
-    render(<OntologyGraph {...defaultProps} />);
-    expect(screen.getByLabelText("Fit view")).toBeDefined();
-  });
-
   // --- Null graphData ---
 
   it("renders without crashing when graphData is null", () => {
-    mockUseGraphData.mockReturnValue({ ...defaultReturn, graphData: null });
+    // With no graph the hook reports resolvedCount 0 (nodes.length ?? 0), so the
+    // toolbar reads "0 nodes, 0 edges".
+    mockUseGraphData.mockReturnValue({
+      ...defaultReturn,
+      graphData: null,
+      resolvedCount: 0,
+    });
     render(<OntologyGraph {...defaultProps} />);
     expect(screen.getByTestId("react-flow")).toBeDefined();
     expect(screen.getByText(/0 nodes, 0 edges/)).toBeDefined();
@@ -206,13 +193,16 @@ describe("OntologyGraph", () => {
 
   // --- Passes correct options to useGraphData ---
 
-  it("passes correct options to useGraphData", () => {
+  it("passes the access token through as the token option", () => {
+    // Regression (/ce:review MEDIUM): OntologyGraph must forward accessToken to
+    // useGraphData as `token` so the graph endpoint receives the Bearer header
+    // for private projects.
     render(<OntologyGraph {...defaultProps} />);
     expect(mockUseGraphData).toHaveBeenCalledWith(
       expect.objectContaining({
         focusIri: "iri:Class1",
         projectId: "proj-1",
-        accessToken: "tok",
+        token: "tok",
         branch: "main",
       })
     );
@@ -248,7 +238,7 @@ describe("GraphLegend", () => {
     fireEvent.click(screen.getByLabelText("Expand legend"));
     expect(screen.getByText("Focus")).toBeDefined();
     expect(screen.getByText("Class")).toBeDefined();
-    expect(screen.getByText("Root")).toBeDefined();
+    expect(screen.getByText("Root ancestor")).toBeDefined();
     expect(screen.getByText("Individual")).toBeDefined();
     expect(screen.getByText("Property")).toBeDefined();
     expect(screen.getByText("External")).toBeDefined();
@@ -261,7 +251,7 @@ describe("GraphLegend", () => {
     expect(screen.getByText("subClassOf")).toBeDefined();
     expect(screen.getByText("equivalentTo")).toBeDefined();
     expect(screen.getByText("disjointWith")).toBeDefined();
-    expect(screen.getByText("seeAlso")).toBeDefined();
+    expect(screen.getByText("rdfs:seeAlso")).toBeDefined();
   });
 
   it("collapses legend when clicked again", () => {

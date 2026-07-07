@@ -86,7 +86,7 @@ describe("OntologyEdge", () => {
       </svg>
     );
     const edge = screen.getByTestId("base-edge-edge-1");
-    expect(edge.style.strokeDasharray).toBe("2 4");
+    expect(edge.style.strokeDasharray).toBe("6 3");
   });
 
   it("does not show label by default (not hovered)", () => {

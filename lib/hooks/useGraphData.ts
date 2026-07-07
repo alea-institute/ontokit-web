@@ -7,6 +7,11 @@ interface UseGraphDataOptions {
   focusIri: string | null;
   projectId: string;
   branch?: string;
+  /**
+   * OIDC access token. Threaded to the graph endpoint (OptionalUser) so private
+   * projects authorize; public projects still resolve when it is undefined.
+   */
+  token?: string;
 }
 
 interface UseGraphDataReturn {
@@ -23,6 +28,7 @@ export function useGraphData({
   focusIri,
   projectId,
   branch,
+  token,
 }: UseGraphDataOptions): UseGraphDataReturn {
   const [graphData, setGraphData] = useState<EntityGraphResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -46,11 +52,16 @@ export function useGraphData({
     expandedNodes.current = new Set([focusIri]);
 
     graphApi
-      .getEntityGraph(projectId, focusIri, {
-        branch,
-        ancestorsDepth: 5,
-        descendantsDepth: showDescendants ? 2 : 0,
-      })
+      .getEntityGraph(
+        projectId,
+        focusIri,
+        {
+          branch,
+          ancestorsDepth: 5,
+          descendantsDepth: showDescendants ? 2 : 0,
+        },
+        token,
+      )
       .then((data) => {
         if (!cancelled) setGraphData(data);
       })
@@ -64,7 +75,7 @@ export function useGraphData({
     return () => {
       cancelled = true;
     };
-  }, [focusIri, projectId, branch, showDescendants]);
+  }, [focusIri, projectId, branch, showDescendants, token]);
 
   // Progressive expansion: fetch 1-hop neighborhood and merge
   const expandNode = useCallback(
@@ -74,12 +85,17 @@ export function useGraphData({
       const generation = requestGeneration.current;
 
       graphApi
-        .getEntityGraph(projectId, iri, {
-          branch,
-          ancestorsDepth: 1,
-          descendantsDepth: 1,
-          maxNodes: 50,
-        })
+        .getEntityGraph(
+          projectId,
+          iri,
+          {
+            branch,
+            ancestorsDepth: 1,
+            descendantsDepth: 1,
+            maxNodes: 50,
+          },
+          token,
+        )
         .then((newData) => {
           // A newer focus/branch/descendants fetch superseded this expansion —
           // discard it rather than merge stale nodes into the current graph.
@@ -110,7 +126,7 @@ export function useGraphData({
           // Silently fail expansion
         });
     },
-    [graphData, projectId, branch],
+    [graphData, projectId, branch, token],
   );
 
   const resetGraph = useCallback(() => {

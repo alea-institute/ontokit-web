@@ -73,6 +73,7 @@ describe("useGraphData", () => {
       "proj-1",
       "http://example.org/A",
       expect.objectContaining({ ancestorsDepth: 5, descendantsDepth: 0 }),
+      undefined,
     );
     expect(result.current.graphData).not.toBeNull();
     expect(result.current.resolvedCount).toBe(1);
@@ -142,6 +143,7 @@ describe("useGraphData", () => {
         "proj-1",
         "http://example.org/A",
         expect.objectContaining({ descendantsDepth: 2 }),
+        undefined,
       ),
     );
   });
@@ -160,6 +162,68 @@ describe("useGraphData", () => {
         "proj-1",
         "http://example.org/A",
         expect.objectContaining({ branch: "dev" }),
+        undefined,
+      ),
+    );
+  });
+
+  // Regression: the graph endpoint is OptionalUser — private-project graphs
+  // 401/403 without the Bearer token. The pre-port code passed accessToken; the
+  // ported client dropped it (/ce:review MEDIUM). The hook must thread the token
+  // to getEntityGraph on both the focus fetch and progressive expansion.
+  it("threads the access token to the focus fetch", async () => {
+    renderHook(() =>
+      useGraphData({
+        focusIri: "http://example.org/A",
+        projectId: "proj-1",
+        token: "tok-123",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mockedGetEntityGraph).toHaveBeenCalledWith(
+        "proj-1",
+        "http://example.org/A",
+        expect.any(Object),
+        "tok-123",
+      ),
+    );
+  });
+
+  it("threads the access token to progressive expansion", async () => {
+    const { result } = renderHook(() =>
+      useGraphData({
+        focusIri: "http://example.org/A",
+        projectId: "proj-1",
+        token: "tok-123",
+      }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    mockedGetEntityGraph.mockClear();
+
+    await act(async () => {
+      result.current.expandNode("http://example.org/B");
+    });
+
+    expect(mockedGetEntityGraph).toHaveBeenCalledWith(
+      "proj-1",
+      "http://example.org/B",
+      expect.any(Object),
+      "tok-123",
+    );
+  });
+
+  it("omits the token argument for anonymous (public-project) reads", async () => {
+    renderHook(() =>
+      useGraphData({ focusIri: "http://example.org/A", projectId: "proj-1" }),
+    );
+
+    await waitFor(() =>
+      expect(mockedGetEntityGraph).toHaveBeenCalledWith(
+        "proj-1",
+        "http://example.org/A",
+        expect.any(Object),
+        undefined,
       ),
     );
   });
