@@ -75,6 +75,34 @@ describe("generateTurtleSnippet", () => {
     expect(snippet).toContain("rdfs:subPropertyOf");
   });
 
+  // ── B-1: property suggestions must NEVER emit owl:Class ──────────────
+
+  it("emits owl:ObjectProperty (never owl:Class) for an accepted object sub-property", () => {
+    const snippet = generateTurtleSnippet({
+      iri: "http://example.org/ont#hasSubPart",
+      label: "has sub part",
+      entityType: "objectProperty",
+      parentIri: "http://example.org/ont#hasPart",
+    });
+    expect(snippet).toContain("a owl:ObjectProperty");
+    expect(snippet).not.toContain("owl:Class");
+    // The parent link must be rdfs:subPropertyOf, not rdfs:subClassOf
+    expect(snippet).toContain("rdfs:subPropertyOf");
+    expect(snippet).not.toContain("rdfs:subClassOf");
+  });
+
+  it("emits owl:DatatypeProperty (never owl:Class) for an accepted data sub-property", () => {
+    const snippet = generateTurtleSnippet({
+      iri: "http://example.org/ont#birthYear",
+      label: "birth year",
+      entityType: "dataProperty",
+      parentIri: "http://example.org/ont#year",
+    });
+    expect(snippet).toContain("a owl:DatatypeProperty");
+    expect(snippet).not.toContain("owl:Class");
+    expect(snippet).toContain("rdfs:subPropertyOf");
+  });
+
   it("adds rdf:type for an individual with parent class", () => {
     const snippet = generateTurtleSnippet({
       iri: "http://example.org/ont#fido",

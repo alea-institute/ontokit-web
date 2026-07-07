@@ -71,7 +71,18 @@ interface PropertyDetailPanelProps {
   canUseLLM?: boolean;
   byoKey?: string;
   headerActions?: React.ReactNode;
-  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string) => void;
+  /**
+   * Create a new PROPERTY entity from an accepted sub-property suggestion.
+   * `propertyType` carries the parent property's OWL kind so the emitted
+   * snippet gets the correct rdf:type (owl:ObjectProperty / DatatypeProperty /
+   * AnnotationProperty) — NOT owl:Class (B-1).
+   */
+  onAddSuggestedProperty?: (
+    iri: string,
+    label: string,
+    parentIri: string,
+    propertyType: "object" | "data" | "annotation",
+  ) => void;
 }
 
 export function PropertyDetailPanel({
@@ -424,6 +435,7 @@ export function PropertyDetailPanel({
   const handleAcceptAnnotation = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
       if (!suggestion.property_iri) return;
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — only the value survives into the edit draft. See QA queue.
       const newValue = { value: editedValue ?? suggestion.value ?? suggestion.label, lang: suggestion.lang ?? "en" };
       if (suggestion.property_iri.endsWith("#label")) {
         setEditLabels((prev) => [...prev.filter((l) => l.value.trim()), newValue]);
@@ -450,6 +462,7 @@ export function PropertyDetailPanel({
   const handleAcceptDomainRange = useCallback(
     (suggestion: GeneratedSuggestion, _editedValue?: string) => {
       const targetIri = suggestion.target_iri ?? suggestion.iri;
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped when the domain/range is added. See QA queue.
       // Use relationship_type to distinguish domain vs range; default to domain
       if (suggestion.relationship_type?.includes("range")) {
         setEditRangeIris((prev) => prev.includes(targetIri) ? prev : [...prev, targetIri]);
@@ -463,10 +476,18 @@ export function PropertyDetailPanel({
 
   const handleAcceptChildProperty = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
-      // PROP-02: Create new property entity directly (same pattern as class children)
-      onAddSuggestedProperty?.(suggestion.iri, editedValue ?? suggestion.label, propertyIri!);
+      // PROP-02 / B-1: Create a new PROPERTY entity (not a class). Pass the
+      // parent property's OWL kind so the snippet emits the correct rdf:type
+      // and the node is NOT injected into the class tree.
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped on accept. See QA queue.
+      onAddSuggestedProperty?.(
+        suggestion.iri,
+        editedValue ?? suggestion.label,
+        propertyIri!,
+        detail?.propertyType ?? "object",
+      );
     },
-    [onAddSuggestedProperty, propertyIri],
+    [onAddSuggestedProperty, propertyIri, detail?.propertyType],
   );
 
   const annotationsSuggestions = useSuggestions({

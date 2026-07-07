@@ -65,6 +65,7 @@ export const generationApi = {
     data: GenerateSuggestionsRequest,
     token: string,
     byoKey?: string,
+    signal?: AbortSignal,
   ) =>
     api.post<GenerateSuggestionsResponse>(
       `/api/v1/projects/${projectId}/llm/generate-suggestions`,
@@ -74,6 +75,9 @@ export const generationApi = {
           Authorization: `Bearer ${token}`,
           ...(byoKey ? { "X-BYO-API-Key": byoKey } : {}),
         },
+        // Forwarded so an aborted controller (e.g. navigating away) actually
+        // cancels the underlying fetch rather than orphaning it.
+        signal,
       },
     ),
 };

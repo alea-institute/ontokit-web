@@ -134,6 +134,8 @@ export interface DeveloperEditorLayoutProps {
 
   // LLM suggestion support
   onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => void;
+  /** Create a new PROPERTY entity from an accepted sub-property suggestion (B-1). */
+  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation") => void;
   acceptedSuggestionIris?: Set<string>;
 }
 
@@ -187,6 +189,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     showSignInToEdit,
     onSignInToEdit,
     onAddSuggestedChild,
+    onAddSuggestedProperty,
     acceptedSuggestionIris,
   } = props;
 
@@ -666,7 +669,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   labelHints={treeLabelHintsRecord}
                   canUseLLM={llmGate.canUseLLM}
                   byoKey={byoEntry?.key}
-                  onAddSuggestedProperty={onAddSuggestedChild}
+                  onAddSuggestedProperty={onAddSuggestedProperty}
                   headerActions={selectedPropertyIri ? (
                     <BranchNavigator
                       nodes={nodes}
