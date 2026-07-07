@@ -1138,6 +1138,7 @@ export default function EditorPage() {
                   accessToken={session?.accessToken}
                   activeBranch={activeBranch}
                   canEdit={!!canEdit}
+                  userRole={project?.user_role}
                   entityNavigationRef={entityNavigationRef}
                   canSuggest={!!canSuggest}
                   isSuggestionMode={isSuggestionMode}
@@ -1190,6 +1191,7 @@ export default function EditorPage() {
                 accessToken={session?.accessToken}
                 activeBranch={activeBranch}
                 canEdit={!!canEdit}
+                userRole={project?.user_role}
                 canSuggest={!!canSuggest}
                 entityNavigationRef={entityNavigationRef}
                 isSuggestionMode={isSuggestionMode}
