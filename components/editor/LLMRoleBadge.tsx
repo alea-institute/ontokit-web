@@ -1,8 +1,9 @@
 import { cn } from "@/lib/utils";
+import type { ProjectRole } from "@/lib/api/projects";
 
 interface LLMRoleBadgeProps {
   roleLimitLabel: string | null;
-  userRole?: string | null;
+  userRole?: ProjectRole | null;
 }
 
 export function LLMRoleBadge({ roleLimitLabel, userRole }: LLMRoleBadgeProps) {
@@ -16,8 +17,9 @@ export function LLMRoleBadge({ roleLimitLabel, userRole }: LLMRoleBadgeProps) {
         "rounded-full px-2 py-1 text-xs font-semibold",
         roleColorClasses
       )}
-      aria-label={`Your LLM access: ${roleLimitLabel}`}
     >
+      {/* sr-only prefix: aria-label on a role-less span is unreliably exposed */}
+      <span className="sr-only">Your LLM access: </span>
       {roleLimitLabel}
     </span>
   );

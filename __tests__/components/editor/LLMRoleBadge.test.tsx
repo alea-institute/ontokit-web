@@ -11,15 +11,16 @@ describe("LLMRoleBadge", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders the role limit label with an accessible description", () => {
+  it("renders the role limit label with an accessible sr-only description", () => {
     render(
       <LLMRoleBadge
         roleLimitLabel={"Editor — 500/day"}
         userRole="editor"
       />
     );
-    const badge = screen.getByText("Editor — 500/day");
-    expect(badge.getAttribute("aria-label")).toBe("Your LLM access: Editor — 500/day");
+    expect(screen.getByText("Editor — 500/day")).toBeTruthy();
+    const srPrefix = screen.getByText("Your LLM access:");
+    expect(srPrefix.className).toContain("sr-only");
   });
 
   it("uses distinct color treatments per role", () => {

@@ -177,6 +177,49 @@ describe("useLLMGate", () => {
     expect(result.current.roleLimitLabel).toBe(expected);
   });
 
+  it("returns canUseLLM=false when the daily cap is consumed (server would 402)", async () => {
+    mockedUseSession.mockReturnValue(authedSession());
+    mockedGetStatus.mockResolvedValueOnce(
+      statusResponse({ daily_remaining: 0 })
+    );
+
+    const { result } = renderHook(() => useLLMGate("proj-1", "suggester"), {
+      wrapper: createWrapper(),
+    });
+
+    await waitFor(() => expect(result.current.dailyExhausted).toBe(true));
+    expect(result.current.canUseLLM).toBe(false);
+    expect(result.current.hasRoleAccess).toBe(true);
+    expect(result.current.budgetExhausted).toBe(false);
+  });
+
+  it("does not claim notConfigured while loading or on fetch error", async () => {
+    mockedUseSession.mockReturnValue(authedSession());
+    let rejectFetch: (err: Error) => void = () => {};
+    mockedGetStatus.mockReturnValueOnce(
+      new Promise((_resolve, reject) => {
+        rejectFetch = reject;
+      })
+    );
+
+    const { result } = renderHook(() => useLLMGate("proj-1", "editor"), {
+      wrapper: createWrapper(),
+    });
+
+    // While loading: unknown, not "unconfigured"
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.notConfigured).toBe(false);
+    expect(result.current.canUseLLM).toBe(false); // fail closed
+
+    rejectFetch(new Error("500 Internal Server Error"));
+    await waitFor(() => expect(result.current.isError).toBe(true));
+
+    // On error: still not "unconfigured" — the server never said that
+    expect(result.current.notConfigured).toBe(false);
+    expect(result.current.canUseLLM).toBe(false);
+    expect(result.current.error).toBeInstanceOf(Error);
+  });
+
   it("invalidateStatus triggers a status refetch (post-402 recovery path)", async () => {
     mockedUseSession.mockReturnValue(authedSession());
     mockedGetStatus.mockResolvedValue(statusResponse());
