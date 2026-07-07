@@ -48,8 +48,24 @@ describe("LLMBudgetBanner", () => {
       screen.getByText(/AI budget 85% used this month/)
     ).toBeTruthy();
     expect(screen.getByText(/\$15\.00 remaining/)).toBeTruthy();
-    // Warning is informational, not an alert
+    // Warning is informational, not an alert — but must be a polite live
+    // region so screen readers hear it before the budget is fully gone
     expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.getByRole("status")).toBeTruthy();
+  });
+
+  it("keeps warning when spend passes 100% before the server flags exhaustion", () => {
+    render(
+      <LLMBudgetBanner
+        budgetExhausted={false}
+        monthlySpentUsd={105}
+        monthlyBudgetUsd={100}
+      />
+    );
+    const status = screen.getByRole("status");
+    expect(status.textContent).toMatch(/AI budget 105% used this month/);
+    // Remaining clamps to zero, never negative
+    expect(status.textContent).toMatch(/\$0\.00 remaining/);
   });
 
   it("shows the exhausted alert when budgetExhausted is true", () => {
@@ -89,7 +105,7 @@ describe("LLMBudgetBanner", () => {
       />
     );
     await user.click(
-      screen.getByRole("button", { name: "Dismiss budget warning" })
+      screen.getByRole("button", { name: "Dismiss budget notice" })
     );
     expect(screen.queryByRole("alert")).toBeNull();
   });
