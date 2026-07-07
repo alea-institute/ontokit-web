@@ -27,6 +27,26 @@ Both projects benefit from grassroots-level collaborative ontology editing — t
 - Dark mode support
 - Responsive design
 
+## Who It's For
+
+OntoKit is built for the mixed communities that maintain a shared ontology — domain experts who know the subject but not the formalisms, engineers who live in Turtle, and the stewards who keep contributions coherent. Each has a tailored path through the app.
+
+- **Domain contributor** (e.g., a canon-law scholar, a theologian, a legal analyst) — *Goal: capture their expertise as concepts and relationships without learning OWL.* Works in the **Standard** editor: a class tree, property and annotation forms, entity search, and multi-language labels. Instead of committing directly, they open a **suggestion** session that a maintainer reviews — so subject-matter knowledge flows in even without write access or RDF fluency.
+- **Ontology engineer / knowledge modeler** — *Goal: model precisely and keep the ontology logically sound.* Switches to the **Developer** editor to edit Turtle/OWL source directly (Monaco), inspects the class hierarchy in the interactive graph, and runs quality, lint, consistency, and delete-impact checks. Semantic (embedding-based) search surfaces similar concepts to avoid duplicates before adding new ones.
+- **Maintainer / ontology steward** (project owner or admin) — *Goal: protect quality while welcoming outside contributions.* Reviews **pull requests** and suggestion sessions with triple-level diffs, comments, requests changes, approves, and merges. Manages the team via join requests and roles (owner, admin, editor, reviewer, contributor, viewer) and syncs the merged ontology to a GitHub repository.
+- **Project lead / community organizer** — *Goal: run a grassroots ontology effort.* Creates public or private projects, invites and permissions contributors, watches growth through project analytics, and coordinates the kind of open, collaborative editing that FOLIO and the Catholic Semantic Canon depend on.
+- **Learner / ontology consumer** — *Goal: understand or reuse an existing ontology.* Browses public projects, reads the built-in guide (what an ontology is, common vocabularies, syntax, and formats), explores class hierarchies visually, and references the API for downstream integration.
+
+## Use Cases
+
+- **Crowd-sourced legal and canonical vocabularies** — maintain structured vocabularies for governmental rules and laws (FOLIO) and the rules and laws of faith (Catholic Semantic Canon), with domain experts contributing directly through guided forms.
+- **Review-gated ontology curation** — accept changes from non-technical contributors as reviewable suggestions and pull requests, keeping a formal ontology accurate without granting everyone commit rights.
+- **Collaborative OWL modeling** — let engineers edit Turtle source, visualize the class hierarchy, and run consistency and lint checks together on the same ontology in real time.
+- **Duplicate-free concept authoring** — use semantic search over existing concepts to find and reuse near-matches before introducing redundant classes or properties.
+- **Multilingual terminology management** — attach labels and annotations in multiple languages so an ontology serves international and cross-jurisdictional communities.
+- **Versioned, auditable knowledge history** — track every change through branches, commits, and revision history, and review triple-level diffs before merging.
+- **GitHub-backed publishing** — synchronize a curated ontology to a GitHub repository so it can be versioned, released, and consumed by downstream tools.
+
 ## Tech Stack
 
 - **Framework**: Next.js 15 (App Router)
