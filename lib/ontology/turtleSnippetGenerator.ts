@@ -9,6 +9,34 @@ import type { EntityType } from "./iriGeneration";
 
 // ── Types ────────────────────────────────────────────────────────────
 
+/**
+ * PROV-O provenance for an AI-generated entity (q9 decision: PROV-O).
+ *
+ * Persisted on the new entity as:
+ * `prov:wasGeneratedBy [ a prov:Activity ;
+ *    prov:wasAssociatedWith [ a prov:SoftwareAgent ; rdfs:label <model> ] ;
+ *    prov:used [ a prov:Plan ; rdfs:label <promptTemplate> ] ]`
+ *
+ * Only entities actually minted from an accepted LLM suggestion should carry
+ * this. Value-level accepts on EXISTING entities (annotations/parents/edges)
+ * are deliberately NOT stamped: statement-level provenance is not expressible
+ * in plain Turtle without reification, and `prov:wasGeneratedBy` on a
+ * pre-existing entity would assert something false.
+ */
+export interface SnippetProvenance {
+  /** Model id that generated the suggestion (e.g., "openai/gpt-4o") */
+  model: string;
+  /** Prompt-template dispatch key (e.g., "children-v1") — persisted as a prov:Plan */
+  promptTemplate?: string;
+  /**
+   * Emit `@prefix prov: <http://www.w3.org/ns/prov#> .` ahead of the entity
+   * block. Turtle allows re-declaration, so `true` is always safe; callers
+   * that can see the document source may pass `false` when the prefix is
+   * already declared, to keep the source tidy. Default: true.
+   */
+  declarePrefix?: boolean;
+}
+
 export interface TurtleSnippetOptions {
   /** Full IRI of the new entity */
   iri: string;
@@ -22,6 +50,8 @@ export interface TurtleSnippetOptions {
   ontologyPrefix?: string;
   /** The ontology namespace (e.g., "http://example.org/ont#") */
   ontologyNamespace?: string;
+  /** If provided, persists PROV-O provenance triples on the new entity */
+  provenance?: SnippetProvenance;
 }
 
 // ── Mappings ─────────────────────────────────────────────────────────
@@ -41,6 +71,17 @@ const PARENT_PREDICATE: Record<EntityType, string> = {
   annotationProperty: "rdfs:subPropertyOf",
   individual: "rdf:type",
 };
+
+/** W3C PROV-O namespace (inline constant — no runtime dependency). */
+export const PROV_NAMESPACE = "http://www.w3.org/ns/prov#";
+
+const PROV_PREFIX_DIRECTIVE = `@prefix prov: <${PROV_NAMESPACE}> .`;
+
+/**
+ * Matches an existing prov: prefix declaration in a Turtle document
+ * (`@prefix prov: …` or SPARQL-style `PREFIX prov: …`).
+ */
+export const PROV_PREFIX_DECLARED_RE = /^\s*(@prefix|PREFIX)\s+prov:/im;
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -66,6 +107,33 @@ function toPrefixedOrFull(
   return `<${iri}>`;
 }
 
+/**
+ * Build the PROV-O predicate block for an AI-generated entity.
+ * Returned WITHOUT leading indentation on the first line (the caller
+ * indents predicate lines uniformly).
+ */
+function provenanceBlock(provenance: SnippetProvenance): string {
+  const model = escapeTurtleString(provenance.model);
+  const inner: string[] = [
+    "        a prov:Activity ;",
+    "        prov:wasAssociatedWith [",
+    "            a prov:SoftwareAgent ;",
+    `            rdfs:label "${model}"`,
+    "        ]",
+  ];
+  if (provenance.promptTemplate) {
+    const plan = escapeTurtleString(provenance.promptTemplate);
+    inner[inner.length - 1] += " ;";
+    inner.push(
+      "        prov:used [",
+      "            a prov:Plan ;",
+      `            rdfs:label "${plan}"`,
+      "        ]",
+    );
+  }
+  return ["prov:wasGeneratedBy [", ...inner, "    ]"].join("\n");
+}
+
 // ── Generator ────────────────────────────────────────────────────────
 
 /**
@@ -86,30 +154,37 @@ export function generateTurtleSnippet(options: TurtleSnippetOptions): string {
     parentIri,
     ontologyPrefix,
     ontologyNamespace,
+    provenance,
   } = options;
 
   const subject = toPrefixedOrFull(iri, ontologyPrefix, ontologyNamespace);
   const owlType = OWL_TYPE[entityType];
   const escapedLabel = escapeTurtleString(label);
 
-  const lines: string[] = [];
+  // Predicate list (joined with ";", terminated with ".")
+  const predicates: string[] = [`rdfs:label "${escapedLabel}"@en`];
 
-  // Subject and rdf:type
-  lines.push(`${subject} a ${owlType} ;`);
-
-  // rdfs:label
-  if (parentIri) {
-    lines.push(`    rdfs:label "${escapedLabel}"@en ;`);
-  } else {
-    lines.push(`    rdfs:label "${escapedLabel}"@en .`);
-  }
-
-  // Parent relationship
   if (parentIri) {
     const predicate = PARENT_PREDICATE[entityType];
     const parentRef = toPrefixedOrFull(parentIri, ontologyPrefix, ontologyNamespace);
-    lines.push(`    ${predicate} ${parentRef} .`);
+    predicates.push(`${predicate} ${parentRef}`);
   }
+
+  if (provenance) {
+    predicates.push(provenanceBlock(provenance));
+  }
+
+  const lines: string[] = [];
+
+  if (provenance && provenance.declarePrefix !== false) {
+    lines.push(PROV_PREFIX_DIRECTIVE);
+  }
+
+  lines.push(`${subject} a ${owlType} ;`);
+  predicates.forEach((p, i) => {
+    const terminator = i === predicates.length - 1 ? " ." : " ;";
+    lines.push(`    ${p}${terminator}`);
+  });
 
   // Leading blank line for separation, trailing newline
   return "\n" + lines.join("\n") + "\n";

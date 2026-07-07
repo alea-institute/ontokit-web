@@ -208,4 +208,104 @@ describe("generateTurtleSnippet", () => {
     });
     expect(snippet.trimEnd()).toMatch(/\.$/);
   });
+
+  // ── PROV-O provenance (q9: PROV-O persistence for AI-generated entities) ──
+
+  describe("PROV-O provenance", () => {
+    const base = {
+      iri: "http://example.org/ont#Foo",
+      label: "Foo",
+      entityType: "class" as const,
+      parentIri: "http://example.org/ont#Bar",
+      ontologyPrefix: "ex",
+      ontologyNamespace: "http://example.org/ont#",
+    };
+
+    it("emits no PROV-O triples when provenance is absent", () => {
+      const snippet = generateTurtleSnippet(base);
+      expect(snippet).not.toContain("prov:");
+    });
+
+    it("persists prov:wasGeneratedBy with a prov:SoftwareAgent carrying the model id", () => {
+      const snippet = generateTurtleSnippet({
+        ...base,
+        provenance: { model: "openai/gpt-4o" },
+      });
+      expect(snippet).toContain("prov:wasGeneratedBy [");
+      expect(snippet).toContain("a prov:Activity");
+      expect(snippet).toContain("prov:wasAssociatedWith [");
+      expect(snippet).toContain("a prov:SoftwareAgent");
+      expect(snippet).toContain('rdfs:label "openai/gpt-4o"');
+    });
+
+    it("persists the prompt template as a prov:Plan via prov:used", () => {
+      const snippet = generateTurtleSnippet({
+        ...base,
+        provenance: { model: "openai/gpt-4o", promptTemplate: "children-v1" },
+      });
+      expect(snippet).toContain("prov:used [");
+      expect(snippet).toContain("a prov:Plan");
+      expect(snippet).toContain('rdfs:label "children-v1"');
+    });
+
+    it("omits prov:used when no prompt template is given", () => {
+      const snippet = generateTurtleSnippet({
+        ...base,
+        provenance: { model: "openai/gpt-4o" },
+      });
+      expect(snippet).not.toContain("prov:used");
+      expect(snippet).not.toContain("prov:Plan");
+    });
+
+    it("declares the prov prefix by default", () => {
+      const snippet = generateTurtleSnippet({
+        ...base,
+        provenance: { model: "m" },
+      });
+      expect(snippet).toContain("@prefix prov: <http://www.w3.org/ns/prov#> .");
+    });
+
+    it("suppresses the prefix declaration when declarePrefix is false", () => {
+      const snippet = generateTurtleSnippet({
+        ...base,
+        provenance: { model: "m", declarePrefix: false },
+      });
+      expect(snippet).not.toContain("@prefix");
+      expect(snippet).toContain("prov:wasGeneratedBy");
+    });
+
+    it("keeps the parent link and label intact alongside provenance", () => {
+      const snippet = generateTurtleSnippet({
+        ...base,
+        provenance: { model: "m", promptTemplate: "t" },
+      });
+      expect(snippet).toContain("ex:Foo a owl:Class ;");
+      expect(snippet).toContain('rdfs:label "Foo"@en ;');
+      expect(snippet).toContain("rdfs:subClassOf ex:Bar ;");
+      expect(snippet.trimEnd()).toMatch(/\] \.$/);
+    });
+
+    it("escapes quotes and backslashes in model and template ids", () => {
+      const snippet = generateTurtleSnippet({
+        ...base,
+        provenance: { model: 'mo"del\\x', promptTemplate: 'te"mpl' },
+      });
+      expect(snippet).toContain('rdfs:label "mo\\"del\\\\x"');
+      expect(snippet).toContain('rdfs:label "te\\"mpl"');
+    });
+
+    it("emits a balanced, period-terminated block (well-formed Turtle shape)", () => {
+      const snippet = generateTurtleSnippet({
+        ...base,
+        provenance: { model: "m", promptTemplate: "t" },
+      });
+      const opens = (snippet.match(/\[/g) ?? []).length;
+      const closes = (snippet.match(/\]/g) ?? []).length;
+      expect(opens).toBe(closes);
+      expect(snippet.trimEnd()).toMatch(/\.$/);
+      // exactly one statement terminator after the prefix directive
+      const body = snippet.split("\n").filter((l) => !l.startsWith("@prefix"));
+      expect(body.join("\n").match(/ \.\s*$/)).toBeTruthy();
+    });
+  });
 });
