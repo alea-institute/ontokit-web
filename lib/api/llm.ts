@@ -134,8 +134,6 @@ export const llmApi = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 
-  // PR-4 (cost controls): /llm/status is not wired by any hook in PR-3 — shipped
-  // inert here so the client surface travels with lib/api/llm.ts.
   getStatus: (projectId: string, token: string) =>
     api.get<LLMStatusResponse>(`/api/v1/projects/${projectId}/llm/status`, {
       headers: { Authorization: `Bearer ${token}` },
