@@ -66,6 +66,7 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
         { class_iri: entityIri, branch, suggestion_type: suggestionType, batch_size: batchSize },
         accessToken,
         byoKey,
+        controller.signal,
       );
       if (!controller.signal.aborted) {
         store.getState().setSuggestions(entityIri, suggestionType, response.suggestions);

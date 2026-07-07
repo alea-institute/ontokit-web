@@ -41,9 +41,18 @@ export function SuggestionCard({
 
   // Provenance attribution surfaced on the sparkle icon (full badge UI ships
   // with the reviewer tools; here every suggestion still declares its origin).
+  // Both the model AND the prompt-template are surfaced so every suggestion
+  // carries its full generation provenance (H-3).
+  const modelLabel = suggestion.model
+    ? ` by ${suggestion.model}${suggestion.prompt_template ? ` (${suggestion.prompt_template})` : ""}`
+    : suggestion.prompt_template
+      ? ` (${suggestion.prompt_template})`
+      : "";
   const provenanceLabel = isUserEdited
-    ? `AI-suggested${suggestion.model ? ` by ${suggestion.model}` : ""}, edited by you`
-    : `AI-suggested${suggestion.model ? ` by ${suggestion.model}` : ""}`;
+    ? `AI-suggested${modelLabel}, edited by you`
+    : `AI-suggested${modelLabel}`;
+
+  const validationErrors = suggestion.validation_errors ?? [];
 
   // Display the annotation value when property_iri exists, otherwise the label
   const displayText = suggestion.property_iri
@@ -56,9 +65,18 @@ export function SuggestionCard({
   }, [item.editedValue, displayText]);
 
   const handleAcceptEdit = useCallback(() => {
+    // M-5: the edit flow (onEdit) bypasses the plain Accept button's
+    // `disabled || isBlocked` guard. If this suggestion is a blocked duplicate
+    // and the text was NOT changed, committing would silently accept the
+    // duplicate — so refuse. If the text changed, the duplicate was resolved
+    // by editing and we allow the commit (the store re-flags provenance).
+    if (isBlocked && editValue === displayText) {
+      setIsEditing(false);
+      return;
+    }
     onEdit(editValue);
     setIsEditing(false);
-  }, [editValue, onEdit]);
+  }, [editValue, onEdit, isBlocked, displayText]);
 
   const handleDiscardEdit = useCallback(() => {
     setIsEditing(false);
@@ -121,21 +139,38 @@ export function SuggestionCard({
             ))}
           </div>
         )}
+
+        {/* Validation errors (L-2) — malformed suggestions must not read as clean */}
+        {validationErrors.length > 0 && !isEditing && (
+          <ul className="mt-1 space-y-0.5">
+            {validationErrors.map((err, i) => (
+              <li
+                key={`${err.field}-${err.code}-${i}`}
+                className="text-xs text-red-600 dark:text-red-400"
+              >
+                {err.field ? `${err.field}: ` : ""}{err.message}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
-      {/* Duplicate warn icon */}
+      {/* Duplicate warn icon (M-4 — announced to screen readers) */}
       {isWarned && !isEditing && (
-        <span className="shrink-0 mt-0.5" title="Similar entity exists">
+        <span className="shrink-0 mt-0.5" title="Similar entity may already exist">
           <AlertTriangle
             className="h-3.5 w-3.5 text-amber-500"
-            aria-hidden="true"
+            aria-label="Similar entity may already exist"
+            role="img"
           />
+          <span className="sr-only">Similar entity may already exist</span>
         </span>
       )}
 
-      {/* Confidence badge */}
+      {/* Confidence badge (L-3 — accessible name) */}
       {confidence !== null && confidence !== undefined && !isEditing && (
         <span
+          aria-label={`confidence ${Math.round(confidence * 100)}%`}
           className={cn(
             "inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-medium shrink-0",
             confidenceBadgeClass(confidence)

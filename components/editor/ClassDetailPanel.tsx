@@ -47,7 +47,7 @@ import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { useToast } from "@/lib/context/ToastContext";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
-import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton, SuggestionScopeToggle, type SuggestionScope } from "@/components/editor/suggestions";
+import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
 import type { GeneratedSuggestion } from "@/lib/api/generation";
 import type { ProjectRole } from "@/lib/api/projects";
 
@@ -516,9 +516,6 @@ export function ClassDetailPanel({
     ]);
   }, []);
 
-  // ── Annotation scope toggle state (D-05) ──
-  const [annotationScope, setAnnotationScope] = useState<SuggestionScope>("this-class");
-
   // ── Suggestion hooks — one per section type ──
   const suggestionOpts = {
     projectId,
@@ -533,6 +530,7 @@ export function ClassDetailPanel({
   const handleAcceptChildSuggestion = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
       // D-07: Create entity directly in tree WITHOUT opening AddEntityDialog
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — currently dropped on accept. See QA queue.
       onAddSuggestedChild?.(suggestion.iri, editedValue ?? suggestion.label, classIri!);
     },
     [onAddSuggestedChild, classIri],
@@ -541,6 +539,7 @@ export function ClassDetailPanel({
   const handleAcceptAnnotationSuggestion = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
       if (!suggestion.property_iri) return;
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — only the value survives into the edit draft. See QA queue.
       // Merge into edit annotations state
       setEditAnnotations((prev) => {
         const existing = prev.find((a) => a.property_iri === suggestion.property_iri);
@@ -561,6 +560,7 @@ export function ClassDetailPanel({
 
   const handleAcceptParentSuggestion = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped when the parent is added. See QA queue.
       addParent(suggestion.iri, editedValue ?? suggestion.label);
     },
     [addParent],
@@ -569,6 +569,7 @@ export function ClassDetailPanel({
   const handleAcceptEdgeSuggestion = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
       if (!suggestion.relationship_type || !suggestion.target_iri) return;
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped when the edge is added. See QA queue.
       setEditRelationships((prev) => {
         const existing = prev.find((g) => g.property_iri === suggestion.relationship_type);
         const newTarget: RelationshipTarget = {
@@ -624,18 +625,19 @@ export function ClassDetailPanel({
     onAccepted: handleAcceptEdgeSuggestion,
   });
 
-  // D-09: Auto-fire annotation suggestions when navigating via BranchNavigator
-  const prevAutoSuggestIriRef = useRef(classIri);
+  // D-09 / M-1: Auto-fire annotation suggestions when navigating via
+  // BranchNavigator. The panel is REMOUNTED per selection (key={selectedIri}
+  // in both layouts), so an intra-instance "IRI changed" guard could never
+  // fire. Instead we fire once on mount when the layout has flagged this
+  // navigation as auto-suggest. A per-instance ref guarantees exactly one
+  // request even if the flag prop toggles during the instance's lifetime.
+  const didAutoSuggestRef = useRef(false);
   useEffect(() => {
-    if (
-      autoSuggestAnnotationsOnMount &&
-      classIri &&
-      classIri !== prevAutoSuggestIriRef.current &&
-      canUseLLM
-    ) {
+    if (didAutoSuggestRef.current) return;
+    if (autoSuggestAnnotationsOnMount && classIri && canUseLLM) {
+      didAutoSuggestRef.current = true;
       annotationsSuggestions.request();
     }
-    prevAutoSuggestIriRef.current = classIri;
   }, [classIri, autoSuggestAnnotationsOnMount, canUseLLM]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Helper: Render suggestion slot for a section ──
@@ -1126,7 +1128,11 @@ export function ClassDetailPanel({
                   />
                 )}
 
-                {/* Annotation Suggestion Slot with scope toggle (D-05) */}
+                {/* Annotation Suggestion Slot (M-2: the scope toggle was a
+                    no-op — GenerateSuggestionsRequest has no scope field, so
+                    it has been removed to avoid misleading users.
+                    TODO: restore a scope toggle here once the backend accepts a
+                    scope parameter on generate-suggestions.) */}
                 {canUseLLM && (
                   <div className="mt-2 flex items-center gap-2">
                     <SuggestImprovementsButton
@@ -1134,7 +1140,6 @@ export function ClassDetailPanel({
                       isLoading={annotationsSuggestions.isLoading}
                       disabled={!classIri}
                     />
-                    <SuggestionScopeToggle value={annotationScope} onChange={setAnnotationScope} />
                   </div>
                 )}
                 {renderSuggestionSlot(annotationsSuggestions)}

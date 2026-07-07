@@ -23,7 +23,10 @@ async function request<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { params, ...fetchOptions } = options;
+  // Pull the caller's optional AbortSignal out so we can combine it with the
+  // internal per-attempt timeout controller (we can't pass two signals to
+  // fetch directly).
+  const { params, signal: externalSignal, ...fetchOptions } = options;
 
   // Build URL with query params
   const url = new URL(`${API_BASE}${endpoint}`);
@@ -45,6 +48,14 @@ async function request<T>(
   for (let attempt = 0; attempt <= 2; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+    // Forward the caller's abort (e.g. navigating away cancels an in-flight
+    // suggestion request) onto the per-attempt timeout controller.
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort();
+      else externalSignal.addEventListener("abort", onExternalAbort, { once: true });
+    }
 
     try {
       const response = await fetch(url.toString(), {
@@ -73,6 +84,7 @@ async function request<T>(
       throw error;
     } finally {
       clearTimeout(timeoutId);
+      externalSignal?.removeEventListener("abort", onExternalAbort);
     }
   }
 

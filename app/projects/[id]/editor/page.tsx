@@ -21,6 +21,7 @@ import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { useQueryClient } from "@tanstack/react-query";
 import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
+import { useLLMGate } from "@/lib/hooks/useLLMGate";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
@@ -46,6 +47,15 @@ import { useAnonymousSuggestion } from "@/lib/hooks/useAnonymousSuggestion";
 import { CreditModal } from "@/components/suggestions/CreditModal";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+
+/**
+ * True when a suggestion card (role="listitem") currently owns focus. Used to
+ * gate the bare-key suggestion shortcuts so they only fire — and only consume
+ * the event — when the user is actually reviewing a suggestion (H-1).
+ */
+function suggestionCardHasFocus(): boolean {
+  return !!document.activeElement?.closest('[role="listitem"]');
+}
 
 export default function EditorPage() {
   const { data: session, status } = useSession();
@@ -116,6 +126,12 @@ export default function EditorPage() {
     connectionStatus, wsEndpoint, wsPurpose,
     resetSourceState,
   } = viewer;
+
+  // LLM access gate — shared (React Query dedupes) with the layouts. Used here
+  // to scope the suggestion keyboard shortcuts so they only register when the
+  // project actually has LLM access (H-1).
+  const llmGate = useLLMGate(projectId, project?.user_role);
+  const canUseLLM = llmGate.canUseLLM;
 
   // UI state (editor-only)
   const [showHistory, setShowHistory] = useState(false);
@@ -394,9 +410,10 @@ export default function EditorPage() {
     [canSuggest, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
   );
 
-  // Handle accepted child suggestion — creates entity directly in tree (D-07)
+  // Handle accepted child suggestion — creates a CLASS entity directly in tree (D-07)
   const handleAddSuggestedChild = useCallback((iri: string, label: string, parentIri: string) => {
     // Generate Turtle snippet for the new entity (same as handleEntityConfirm)
+    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — the accepted suggestion's metadata is dropped here. See QA queue.
     const snippet = generateTurtleSnippet({
       iri,
       label,
@@ -420,6 +437,45 @@ export default function EditorPage() {
     // Track as accepted-suggestion IRI for sparkle badge
     setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
   }, [ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, setSourceContent]);
+
+  // Handle accepted sub-PROPERTY suggestion (B-1). Distinct from
+  // handleAddSuggestedChild (classes): emits the correct OWL property rdf:type
+  // and does NOT push a node into the class tree — properties live in the
+  // property tree, which re-derives from the ontology source.
+  const handleAddSuggestedProperty = useCallback((
+    iri: string,
+    label: string,
+    parentIri: string,
+    propertyType: "object" | "data" | "annotation" = "object",
+  ) => {
+    const entityType =
+      propertyType === "data"
+        ? "dataProperty"
+        : propertyType === "annotation"
+          ? "annotationProperty"
+          : "objectProperty";
+
+    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped here; only label/type/parent are emitted. See QA queue.
+    const snippet = generateTurtleSnippet({
+      iri,
+      label,
+      entityType,
+      parentIri,
+      ontologyPrefix,
+      ontologyNamespace,
+    });
+
+    // Insert into source (no class-tree optimistic insert — this is a property)
+    if (sourceEditorRef.current) {
+      sourceEditorRef.current.insertAtEnd(snippet);
+      setSourceContent(sourceEditorRef.current.getValue());
+    } else if (sourceContent) {
+      setSourceContent((prev) => prev + snippet);
+    }
+
+    // Track as accepted-suggestion IRI for sparkle badge
+    setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
+  }, [ontologyPrefix, ontologyNamespace, sourceContent, setSourceContent]);
 
   // Handle copy IRI
   const handleCopyIri = useCallback(async (iri: string) => {
@@ -885,47 +941,55 @@ export default function EditorPage() {
       global: true,
       ignoreWhenEditorFocused: false,
     },
-    // Suggestion curation shortcuts (D-16)
-    {
-      id: "suggestion-accept",
-      key: "Enter",
-      description: "Accept focused suggestion",
-      category: "Suggestions",
-      action: () => {
-        const focused = document.activeElement?.closest('[role="listitem"]');
-        if (focused) {
-          const acceptBtn = focused.querySelector('[aria-label="Accept suggestion"]') as HTMLButtonElement;
-          acceptBtn?.click();
-        }
+    // Suggestion curation shortcuts (D-16). Only registered when the project
+    // has LLM access, and each is gated (shouldFire) on a suggestion card
+    // actually owning focus — so a bare Enter/Delete/e never hijacks a focused
+    // button/link elsewhere in the editor (H-1).
+    ...(canUseLLM ? [
+      {
+        id: "suggestion-accept",
+        key: "Enter",
+        description: "Accept focused suggestion",
+        category: "Suggestions",
+        shouldFire: suggestionCardHasFocus,
+        action: () => {
+          const focused = document.activeElement?.closest('[role="listitem"]');
+          if (focused) {
+            const acceptBtn = focused.querySelector('[aria-label="Accept suggestion"]') as HTMLButtonElement | null;
+            acceptBtn?.click();
+          }
+        },
       },
-    },
-    {
-      id: "suggestion-reject",
-      key: "Delete",
-      description: "Reject focused suggestion",
-      category: "Suggestions",
-      action: () => {
-        const focused = document.activeElement?.closest('[role="listitem"]');
-        if (focused) {
-          const rejectBtn = focused.querySelector('[aria-label="Reject suggestion"]') as HTMLButtonElement;
-          rejectBtn?.click();
-        }
+      {
+        id: "suggestion-reject",
+        key: "Delete",
+        description: "Reject focused suggestion",
+        category: "Suggestions",
+        shouldFire: suggestionCardHasFocus,
+        action: () => {
+          const focused = document.activeElement?.closest('[role="listitem"]');
+          if (focused) {
+            const rejectBtn = focused.querySelector('[aria-label="Reject suggestion"]') as HTMLButtonElement | null;
+            rejectBtn?.click();
+          }
+        },
       },
-    },
-    {
-      id: "suggestion-edit",
-      key: "e",
-      description: "Edit focused suggestion",
-      category: "Suggestions",
-      action: () => {
-        const focused = document.activeElement?.closest('[role="listitem"]');
-        if (focused) {
-          const editBtn = focused.querySelector('[aria-label="Edit suggestion before accepting"]') as HTMLButtonElement;
-          editBtn?.click();
-        }
+      {
+        id: "suggestion-edit",
+        key: "e",
+        description: "Edit focused suggestion",
+        category: "Suggestions",
+        shouldFire: suggestionCardHasFocus,
+        action: () => {
+          const focused = document.activeElement?.closest('[role="listitem"]');
+          if (focused) {
+            const editBtn = focused.querySelector('[aria-label="Edit suggestion before accepting"]') as HTMLButtonElement | null;
+            editBtn?.click();
+          }
+        },
       },
-    },
-  ], [handleAddEntity, shortcutDialogOpen, showHistory, canSuggest]);
+    ] : []),
+  ], [handleAddEntity, shortcutDialogOpen, showHistory, canSuggest, canUseLLM]);
 
   useKeyboardShortcuts(keyboardShortcuts);
 
@@ -1322,6 +1386,7 @@ export default function EditorPage() {
                   onProposeEdit={handleProposeEdit}
                   isAnonymousProposalMode={isAnonymousProposalMode}
                   onAddSuggestedChild={handleAddSuggestedChild}
+                  onAddSuggestedProperty={handleAddSuggestedProperty}
                   acceptedSuggestionIris={acceptedSuggestionIris}
                 />
               </div>
@@ -1374,6 +1439,7 @@ export default function EditorPage() {
                 onProposeEdit={handleProposeEdit}
                 isAnonymousProposalMode={isAnonymousProposalMode}
                 onAddSuggestedChild={handleAddSuggestedChild}
+                onAddSuggestedProperty={handleAddSuggestedProperty}
                 acceptedSuggestionIris={acceptedSuggestionIris}
               />
             )}

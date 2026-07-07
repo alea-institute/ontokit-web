@@ -93,6 +93,13 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
     }),
   clearAllSuggestions: () => set({ suggestions: {} }),
   getPendingCount: () => {
+    // L-1: this counts pending suggestions across EVERY entity ever visited in
+    // the session, so the badge accumulates as the user navigates. Clearing on
+    // navigation would discard in-progress review that the user may return to,
+    // so leaving the accumulation for now.
+    // TODO(L-1): scope the pending badge to the active entity (or expire stale
+    // per-entity suggestion sets) once we have a clear signal for "review
+    // abandoned" vs "navigated but will return".
     const { suggestions } = get();
     return Object.values(suggestions)
       .flat()

@@ -88,6 +88,22 @@ describe("generationApi", () => {
     );
   });
 
+  it("generateSuggestions forwards the AbortSignal to api.post (M-3)", async () => {
+    mockPost.mockResolvedValue(MOCK_RESPONSE);
+
+    const data: GenerateSuggestionsRequest = {
+      class_iri: "http://example.org/Foo",
+      branch: "main",
+      suggestion_type: "children",
+    };
+
+    const controller = new AbortController();
+    await generationApi.generateSuggestions("proj-1", data, "tok-abc", undefined, controller.signal);
+
+    const [, , options] = mockPost.mock.calls[0];
+    expect(options?.signal).toBe(controller.signal);
+  });
+
   it("generateSuggestions omits X-BYO-API-Key header when byoKey is undefined", async () => {
     mockPost.mockResolvedValue(MOCK_RESPONSE);
 

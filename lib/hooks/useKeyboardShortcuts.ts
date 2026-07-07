@@ -13,6 +13,14 @@ export interface ShortcutDefinition {
   global?: boolean;
   /** If true, does not fire when Monaco editor is focused */
   ignoreWhenEditorFocused?: boolean;
+  /**
+   * Optional gate predicate. When provided and it returns false, the shortcut
+   * is skipped WITHOUT consuming the event (no preventDefault/stopPropagation)
+   * — so a bare key such as Enter/Delete/e only acts when the predicate holds
+   * (e.g. "a suggestion card owns focus"), and otherwise passes through to the
+   * focused button/link/etc. as normal.
+   */
+  shouldFire?: () => boolean;
 }
 
 export function isMac(): boolean {
@@ -80,6 +88,10 @@ export function useKeyboardShortcuts(shortcuts: ShortcutDefinition[]): void {
 
         // Skip if input focused and shortcut is not global
         if (inputFocused && !shortcut.global) continue;
+
+        // Gate predicate — when it fails, do NOT consume the event so the
+        // keystroke reaches whatever element actually has focus.
+        if (shortcut.shouldFire && !shortcut.shouldFire()) continue;
 
         e.preventDefault();
         e.stopPropagation();
