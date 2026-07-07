@@ -1,6 +1,14 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+// BYO provider API keys are user secrets. They are deliberately NOT sent to our
+// backend for storage (they are billed directly to the user and used only via
+// the ephemeral X-BYO-API-Key request header). Client-side we hold them in
+// sessionStorage, NOT localStorage: sessionStorage is cleared when the tab
+// closes, so a key does not persist across sessions or outlive sign-out on a
+// shared machine. This narrows the exposure window while keeping the key
+// available across in-session navigations (settings → editor).
+
 interface BYOKeyEntry {
   provider: string;
   key: string;
@@ -54,7 +62,9 @@ export const useByoKeyStore = create<BYOKeyState>()(
     }),
     {
       name: "ontokit-byo-keys",
-      storage: createJSONStorage(() => localStorage),
+      // sessionStorage (not localStorage): keys are cleared when the tab closes
+      // and never persist across browser sessions or survive sign-out.
+      storage: createJSONStorage(() => sessionStorage),
     }
   )
 );
