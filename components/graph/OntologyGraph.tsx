@@ -166,11 +166,17 @@ export function OntologyGraph({
 
   // Run ELK layout when data or direction changes
   useEffect(() => {
-    if (!graphData || graphData.nodes.length === 0) return;
+    if (!graphData || graphData.nodes.length === 0) {
+      // Clear the canvas on reset/empty — otherwise a stale graph lingers
+      // after resetGraph() (which sets graphData back to null).
+      setNodes([]);
+      setEdges([]);
+      return;
+    }
     runLayout(graphData, direction).catch(() => {
       // Layout failed — nodes stay empty
     });
-  }, [graphData, direction, runLayout]);
+  }, [graphData, direction, runLayout, setNodes, setEdges]);
 
   // Sync layout results to React Flow state
   useEffect(() => {

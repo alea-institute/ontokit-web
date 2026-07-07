@@ -28,6 +28,10 @@ export function useGraphData({
   const [isLoading, setIsLoading] = useState(false);
   const [showDescendants, setShowDescendants] = useState(false);
   const expandedNodes = useRef(new Set<string>());
+  // Bumped every time the focus graph is (re)fetched. In-flight expansions
+  // capture the current value and bail on merge if it has changed, so a focus/
+  // branch/descendants change can't contaminate the new graph with stale nodes.
+  const requestGeneration = useRef(0);
 
   // Fetch graph from backend BFS endpoint
   useEffect(() => {
@@ -38,6 +42,7 @@ export function useGraphData({
 
     let cancelled = false;
     setIsLoading(true);
+    requestGeneration.current += 1;
     expandedNodes.current = new Set([focusIri]);
 
     graphApi
@@ -66,6 +71,7 @@ export function useGraphData({
     (iri: string) => {
       if (!graphData || expandedNodes.current.has(iri)) return;
       expandedNodes.current.add(iri);
+      const generation = requestGeneration.current;
 
       graphApi
         .getEntityGraph(projectId, iri, {
@@ -75,6 +81,9 @@ export function useGraphData({
           maxNodes: 50,
         })
         .then((newData) => {
+          // A newer focus/branch/descendants fetch superseded this expansion —
+          // discard it rather than merge stale nodes into the current graph.
+          if (generation !== requestGeneration.current) return;
           setGraphData((prev) => {
             if (!prev) return newData;
 
@@ -91,8 +100,9 @@ export function useGraphData({
                 ...prev.edges,
                 ...newData.edges.filter((e) => !existingEdgeIds.has(e.id)),
               ],
-              total_concept_count:
-                prev.total_concept_count + newData.nodes.filter((n) => !existingNodeIds.has(n.id)).length,
+              // Preserve the backend's discovered-total from the focus fetch;
+              // merging 1-hop neighborhoods must not inflate the truncation count.
+              total_concept_count: prev.total_concept_count,
             };
           });
         })

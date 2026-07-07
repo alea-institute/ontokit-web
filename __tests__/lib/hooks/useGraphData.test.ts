@@ -163,4 +163,41 @@ describe("useGraphData", () => {
       ),
     );
   });
+
+  it("discards an in-flight expansion after the focus changes (no stale merge)", async () => {
+    const { result, rerender } = renderHook(
+      ({ focus }: { focus: string }) =>
+        useGraphData({ focusIri: focus, projectId: "proj-1" }),
+      { initialProps: { focus: "http://example.org/A" } },
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    // The expand call returns a promise we control, so it stays in flight.
+    let resolveExpand!: (v: EntityGraphResponse) => void;
+    mockedGetEntityGraph.mockReturnValueOnce(
+      new Promise<EntityGraphResponse>((r) => {
+        resolveExpand = r;
+      }),
+    );
+    act(() => {
+      result.current.expandNode("http://example.org/X");
+    });
+
+    // Focus changes to C before the expansion resolves.
+    mockedGetEntityGraph.mockResolvedValue(makeGraph("http://example.org/C"));
+    rerender({ focus: "http://example.org/C" });
+    await waitFor(() =>
+      expect(result.current.graphData?.focus_iri).toBe("http://example.org/C"),
+    );
+
+    // The stale expansion resolves — it must NOT merge into the new C graph.
+    await act(async () => {
+      resolveExpand(makeGraph("http://example.org/X", ["http://example.org/C"]));
+      await Promise.resolve();
+    });
+
+    expect(result.current.graphData?.nodes.map((n) => n.id)).toEqual([
+      "http://example.org/C",
+    ]);
+  });
 });
