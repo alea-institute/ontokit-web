@@ -1,189 +1,121 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import { useGraphData } from "@/lib/hooks/useGraphData";
+import type { EntityGraphResponse } from "@/lib/api/graph";
 
-// Mock API and graph builder
-vi.mock("@/lib/api/client", () => ({
-  projectOntologyApi: {
-    getClassDetail: vi.fn(),
-    getClassAncestors: vi.fn(),
-    searchEntities: vi.fn(),
+// The hook now fetches from the server-side BFS endpoint via graphApi.
+vi.mock("@/lib/api/graph", () => ({
+  graphApi: {
+    getEntityGraph: vi.fn(),
   },
 }));
 
-vi.mock("@/lib/graph/buildGraphData", () => ({
-  buildGraphFromClassDetail: vi.fn(),
-  getSeeAlsoIris: vi.fn().mockReturnValue([]),
-}));
+import { graphApi } from "@/lib/api/graph";
 
-vi.mock("@/lib/utils", () => ({
-  getLocalName: vi.fn((iri: string) => {
-    const hash = iri.lastIndexOf("#");
-    if (hash >= 0) return iri.slice(hash + 1);
-    const slash = iri.lastIndexOf("/");
-    if (slash >= 0) return iri.slice(slash + 1);
-    return iri;
-  }),
-}));
+const mockedGetEntityGraph = graphApi.getEntityGraph as ReturnType<typeof vi.fn>;
 
-import { projectOntologyApi } from "@/lib/api/client";
-import { buildGraphFromClassDetail } from "@/lib/graph/buildGraphData";
-
-const mockedGetClassDetail = projectOntologyApi.getClassDetail as ReturnType<typeof vi.fn>;
-const mockedGetClassAncestors = projectOntologyApi.getClassAncestors as ReturnType<typeof vi.fn>;
-const mockedBuildGraph = buildGraphFromClassDetail as ReturnType<typeof vi.fn>;
-
-function makeDetail(iri: string, parentIris: string[] = []) {
-  return {
+function makeGraph(
+  focusIri: string,
+  extraNodeIris: string[] = [],
+): EntityGraphResponse {
+  const nodes = [focusIri, ...extraNodeIris].map((iri, i) => ({
+    id: iri,
+    label: iri.split("/").pop() || iri,
     iri,
-    labels: [{ value: iri.split("/").pop() || iri, lang: "en" }],
-    comments: [],
-    parent_iris: parentIris,
-    annotations: [],
-    deprecated: false,
-    equivalent_iris: [],
-    disjoint_iris: [],
+    definition: null,
+    is_focus: i === 0,
+    is_root: false,
+    depth: i === 0 ? 0 : 1,
+    node_type: i === 0 ? "focus" : "class",
+    child_count: null,
+  }));
+  const edges = extraNodeIris.map((iri) => ({
+    id: `${focusIri}->${iri}`,
+    source: focusIri,
+    target: iri,
+    edge_type: "subClassOf" as const,
+    label: null,
+  }));
+  return {
+    focus_iri: focusIri,
+    focus_label: nodes[0].label,
+    nodes,
+    edges,
+    truncated: false,
+    total_concept_count: nodes.length,
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedBuildGraph.mockReturnValue({
-    nodes: [{ id: "http://example.org/A", label: "A", nodeType: "focus" }],
-    edges: [],
-  });
-  mockedGetClassAncestors.mockResolvedValue({ nodes: [] });
+  mockedGetEntityGraph.mockResolvedValue(makeGraph("http://example.org/A"));
 });
 
 describe("useGraphData", () => {
-  it("returns null graphData when focusIri is null", () => {
+  it("returns null graphData and does not fetch when focusIri is null", () => {
     const { result } = renderHook(() =>
-      useGraphData({
-        focusIri: null,
-        projectId: "proj-1",
-        accessToken: "token",
-      }),
+      useGraphData({ focusIri: null, projectId: "proj-1" }),
     );
 
     expect(result.current.graphData).toBeNull();
     expect(result.current.isLoading).toBe(false);
+    expect(mockedGetEntityGraph).not.toHaveBeenCalled();
   });
 
-  it("returns null graphData when accessToken is missing", () => {
+  it("fetches the BFS graph for the focus entity on mount", async () => {
     const { result } = renderHook(() =>
-      useGraphData({
-        focusIri: "http://example.org/A",
-        projectId: "proj-1",
-      }),
+      useGraphData({ focusIri: "http://example.org/A", projectId: "proj-1" }),
     );
 
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(mockedGetEntityGraph).toHaveBeenCalledWith(
+      "proj-1",
+      "http://example.org/A",
+      expect.objectContaining({ ancestorsDepth: 5, descendantsDepth: 0 }),
+    );
+    expect(result.current.graphData).not.toBeNull();
+    expect(result.current.resolvedCount).toBe(1);
+  });
+
+  it("clears graphData when the focus fetch fails", async () => {
+    mockedGetEntityGraph.mockRejectedValueOnce(new Error("boom"));
+
+    const { result } = renderHook(() =>
+      useGraphData({ focusIri: "http://example.org/A", projectId: "proj-1" }),
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.graphData).toBeNull();
   });
 
-  it("fetches focus node and builds graph", async () => {
-    const detail = makeDetail("http://example.org/A");
-    mockedGetClassDetail.mockResolvedValue(detail);
-
+  it("expandNode fetches a 1-hop neighborhood and merges new nodes/edges", async () => {
     const { result } = renderHook(() =>
-      useGraphData({
-        focusIri: "http://example.org/A",
-        projectId: "proj-1",
-        accessToken: "token",
-      }),
+      useGraphData({ focusIri: "http://example.org/A", projectId: "proj-1" }),
     );
-
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.resolvedCount).toBe(1);
 
-    expect(mockedGetClassDetail).toHaveBeenCalledWith(
-      "proj-1",
-      "http://example.org/A",
-      "token",
-      undefined,
+    mockedGetEntityGraph.mockResolvedValueOnce(
+      makeGraph("http://example.org/B", ["http://example.org/A"]),
     );
-    expect(mockedBuildGraph).toHaveBeenCalled();
-    expect(result.current.graphData).not.toBeNull();
-  });
-
-  it("fetches parent nodes at depth 1", async () => {
-    const detailA = makeDetail("http://example.org/A", ["http://example.org/B"]);
-    const detailB = makeDetail("http://example.org/B");
-
-    mockedGetClassDetail
-      .mockResolvedValueOnce(detailA) // focus node
-      .mockResolvedValueOnce(detailB); // parent node
-
-    const { result } = renderHook(() =>
-      useGraphData({
-        focusIri: "http://example.org/A",
-        projectId: "proj-1",
-        accessToken: "token",
-      }),
-    );
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-    expect(mockedGetClassDetail).toHaveBeenCalledTimes(2);
-  });
-
-  it("handles fetch errors for focus node gracefully", async () => {
-    mockedGetClassDetail.mockRejectedValue(new Error("Not found"));
-
-    const { result } = renderHook(() =>
-      useGraphData({
-        focusIri: "http://example.org/A",
-        projectId: "proj-1",
-        accessToken: "token",
-      }),
-    );
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-    // Should still build a graph (single-node graph fallback)
-    expect(mockedBuildGraph).toHaveBeenCalled();
-  });
-
-  it("expandNode fetches detail and rebuilds graph", async () => {
-    const detailA = makeDetail("http://example.org/A");
-    const detailB = makeDetail("http://example.org/B");
-
-    mockedGetClassDetail
-      .mockResolvedValueOnce(detailA) // initial load
-      .mockResolvedValueOnce(detailB); // expand node
-
-    const { result } = renderHook(() =>
-      useGraphData({
-        focusIri: "http://example.org/A",
-        projectId: "proj-1",
-        accessToken: "token",
-      }),
-    );
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-    mockedBuildGraph.mockClear();
 
     await act(async () => {
       result.current.expandNode("http://example.org/B");
     });
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-    expect(mockedBuildGraph).toHaveBeenCalled();
+    await waitFor(() => expect(result.current.resolvedCount).toBe(2));
+    // The overlapping node A is de-duplicated, only B is added.
+    expect(result.current.graphData?.nodes.map((n) => n.id)).toEqual([
+      "http://example.org/A",
+      "http://example.org/B",
+    ]);
   });
 
   it("resetGraph clears the graph data", async () => {
-    mockedGetClassDetail.mockResolvedValue(
-      makeDetail("http://example.org/A"),
-    );
-
     const { result } = renderHook(() =>
-      useGraphData({
-        focusIri: "http://example.org/A",
-        projectId: "proj-1",
-        accessToken: "token",
-      }),
+      useGraphData({ focusIri: "http://example.org/A", projectId: "proj-1" }),
     );
-
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.graphData).not.toBeNull();
 
@@ -195,27 +127,40 @@ describe("useGraphData", () => {
     expect(result.current.resolvedCount).toBe(0);
   });
 
-  it("passes branch to API calls", async () => {
-    mockedGetClassDetail.mockResolvedValue(
-      makeDetail("http://example.org/A"),
-    );
-
+  it("requests descendants when showDescendants is toggled on", async () => {
     const { result } = renderHook(() =>
+      useGraphData({ focusIri: "http://example.org/A", projectId: "proj-1" }),
+    );
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    act(() => {
+      result.current.setShowDescendants(true);
+    });
+
+    await waitFor(() =>
+      expect(mockedGetEntityGraph).toHaveBeenLastCalledWith(
+        "proj-1",
+        "http://example.org/A",
+        expect.objectContaining({ descendantsDepth: 2 }),
+      ),
+    );
+  });
+
+  it("passes the branch through to the API call", async () => {
+    renderHook(() =>
       useGraphData({
         focusIri: "http://example.org/A",
         projectId: "proj-1",
-        accessToken: "token",
         branch: "dev",
       }),
     );
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-    expect(mockedGetClassDetail).toHaveBeenCalledWith(
-      "proj-1",
-      "http://example.org/A",
-      "token",
-      "dev",
+    await waitFor(() =>
+      expect(mockedGetEntityGraph).toHaveBeenCalledWith(
+        "proj-1",
+        "http://example.org/A",
+        expect.objectContaining({ branch: "dev" }),
+      ),
     );
   });
 });
