@@ -6,11 +6,7 @@ import { UserMenu } from "@/components/auth/user-menu";
 import { NotificationBell } from "@/components/layout/notification-bell";
 import { ThemeToggle } from "@/components/editor/ThemeToggle";
 import { cn } from "@/lib/utils";
-
-// Auth mode flags — set at build time by next.config.ts
-const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
-const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
-const showAuthUI = authMode === "required" || (authMode === "optional" && zitadelConfigured);
+import { shouldShowAuthUI } from "@/lib/auth-mode";
 
 const navLinks = [
   { href: "/", label: "Projects" },
@@ -21,6 +17,9 @@ const navLinks = [
 
 export function Header() {
   const pathname = usePathname();
+  // Whether to show sign-in affordances (client-safe, reads build-time
+  // NEXT_PUBLIC_* flags). Shared predicate with UserMenu to avoid drift.
+  const showAuthUI = shouldShowAuthUI();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm supports-backdrop-filter:bg-white/60">

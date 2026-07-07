@@ -4,18 +4,16 @@ import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
+import { shouldShowAuthUI } from "@/lib/auth-mode";
 
 // Zitadel configuration
 const ZITADEL_ISSUER = process.env.NEXT_PUBLIC_ZITADEL_ISSUER || "http://localhost:8080";
 const ZITADEL_CLIENT_ID = process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID || "";
 
-// Auth mode flags — set at build time by next.config.ts
-const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
-const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
-const showAuthUI = authMode === "required" || (authMode === "optional" && zitadelConfigured);
-
 export function UserMenu() {
   const { data: session, status } = useSession();
+  // Whether sign-in affordances are shown — shared predicate with header.tsx.
+  const showAuthUI = shouldShowAuthUI();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
