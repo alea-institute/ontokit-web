@@ -37,6 +37,13 @@ export function SuggestionCard({
   const isBlocked = suggestion.duplicate_verdict === "block";
   const isWarned = suggestion.duplicate_verdict === "warn";
   const confidence = suggestion.confidence;
+  const isUserEdited = suggestion.provenance === "user-edited-from-llm";
+
+  // Provenance attribution surfaced on the sparkle icon (full badge UI ships
+  // with the reviewer tools; here every suggestion still declares its origin).
+  const provenanceLabel = isUserEdited
+    ? `AI-suggested${suggestion.model ? ` by ${suggestion.model}` : ""}, edited by you`
+    : `AI-suggested${suggestion.model ? ` by ${suggestion.model}` : ""}`;
 
   // Display the annotation value when property_iri exists, otherwise the label
   const displayText = suggestion.property_iri
@@ -70,8 +77,11 @@ export function SuggestionCard({
         "transition-colors duration-200"
       )}
     >
-      {/* Sparkle icon -- always present */}
-      <Sparkles className="h-3 w-3 shrink-0 text-amber-500 mt-0.5" />
+      {/* Provenance icon -- every suggestion declares its origin */}
+      <span className="shrink-0 mt-0.5" title={provenanceLabel}>
+        <Sparkles className="h-3 w-3 text-amber-500" aria-hidden="true" />
+        <span className="sr-only">{provenanceLabel}</span>
+      </span>
 
       {/* Content area */}
       <div className="flex-1 min-w-0">
@@ -89,7 +99,12 @@ export function SuggestionCard({
           />
         ) : (
           <span className="text-sm text-slate-700 dark:text-slate-300">
-            {displayText}
+            {item.editedValue ?? displayText}
+            {isUserEdited && (
+              <span className="ml-1.5 text-xs italic text-slate-400 dark:text-slate-500">
+                edited
+              </span>
+            )}
           </span>
         )}
 

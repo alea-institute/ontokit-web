@@ -27,6 +27,10 @@ export interface GeneratedSuggestion {
   definition?: string | null;
   confidence?: number | null;
   provenance: Provenance;
+  /** Model id that produced this suggestion (e.g. "gpt-4o-mini") — provenance metadata */
+  model?: string | null;
+  /** Prompt-template key that produced this suggestion (e.g. "children") — provenance metadata */
+  prompt_template?: string | null;
   validation_errors: ValidationError[];
   duplicate_verdict: DuplicateVerdict;
   duplicate_candidates: DuplicateCandidate[];

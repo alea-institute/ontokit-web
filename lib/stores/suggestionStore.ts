@@ -58,7 +58,28 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
     const key = storeKey(entityIri, suggestionType);
     set((state) => {
       const arr = [...(state.suggestions[key] || [])];
-      if (arr[index]) arr[index] = { ...arr[index], editedValue: value };
+      const item = arr[index];
+      if (item) {
+        // Provenance must track reality: once the user rewrites the text the
+        // suggestion is no longer purely "llm-proposed". If the edit restores
+        // the original text exactly, drop the edit and the provenance flip.
+        const original = item.suggestion.property_iri
+          ? (item.suggestion.value ?? item.suggestion.label)
+          : item.suggestion.label;
+        if (value === original) {
+          arr[index] = {
+            ...item,
+            editedValue: undefined,
+            suggestion: { ...item.suggestion, provenance: "llm-proposed" },
+          };
+        } else {
+          arr[index] = {
+            ...item,
+            editedValue: value,
+            suggestion: { ...item.suggestion, provenance: "user-edited-from-llm" },
+          };
+        }
+      }
       return { suggestions: { ...state.suggestions, [key]: arr } };
     });
   },

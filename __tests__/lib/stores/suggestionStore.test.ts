@@ -118,3 +118,63 @@ describe("suggestionStore", () => {
     expect(useSuggestionStore.getState().getFirstPendingRef()).toBeNull();
   });
 });
+
+describe("suggestionStore provenance tracking", () => {
+  beforeEach(() => {
+    useSuggestionStore.getState().clearAllSuggestions();
+  });
+
+  it("editSuggestion flips provenance to user-edited-from-llm when the text changes", () => {
+    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [makeSuggestion()]);
+
+    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "children", 0, "Renamed Child");
+
+    const item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::children"][0];
+    expect(item.editedValue).toBe("Renamed Child");
+    expect(item.suggestion.provenance).toBe("user-edited-from-llm");
+  });
+
+  it("editSuggestion back to the original text restores llm-proposed and clears editedValue", () => {
+    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "children", 0, "Renamed Child");
+
+    // Restore the exact original label
+    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "children", 0, "Child 1");
+
+    const item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::children"][0];
+    expect(item.editedValue).toBeUndefined();
+    expect(item.suggestion.provenance).toBe("llm-proposed");
+  });
+
+  it("editSuggestion on an annotation compares against value, not label", () => {
+    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "annotations", [
+      makeSuggestion({
+        suggestion_type: "annotations",
+        property_iri: "http://www.w3.org/2000/01/rdf-schema#label",
+        value: "Original value",
+      }),
+    ]);
+
+    // Same as value → no provenance flip
+    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "annotations", 0, "Original value");
+    let item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::annotations"][0];
+    expect(item.suggestion.provenance).toBe("llm-proposed");
+
+    // Different from value → flip
+    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "annotations", 0, "New value");
+    item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::annotations"][0];
+    expect(item.suggestion.provenance).toBe("user-edited-from-llm");
+    expect(item.editedValue).toBe("New value");
+  });
+
+  it("model and prompt_template provenance metadata survive the store round-trip", () => {
+    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [
+      makeSuggestion({ model: "gpt-4o-mini", prompt_template: "children" }),
+    ]);
+    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "children", 0, "Renamed");
+
+    const item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::children"][0];
+    expect(item.suggestion.model).toBe("gpt-4o-mini");
+    expect(item.suggestion.prompt_template).toBe("children");
+  });
+});
