@@ -48,6 +48,7 @@ import { useToast } from "@/lib/context/ToastContext";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
 import type { GeneratedSuggestion } from "@/lib/api/generation";
+import { provenanceFromSuggestion, type AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
 import type { ProjectRole } from "@/lib/api/projects";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
@@ -89,7 +90,12 @@ interface ClassDetailPanelProps {
   canUseLLM?: boolean;
   byoKey?: string;
   userRole?: ProjectRole;
-  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => void;
+  onAddSuggestedChild?: (
+    iri: string,
+    label: string,
+    parentIri: string,
+    provenance?: AcceptedSuggestionProvenance,
+  ) => void;
   /** When true, auto-fire annotation suggestions when classIri changes (D-09) */
   autoSuggestAnnotationsOnMount?: boolean;
 }
@@ -519,9 +525,15 @@ export function ClassDetailPanel({
   // Accept handlers
   const handleAcceptChildSuggestion = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
-      // D-07: Create entity directly in tree WITHOUT opening AddEntityDialog
-      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — currently dropped on accept. See QA queue.
-      onAddSuggestedChild?.(suggestion.iri, editedValue ?? suggestion.label, classIri!);
+      // D-07: Create entity directly in tree WITHOUT opening AddEntityDialog.
+      // PR-6 (q9: PROV-O): the new entity persists prov:wasGeneratedBy with the
+      // suggestion's model + prompt template (human edits keep the AI origin).
+      onAddSuggestedChild?.(
+        suggestion.iri,
+        editedValue ?? suggestion.label,
+        classIri!,
+        provenanceFromSuggestion(suggestion),
+      );
     },
     [onAddSuggestedChild, classIri],
   );
@@ -529,7 +541,7 @@ export function ClassDetailPanel({
   const handleAcceptAnnotationSuggestion = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
       if (!suggestion.property_iri) return;
-      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — only the value survives into the edit draft. See QA queue.
+      // PR-6 provenance decision (q9): NOT persisted here — this accept edits an EXISTING entity; statement-level provenance is not expressible in plain Turtle (needs reification/RDF-star) and stamping the whole entity prov:wasGeneratedBy would be false. Kept in the suggestion session + audit log (D-08).
       // Merge into edit annotations state
       setEditAnnotations((prev) => {
         const existing = prev.find((a) => a.property_iri === suggestion.property_iri);
@@ -550,7 +562,7 @@ export function ClassDetailPanel({
 
   const handleAcceptParentSuggestion = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
-      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped when the parent is added. See QA queue.
+      // PR-6 provenance decision (q9): NOT persisted here — this accept edits an EXISTING entity; statement-level provenance is not expressible in plain Turtle (needs reification/RDF-star) and stamping the whole entity prov:wasGeneratedBy would be false. Kept in the suggestion session + audit log (D-08).
       addParent(suggestion.iri, editedValue ?? suggestion.label);
     },
     [addParent],
@@ -559,7 +571,7 @@ export function ClassDetailPanel({
   const handleAcceptEdgeSuggestion = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
       if (!suggestion.relationship_type || !suggestion.target_iri) return;
-      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped when the edge is added. See QA queue.
+      // PR-6 provenance decision (q9): NOT persisted here — this accept edits an EXISTING entity; statement-level provenance is not expressible in plain Turtle (needs reification/RDF-star) and stamping the whole entity prov:wasGeneratedBy would be false. Kept in the suggestion session + audit log (D-08).
       setEditRelationships((prev) => {
         const existing = prev.find((g) => g.property_iri === suggestion.relationship_type);
         const newTarget: RelationshipTarget = {

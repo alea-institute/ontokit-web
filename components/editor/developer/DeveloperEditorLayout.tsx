@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
 import dynamic from "next/dynamic";
 import { FileCode, TreePine, Code, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -133,9 +134,9 @@ export interface DeveloperEditorLayoutProps {
 
 
   // LLM suggestion support
-  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => void;
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string, provenance?: AcceptedSuggestionProvenance) => void;
   /** Create a new PROPERTY entity from an accepted sub-property suggestion (B-1). */
-  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation") => void;
+  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation", provenance?: AcceptedSuggestionProvenance) => void;
   acceptedSuggestionIris?: Set<string>;
 }
 

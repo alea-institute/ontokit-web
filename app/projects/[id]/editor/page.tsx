@@ -28,7 +28,8 @@ import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
-import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
+import { generateTurtleSnippet, PROV_PREFIX_DECLARED_RE } from "@/lib/ontology/turtleSnippetGenerator";
+import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
 import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
@@ -389,9 +390,17 @@ export default function EditorPage() {
   );
 
   // Handle accepted child suggestion — creates a CLASS entity directly in tree (D-07)
-  const handleAddSuggestedChild = useCallback((iri: string, label: string, parentIri: string) => {
-    // Generate Turtle snippet for the new entity (same as handleEntityConfirm)
-    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — the accepted suggestion's metadata is dropped here. See QA queue.
+  const handleAddSuggestedChild = useCallback((
+    iri: string,
+    label: string,
+    parentIri: string,
+    provenance?: AcceptedSuggestionProvenance,
+  ) => {
+    // Generate Turtle snippet for the new entity (same as handleEntityConfirm).
+    // PR-6 (q9: PROV-O): AI-minted entities persist prov:wasGeneratedBy — the
+    // model as prov:SoftwareAgent, the prompt template as prov:Plan. The prov
+    // prefix is declared inside the snippet only when the document lacks one.
+    const currentSource = sourceEditorRef.current?.getValue() ?? sourceContent;
     const snippet = generateTurtleSnippet({
       iri,
       label,
@@ -399,6 +408,10 @@ export default function EditorPage() {
       parentIri,
       ontologyPrefix,
       ontologyNamespace,
+      provenance: provenance && {
+        ...provenance,
+        declarePrefix: !currentSource || !PROV_PREFIX_DECLARED_RE.test(currentSource),
+      },
     });
 
     // Insert into source
@@ -425,6 +438,7 @@ export default function EditorPage() {
     label: string,
     parentIri: string,
     propertyType: "object" | "data" | "annotation" = "object",
+    provenance?: AcceptedSuggestionProvenance,
   ) => {
     const entityType =
       propertyType === "data"
@@ -433,7 +447,9 @@ export default function EditorPage() {
           ? "annotationProperty"
           : "objectProperty";
 
-    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped here; only label/type/parent are emitted. See QA queue.
+    // PR-6 (q9: PROV-O): AI-minted properties persist prov:wasGeneratedBy, same
+    // as suggested children (see handleAddSuggestedChild).
+    const currentSource = sourceEditorRef.current?.getValue() ?? sourceContent;
     const snippet = generateTurtleSnippet({
       iri,
       label,
@@ -441,6 +457,10 @@ export default function EditorPage() {
       parentIri,
       ontologyPrefix,
       ontologyNamespace,
+      provenance: provenance && {
+        ...provenance,
+        declarePrefix: !currentSource || !PROV_PREFIX_DECLARED_RE.test(currentSource),
+      },
     });
 
     // Insert into source (no class-tree optimistic insert — this is a property)
