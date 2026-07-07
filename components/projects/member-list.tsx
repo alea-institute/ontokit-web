@@ -155,6 +155,30 @@ export function MemberList({
                 <span className="text-sm font-medium">{roleLabels[member.role]}</span>
               </div>
 
+              {member.role === "editor" && canManageMembers && (
+                <label
+                  className="flex min-h-[44px] cursor-pointer items-center gap-2"
+                  title="Allow this editor to merge structural PRs directly"
+                >
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Structural self-merge</span>
+                  <div className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      className="peer sr-only"
+                      checked={member.can_self_merge_structural ?? false}
+                      disabled={isLoading || isProcessing}
+                      onChange={() =>
+                        onUpdateRole(member.user_id, {
+                          role: member.role,
+                          can_self_merge_structural: !(member.can_self_merge_structural ?? false),
+                        })
+                      }
+                    />
+                    <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-primary-600 peer-checked:after:translate-x-full dark:bg-slate-600 dark:peer-checked:bg-primary-500" />
+                  </div>
+                </label>
+              )}
+
               {(canEditMember(member) || canRemoveMember(member) || canTransferTo(member)) && (
                 <div className="relative">
                   <Button
