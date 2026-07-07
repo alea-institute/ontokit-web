@@ -1269,6 +1269,7 @@ export default function EditorPage() {
                   accessToken={session?.accessToken}
                   activeBranch={isAnonymousProposalMode && anonymousSuggestion.branch ? anonymousSuggestion.branch : activeBranch}
                   canEdit={isAnonymousProposalMode ? true : !!canEdit}
+                  userRole={project?.user_role}
                   entityNavigationRef={entityNavigationRef}
                   canSuggest={!!canSuggest}
                   isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
@@ -1330,6 +1331,7 @@ export default function EditorPage() {
                 accessToken={session?.accessToken}
                 activeBranch={isAnonymousProposalMode && anonymousSuggestion.branch ? anonymousSuggestion.branch : activeBranch}
                 canEdit={isAnonymousProposalMode ? true : !!canEdit}
+                userRole={project?.user_role}
                 canSuggest={!!canSuggest}
                 entityNavigationRef={entityNavigationRef}
                 isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
