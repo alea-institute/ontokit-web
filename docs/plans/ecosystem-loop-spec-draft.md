@@ -628,6 +628,14 @@ These three are **not** engineering calls — they're policy/ownership and belon
 
 (Full option sets + recommendations are in the report's QA JSONL for appending to `briefs/qa/pending-questions.jsonl`.)
 
+### 7.3 Damien decisions (QA round-1, 2026-07-07)
+
+Round-1 QA-portal answers to §7.2 (`briefs/qa/round-1-answers.json`, submitted 2026-07-07 07:45). These are **locked policy** and bind the build:
+
+- **q5 (QA-1 — Queue ownership / triage): Single ontology steward, ROUND-ROBIN batches allowed.** One steward owns a given decision, but ownership rotates *per batch* — a different steward may own each import batch. **Design impact:** the queue's batch-assignment must be first-class. Each ingest batch (from A1's `POST /suggestions/import` `items[]`) gets an `assigned_steward` field, assignable independently per batch (round-robin or manual). The unified queue is single-owner *at the item/decision level* but multi-owner *across batches* — model `queue_batch` as the assignment unit, not the whole queue. Sort/filter by `assigned_steward` in the review UI (§6 source chips gain a steward facet).
+- **q6 (QA-2 — Dedupe policy): Tiered — auto-merge only deterministic exact-label; embedding near-dups always human-flagged.** In the §4.4 cascade: **Stage 1 (deterministic)** may auto-merge ONLY when the normalized-label match is exact AND score ≥ 0.95 AND the candidate is same-branch and same suggestion_type — those become `merged-duplicate` silently. **Stage 2 (embedding/probabilistic)** near-duplicates are NEVER auto-merged: they always land as `flagged-duplicate` for a human. This makes `auto_merge_threshold` apply to Stage 1 only; Stage 2 has no auto-merge path regardless of similarity. (Reinforces the gestalt rule §2.4: deterministic auto, probabilistic → human gate.)
+- **q7 (QA-3 — Per-source trust tiers): Credential-derived tiers gate stage-skipping; human write-back gate never removed; destructive types high-trust-only.** Trust tier is **server-derived from the Zitadel service credential** (§4.1 A3), never from the payload's advisory `trust_tier`. Tier gates which *dedupe/validation* stages an item may fast-track (high-trust may skip scrutiny stages; raw-llm never skips). **Hard invariant:** the human approve→OWL write-back gate (Workstream B, §8) is NEVER removed by any trust tier — no feeder, however trusted, writes to FOLIO without human approval. **Destructive suggestion types** (`deprecation`, and any type that restructures/removes rather than adds) are restricted to high-trust credentials only (`human-confirmed`/`deterministic`); low-trust keys receive `scope.forbidden` (§4.4 rejection example). Additive types (new concept, mapping) remain open to all tiers subject to the standard cascade.
+
 ---
 
 ## 8. Sequencing & dependencies
