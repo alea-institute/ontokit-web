@@ -24,6 +24,12 @@ export interface UseSuggestionsReturn {
   edit: (index: number, value: string) => void;
 }
 
+// Stable fallback so the store selector returns a referentially-equal
+// snapshot when an entity has no suggestions — a fresh [] per call makes
+// useSyncExternalStore's getSnapshot unstable and React 19 aborts the
+// render ("The result of getSnapshot should be cached").
+const NO_SUGGESTIONS: StoredSuggestion[] = [];
+
 export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsReturn {
   const {
     projectId, entityIri, branch, suggestionType,
@@ -36,7 +42,9 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
 
   const store = useSuggestionStore;
   const items = useSuggestionStore((s) =>
-    entityIri ? (s.suggestions[`${entityIri}::${suggestionType}`] || []) : []
+    entityIri
+      ? (s.suggestions[`${entityIri}::${suggestionType}`] ?? NO_SUGGESTIONS)
+      : NO_SUGGESTIONS
   );
 
   // Abort in-flight request when entityIri changes (Pitfall 6 defense)

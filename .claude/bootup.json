@@ -1,0 +1,10 @@
+{
+  "servers": [
+    {
+      "name": "OntoKit Web (Next.js)",
+      "cwd": ".",
+      "command": "./ontokit-web.sh start",
+      "url": "http://localhost:3000"
+    }
+  ]
+}

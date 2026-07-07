@@ -448,7 +448,7 @@ export function PropertyDetailPanel({
   );
 
   const handleAcceptDomainRange = useCallback(
-    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+    (suggestion: GeneratedSuggestion, _editedValue?: string) => {
       const targetIri = suggestion.target_iri ?? suggestion.iri;
       // Use relationship_type to distinguish domain vs range; default to domain
       if (suggestion.relationship_type?.includes("range")) {

@@ -21,6 +21,30 @@ vi.hoisted(() => {
 
 // --- Mocks ---
 
+// PR-5 mounts useLLMGate (session + react-query backed) in the layouts; the
+// gate has its own dedicated tests — here we stub an anonymous/no-access
+// state so the layout renders without Session/QueryClient providers.
+vi.mock("@/lib/hooks/useLLMGate", () => ({
+  useLLMGate: () => ({
+    canUseLLM: false,
+    budgetExhausted: false,
+    dailyExhausted: false,
+    notConfigured: false,
+    dailyRemaining: null,
+    isBudgetUnlimited: true,
+    isAnonymous: true,
+    hasRoleAccess: false,
+    monthlySpentUsd: 0,
+    monthlyBudgetUsd: null,
+    burnRateDailyUsd: 0,
+    roleLimitLabel: null,
+    invalidateStatus: () => {},
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+}));
+
 vi.mock("next/dynamic", () => ({
   __esModule: true,
   default: () => () => <div data-testid="ontology-graph" />,
