@@ -1,6 +1,19 @@
 import NextAuth from "next-auth";
 import type { NextAuthConfig, User } from "next-auth";
 import "next-auth/jwt";
+import { randomBytes } from "crypto";
+import { isAuthActive, isZitadelConfigured } from "@/lib/auth-mode";
+
+// NextAuth needs a signing secret to boot. Only auto-supply one when Zitadel is
+// NOT configured — in that case no real OIDC sessions exist, so there is nothing
+// to protect. When Zitadel IS configured (in ANY auth mode, including "optional"),
+// a real NEXTAUTH_SECRET is mandatory (enforced by lib/env.ts): otherwise a
+// known/committed secret would let anyone forge a valid session JWT and
+// impersonate a signed-in user. The fallback is randomized per process so it is
+// never a replayable value.
+if (!isZitadelConfigured() && !process.env.NEXTAUTH_SECRET) {
+  process.env.NEXTAUTH_SECRET = randomBytes(32).toString("hex");
+}
 
 // Zitadel provider configuration
 const zitadelProvider = {
@@ -26,7 +39,7 @@ const zitadelProvider = {
 };
 
 export const authConfig: NextAuthConfig = {
-  providers: [zitadelProvider],
+  providers: isAuthActive() ? [zitadelProvider] : [],
   events: {
     async signOut(_message) {
       // This event fires after local session is cleared
@@ -44,6 +57,12 @@ export const authConfig: NextAuthConfig = {
           expiresAt: account.expires_at,
           user,
         };
+      }
+
+      // Skip token refresh when the OIDC provider isn't active (disabled mode or
+      // Zitadel unconfigured) — no Zitadel token endpoint to call.
+      if (!isAuthActive()) {
+        return token;
       }
 
       // Return previous token if the access token has not expired yet
@@ -95,10 +114,11 @@ export const authConfig: NextAuthConfig = {
       return session;
     },
   },
-  pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error",
-  },
+  // Custom sign-in/error pages apply whenever sign-in is actually available
+  // (required mode, or optional mode with Zitadel configured) — not just required.
+  pages: isAuthActive()
+    ? { signIn: "/auth/signin", error: "/auth/error" }
+    : {},
   debug: process.env.NODE_ENV === "development",
 };
 

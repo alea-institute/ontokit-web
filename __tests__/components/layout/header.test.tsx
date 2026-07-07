@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { Header } from "@/components/layout/header";
 
@@ -32,6 +32,13 @@ vi.mock("@/components/editor/ThemeToggle", () => ({
 describe("Header", () => {
   beforeEach(() => {
     mockPathname = "/";
+    // Configured deployment (Zitadel present) so auth affordances render — the
+    // case these tests assert. Anonymous/hidden case covered separately below.
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("renders the OntoKit brand link", () => {
@@ -59,6 +66,15 @@ describe("Header", () => {
     render(<Header />);
     expect(screen.getByTestId("user-menu")).toBeDefined();
     expect(screen.getByTestId("notification-bell")).toBeDefined();
+    expect(screen.getByTestId("theme-toggle")).toBeDefined();
+  });
+
+  it("hides UserMenu and NotificationBell in anonymous mode (Zitadel unconfigured)", () => {
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "false");
+    render(<Header />);
+    expect(screen.queryByTestId("user-menu")).toBeNull();
+    expect(screen.queryByTestId("notification-bell")).toBeNull();
+    // ThemeToggle is always shown regardless of auth mode.
     expect(screen.getByTestId("theme-toggle")).toBeDefined();
   });
 

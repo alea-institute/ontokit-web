@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -32,11 +32,18 @@ import { UserMenu } from "@/components/auth/user-menu";
 describe("UserMenu", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default to a configured deployment (Zitadel present) so sign-in UI shows —
+    // the case these tests exercise. Anonymous/hidden case tested separately below.
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
     // Reset location mock
     Object.defineProperty(window, "location", {
       writable: true,
       value: { origin: "http://localhost:3000", href: "" },
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("shows loading skeleton when status is loading", () => {
@@ -57,6 +64,14 @@ describe("UserMenu", () => {
     render(<UserMenu />);
     await userEvent.click(screen.getByText("Sign in"));
     expect(mockSignIn).toHaveBeenCalledWith("zitadel");
+  });
+
+  it("renders nothing when unauthenticated and auth UI is hidden (disabled/anonymous mode)", () => {
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "false");
+    mockUseSession.mockReturnValue({ data: null, status: "unauthenticated" });
+    const { container } = render(<UserMenu />);
+    expect(screen.queryByText("Sign in")).toBeNull();
+    expect(container.firstChild).toBeNull();
   });
 
   it("shows user initial when authenticated without image", () => {
