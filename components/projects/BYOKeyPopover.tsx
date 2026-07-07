@@ -118,7 +118,8 @@ export function BYOKeyPopover({
           </button>
         </div>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Your key stays in your browser and is billed directly to you.
+          Your key stays in this browser session (cleared when you close the
+          tab) and is billed directly to you.
         </p>
         <input
           ref={inputRef}

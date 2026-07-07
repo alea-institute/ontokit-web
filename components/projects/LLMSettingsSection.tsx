@@ -533,7 +533,8 @@ export function LLMSettingsSection({
         {isByoEnabled && (
           <div className="mt-2 space-y-2 pl-6">
             <p className="text-xs text-slate-500">
-              Your key is stored in your browser only and billed directly to you.
+              Your key stays in this browser session only (cleared when you
+              close the tab) and is billed directly to you.
             </p>
             <div className="relative">
               <input
