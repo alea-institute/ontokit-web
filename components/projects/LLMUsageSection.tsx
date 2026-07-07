@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Check, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLLMUsage } from "@/lib/hooks/useLLMUsage";
+import { useLLMConfig } from "@/lib/hooks/useLLMConfig";
 import type { LLMUsageResponse } from "@/lib/api/llm";
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -42,13 +43,19 @@ export function LLMUsageSection({
     projectId,
     accessToken
   );
+  // Fall back to the project's configured budget when the prop is not supplied,
+  // so the "Remaining" tile isn't stuck on "No budget cap" while the progress
+  // bar below already shows a consumed percentage. Shares the cached
+  // ["llm-config"] query with LLMSettingsSection (no extra fetch).
+  const { config } = useLLMConfig(projectId, accessToken);
 
   const [currentPage, setCurrentPage] = useState(0);
 
   const budgetConsumedPct = usage?.budget_consumed_pct ?? null;
   const totalCost = usage?.total_cost_usd ?? 0;
   const burnRate = usage?.burn_rate_daily_usd ?? 0;
-  const effectiveBudget: number | null = monthlyBudgetUsd ?? null;
+  const effectiveBudget: number | null =
+    monthlyBudgetUsd ?? config?.monthly_budget_usd ?? null;
 
   // Derive remaining from budget
   let remainingUsd: number | null = null;
