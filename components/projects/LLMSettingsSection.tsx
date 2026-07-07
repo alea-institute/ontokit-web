@@ -47,6 +47,12 @@ const PROVIDERS: ProviderOption[] = [
   { value: "custom", label: "Custom endpoint", requiresApiKey: false, isLocal: true },
 ];
 
+// Parse a budget input into a positive number, or null (blank / non-finite).
+function parseBudget(value: string): number | null {
+  const n = parseFloat(value);
+  return value.trim() && Number.isFinite(n) ? n : null;
+}
+
 function getProviderIcon(provider: LLMProviderType) {
   switch (provider) {
     case "openai":
@@ -167,7 +173,8 @@ export function LLMSettingsSection({
     }, 5000);
   }, []);
 
-  const selectedProvider = PROVIDERS.find((p) => p.value === provider)!;
+  const selectedProvider =
+    PROVIDERS.find((p) => p.value === provider) ?? PROVIDERS[0];
   const isLocalProvider = selectedProvider.isLocal;
   const currentIndex = PROVIDERS.findIndex((p) => p.value === provider);
 
@@ -226,13 +233,18 @@ export function LLMSettingsSection({
         byoKeyStore.clearKey(projectId);
       }
 
-      // Validate key if provided
-      if (apiKey.trim() || (isByoEnabled && byoKey.trim())) {
+      // Validate the key that is actually being configured. A newly typed
+      // server key is not yet stored, so we must send it through the ephemeral
+      // X-BYO-API-Key test header — otherwise test-connection would validate the
+      // OLD/absent stored key and could reject (and discard) a valid new key.
+      const keyToTest =
+        isByoEnabled && byoKey.trim()
+          ? byoKey.trim()
+          : apiKey.trim() || undefined;
+      if (keyToTest) {
         setValidationStatus("validating");
         try {
-          const result = await testConnection(
-            isByoEnabled && byoKey.trim() ? byoKey.trim() : undefined
-          );
+          const result = await testConnection(keyToTest);
           if (result.success) {
             setValidationStatus("valid");
             byoKeyStore.markValidated(projectId);
@@ -263,10 +275,8 @@ export function LLMSettingsSection({
         ...(isLocalProvider && baseUrl.trim()
           ? { base_url: baseUrl.trim() }
           : { base_url: null }),
-        monthly_budget_usd: monthlyBudget.trim()
-          ? parseFloat(monthlyBudget)
-          : null,
-        daily_cap_usd: dailyCap.trim() ? parseFloat(dailyCap) : null,
+        monthly_budget_usd: parseBudget(monthlyBudget),
+        daily_cap_usd: parseBudget(dailyCap),
       });
 
       setApiKey("");
@@ -594,7 +604,7 @@ export function LLMSettingsSection({
       <div>
         <Button
           onClick={handleSave}
-          disabled={isUpdating}
+          disabled={isUpdating || validationStatus === "validating"}
           className="flex items-center gap-2"
         >
           {isUpdating ? (

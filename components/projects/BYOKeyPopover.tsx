@@ -70,9 +70,6 @@ export function BYOKeyPopover({
     setIsValidating(true);
     setValidationError(null);
 
-    // Store the key first (in case validation is slow)
-    setKey(projectId, provider, keyValue.trim());
-
     try {
       const result = await llmApi.testConnection(
         projectId,
@@ -81,6 +78,9 @@ export function BYOKeyPopover({
       );
 
       if (result.success) {
+        // Only persist the key once it has actually validated — never store a
+        // rejected key in sessionStorage where the next flow would reuse it.
+        setKey(projectId, provider, keyValue.trim());
         markValidated(projectId);
         onKeySaved();
       } else {
@@ -124,6 +124,8 @@ export function BYOKeyPopover({
         <input
           ref={inputRef}
           type="password"
+          name="byo-api-key"
+          autoComplete="off"
           value={keyValue}
           onChange={(e) => {
             setKeyValue(e.target.value);
