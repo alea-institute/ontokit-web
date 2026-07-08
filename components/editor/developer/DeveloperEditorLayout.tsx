@@ -138,6 +138,11 @@ export interface DeveloperEditorLayoutProps {
   /** Create a new PROPERTY entity from an accepted sub-property suggestion (B-1). */
   onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation", provenance?: AcceptedSuggestionProvenance) => void;
   acceptedSuggestionIris?: Set<string>;
+
+  // Anonymous proposal mode
+  canPropose?: boolean;
+  onProposeEdit?: () => void;
+  isAnonymousProposalMode?: boolean;
 }
 
 export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
@@ -192,6 +197,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     onAddSuggestedChild,
     onAddSuggestedProperty,
     acceptedSuggestionIris,
+    canPropose,
+    onProposeEdit,
+    isAnonymousProposalMode,
   } = props;
 
   const toast = useToast();
@@ -653,6 +661,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                       onAutoSuggest={handleAutoSuggest}
                     />
                   ) : undefined}
+                  canPropose={canPropose}
+                  onProposeEdit={onProposeEdit}
+                  isAnonymousProposalMode={isAnonymousProposalMode}
                 />
               ) : activeTab === "properties" ? (
                 <PropertyDetailPanel

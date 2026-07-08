@@ -109,6 +109,11 @@ export interface StandardEditorLayoutProps {
   /** Create a new PROPERTY entity from an accepted sub-property suggestion (B-1). */
   onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation", provenance?: AcceptedSuggestionProvenance) => void;
   acceptedSuggestionIris?: Set<string>;
+
+  // Anonymous proposal mode
+  canPropose?: boolean;
+  onProposeEdit?: () => void;
+  isAnonymousProposalMode?: boolean;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -152,6 +157,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     onAddSuggestedChild,
     onAddSuggestedProperty,
     acceptedSuggestionIris,
+    canPropose,
+    onProposeEdit,
+    isAnonymousProposalMode,
   } = props;
 
   const toast = useToast();
@@ -545,6 +553,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             byoKey={byoEntry?.key}
             onAddSuggestedChild={onAddSuggestedChild}
             autoSuggestAnnotationsOnMount={isAutoSuggesting}
+            canPropose={canPropose}
+            onProposeEdit={onProposeEdit}
+            isAnonymousProposalMode={isAnonymousProposalMode}
             headerActions={selectedIri ? (
               <>
                 <BranchNavigator
