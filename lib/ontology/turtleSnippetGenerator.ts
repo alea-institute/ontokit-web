@@ -77,17 +77,40 @@ export const PROV_NAMESPACE = "http://www.w3.org/ns/prov#";
 
 const PROV_PREFIX_DIRECTIVE = `@prefix prov: <${PROV_NAMESPACE}> .`;
 
+const PROV_PREFIX_DECLARATION_RE = /^[ \t]*(?:@prefix|PREFIX)[ \t]+prov:[ \t]*<([^>]*)>/gim;
+
 /**
- * Matches an existing prov: prefix declaration in a Turtle document
- * (`@prefix prov: …` or SPARQL-style `PREFIX prov: …`).
+ * True only when the document's GOVERNING `prov:` declaration binds the W3C
+ * PROV-O namespace. IRI-aware on purpose: a `prov:` prefix bound to anything
+ * else (e.g. an ecclesiastical-province vocabulary) must NOT suppress our own
+ * declaration, or the emitted triples would silently resolve under the wrong
+ * namespace. Turtle scopes a prefix from its declaration onward, and our
+ * snippets are appended at the END of the document — so the LAST declaration
+ * in source order is the one that governs the appended block.
  */
-export const PROV_PREFIX_DECLARED_RE = /^\s*(@prefix|PREFIX)\s+prov:/im;
+export function isProvPrefixBoundToProvO(source: string): boolean {
+  let lastIri: string | null = null;
+  for (const match of source.matchAll(PROV_PREFIX_DECLARATION_RE)) {
+    lastIri = match[1];
+  }
+  return lastIri === PROV_NAMESPACE;
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-/** Escape a Turtle string literal (quotes and backslashes). */
+/**
+ * Escape a Turtle string literal: backslashes first, then quotes and the
+ * control characters (\n, \r, \t) that would otherwise break the literal out
+ * of its quotes. `model` / `promptTemplate` arrive from a network payload, so
+ * raw newlines are a real possibility — not just user keystrokes.
+ */
 function escapeTurtleString(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t")
+    .replace(/"/g, '\\"');
 }
 
 /**

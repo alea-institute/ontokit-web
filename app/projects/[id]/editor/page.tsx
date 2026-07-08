@@ -28,7 +28,7 @@ import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
-import { generateTurtleSnippet, PROV_PREFIX_DECLARED_RE } from "@/lib/ontology/turtleSnippetGenerator";
+import { generateTurtleSnippet, isProvPrefixBoundToProvO } from "@/lib/ontology/turtleSnippetGenerator";
 import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
 import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
@@ -410,7 +410,7 @@ export default function EditorPage() {
       ontologyNamespace,
       provenance: provenance && {
         ...provenance,
-        declarePrefix: !currentSource || !PROV_PREFIX_DECLARED_RE.test(currentSource),
+        declarePrefix: !currentSource || !isProvPrefixBoundToProvO(currentSource),
       },
     });
 
@@ -459,7 +459,7 @@ export default function EditorPage() {
       ontologyNamespace,
       provenance: provenance && {
         ...provenance,
-        declarePrefix: !currentSource || !PROV_PREFIX_DECLARED_RE.test(currentSource),
+        declarePrefix: !currentSource || !isProvPrefixBoundToProvO(currentSource),
       },
     });
 

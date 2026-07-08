@@ -44,6 +44,15 @@ describe("provenanceFromSuggestion", () => {
     ).toBeUndefined();
   });
 
+  it("treats whitespace-only model ids as missing (trims the persisted id)", () => {
+    expect(
+      provenanceFromSuggestion({ provenance: "llm-proposed", model: "   ", prompt_template: "t" }),
+    ).toBeUndefined();
+    expect(
+      provenanceFromSuggestion({ provenance: "llm-proposed", model: "  gpt-4o  ", prompt_template: "t" }),
+    ).toEqual({ model: "gpt-4o", promptTemplate: "t" });
+  });
+
   it("omits promptTemplate when absent instead of emitting null", () => {
     expect(
       provenanceFromSuggestion({ provenance: "llm-proposed", model: "m", prompt_template: null }),

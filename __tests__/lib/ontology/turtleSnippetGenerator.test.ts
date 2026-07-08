@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
+import {
+  generateTurtleSnippet,
+  isProvPrefixBoundToProvO,
+  PROV_NAMESPACE,
+} from "@/lib/ontology/turtleSnippetGenerator";
 
 describe("generateTurtleSnippet", () => {
   // ── Entity types ─────────────────────────────────────────────────
@@ -294,6 +298,40 @@ describe("generateTurtleSnippet", () => {
       expect(snippet).toContain('rdfs:label "te\\"mpl"');
     });
 
+    it("emits provenance correctly when no parent is present", () => {
+      const snippet = generateTurtleSnippet({
+        iri: "http://example.org/ont#Foo",
+        label: "Foo",
+        entityType: "class",
+        ontologyPrefix: "ex",
+        ontologyNamespace: "http://example.org/ont#",
+        provenance: { model: "m", promptTemplate: "t" },
+      });
+      expect(snippet).toContain('rdfs:label "Foo"@en ;');
+      expect(snippet).toContain("prov:wasGeneratedBy [");
+      expect(snippet.trimEnd()).toMatch(/\] \.$/);
+      const opens = (snippet.match(/\[/g) ?? []).length;
+      expect(opens).toBe((snippet.match(/\]/g) ?? []).length);
+    });
+
+    it("escapes newlines, carriage returns, and tabs in network-sourced ids", () => {
+      const snippet = generateTurtleSnippet({
+        iri: "http://example.org/ont#Foo",
+        label: "line1\nline2",
+        entityType: "class",
+        provenance: { model: "mo\ndel", promptTemplate: "te\r\tmpl" },
+      });
+      expect(snippet).toContain('rdfs:label "line1\\nline2"@en');
+      expect(snippet).toContain('rdfs:label "mo\\ndel"');
+      expect(snippet).toContain('rdfs:label "te\\r\\tmpl"');
+      // no raw control characters may survive inside the emitted literals
+      const literals = [...snippet.matchAll(/"((?:[^"\\]|\\.)*)"/g)].map((m) => m[1]);
+      expect(literals.length).toBeGreaterThan(0);
+      for (const lit of literals) {
+        expect(/[\n\r\t]/.test(lit)).toBe(false);
+      }
+    });
+
     it("emits a balanced, period-terminated block (well-formed Turtle shape)", () => {
       const snippet = generateTurtleSnippet({
         ...base,
@@ -307,5 +345,43 @@ describe("generateTurtleSnippet", () => {
       const body = snippet.split("\n").filter((l) => !l.startsWith("@prefix"));
       expect(body.join("\n").match(/ \.\s*$/)).toBeTruthy();
     });
+  });
+});
+
+describe("isProvPrefixBoundToProvO (B1: IRI-aware prefix detection)", () => {
+  it("false for an empty or prefix-less document", () => {
+    expect(isProvPrefixBoundToProvO("")).toBe(false);
+    expect(isProvPrefixBoundToProvO("ex:Foo a owl:Class .")).toBe(false);
+  });
+
+  it("true when prov: is bound to the W3C PROV-O namespace", () => {
+    expect(
+      isProvPrefixBoundToProvO(`@prefix prov: <${PROV_NAMESPACE}> .\nex:Foo a owl:Class .`),
+    ).toBe(true);
+    expect(
+      isProvPrefixBoundToProvO(`PREFIX prov: <${PROV_NAMESPACE}>`),
+    ).toBe(true);
+  });
+
+  it("FALSE when prov: is bound to a different namespace (collision must not suppress our declaration)", () => {
+    expect(
+      isProvPrefixBoundToProvO("@prefix prov: <http://example.org/canon-law#province> .\n"),
+    ).toBe(false);
+  });
+
+  it("uses the LAST declaration — the one governing an appended snippet", () => {
+    const provoThenCollision =
+      `@prefix prov: <${PROV_NAMESPACE}> .\n` +
+      "@prefix prov: <http://example.org/other#> .\n";
+    expect(isProvPrefixBoundToProvO(provoThenCollision)).toBe(false);
+
+    const collisionThenProvo =
+      "@prefix prov: <http://example.org/other#> .\n" +
+      `@prefix prov: <${PROV_NAMESPACE}> .\n`;
+    expect(isProvPrefixBoundToProvO(collisionThenProvo)).toBe(true);
+  });
+
+  it("does not match prov-prefixed names in triples (only declarations)", () => {
+    expect(isProvPrefixBoundToProvO("ex:Foo prov:wasGeneratedBy [] .")).toBe(false);
   });
 });

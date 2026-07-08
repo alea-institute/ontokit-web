@@ -33,9 +33,10 @@ export function provenanceFromSuggestion(
   suggestion: Pick<GeneratedSuggestion, "provenance" | "model" | "prompt_template">,
 ): AcceptedSuggestionProvenance | undefined {
   if (suggestion.provenance === "user-written") return undefined;
-  if (!suggestion.model) return undefined;
+  const model = suggestion.model?.trim();
+  if (!model) return undefined;
   return {
-    model: suggestion.model,
+    model,
     promptTemplate: suggestion.prompt_template ?? undefined,
   };
 }
