@@ -15,23 +15,29 @@ import { useAnonymousCreditStore } from "@/lib/stores/anonymousCreditStore";
 
 interface CreditModalProps {
   open: boolean;
-  onClose: () => void;
-  onSubmitCredit: (name: string | null, email: string | null) => void;
+  /**
+   * Sole exit path — fired on save, skip, AND dismiss (Escape/backdrop).
+   * `website` is the raw honeypot value; the parent MUST forward it verbatim
+   * to the submit payload so the server-side control (filled honeypot ->
+   * silent fake success) receives the bot signal. The parent closes the
+   * modal itself (controlled `open`).
+   */
+  onSubmitCredit: (name: string | null, email: string | null, website: string) => void;
 }
 
 /**
- * Post-submission modal that lets anonymous contributors optionally
- * provide their name and email for credit attribution.
- *
- * Appears AFTER a successful suggestion submit — it does not block the
- * submission itself. Credit info is remembered in localStorage via
+ * Pre-submission gate that lets anonymous contributors optionally provide
+ * their name and email for credit attribution. Clicking "Submit Proposal"
+ * opens this modal; the actual submit fires on every exit path (save, skip,
+ * dismiss) via onSubmitCredit. Credit info is remembered in localStorage via
  * useAnonymousCreditStore for future proposals.
  *
- * Includes a hidden honeypot field (name="website") that bots will fill
- * but human users won't see. The parent should pass this value through
- * to the submit payload as website="" (already handled by useAnonymousSuggestion).
+ * Includes a hidden honeypot field (name="website") that bots fill but
+ * humans never see. The value is forwarded verbatim — enforcement is
+ * server-side (filled honeypot -> silent fake success), so the client must
+ * not swallow it.
  */
-export function CreditModal({ open, onClose, onSubmitCredit }: CreditModalProps) {
+export function CreditModal({ open, onSubmitCredit }: CreditModalProps) {
   const creditStore = useAnonymousCreditStore();
 
   const [name, setName] = useState("");
@@ -48,30 +54,27 @@ export function CreditModal({ open, onClose, onSubmitCredit }: CreditModalProps)
   }, [open, creditStore.name, creditStore.email]);
 
   const handleSave = () => {
-    // If the honeypot field was filled (bot behavior), silently treat as skip
-    if (honeypot) {
-      onClose();
-      return;
-    }
-
     const trimmedName = name.trim() || null;
     const trimmedEmail = email.trim() || null;
 
-    // Cache credit info for future proposals (even if both are null = skip)
-    if (trimmedName || trimmedEmail) {
+    // Cache credit info for future proposals — but never cache anything a
+    // honeypot-tripping submission typed (bot junk).
+    if (!honeypot && (trimmedName || trimmedEmail)) {
       creditStore.setCredit(trimmedName, trimmedEmail);
     }
 
-    onSubmitCredit(trimmedName, trimmedEmail);
-    onClose();
+    // Forward the honeypot verbatim — the SERVER decides what a filled
+    // honeypot means (silent fake success). Swallowing it client-side would
+    // let the bot's edit through as a real submission.
+    onSubmitCredit(trimmedName, trimmedEmail, honeypot);
   };
 
   const handleSkip = () => {
-    onClose();
+    onSubmitCredit(null, null, honeypot);
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) handleSkip(); }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
