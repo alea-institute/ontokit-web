@@ -24,8 +24,15 @@ export interface UseAnonymousSuggestionReturn {
   entitiesModified: string[];
   isActive: boolean;
   startSession: () => Promise<void>;
-  saveToSession: (content: string, entityIri: string, entityLabel: string) => Promise<void>;
-  submitSession: (summary?: string, submitterName?: string, submitterEmail?: string) => Promise<void>;
+  /** Resolves true only when the save actually reached the session branch. */
+  saveToSession: (content: string, entityIri: string, entityLabel: string) => Promise<boolean>;
+  /** `website` is the honeypot value — forward verbatim from CreditModal. */
+  submitSession: (
+    summary?: string,
+    submitterName?: string,
+    submitterEmail?: string,
+    website?: string,
+  ) => Promise<void>;
   discardSession: () => Promise<void>;
 }
 
@@ -61,6 +68,7 @@ export function useAnonymousSuggestion({
   const [entitiesModified, setEntitiesModified] = useState<string[]>([]);
 
   const savingRef = useRef(false);
+  const submittingRef = useRef(false);
   const restoredRef = useRef(false);
 
   // Restore any active session from localStorage on mount
@@ -106,8 +114,11 @@ export function useAnonymousSuggestion({
     content: string,
     entityIri: string,
     entityLabel: string,
-  ) => {
-    if (!sessionId || !anonymousToken || savingRef.current) return;
+  ): Promise<boolean> => {
+    // Returns true only when the save actually happened — callers must NOT
+    // report success (or update local state) on a false return (a concurrent
+    // save was in flight, the session is missing, or the request failed).
+    if (!sessionId || !anonymousToken || savingRef.current) return false;
 
     savingRef.current = true;
     setStatus("saving");
@@ -129,11 +140,13 @@ export function useAnonymousSuggestion({
       });
 
       setStatus("active");
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save anonymous suggestion";
       setStatus("error");
       setError(msg);
       onError?.(msg);
+      return false;
     } finally {
       savingRef.current = false;
     }
@@ -143,8 +156,12 @@ export function useAnonymousSuggestion({
     summary?: string,
     submitterName?: string,
     submitterEmail?: string,
+    website: string = "",
   ) => {
-    if (!sessionId || !anonymousToken) return;
+    // Double-submit guard: a fast second click while the first submit is in
+    // flight must not open two PRs for the same session.
+    if (!sessionId || !anonymousToken || submittingRef.current) return;
+    submittingRef.current = true;
 
     setStatus("submitting");
     setError(null);
@@ -157,7 +174,10 @@ export function useAnonymousSuggestion({
           summary,
           submitter_name: submitterName,
           submitter_email: submitterEmail,
-          website: "", // honeypot — always empty for legitimate users
+          // Honeypot: forwarded VERBATIM — empty for humans (the visible form
+          // never touches it); bots fill it and the server silently fakes
+          // success. The client must not sanitize this to "".
+          website,
         },
         anonymousToken,
       );
@@ -179,6 +199,8 @@ export function useAnonymousSuggestion({
       setStatus("error");
       setError(msg);
       onError?.(msg);
+    } finally {
+      submittingRef.current = false;
     }
   }, [sessionId, anonymousToken, projectId, tokenStore, onSubmitted, onError]);
 

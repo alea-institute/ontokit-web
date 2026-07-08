@@ -335,20 +335,10 @@ export const anonymousSuggestionsApi = {
       { headers: { "X-Anonymous-Token": anonymousToken } },
     ),
 
-  /**
-   * Send a beacon payload to flush the last draft on browser close.
-   * Uses navigator.sendBeacon — cannot set X-Anonymous-Token header,
-   * so the token is passed as a query param.
-   */
-  beacon: (
-    projectId: string,
-    sessionId: string,
-    content: string,
-    anonymousToken: string,
-  ) => {
-    const url = `${API_BASE}/api/v1/projects/${projectId}/suggestions/anonymous/beacon?token=${encodeURIComponent(anonymousToken)}`;
-    const payload = JSON.stringify({ session_id: sessionId, content });
-    const blob = new Blob([payload], { type: "application/json" });
-    return navigator.sendBeacon(url, blob);
-  },
+  // NOTE: no beacon() client here on purpose. navigator.sendBeacon cannot set
+  // headers, and putting the full 24h X-Anonymous-Token in a query string
+  // would leak a bearer-equivalent into browser history and access logs (the
+  // authenticated flow uses a separate short-lived beaconToken for exactly
+  // this reason). An anonymous flush-on-close needs a scoped beacon token
+  // from the api first — tracked as a PR-7 follow-up.
 };

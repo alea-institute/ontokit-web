@@ -218,9 +218,14 @@ export default function EditorPage() {
   // Suggestion session (only active for suggesters who can't directly edit)
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
-  // Anonymous proposal mode: available when AUTH_MODE != required and user is NOT signed in as editor/suggester
-  const canPropose = authMode !== "required" && !canEdit && !canSuggest;
+  // Anonymous proposal mode: available when AUTH_MODE != required, the user is
+  // NOT signed in as editor/suggester, and the project is PUBLIC (the api only
+  // allows anonymous sessions on public projects — hiding the affordance on
+  // private projects avoids a guaranteed 403 loop). Evaluated after the
+  // isLoading early-return, so project is resolved wherever this gates.
+  const canPropose = authMode !== "required" && !canEdit && !canSuggest && !!project?.is_public;
   const [creditModalOpen, setCreditModalOpen] = useState(false);
+  const [discardProposalConfirmOpen, setDiscardProposalConfirmOpen] = useState(false);
 
   const anonymousSuggestion = useAnonymousSuggestion({
     projectId,
@@ -791,7 +796,14 @@ export default function EditorPage() {
     const modifiedSource = updateClassInTurtle(source, classIri, data);
     const label = data.labels[0]?.value || getLocalName(classIri);
 
-    await anonymousSuggestion.saveToSession(modifiedSource, classIri, label);
+    const saved = await anonymousSuggestion.saveToSession(modifiedSource, classIri, label);
+    if (!saved) {
+      // A concurrent save was in flight (or the save failed — errors already
+      // toast via onError). Do NOT report success or update local state for a
+      // change that never reached the session branch.
+      toast.error("Change not saved", "A previous save was still in progress or the save failed — please retry.");
+      return;
+    }
 
     setSourceContent(modifiedSource);
     toast.success(`Proposed update to "${label}"`);
@@ -810,10 +822,17 @@ export default function EditorPage() {
     // which re-renders ClassDetailPanel with canEdit=true allowing form editing
   }, [anonymousSuggestion]);
 
-  // Handle "Submit Proposal" — called by CreditModal onSubmitCredit after user fills in name/email (or skips)
-  const handleAnonymousSubmit = useCallback(async (name: string | null, email: string | null) => {
+  // Handle "Submit Proposal" — called by CreditModal for EVERY exit path
+  // (save / skip / dismiss). The honeypot value is forwarded verbatim so the
+  // server-side control (filled honeypot -> silent fake success) actually
+  // receives the bot signal (PR-7 /ce:review BLOCKER fix).
+  const handleAnonymousSubmit = useCallback(async (
+    name: string | null,
+    email: string | null,
+    website: string = "",
+  ) => {
     setCreditModalOpen(false);
-    await anonymousSuggestion.submitSession(undefined, name ?? undefined, email ?? undefined);
+    await anonymousSuggestion.submitSession(undefined, name ?? undefined, email ?? undefined, website);
   }, [anonymousSuggestion]);
 
   // Handle drag-and-drop reparent class
@@ -1044,8 +1063,10 @@ export default function EditorPage() {
     );
   }
 
-  // Auth guard: redirect unauthenticated or unauthorized users to the viewer
-  if (status === "unauthenticated" || (project && !canSuggest)) {
+  // Auth guard: redirect unauthenticated or unauthorized users to the viewer —
+  // UNLESS anonymous proposal mode applies (AUTH_MODE != required + public
+  // project): those users are this page's audience in propose mode (PR-7).
+  if ((status === "unauthenticated" || (project && !canSuggest)) && !canPropose) {
     router.replace(`/projects/${projectId}`);
     return (
       <>
@@ -1188,7 +1209,7 @@ export default function EditorPage() {
                   variant="ghost"
                   size="sm"
                   className="gap-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  onClick={() => anonymousSuggestion.discardSession()}
+                  onClick={() => setDiscardProposalConfirmOpen(true)}
                 >
                   Discard
                 </Button>
@@ -1539,9 +1560,20 @@ export default function EditorPage() {
       />
 
       {/* Credit Modal for anonymous proposal submissions — opens before submit to collect optional credit info */}
+      <ConfirmDialog
+        open={discardProposalConfirmOpen}
+        onOpenChange={setDiscardProposalConfirmOpen}
+        title="Discard proposal?"
+        description="All changes in this anonymous proposal will be permanently discarded. This cannot be undone."
+        confirmLabel="Discard"
+        variant="danger"
+        onConfirm={() => {
+          setDiscardProposalConfirmOpen(false);
+          anonymousSuggestion.discardSession();
+        }}
+      />
       <CreditModal
         open={creditModalOpen}
-        onClose={() => handleAnonymousSubmit(null, null)}
         onSubmitCredit={handleAnonymousSubmit}
       />
     </BranchProvider>

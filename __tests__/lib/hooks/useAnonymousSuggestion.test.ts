@@ -234,7 +234,7 @@ describe("useAnonymousSuggestion", () => {
     expect(onError).toHaveBeenCalledWith("save failed");
   });
 
-  it("submitSession sends credit fields, always sends an empty honeypot, and clears the persisted token", async () => {
+  it("submitSession sends credit fields, defaults the honeypot to empty, and clears the persisted token", async () => {
     mockedCreateSession.mockResolvedValue({
       session_id: "sess-1",
       branch: "anon/sess-1",
@@ -266,7 +266,7 @@ describe("useAnonymousSuggestion", () => {
         summary: "My summary",
         submitter_name: "Ada Lovelace",
         submitter_email: "ada@example.org",
-        website: "", // honeypot — must always be sent empty, never user-controlled
+        website: "", // honeypot — defaults to empty when no value was captured
       },
       "tok-1",
     );
@@ -284,7 +284,7 @@ describe("useAnonymousSuggestion", () => {
     expect(useAnonymousTokenStore.getState().getToken(PROJECT_ID)).toBeNull();
   });
 
-  it("submitSession omits credit fields when name/email are not provided, still sending an empty honeypot", async () => {
+  it("submitSession omits credit fields when name/email are not provided, still defaulting the honeypot to empty", async () => {
     mockedCreateSession.mockResolvedValue({
       session_id: "sess-1",
       branch: "anon/sess-1",
@@ -369,4 +369,61 @@ describe("useAnonymousSuggestion", () => {
 
     expect(mockedDiscard).not.toHaveBeenCalled();
   });
+
+  it("submitSession forwards a captured honeypot value VERBATIM (server-side control needs the bot signal)", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-1",
+      branch: "anon/sess-1",
+      created_at: "2024-01-01T00:00:00Z",
+      anonymous_token: "tok-1",
+    });
+    mockedSubmit.mockResolvedValue({ pr_number: 7, pr_url: "http://example.org/pr/7", status: "submitted" });
+
+    const { result } = renderHook(() => useAnonymousSuggestion({ projectId: PROJECT_ID }));
+    await act(async () => {
+      await result.current.startSession();
+    });
+    await act(async () => {
+      await result.current.submitSession(undefined, undefined, undefined, "http://spam.example");
+    });
+
+    expect(mockedSubmit).toHaveBeenCalledWith(
+      PROJECT_ID,
+      "sess-1",
+      expect.objectContaining({ website: "http://spam.example" }),
+      "tok-1",
+    );
+  });
+
+  it("submitSession guards against double-submit while a submit is in flight", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-1",
+      branch: "anon/sess-1",
+      created_at: "2024-01-01T00:00:00Z",
+      anonymous_token: "tok-1",
+    });
+    let resolveSubmit: (v: unknown) => void = () => {};
+    mockedSubmit.mockImplementation(
+      () => new Promise((resolve) => { resolveSubmit = resolve; }),
+    );
+
+    const { result } = renderHook(() => useAnonymousSuggestion({ projectId: PROJECT_ID }));
+    await act(async () => {
+      await result.current.startSession();
+    });
+
+    let first: Promise<void>;
+    act(() => {
+      first = result.current.submitSession();
+      // second call while the first is still pending must be a no-op
+      void result.current.submitSession();
+    });
+    await act(async () => {
+      resolveSubmit({ pr_number: 7, pr_url: null, status: "submitted" });
+      await first!;
+    });
+
+    expect(mockedSubmit).toHaveBeenCalledTimes(1);
+  });
+
 });
