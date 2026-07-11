@@ -3,7 +3,7 @@ title: Upstream Divergence Tracking (FOLIO ⇄ CatholicOS)
 type: ledger
 status: active
 owner: Damien Riehl
-updated: 2026-07-08 (PR-7 queued — 8-PR drain complete)
+updated: 2026-07-10 (fork-side hardening pass — 6 documented follow-ups closed; stack rebased)
 ---
 
 > **⚠ POLICY UPDATE (TODAY-2026-07-07):** Today upstream PRs are staged **INSIDE the
@@ -82,6 +82,36 @@ dependency-ordered PRs; batch 1–2 at a time; each: slice → rebase onto fresh
 
 **Merge order:** 0 → 1 → 2 → 3 → 4 → 5 → 6 → (7). PR-0 must merge before PR-5 (editor
 layouts import `lib/graph/utils.ts`).
+
+---
+
+## H2 — Fork-side hardening pass (2026-07-10, "all-batch2 / Fr. John out")
+
+**Frame:** Damien 2026-07-10 (`briefs/qa/2026-07-10-retarget-answers.json`) — Fr. John is
+out of pocket for a few weeks; **no upstream promotion**, everything stays in the alea fork
+UNMERGED. Directive: *make everything as solid as we can, fork-side*. This pass closed the six
+documented engineering follow-ups accumulated across sessions 4–8. **All API-side** — the web
+stack was untouched. Method: commit each fix to the branch that owns the code, then
+**rebase-in-place** up the stack so all PRs stay coherent (the brief's primary preference;
+the top-hardening-PR fallback was not needed — every rebase was conflict-free except one
+trivial `__init__.py` export-list union on cost-controls).
+
+| # | Follow-up | Owning branch / PR | Commit | Resolution |
+|---|-----------|--------------------|--------|------------|
+| 1 | **WS-auth parity** | `optional-auth` / api#5 (island — 0 cascade) | `efd659c` | `authenticate_ws` hard-required a token regardless of `auth_mode`, so a `disabled`/`optional` deployment admitted anonymous callers on HTTP but rejected them at the WS handshake. Now mirrors `core.auth`: disabled→ANONYMOUS_USER (no token), optional→absent/invalid token downgrades to anonymous, required→token mandatory. Project-access check still gates private projects. +7 tests. |
+| 2 | **SSRF connect-time pinning** | `llm-config` / api#6 | `b8dc77e` | New `resolve_and_validate()` + `SSRFProtectedTransport` re-validate the target host on **every** request, immediately before the socket opens — kills the config-time→connect-time DNS-rebinding TOCTOU. `secure_async_client()` also disables redirect-following. Wired into every provider that dials a project-controlled base_url: cohere/google/github_models (raw httpx) + openai_compat (openai SDK `http_client`); local providers pass `allow_private=True` (metadata endpoint still blocked). |
+| 3 | **Fernet MultiFernet rotation** | `llm-config` / api#6 | `b8dc77e` | `crypto._get_fernet()` now builds a `MultiFernet`: current `SECRET_KEY` encrypts, retired keys in new `SECRET_KEY_PREVIOUS` (comma-sep) decrypt-only → zero-downtime rotation. `rotate_secret()` migrates stored ciphertext onto the current key. Shipped insecure default is never trusted as a rotation key. |
+| 4 | **Rate-limiter fail-open alerting + parity** | `cost-controls` / api#7 (+`suggestion-generation`/#8) | `212c487` region + `5dab893` region | Unified all fail-open paths onto ONE stable, structured signal `FAIL_OPEN_EVENT=llm_rate_limiter_fail_open` (extra: event/operation/project_id/user_id + error): `check_rate_limit`, `get_remaining_calls` (cost-controls) and the route-level Redis-pool-absent bypass in `generation.py` (suggestion-generation). **Parity audit:** budget layer (DB) and the anonymous IP limiter (DB `COUNT` query) both fail **CLOSED** — no gap. quality/lint WS limiter is a separate pre-existing subsystem (out of scope). +tests assert the marker on every path. |
+| 5 | **`DuplicateCheckRequest.branch` dead field** | schema on `suggestion-generation` / api#8; test on `reviewer-tools` / api#9 | `5dab893` region + `ae95651` region | Duplicate detection always searches ALL branches (DEDUP-08), so the request's `branch` was silently ignored → **removed** (no queued web PR sends it; the shard UI that would is deferred). Documented why no per-request branch scope exists; the candidate's found-on branch is still on `DuplicateCandidate.branch`. Contract-pin test on reviewer-tools updated to assert removal + extra-field-ignored. |
+| 6 | **Shard subsystem design doc** | (design only — no code) | this branch | `docs/plans/2026-07-10-008-feat-shard-review-subsystem-design.md` — specifies the 5 phantom endpoints (`cluster`/`batch-submit`/`detail`/`shard-reviews`/`clean-pr`): full request/response contracts (mined from the web client on `origin/llm-helper`), auth + role gates, pagination (`/detail` is cursor-paginated; `next_cursor` to add), persistence (`suggestion_shard_reviews` + shard→PR mapping), api-first build sequence, and 4 open questions. **Endpoints NOT built.** |
+
+**Stack integrity after rebase (suites green on every touched branch, ruff + mypy-strict 0,
+single Alembic head, OpenAPI intact):** optional-auth 1554 · llm-config 1575 · cost-controls
+1632 · suggestion-generation 1701 · reviewer-tools 1714 · anonymous-suggestions 1752. All six
+api branches force-pushed to alea (`--force-with-lease`); PRs api#5–#10 confirmed OPEN +
+MERGEABLE. Branch SHAs changed by the rebase — PR bodies unchanged (fixes are self-describing
+in commit messages). PR-5 rubric-graded suggestion-quality eval **remains DEFERRED** (needs a
+paid generation run; $0-API constraint).
 
 ---
 
