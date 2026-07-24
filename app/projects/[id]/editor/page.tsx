@@ -46,6 +46,7 @@ import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
 import { ShareButton } from "@/components/editor/ShareButton";
 import { useAnonymousSuggestion } from "@/lib/hooks/useAnonymousSuggestion";
 import { CreditModal } from "@/components/suggestions/CreditModal";
+import { ProposalSubmittedDialog } from "@/components/editor/ProposalSubmittedDialog";
 import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
 import type { TrustGate } from "@/components/editor/TrustExplainer";
 
@@ -266,10 +267,17 @@ export default function EditorPage() {
   const [creditModalOpen, setCreditModalOpen] = useState(false);
   const [discardProposalConfirmOpen, setDiscardProposalConfirmOpen] = useState(false);
 
+  // Post-submit success state for anonymous proposals (R7, KTD12). A dialog
+  // rather than a toast, because this is the one moment the account nudge has
+  // the contributor's attention — and a toast that vanishes cannot carry a CTA.
+  const [submittedProposal, setSubmittedProposal] = useState<
+    { prNumber: number; prUrl: string | null } | null
+  >(null);
+
   const anonymousSuggestion = useAnonymousSuggestion({
     projectId,
-    onSubmitted: (prNumber) => {
-      toast.success(`Proposal submitted as PR #${prNumber}`);
+    onSubmitted: (prNumber, prUrl) => {
+      setSubmittedProposal({ prNumber, prUrl });
     },
     onError: (msg) => toast.error("Proposal error", msg),
   });
@@ -1620,6 +1628,20 @@ export default function EditorPage() {
       <CreditModal
         open={creditModalOpen}
         onSubmitCredit={handleAnonymousSubmit}
+      />
+
+      {/* Anonymous submit-success + account nudge (R7) */}
+      <ProposalSubmittedDialog
+        open={!!submittedProposal}
+        onOpenChange={(open) => { if (!open) setSubmittedProposal(null); }}
+        prNumber={submittedProposal?.prNumber ?? null}
+        prUrl={submittedProposal?.prUrl ?? null}
+        isSignedIn={!!session?.accessToken}
+        onSignIn={
+          zitadelConfigured
+            ? () => signIn("zitadel", { callbackUrl: window.location.href })
+            : undefined
+        }
       />
     </BranchProvider>
   );
