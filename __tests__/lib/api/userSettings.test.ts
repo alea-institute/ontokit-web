@@ -2,7 +2,6 @@ import { describe, expect, it, beforeEach } from "vitest";
 import {
   mockFetch,
   mockOk,
-  mockEmpty,
   resetFetch,
 } from "@/__tests__/helpers/mockFetch";
 import { userSettingsApi } from "@/lib/api/userSettings";
@@ -28,36 +27,45 @@ describe("userSettingsApi", () => {
     });
   });
 
-  describe("saveGitHubToken", () => {
-    it("saves a GitHub PAT", async () => {
-      const data = {
-        github_username: "user1",
-        created_at: "2025-01-01T00:00:00Z",
-      };
-      mockOk(data);
+  describe("commit identity", () => {
+    const identity = {
+      display_name: "Maria Gonzalez",
+      noreply_alias: "maria-gonzalez-a1b2c3d4@users.noreply.ontokit.local",
+      commit_email: null,
+      commit_email_verified: false,
+      use_verified_email: false,
+      effective_email: "maria-gonzalez-a1b2c3d4@users.noreply.ontokit.local",
+    };
 
-      const result = await userSettingsApi.saveGitHubToken(
-        "ghp_abc123",
-        "tok"
-      );
-      expect(result).toEqual(data);
+    it("reads how commits are credited", async () => {
+      mockOk(identity);
+
+      const result = await userSettingsApi.getCommitIdentity("tok");
+      expect(result).toEqual(identity);
 
       const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/api/v1/users/me/github-token");
-      expect(options.method).toBe("POST");
-      expect(JSON.parse(options.body)).toEqual({ token: "ghp_abc123" });
+      expect(url).toContain("/api/v1/users/me/commit-identity");
+      expect(options.method).toBe("GET");
+    });
+
+    it("updates the opt-in preference", async () => {
+      mockOk({ ...identity, use_verified_email: true });
+
+      await userSettingsApi.updateCommitIdentity({ use_verified_email: true }, "tok");
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/users/me/commit-identity");
+      expect(options.method).toBe("PATCH");
+      expect(JSON.parse(options.body)).toEqual({ use_verified_email: true });
     });
   });
 
-  describe("deleteGitHubToken", () => {
-    it("deletes the stored token", async () => {
-      mockEmpty();
-
-      await userSettingsApi.deleteGitHubToken("tok");
-
-      const [url, options] = mockFetch.mock.calls[0];
-      expect(url).toContain("/api/v1/users/me/github-token");
-      expect(options.method).toBe("DELETE");
+  describe("retired PAT write surface", () => {
+    it("no longer exposes token write methods", () => {
+      // Per-user PATs are retired (R3/KD6): a lay contributor should never be
+      // asked for a GitHub credential. Pinned so they cannot quietly return.
+      expect("saveGitHubToken" in userSettingsApi).toBe(false);
+      expect("deleteGitHubToken" in userSettingsApi).toBe(false);
     });
   });
 
