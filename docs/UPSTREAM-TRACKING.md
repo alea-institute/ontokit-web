@@ -121,10 +121,43 @@ paid generation run; $0-API constraint).
 |------|---------|---------------|--------|-------|
 | ontokit-api | Startup async-safety (no hang on unreachable MinIO/DB) | `fix/startup-async-safety` (ahead 1 of `catholicos/main`) | `PLANNED` | Fold into an early PR (needed for reliable dev-box + preview-env startup). |
 | ontokit-api | Lint hardening (empty-rules, role gating, XOR validation) | `fix/pr-94-blockers` | `PLANNED` | Standalone lint-hardening PR. Related: `review-pr-94`. |
-| ontokit-api | **Worker Redis-auth bug** — `get_redis_settings()` drops the DSN password → arq worker can't auth to a password-protected Redis | _found during FOLIO DEV deploy 2026-07-06; runtime-patched on box_ | `PLANNED` (bug) | Real bug (repo's own compose uses password-less Redis, hiding it). Fix `password=parsed.password`. Fold into an early api PR. |
+| ontokit-api | **Worker Redis-auth bug** — `get_redis_settings()` drops the DSN password → arq worker can't auth to a password-protected Redis | `feat/trust-ladder` (`ea9e3e9`) | `FIXED` (local, unpushed) | Real bug (repo's own compose uses password-less Redis, hiding it). Fixed 2026-07-24 on the trust-ladder branch: now carries `username` + `password` (URL-decoded, so a password with reserved characters survives) and maps the `rediss://` scheme to `ssl=True`, which was previously ignored outright. 11 regression tests. Carve out to its own PR if the trust ladder lands later than this should. |
 | ontokit-web | **Lockfile fix** — dependabot drift made `npm ci` fail (node:22-alpine/npm10) | pushed to alea `origin/dev` `ac67d1f` (package-lock.json only) | `PLANNED` | Diverges alea fork's `dev` from `catholicos/dev` by 1 commit → next fork-sync needs a rebase; same fix should land upstream. |
 
 > **Alea-fork `dev` divergence (2026-07-06):** `alea-institute/ontokit-web` `dev` = `ac67d1f` = `catholicos/dev` (`b5aa5e3`) + the lockfile commit. `alea-institute/ontokit-api` `dev` = `25cc4de` (== catholicos/dev, clean). Reconcile the web lockfile commit upstream to keep the mirror ff-only.
+
+---
+
+## A3 — Contribution trust ladder & identity pipeline (2026-07-24)
+
+Plan: `ontokit-web:docs/plans/2026-07-24-009-feat-contribution-trust-ladder-plan.md`
+(enriched from requirements-only to **implementation-ready**: 15 U-IDs across five
+phases, 15 key technical decisions resolving all seven planning-deferred questions).
+
+Branch **`feat/trust-ladder`** in both repos, based on
+`upstream-queue/anonymous-suggestions` (PR-7, top of the 8-PR stack).
+**LOCAL ONLY — nothing pushed, no PRs opened** (CatholicOS-family repo; Damien
+pushes personally).
+
+| Repo | Scope landed | Units | Suite | Status |
+|------|--------------|-------|-------|--------|
+| ontokit-api | Trust schema + `TrustService`, append-only outcome log, entity-minting gate, triage queue + bulk review, auto-accept clock + worker sweep, commit identity, outbound-only mirror on a system credential, PAT-write retirement, untrusted rate limit + human verification, admin endpoints | U1–U11 | 1752 → **1979** | `LOCAL` |
+| ontokit-web | Trust API client, capabilities hook, settings credit card, PAT UI retirement | U12 (partial) | 2895 → **2915** | `LOCAL` |
+
+**Not yet built:** U13 (editor minting gating + trust explainer), U14 (triage
+queue UI + admin trust controls), U15 (anonymous post-submit account nudge).
+Every API surface those three need is already in place.
+
+**Operational prerequisites (not code):** a GitHub machine identity with push
+rights to the mirror repos (`GITHUB_MIRROR_TOKEN`); Google and GitHub added as
+federated IdPs inside Zitadel (R2 — console configuration only, no code);
+`COMMIT_NOREPLY_DOMAIN` set per environment **before** the first suggestion
+commit lands, since the alias is baked into permanent history.
+
+**Default-configuration posture:** auto-accept OFF, verification provider
+`none`, mirror credential falling back to the stored per-user PAT with a
+deprecation warning. An existing deployment is behaviorally unchanged until an
+operator opts in.
 
 ---
 
