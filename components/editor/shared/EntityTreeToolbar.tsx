@@ -9,6 +9,10 @@ const TIP_DISMISSED_KEY = "ontokit:expand-tip-dismissed";
 interface EntityTreeToolbarProps {
   canAdd?: boolean;
   onAdd?: () => void;
+  /** Trust ladder (R8): minting is above this contributor's rung. */
+  addLocked?: boolean;
+  /** Plain-language reason shown on the disabled Add button (AE2). */
+  addLockedReason?: string;
   showSearch: boolean;
   searchQuery: string;
   onToggleSearch: () => void;
@@ -27,6 +31,8 @@ interface EntityTreeToolbarProps {
 export function EntityTreeToolbar({
   canAdd,
   onAdd,
+  addLocked = false,
+  addLockedReason,
   showSearch,
   searchQuery,
   onToggleSearch,
@@ -92,8 +98,15 @@ export function EntityTreeToolbar({
         {canAdd && onAdd && (
           <button
             onClick={onAdd}
-            className="rounded-sm p-1 hover:bg-slate-100 dark:hover:bg-slate-700"
+            disabled={addLocked}
+            className={cn(
+              "rounded-sm p-1",
+              addLocked
+                ? "cursor-not-allowed opacity-40"
+                : "hover:bg-slate-100 dark:hover:bg-slate-700",
+            )}
             aria-label="Add entity"
+            title={addLocked ? addLockedReason : undefined}
           >
             <Plus className="h-4 w-4 text-slate-500" />
           </button>

@@ -18,6 +18,10 @@ interface ClassTreeProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  /** Trust ladder (R8): minting is above this contributor's rung. */
+  addChildLocked?: boolean;
+  /** Plain-language reason shown on the disabled affordance (AE2). */
+  addChildLockedReason?: string;
   searchResults?: EntitySearchResult[] | null;
   isSearching?: boolean;
   onSearchSelect?: (iri: string) => void;
@@ -50,6 +54,8 @@ export function ClassTree({
   onCopyIri,
   onDelete,
   onViewInSource,
+  addChildLocked,
+  addChildLockedReason,
   searchResults,
   isSearching,
   onSearchSelect,
@@ -152,6 +158,8 @@ export function ClassTree({
       onCopyIri={onCopyIri}
       onDelete={onDelete}
       onViewInSource={onViewInSource}
+      addChildLocked={addChildLocked}
+      addChildLockedReason={addChildLockedReason}
       draftIris={draftIris}
       suggestedIris={suggestedIris}
       enableKeyboardNav

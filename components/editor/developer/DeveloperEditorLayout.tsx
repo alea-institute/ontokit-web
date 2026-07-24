@@ -19,6 +19,7 @@ import { IndividualList } from "@/components/editor/standard/IndividualList";
 import { PropertyDetailPanel } from "@/components/editor/PropertyDetailPanel";
 import { IndividualDetailPanel } from "@/components/editor/IndividualDetailPanel";
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
+import { TrustExplainer, mintingLockReason, type TrustGate } from "@/components/editor/TrustExplainer";
 import { DraggableTreeWrapper } from "@/components/editor/shared/DraggableTreeWrapper";
 import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
 import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
@@ -72,6 +73,8 @@ export interface DeveloperEditorLayoutProps {
   activeBranch?: string;
   canEdit: boolean;
   canSuggest?: boolean;
+  /** Trust-ladder state for entity minting (R8). Absent = ladder not applicable. */
+  trustGate?: TrustGate;
   isSuggestionMode?: boolean;
   userRole?: ProjectRole | null;
 
@@ -153,6 +156,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     canEdit,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     canSuggest = false,
+    trustGate,
     isSuggestionMode = false,
     userRole,
     nodes,
@@ -201,6 +205,12 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     onProposeEdit,
     isAnonymousProposalMode,
   } = props;
+
+  // Trust ladder (R8, AE2): one derivation, shared by every minting
+  // affordance in this layout, so the toolbar, the tree and the context menu
+  // can never tell a contributor three different stories.
+  const mintingLocked = trustGate?.locked === true;
+  const mintingLockedReason = mintingLockReason(trustGate);
 
   const toast = useToast();
   const { announce } = useAnnounce();
@@ -524,6 +534,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               <EntityTreeToolbar
                 canAdd={canEdit && activeTab === "classes"}
                 onAdd={() => onAddEntity()}
+                addLocked={mintingLocked}
+                addLockedReason={mintingLockedReason}
                 showSearch={showSearch}
                 searchQuery={searchQuery}
                 onToggleSearch={toggleSearch}
@@ -538,6 +550,14 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 hasExpandedNodes={activeTab === "classes" ? hasExpandedNodes : false}
                 isExpandingAll={activeTab === "classes" ? isExpandingAll : false}
               />
+
+              {/* Trust ladder (R8, AE2): the minting affordance above is disabled;
+                  this is where a contributor learns how to un-disable it. */}
+              {trustGate && mintingLocked && canEdit && activeTab === "classes" && (
+                <div className="border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
+                  <TrustExplainer gate={trustGate} />
+                </div>
+              )}
 
               {/* Tab Content */}
               <div className="h-[calc(100%-5.5rem)] overflow-y-auto">
@@ -576,6 +596,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                           onExpand={expandNode}
                           onCollapse={collapseNode}
                           onAddChild={canEdit ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+                          addChildLocked={mintingLocked}
+                          addChildLockedReason={mintingLockedReason}
                           onCopyIri={onCopyIri}
                           onDelete={canEdit ? onDeleteClass : undefined}
                           onViewInSource={handleNavigateToSource}

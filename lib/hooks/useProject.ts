@@ -53,8 +53,19 @@ export function useProject(projectId: string, accessToken?: string) {
 
 /**
  * Derive common permission flags from a Project object.
+ *
+ * `capabilities` carries the server's trust-tier answer (see
+ * `useTrustCapabilities`). Minting is sourced from it rather than re-derived
+ * from roles: the server gate and the UI affordance must read the same
+ * resolution, and a second derivation drifts. When it is absent — the caller
+ * has not fetched capabilities, or they are still loading — `canMintEntities`
+ * is false, which is the fail-safe direction (R8, KTD3).
  */
-export function derivePermissions(project: Project | null, accessToken?: string) {
+export function derivePermissions(
+  project: Project | null,
+  accessToken?: string,
+  capabilities?: { can_mint_entities: boolean } | null,
+) {
   const canManage = project?.user_role === "owner" || project?.user_role === "admin" || !!project?.is_superadmin;
   const hasExplicitRole = !!project?.user_role;
   const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || !!project?.is_superadmin;
@@ -63,6 +74,7 @@ export function derivePermissions(project: Project | null, accessToken?: string)
   const hasValidAccess = !!accessToken;
   const hasOntology = !!project?.source_file_path;
   const isSuggestionMode = isSuggester && !canEdit;
+  const canMintEntities = capabilities?.can_mint_entities === true;
 
-  return { canManage, canEdit, canSuggest, isSuggester, isSuggestionMode, hasValidAccess, hasOntology, hasExplicitRole };
+  return { canManage, canEdit, canSuggest, canMintEntities, isSuggester, isSuggestionMode, hasValidAccess, hasOntology, hasExplicitRole };
 }

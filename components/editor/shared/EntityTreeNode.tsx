@@ -22,6 +22,10 @@ interface EntityTreeNodeProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  /** Trust ladder (R8): minting is above this contributor's rung. */
+  addChildLocked?: boolean;
+  /** Plain-language reason shown on the disabled affordance (AE2). */
+  addChildLockedReason?: string;
   draftIris?: Set<string>;
   /** IRIs of accepted LLM suggestions — shown with sparkle badge indicator */
   suggestedIris?: Set<string>;
@@ -59,6 +63,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   onCopyIri,
   onDelete,
   onViewInSource,
+  addChildLocked = false,
+  addChildLockedReason,
   draftIris,
   suggestedIris,
   dragState,
@@ -123,9 +129,10 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   const handleAddChild = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (addChildLocked) return;
       onAddChild?.(node.iri);
     },
-    [node.iri, onAddChild],
+    [node.iri, onAddChild, addChildLocked],
   );
 
   // Group headers: uppercase label + count, click only toggles expand
@@ -167,6 +174,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
                 onCopyIri={onCopyIri}
                 onDelete={onDelete}
                 onViewInSource={onViewInSource}
+                addChildLocked={addChildLocked}
+                addChildLockedReason={addChildLockedReason}
                 draftIris={draftIris}
                 suggestedIris={suggestedIris}
               />
@@ -261,8 +270,15 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
       {onAddChild && (
         <button
           onClick={handleAddChild}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded-sm hover:bg-slate-200 dark:hover:bg-slate-700"
+          disabled={addChildLocked}
+          className={cn(
+            "opacity-0 group-hover:opacity-100 p-1 rounded-sm",
+            addChildLocked
+              ? "cursor-not-allowed disabled:opacity-0 group-hover:opacity-40"
+              : "hover:bg-slate-200 dark:hover:bg-slate-700",
+          )}
           aria-label="Add subclass"
+          title={addChildLocked ? addChildLockedReason : undefined}
           tabIndex={-1}
         >
           <Plus className="w-3 h-3" />
@@ -282,6 +298,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
             onCopyIri={onCopyIri}
             onDelete={onDelete}
             onViewInSource={onViewInSource}
+            addChildLocked={addChildLocked}
+            addChildLockedReason={addChildLockedReason}
           />
         </ContextMenu>
       ) : (
@@ -305,6 +323,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
             onCopyIri={onCopyIri}
             onDelete={onDelete}
             onViewInSource={onViewInSource}
+            addChildLocked={addChildLocked}
+            addChildLockedReason={addChildLockedReason}
             draftIris={draftIris}
             suggestedIris={suggestedIris}
             dragState={dragState}
