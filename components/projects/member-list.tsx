@@ -15,6 +15,12 @@ interface MemberListProps {
   onRemove: (userId: string) => Promise<void>;
   onTransferOwnership?: (userId: string) => Promise<void>;
   isLoading?: boolean;
+  /**
+   * Optional per-member trust control (R6). Supplied by the settings page,
+   * which owns the trust query; return null for members the ladder does not
+   * govern (owners, admins and editors already resolve above trusted).
+   */
+  renderTrustControl?: (member: ProjectMember) => React.ReactNode;
 }
 
 const roleIcons: Record<ProjectRole, React.ComponentType<{ className?: string }>> = {
@@ -50,6 +56,7 @@ export function MemberList({
   onRemove,
   onTransferOwnership,
   isLoading = false,
+  renderTrustControl,
 }: MemberListProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -154,6 +161,8 @@ export function MemberList({
                 <RoleIcon className="h-4 w-4" />
                 <span className="text-sm font-medium">{roleLabels[member.role]}</span>
               </div>
+
+              {renderTrustControl?.(member)}
 
               {member.role === "editor" && canManageMembers && (
                 <label

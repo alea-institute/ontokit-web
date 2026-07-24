@@ -20,6 +20,8 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectForm } from "@/components/projects/project-form";
 import { MemberList } from "@/components/projects/member-list";
+import { MemberTrustControl } from "@/components/projects/MemberTrustControl";
+import { TrustLadderSection } from "@/components/projects/TrustLadderSection";
 import { UserSearchInput } from "@/components/projects/user-search-input";
 import { LabelPreferences } from "@/components/projects/label-preferences";
 import { ApiError, projectOntologyApi, type IndexStatusResponse, type IndexStatus } from "@/lib/api/client";
@@ -58,6 +60,7 @@ import {
 import { useRemoteSync } from "@/lib/hooks/useRemoteSync";
 import { useProject, projectQueryKeys } from "@/lib/hooks/useProject";
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
+import { useMemberTrust, memberTrustQueryKeys } from "@/lib/hooks/useMemberTrust";
 import { useMembers, memberQueryKeys } from "@/lib/hooks/useMembers";
 import { useNormalizationStatus, normalizationQueryKeys } from "@/lib/hooks/useNormalizationStatus";
 import { useIndexStatus, indexQueryKeys } from "@/lib/hooks/useIndexStatus";
@@ -260,6 +263,18 @@ export default function ProjectSettingsPage() {
   const canManage =
     project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
   const isOwner = project?.user_role === "owner";
+
+  // Contribution trust ladder (R6): every member's rung and accepted count.
+  // Owner/admin only, mirroring the endpoint's own gate.
+  const { data: memberTrustRows } = useMemberTrust(
+    projectId,
+    session?.accessToken,
+    !!canManage,
+  );
+  const trustByUserId = useMemo(
+    () => new Map((memberTrustRows ?? []).map((row) => [row.user_id, row])),
+    [memberTrustRows],
+  );
 
   // Sync label preferences from project data
   useEffect(() => {
@@ -1663,8 +1678,34 @@ export default function ProjectSettingsPage() {
               onUpdateRole={handleUpdateMemberRole}
               onRemove={handleRemoveMember}
               onTransferOwnership={isOwner ? handleTransferOwnership : undefined}
+              renderTrustControl={(member) => {
+                // The ladder governs suggesters only — owners, admins and
+                // editors already resolve above trusted (KTD4), so a trust
+                // control on their row would be a decision with no effect.
+                if (!canManage || member.role !== "suggester") return null;
+                return (
+                  <MemberTrustControl
+                    projectId={projectId}
+                    userId={member.user_id}
+                    trust={trustByUserId.get(member.user_id) ?? null}
+                    token={session?.accessToken || ""}
+                    onChanged={() => {
+                      queryClient.invalidateQueries({
+                        queryKey: memberTrustQueryKeys.list(projectId),
+                      });
+                    }}
+                  />
+                );
+              }}
             />
           </section>
+
+          {/* Contribution Trust Section — owners and admins */}
+          <TrustLadderSection
+            projectId={projectId}
+            accessToken={session?.accessToken}
+            canManage={!!canManage}
+          />
 
           {/* PR Settings Section - only for owners */}
           {isOwner && (
