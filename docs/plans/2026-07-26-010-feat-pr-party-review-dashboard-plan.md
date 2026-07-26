@@ -471,6 +471,14 @@ Visual checks of rendered cards use MCP chrome-devtools per house convention.
 
 ---
 
+## Superseded — read this first
+
+**This plan's delivery shape was reversed on 2026-07-26.** PR Party becomes a first-class OntoKit feature (UI in ontokit-web, pipeline in ontokit-api) rather than Cockpit tooling. The successor is `docs/plans/2026-07-26-011-feat-pr-party-ontokit-native-plan.md` — **start there.**
+
+What still stands in this document: the Product Contract (R1–R22, KD1–KD13, actors, flows, acceptance examples), the external GitHub/CodeRabbit research, and the Sources. The successor carries those forward by reference rather than restating them.
+
+What no longer applies: KD4 and KTD1–KTD10 (the Cockpit delivery decisions), the Implementation Units, and the Verification Contract. Those describe the prototype, which was built and reviewed but is not the shipping path.
+
 ## Implementation Trace
 
 All nine units were implemented on branch `feat/pr-party-dashboard` in the Cockpit repo (10 commits, pushed), each unit citing its U-ID in the commit subject. Code review found the branch **not ready to deploy**: four defects fail on first contact and one is a security containment gap.
