@@ -477,6 +477,8 @@ All nine units were implemented on branch `feat/pr-party-dashboard` in the Cockp
 
 **A fresh session picks up from `Coding Projects/docs/residual-review-findings/2026-07-26-pr-party-dashboard-review.md`** — it carries all ~33 findings with `file:line` and fixes, the recommended fix order, the worktree/branch/suite state, the human-only external gates, and two environment issues (no headless browser config, so no UI has been visually verified; the cross-model review route is unauthenticated in this sandbox).
 
+**Contribution route (standing rule, 2026-07-26):** all ontokit work happens on the FOLIO fork (`origin` = `alea-institute/*`, default `main`) and reaches CatholicOS only as a pull request against `catholicos/dev` — never a direct push to a `catholicos` remote, and every upstream PR carries a linked issue. The fork and upstream default to *different* branches, so a fork PR must explicitly target `dev`. This retargets the plan's one CatholicOS-bound artifact — U8's `@claude` org workflow, destined for `catholicos/.github` — from the direct push its staged README-NOTE implies to a fork PR. It does not move the PR Party code itself, which lives in the Cockpit repo (personal, no upstream). Full table in the residual-findings doc.
+
 Corrections this work forced on the plan's assumptions, recorded so they are not re-derived:
 
 - Damien is a **member**, not an owner, of the catholicos org — his fine-grained PAT needs owner approval, which Fr. John (`jmurquidi`, an owner) can grant. The Dependencies section's org-owner assumption was wrong.
