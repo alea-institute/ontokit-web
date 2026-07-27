@@ -183,6 +183,19 @@ export function PRPartyCard({
         if (response.deep_link) {
           window.open(response.deep_link, "_blank", "noopener,noreferrer");
         }
+      }
+
+      // A replay is the server handing back a stored receipt, not a new
+      // verdict. Announcing it as a fresh submission tells the reviewer they
+      // just did something they did not do — and hides the fact that their
+      // second tap changed nothing.
+      if (response.replayed) {
+        announce(
+          response.degraded
+            ? `${label} was already recorded — nothing was submitted again. GitHub is unavailable; finish it on GitHub.`
+            : `${label} was already recorded — nothing was submitted again.`,
+        );
+      } else if (response.degraded) {
         announce(
           `Verdict recorded for ${label}. GitHub is unavailable — finish it on GitHub.`,
         );

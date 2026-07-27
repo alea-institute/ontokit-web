@@ -76,9 +76,14 @@ function formatTimeAgo(dateStr: string): string {
  * protocol-relative `//evil.test` form that looks relative but is not, would
  * turn a notification row into an open redirect (R21). Anything else falls
  * through to the type switch, which only ever builds paths from our own routes.
+ *
+ * The backslash forms are the same hole with a different slash: browsers
+ * normalise `\` to `/` in the authority position, so `/\evil.test` and
+ * `/\\evil.test` are protocol-relative URLs that a plain `//` check waves
+ * through. Only a leading `/` followed by neither slash nor backslash is safe.
  */
 export function isSafeInternalUrl(url: string | undefined | null): url is string {
-  return typeof url === "string" && url.startsWith("/") && !url.startsWith("//");
+  return typeof url === "string" && /^\/(?![/\\])/.test(url);
 }
 
 function getTargetUrl(notification: { type: NotificationType; project_id?: string; target_id?: string; target_url?: string }): string {
