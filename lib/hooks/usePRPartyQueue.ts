@@ -177,6 +177,32 @@ export function usePRPartyQueue(options: UsePRPartyQueueOptions = {}) {
 }
 
 /**
+ * The reviewer's own PR Party settings (R11): whether merging happens from the
+ * dashboard or on GitHub, and where their ntfy pings go.
+ *
+ * Unlike the queue this is not live data — a preference changes when its owner
+ * changes it — so it keeps the app's default staleness and does not poll.
+ */
+export function usePRPartySettings(options: UsePRPartyQueueOptions = {}) {
+  const { data: session } = useSession();
+  const token = session?.accessToken;
+  const userKey = prPartyUserKey(session);
+
+  const query = useQuery({
+    queryKey: prPartyQueryKeys.settings(userKey),
+    queryFn: () => prPartyApi.getSettings(token!),
+    enabled: (options.enabled ?? true) && !!token,
+  });
+
+  return {
+    settings: query.data ?? null,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+  };
+}
+
+/**
  * One card's detail, for the `?card=` panel. Shares the queue's liveness
  * posture so an open card cannot go stale behind the list that spawned it.
  */

@@ -30,12 +30,16 @@ describe("SessionGuard", () => {
     expect(mockSignIn).not.toHaveBeenCalled();
   });
 
-  it("calls signIn with zitadel when session has RefreshAccessTokenError", () => {
+  it("calls signIn with zitadel and returns to the current page", () => {
     mockUseSession.mockReturnValue({
       data: { error: "RefreshAccessTokenError" },
     });
     render(<SessionGuard />);
-    expect(mockSignIn).toHaveBeenCalledWith("zitadel");
+    // Without a callbackUrl the re-auth dumps the user on the home page, losing
+    // whatever they had open — a PR Party card, a half-typed question.
+    expect(mockSignIn).toHaveBeenCalledWith("zitadel", {
+      callbackUrl: window.location.href,
+    });
   });
 
   it("does not call signIn for other error values", () => {

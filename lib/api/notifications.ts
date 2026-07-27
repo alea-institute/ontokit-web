@@ -21,15 +21,22 @@ export type NotificationType =
   | "pr_review"
   | "remote_update_applied"
   | "remote_update_available"
-  | "remote_sync_error";
+  | "remote_sync_error"
+  /** PR Party: a brief finished brewing and the card is ready to review. */
+  | "pr_party_ready";
 
 export interface Notification {
   id: string;
   type: NotificationType;
   title: string;
   body?: string;
-  project_id: string;
-  project_name: string;
+  /**
+   * Absent on notifications that are not about a project. PR Party rows are the
+   * first of these — a review card belongs to a GitHub PR, not to an OntoKit
+   * project — and the API sends null for both fields.
+   */
+  project_id?: string;
+  project_name?: string;
   target_id?: string;
   target_url?: string;
   is_read: boolean;

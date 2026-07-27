@@ -28,7 +28,7 @@ import { api, ApiError } from "./client";
 export type PRPartyAuthorKind = "own" | "counterpart" | "third_party" | "bot";
 export type PRPartyBriefStatus = "brewing" | "ready" | "ready_with_warning" | "failed";
 export type PRPartyActionKind = "review" | "merge";
-export type PRPartyVerdict = "approve" | "request_changes" | "comment";
+export type PRPartyVerdict = "approve" | "request_changes" | "comment" | "discuss_live";
 export type PRPartyMergeMethod = "merge" | "squash" | "rebase";
 
 export interface PRPartyCredentialHealth {
