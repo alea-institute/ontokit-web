@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { NotificationBell } from "@/components/layout/notification-bell";
+import { NotificationBell, isSafeInternalUrl } from "@/components/layout/notification-bell";
 import type { Notification } from "@/lib/api/notifications";
 
 // Mock next/navigation
@@ -328,6 +328,11 @@ describe("NotificationBell — PR Party rows", () => {
   it.each([
     ["https://evil.com/steal", "an absolute url"],
     ["//evil.com/steal", "a protocol-relative url"],
+    // The URL parser normalises a backslash in the authority position to a
+    // slash, so these resolve to https://evil.test/ exactly as `//evil.test`
+    // does — a `//` check alone waves them straight through.
+    ["/\\evil.test/steal", "a backslash protocol-relative url"],
+    ["/\\\\evil.test/steal", "a double-backslash protocol-relative url"],
     ["javascript:alert(1)", "a javascript url"],
   ])("refuses to navigate to %s (%s)", async (targetUrl) => {
     const user = userEvent.setup();
@@ -344,6 +349,19 @@ describe("NotificationBell — PR Party rows", () => {
     expect(mockPush).not.toHaveBeenCalledWith(targetUrl);
     expect(mockPush.mock.calls[0][0].startsWith("/")).toBe(true);
     expect(mockPush.mock.calls[0][0].startsWith("//")).toBe(false);
+  });
+
+  it("admits only a leading slash followed by neither slash nor backslash", () => {
+    expect(isSafeInternalUrl("/pr-party?card=1")).toBe(true);
+    expect(isSafeInternalUrl("/projects/p/settings#join-requests")).toBe(true);
+
+    expect(isSafeInternalUrl("//evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/\\evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/\\\\evil.test")).toBe(false);
+    expect(isSafeInternalUrl("\\\\evil.test")).toBe(false);
+    expect(isSafeInternalUrl("https://evil.test")).toBe(false);
+    expect(isSafeInternalUrl(undefined)).toBe(false);
+    expect(isSafeInternalUrl(null)).toBe(false);
   });
 
   it("renders a mixed list where one notification has no project", async () => {

@@ -16,7 +16,14 @@ import { nextLinkMock } from "@/__tests__/helpers/mockNextNavigation";
 import { ApiError } from "@/lib/api/client";
 import type { PRPartyCardDetail, PRPartyQueueCard } from "@/lib/api/prParty";
 
-const { signInSpy } = vi.hoisted(() => ({ signInSpy: vi.fn() }));
+const { signInSpy, announceSpy } = vi.hoisted(() => ({
+  signInSpy: vi.fn(),
+  announceSpy: vi.fn(),
+}));
+
+vi.mock("@/components/ui/ScreenReaderAnnouncer", () => ({
+  useAnnounce: () => ({ announce: announceSpy }),
+}));
 
 let mockStatus: "loading" | "authenticated" | "unauthenticated" = "authenticated";
 
@@ -260,6 +267,55 @@ describe("PR Party tabs", () => {
     expect(screen.queryByText("Waiting on you")).toBeNull();
   });
 
+  it("keeps a parked card on the agenda even though the server recorded the park as a succeeded review", async () => {
+    // The real server shape. `discuss_live` IS a review action, and it succeeds
+    // at the current head — so a settledness check that only looks at status
+    // files every parked card under Done and leaves the agenda permanently
+    // empty, which is the one tab the park exists to fill.
+    const parked = makeCard({
+      card_id: "parked",
+      title: "Talk it through",
+      parked: true,
+      actions: [
+        {
+          kind: "review",
+          verdict: "discuss_live",
+          status: "succeeded",
+          head_sha: "aaa111",
+          override: false,
+          created_at: "2026-07-26T10:00:00Z",
+        },
+      ],
+    });
+    mockedQueue.mockReturnValue(queueState({ cards: [parked] }));
+
+    render(<PRPartyQueueView />);
+
+    // Not in the queue, and — the actual regression — not in Done either.
+    expect(screen.queryByText("Talk it through")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /done/i }));
+    expect(screen.getByText("No concluded reviews yet")).toBeDefined();
+
+    await userEvent.click(screen.getByRole("button", { name: /agenda/i }));
+    expect(screen.getByText("Talk it through")).toBeDefined();
+  });
+
+  it("does not count a live-discussion park as a conclusion", () => {
+    const parkedAtHead = makeCard({
+      actions: [
+        {
+          kind: "review",
+          verdict: "discuss_live",
+          status: "succeeded",
+          head_sha: "aaa111",
+          override: false,
+          created_at: "2026-07-26T10:00:00Z",
+        },
+      ],
+    });
+    expect(isSettledForCaller(parkedAtHead)).toBe(false);
+  });
+
   it("treats a verdict on a superseded head as unsettled", () => {
     const card = makeCard({
       head_sha: "bbb222",
@@ -309,6 +365,55 @@ describe("PR Party tabs", () => {
 
     await waitFor(() => expect(screen.getByText("Talk it through")).toBeDefined());
     expect(screen.getByTestId("pr-party-card").className).toContain("ring-2");
+  });
+});
+
+// --- Degraded posture ---
+
+describe("PR Party degraded notice", () => {
+  it("sends a reviewer with no stored token to Review settings rather than blaming GitHub", () => {
+    mockedCapabilities.mockReturnValue({
+      isReviewer: true,
+      degraded: true,
+      credential: null,
+      isLoading: false,
+    });
+    render(<PRPartyQueueView />);
+
+    const notice = screen.getByTestId("pr-party-degraded-notice");
+    expect(notice.getAttribute("data-degraded-cause")).toBe("no-credential");
+    expect(notice.textContent).toContain("Connect your GitHub token");
+    // No outage claim — there is no outage.
+    expect(notice.textContent).not.toMatch(/github is unavailable/i);
+    expect(
+      within(notice).getByRole("link", { name: /review settings/i }).getAttribute("href"),
+    ).toBe("/pr-party/settings");
+  });
+
+  it("keeps the outage wording when a token exists but the capability is degraded", () => {
+    mockedCapabilities.mockReturnValue({
+      isReviewer: true,
+      degraded: true,
+      credential: {
+        expires_at: "2026-06-01T00:00:00Z",
+        last_validated_at: "2026-05-01T00:00:00Z",
+        last_error: "401 from GitHub",
+        expired: true,
+        expires_soon: false,
+      },
+      isLoading: false,
+    });
+    render(<PRPartyQueueView />);
+
+    const notice = screen.getByTestId("pr-party-degraded-notice");
+    expect(notice.getAttribute("data-degraded-cause")).toBe("outage");
+    expect(notice.textContent).toMatch(/github is unavailable/i);
+    expect(notice.textContent).not.toContain("Connect your GitHub token");
+  });
+
+  it("says nothing at all when the capability is healthy", () => {
+    render(<PRPartyQueueView />);
+    expect(screen.queryByTestId("pr-party-degraded-notice")).toBeNull();
   });
 });
 
@@ -411,6 +516,60 @@ describe("PR Party verdict controls", () => {
       expect(screen.getByText(/finish it on github/i)).toBeDefined(),
     );
     expect(openSpy).toHaveBeenCalled();
+    openSpy.mockRestore();
+  });
+});
+
+// --- Replayed receipts ---
+
+describe("PR Party replayed actuations", () => {
+  it("tells the reviewer a replayed verdict was already recorded, not freshly submitted", async () => {
+    const onSubmitAction = vi.fn().mockResolvedValue({
+      action: {},
+      card: makeDetail(),
+      replayed: true,
+    });
+    renderCard({ onSubmitAction });
+
+    await userEvent.click(screen.getByRole("button", { name: /^accept$/i }));
+
+    await waitFor(() => expect(announceSpy).toHaveBeenCalled());
+    const said = announceSpy.mock.calls.map((call) => String(call[0])).join(" ");
+    expect(said).toMatch(/already recorded/i);
+    expect(said).not.toMatch(/submitted for/i);
+  });
+
+  it("still announces a fresh submission as a submission", async () => {
+    const onSubmitAction = vi
+      .fn()
+      .mockResolvedValue({ action: {}, card: makeDetail(), replayed: false });
+    renderCard({ onSubmitAction });
+
+    await userEvent.click(screen.getByRole("button", { name: /^accept$/i }));
+
+    await waitFor(() => expect(announceSpy).toHaveBeenCalled());
+    const said = announceSpy.mock.calls.map((call) => String(call[0])).join(" ");
+    expect(said).toMatch(/submitted for/i);
+    expect(said).not.toMatch(/already recorded/i);
+  });
+
+  it("keeps the finish-on-GitHub instruction on a replayed degraded verdict", async () => {
+    const onSubmitAction = vi.fn().mockResolvedValue({
+      action: {},
+      card: makeDetail(),
+      replayed: true,
+      degraded: true,
+      deep_link: "https://github.com/catholicos/ontokit-api/pull/42#review",
+    });
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderCard({ degraded: true, onSubmitAction });
+
+    await userEvent.click(screen.getByRole("button", { name: /record \+ open github/i }));
+
+    await waitFor(() => expect(announceSpy).toHaveBeenCalled());
+    const said = announceSpy.mock.calls.map((call) => String(call[0])).join(" ");
+    expect(said).toMatch(/already recorded/i);
+    expect(said).toMatch(/finish it on github/i);
     openSpy.mockRestore();
   });
 });

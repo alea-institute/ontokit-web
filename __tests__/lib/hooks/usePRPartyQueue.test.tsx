@@ -115,9 +115,59 @@ describe("prPartyQueryKeys", () => {
 });
 
 describe("usePRPartyQueue liveness", () => {
-  it("polls on the fixed foreground interval", () => {
+  it("actually re-fetches the queue once the poll interval elapses", async () => {
     // The app defaults (60s stale, no focus refetch) are wrong for a live queue.
-    expect(PR_PARTY_POLL_INTERVAL_MS).toBe(25_000);
+    // Asserting the constant proves only that the constant exists — it would
+    // still pass if `refetchInterval` were never wired to it. The only honest
+    // proof is a second fetch that nobody asked for.
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderHook(() => usePRPartyQueue(), {
+        wrapper: createQueryWrapper(),
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(mocked.getQueue).toHaveBeenCalledTimes(1);
+
+      // Nothing fires early…
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(PR_PARTY_POLL_INTERVAL_MS - 1000);
+      });
+      expect(mocked.getQueue).toHaveBeenCalledTimes(1);
+
+      // …and the poll lands on time.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+      expect(mocked.getQueue).toHaveBeenCalledTimes(2);
+
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops polling once the last consumer unmounts", async () => {
+    vi.useFakeTimers();
+    try {
+      const { unmount } = renderHook(() => usePRPartyQueue(), {
+        wrapper: createQueryWrapper(),
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(mocked.getQueue).toHaveBeenCalledTimes(1);
+
+      unmount();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(PR_PARTY_POLL_INTERVAL_MS * 3);
+      });
+      expect(mocked.getQueue).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("loads cards for the signed-in reviewer", async () => {

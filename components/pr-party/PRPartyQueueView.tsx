@@ -31,11 +31,17 @@ import { QueueTabs, type PRPartyTab } from "./QueueTabs";
  * Only actions at `head_sha` count: a verdict on an older commit was concluded
  * against code that has since moved, which is precisely the card that belongs
  * back in the queue rather than in Done.
+ *
+ * `discuss_live` is excluded even though the server records it as a succeeded
+ * review action: parking a card for the party is the opposite of concluding it.
+ * A park that counted as settled would file the card under Done and empty the
+ * agenda the park exists to fill.
  */
 export function isSettledForCaller(card: PRPartyQueueCard): boolean {
   return card.actions.some(
     (action) =>
       action.head_sha === card.head_sha &&
+      action.verdict !== "discuss_live" &&
       (action.status === "succeeded" || action.status === "degraded_confirmed"),
   );
 }
@@ -62,7 +68,12 @@ export interface PRPartyQueueViewProps {
 
 export function PRPartyQueueView({ renderCardDetail }: PRPartyQueueViewProps = {}) {
   const { status } = useSession();
-  const { isReviewer, degraded, isLoading: capsLoading } = usePRPartyCapabilities();
+  const {
+    isReviewer,
+    degraded,
+    credential,
+    isLoading: capsLoading,
+  } = usePRPartyCapabilities();
   const searchParams = useSearchParams();
   const cardParam = searchParams?.get("card") ?? null;
 
@@ -94,8 +105,11 @@ export function PRPartyQueueView({ renderCardDetail }: PRPartyQueueViewProps = {
       done: [],
     };
     for (const card of queue.cards) {
-      if (isSettledForCaller(card)) result.done.push(card);
-      else if (card.parked) result.agenda.push(card);
+      // Parked first, and deliberately: `parked` is the server's own statement
+      // that this card is waiting for the party. Whatever actions sit on it,
+      // the agenda is where the reviewer expects to find it.
+      if (card.parked) result.agenda.push(card);
+      else if (isSettledForCaller(card)) result.done.push(card);
       else result.queue.push(card);
     }
     return result;
@@ -190,10 +204,27 @@ export function PRPartyQueueView({ renderCardDetail }: PRPartyQueueViewProps = {
       {degraded && (
         <p
           data-testid="pr-party-degraded-notice"
+          data-degraded-cause={credential ? "outage" : "no-credential"}
           className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-2 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-300"
         >
-          GitHub is unavailable right now. Verdicts are recorded here and finished on
-          GitHub by hand.
+          {/* A reviewer who has never stored a PAT is not looking at a GitHub
+              outage — they are looking at a setup step nobody told them about.
+              Blaming GitHub sends them to check a status page instead of the
+              one screen that fixes it. */}
+          {credential ? (
+            <>
+              GitHub is unavailable right now. Verdicts are recorded here and finished
+              on GitHub by hand.
+            </>
+          ) : (
+            <>
+              Connect your GitHub token in{" "}
+              <Link href="/pr-party/settings" className="font-medium underline">
+                Review settings
+              </Link>{" "}
+              to post verdicts. Until then they are recorded here only.
+            </>
+          )}
         </p>
       )}
 

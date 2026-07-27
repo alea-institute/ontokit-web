@@ -235,19 +235,30 @@ function sanitize(value: string): string {
 /**
  * Derive the idempotency key for one actuation intent.
  *
- * Deterministic by construction: the same (card, action, head sha, verdict)
- * always yields the same key, so a retry — including one after a page reload —
- * is recognised by the server as a replay rather than a second action. The
- * readable prefix keeps server logs diagnosable; the digest carries the
- * uniqueness that truncation would otherwise cost.
+ * Deterministic by construction: the same intent always yields the same key, so
+ * a retry — including one after a page reload — is recognised by the server as a
+ * replay rather than a second action. The readable prefix keeps server logs
+ * diagnosable; the digest carries the uniqueness that truncation would
+ * otherwise cost.
+ *
+ * The *whole* intent goes into the digest, `body` and `override` included. They
+ * are not decoration: a reviewer who sends "accept with suggestions", rewrites
+ * the note and sends again means a second, different review, and a key blind to
+ * the body would hand them back the first receipt with the old text — silently
+ * discarding what they just wrote. Same for an override, which is a reviewer
+ * deliberately proceeding past a block the first attempt respected.
  */
 export function deriveIdempotencyKey(
   cardId: string,
   actionKind: PRPartyActionKind,
   headSha: string,
   verdict?: PRPartyVerdict | null,
+  body?: string | null,
+  override?: boolean,
 ): string {
-  const digest = fnv1a32(`${cardId}:${actionKind}:${headSha}:${verdict ?? ""}`);
+  const digest = fnv1a32(
+    `${cardId}:${actionKind}:${headSha}:${verdict ?? ""}:${body ?? ""}:${override ? "1" : "0"}`,
+  );
   const suffix = `-${digest}`;
   const prefix = [
     sanitize(cardId).slice(0, 16),
@@ -330,7 +341,14 @@ export const prPartyApi = {
         ...input,
         idempotency_key:
           input.idempotency_key ??
-          deriveIdempotencyKey(cardId, input.action_kind, input.head_sha, input.verdict),
+          deriveIdempotencyKey(
+            cardId,
+            input.action_kind,
+            input.head_sha,
+            input.verdict,
+            input.body,
+            input.override,
+          ),
       },
       actuationOptions(token),
     ),
