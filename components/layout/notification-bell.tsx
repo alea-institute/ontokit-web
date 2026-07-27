@@ -14,6 +14,7 @@ import {
   AlertCircle,
   RefreshCw,
   Download,
+  ClipboardCheck,
 } from "lucide-react";
 import { useNotifications, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/hooks/useNotifications";
 import type { NotificationType } from "@/lib/api/notifications";
@@ -35,6 +36,7 @@ const iconByType: Record<NotificationType, React.ComponentType<{ className?: str
   remote_update_applied: RefreshCw,
   remote_update_available: Download,
   remote_sync_error: AlertCircle,
+  pr_party_ready: ClipboardCheck,
 };
 
 const colorByType: Record<NotificationType, string> = {
@@ -50,6 +52,7 @@ const colorByType: Record<NotificationType, string> = {
   remote_update_applied: "text-blue-500",
   remote_update_available: "text-indigo-500",
   remote_sync_error: "text-red-500",
+  pr_party_ready: "text-emerald-500",
 };
 
 function formatTimeAgo(dateStr: string): string {
@@ -67,8 +70,24 @@ function formatTimeAgo(dateStr: string): string {
   return date.toLocaleDateString();
 }
 
-function getTargetUrl(notification: { type: NotificationType; project_id: string; target_id?: string; target_url?: string }): string {
-  if (notification.target_url) return notification.target_url;
+/**
+ * A `target_url` is server data that ends up in `router.push`. Only a
+ * same-origin *relative* path may be navigated to: an absolute URL, or the
+ * protocol-relative `//evil.test` form that looks relative but is not, would
+ * turn a notification row into an open redirect (R21). Anything else falls
+ * through to the type switch, which only ever builds paths from our own routes.
+ */
+export function isSafeInternalUrl(url: string | undefined | null): url is string {
+  return typeof url === "string" && url.startsWith("/") && !url.startsWith("//");
+}
+
+function getTargetUrl(notification: { type: NotificationType; project_id?: string; target_id?: string; target_url?: string }): string {
+  if (isSafeInternalUrl(notification.target_url)) return notification.target_url;
+
+  // Not every notification belongs to a project — PR Party rows do not — so a
+  // project-scoped fallback is not always available.
+  if (notification.type === "pr_party_ready") return "/pr-party";
+  if (!notification.project_id) return "/";
 
   const base = `/projects/${notification.project_id}`;
 
@@ -210,7 +229,9 @@ export function NotificationBell() {
                         </p>
                       )}
                       <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-                        {n.project_name} · {formatTimeAgo(n.created_at)}
+                        {n.project_name
+                          ? `${n.project_name} · ${formatTimeAgo(n.created_at)}`
+                          : formatTimeAgo(n.created_at)}
                       </p>
                     </div>
                   </button>

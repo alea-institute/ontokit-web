@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { Header } from "@/components/layout/header";
 import { PRPartyQueueView } from "@/components/pr-party/PRPartyQueueView";
+import { CardDetail } from "@/components/pr-party/CardDetail";
 
 /**
  * PR Party — the canonical review queue.
@@ -38,7 +39,9 @@ export default function PRPartyPage() {
               </div>
             }
           >
-            <PRPartyQueueView />
+            <PRPartyQueueView
+              renderCardDetail={(card) => <CardDetail card={card} />}
+            />
           </Suspense>
         </div>
       </main>
