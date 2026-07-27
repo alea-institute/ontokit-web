@@ -19,6 +19,7 @@ import {
   isPRPartyInFlightError,
   parsePRPartyError,
   type PRPartyCardDetail,
+  type PRPartyMergePlacement,
   type PRPartyQueueCard,
 } from "@/lib/api/prParty";
 import type {
@@ -51,6 +52,24 @@ export function isTrustedGitHubLink(url: string): boolean {
   return typeof url === "string" && url.startsWith("https://github.com/");
 }
 
+/** Same three-way outcome vocabulary CardDetail uses, for the same reason (C5). */
+type MergeOutcomeKind = "merged" | "skipped" | "failed";
+
+interface MergeOutcome {
+  kind: MergeOutcomeKind;
+  message: string;
+  link: string | null;
+}
+
+const MERGE_OUTCOME_STYLES: Record<MergeOutcomeKind, string> = {
+  merged:
+    "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200",
+  skipped:
+    "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-200",
+  failed:
+    "border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-900/20 dark:text-red-200",
+};
+
 export interface PRPartyCardProps {
   card: PRPartyQueueCard;
   /**
@@ -66,6 +85,12 @@ export interface PRPartyCardProps {
   onToggleExpanded?: (cardId: string) => void;
   /** U12's detail panel mounts here. */
   detailSlot?: React.ReactNode;
+  /**
+   * The reviewer's stored merge placement (R11). `manual` replaces the own-PR
+   * merge button with a link out, so the two merge affordances on a card agree
+   * with each other and with the setting.
+   */
+  mergePlacement?: PRPartyMergePlacement;
   onSubmitAction: (vars: PRPartySubmitActionVars) => Promise<PRPartyActionResponse>;
   onUnpark?: (vars: PRPartyCardVars) => Promise<unknown>;
   onRerunReview?: (vars: PRPartyCardVars) => Promise<unknown>;
@@ -101,6 +126,7 @@ export function PRPartyCard({
   expanded,
   onToggleExpanded,
   detailSlot,
+  mergePlacement = "dashboard",
   onSubmitAction,
   onUnpark,
   onRerunReview,
@@ -114,6 +140,7 @@ export function PRPartyCard({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [degradedLink, setDegradedLink] = useState<string | null>(null);
+  const [mergeOutcome, setMergeOutcome] = useState<MergeOutcome | null>(null);
 
   const active: PRPartyQueueCard = driftCard ?? card;
   const activeDetail: PRPartyCardDetail | null = driftCard ?? detail;
@@ -189,19 +216,42 @@ export function PRPartyCard({
 
   async function handleMerge() {
     setError(null);
+    setMergeOutcome(null);
     setBusy(true);
     try {
-      await onSubmitAction({
+      const response = await onSubmitAction({
         cardId: active.card_id,
         actionKind: "merge",
         headSha: active.head_sha,
       });
-      announce(`Merge requested for ${label}.`);
+
+      // C5 — the receipt, and only the receipt. GitHub accepts the call and
+      // declines the merge often enough (branch protection, a check that
+      // flipped, a race) that "the request succeeded" says nothing about
+      // whether the PR is in. A reviewer told "merged" walks away from a PR
+      // that is still open.
+      if (response.action?.merged === true) {
+        setMergeOutcome({ kind: "merged", message: `Merged. ${label} is in.`, link: null });
+        announce(`${label} merged.`);
+        return;
+      }
+
+      const status = response.action?.status ?? "unknown";
+      setMergeOutcome({
+        kind: "skipped",
+        message: `Not merged — GitHub recorded the request (${status}) without merging. Finish it there.`,
+        link: response.deep_link ?? active.pr_url,
+      });
+      announce(`${label} was not merged. Finish it on GitHub.`, "assertive");
     } catch (err) {
       const message =
         parsePRPartyError(err)?.message ||
         (err instanceof Error ? err.message : "Merge failed");
-      setError(message);
+      setMergeOutcome({
+        kind: "failed",
+        message: `Not merged. ${message}`,
+        link: active.pr_url,
+      });
       announce(`Merge failed for ${label}: ${message}`, "assertive");
     } finally {
       setBusy(false);
@@ -355,6 +405,33 @@ export function PRPartyCard({
           </p>
         )}
 
+        {mergeOutcome && (
+          <p
+            data-testid="pr-party-card-merge-outcome"
+            data-outcome={mergeOutcome.kind}
+            role={mergeOutcome.kind === "merged" ? "status" : "alert"}
+            className={cn(
+              "rounded-md border p-2 text-sm",
+              MERGE_OUTCOME_STYLES[mergeOutcome.kind],
+            )}
+          >
+            {mergeOutcome.message}
+            {mergeOutcome.link && (
+              <>
+                {" "}
+                <a
+                  href={mergeOutcome.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium underline"
+                >
+                  Open it on GitHub
+                </a>
+              </>
+            )}
+          </p>
+        )}
+
         {degradedLink && (
           <a
             href={degradedLink}
@@ -370,7 +447,20 @@ export function PRPartyCard({
           // R18 — own PRs carry no verdict. The merge appears only once the
           // counterpart has approved; the server enforces the same rule, so
           // hiding it is a courtesy, not the gate.
-          active.other_reviewer.has_approved && (
+          active.other_reviewer.has_approved &&
+          // R11 — where a merge happens is the reviewer's own setting. With
+          // `manual` there is no button to press, only the link out.
+          (mergePlacement === "manual" ? (
+            <a
+              href={active.pr_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-sm font-medium text-primary-700 underline dark:text-primary-300"
+            >
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              Merge it on GitHub
+            </a>
+          ) : (
             <Button
               type="button"
               className="min-h-11 w-full sm:w-auto"
@@ -380,7 +470,7 @@ export function PRPartyCard({
               {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
               Merge pull request
             </Button>
-          )
+          ))
         ) : (
           <VerdictControls
             ready={active.readiness.ready}

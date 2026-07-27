@@ -1901,10 +1901,12 @@ export default function ProjectSettingsPage() {
                   {hasGithubToken === false ? (
                     <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/50 dark:bg-amber-900/20">
                       <p className="text-sm text-amber-700 dark:text-amber-300">
-                        Connect your GitHub account first.{" "}
-                        <Link href="/settings" className="font-medium underline">
-                          Go to Settings
+                        This project has no GitHub connection yet, so there is
+                        nothing to search. Reviewers connect GitHub from{" "}
+                        <Link href="/pr-party/settings" className="font-medium underline">
+                          review settings
                         </Link>
+                        .
                       </p>
                     </div>
                   ) : (

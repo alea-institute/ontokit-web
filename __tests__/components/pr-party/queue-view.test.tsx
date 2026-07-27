@@ -47,15 +47,17 @@ vi.mock("@/lib/hooks/usePRPartyCapabilities", () => ({
 
 vi.mock("@/lib/hooks/usePRPartyQueue", () => ({
   usePRPartyQueue: vi.fn(),
+  usePRPartySettings: vi.fn(),
 }));
 
 import { usePRPartyCapabilities } from "@/lib/hooks/usePRPartyCapabilities";
-import { usePRPartyQueue } from "@/lib/hooks/usePRPartyQueue";
+import { usePRPartyQueue, usePRPartySettings } from "@/lib/hooks/usePRPartyQueue";
 import { PRPartyQueueView, isSettledForCaller } from "@/components/pr-party/PRPartyQueueView";
 import { PRPartyCard, isTrustedGitHubLink } from "@/components/pr-party/PRPartyCard";
 
 const mockedCapabilities = usePRPartyCapabilities as unknown as ReturnType<typeof vi.fn>;
 const mockedQueue = usePRPartyQueue as unknown as ReturnType<typeof vi.fn>;
+const mockedSettings = usePRPartySettings as unknown as ReturnType<typeof vi.fn>;
 
 // --- Fixtures ---
 
@@ -165,6 +167,12 @@ beforeEach(() => {
     isReviewer: true,
     degraded: false,
     isLoading: false,
+  });
+  mockedSettings.mockReturnValue({
+    settings: { merge_default: "dashboard", ntfy_topic: null },
+    isLoading: false,
+    isError: false,
+    error: null,
   });
   mockedQueue.mockReturnValue(queueState());
 });
@@ -499,6 +507,76 @@ describe("PR Party author routing", () => {
     expect(onSubmitAction).toHaveBeenCalledWith(
       expect.objectContaining({ actionKind: "merge", headSha: "aaa111" }),
     );
+  });
+
+  // C5 — a merge is reported from its receipt and nowhere else. GitHub accepts
+  // the call and declines the merge often enough (branch protection, a check
+  // that flipped, a race) that "the request succeeded" says nothing about
+  // whether the PR is in, and a reviewer told "merged" walks away from an open PR.
+  function ownApprovedCard() {
+    return makeCard({
+      author_kind: "own",
+      read_only: true,
+      other_reviewer: { has_approved: true, has_pending_intent: false },
+    });
+  }
+
+  it("claims a merge on an own PR only when the receipt says merged (C5)", async () => {
+    const onSubmitAction = vi.fn().mockResolvedValue({
+      action: { kind: "merge", status: "merged", merged: true },
+      card: makeDetail(),
+    });
+    renderCard({ card: ownApprovedCard(), onSubmitAction });
+
+    await userEvent.click(screen.getByRole("button", { name: /merge pull request/i }));
+    const outcome = await screen.findByTestId("pr-party-card-merge-outcome");
+    expect(outcome.getAttribute("data-outcome")).toBe("merged");
+    expect(outcome.textContent).toMatch(/is in/i);
+  });
+
+  it("says an own PR was NOT merged when the receipt does not say it was (C5)", async () => {
+    const onSubmitAction = vi.fn().mockResolvedValue({
+      // The call succeeded; the merge did not happen.
+      action: { kind: "merge", status: "blocked", merged: false },
+      card: makeDetail(),
+    });
+    renderCard({ card: ownApprovedCard(), onSubmitAction });
+
+    await userEvent.click(screen.getByRole("button", { name: /merge pull request/i }));
+    const outcome = await screen.findByTestId("pr-party-card-merge-outcome");
+    expect(outcome.getAttribute("data-outcome")).toBe("skipped");
+    expect(outcome.textContent).toMatch(/not merged/i);
+    // The reason, and a way to finish the job.
+    expect(outcome.textContent).toContain("blocked");
+    expect(
+      within(outcome).getByRole("link", { name: /open it on GitHub/i }).getAttribute("href"),
+    ).toBe("https://github.com/catholicos/ontokit-api/pull/42");
+  });
+
+  it("never reports a merge when the call itself fails (C5)", async () => {
+    const onSubmitAction = vi.fn().mockRejectedValue(new Error("network down"));
+    renderCard({ card: ownApprovedCard(), onSubmitAction });
+
+    await userEvent.click(screen.getByRole("button", { name: /merge pull request/i }));
+    const outcome = await screen.findByTestId("pr-party-card-merge-outcome");
+    expect(outcome.getAttribute("data-outcome")).toBe("failed");
+    expect(outcome.textContent).toMatch(/not merged/i);
+    expect(outcome.textContent).toContain("network down");
+  });
+
+  it("honours a manual merge default with a link instead of a button (R11)", async () => {
+    const onSubmitAction = vi.fn();
+    renderCard({
+      card: ownApprovedCard(),
+      onSubmitAction,
+      mergePlacement: "manual",
+    });
+
+    expect(screen.queryByRole("button", { name: /merge pull request/i })).toBeNull();
+    expect(
+      screen.getByRole("link", { name: /merge it on GitHub/i }).getAttribute("href"),
+    ).toBe("https://github.com/catholicos/ontokit-api/pull/42");
+    expect(onSubmitAction).not.toHaveBeenCalled();
   });
 });
 

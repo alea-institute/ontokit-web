@@ -31,6 +31,15 @@ export type PRPartyActionKind = "review" | "merge";
 export type PRPartyVerdict = "approve" | "request_changes" | "comment" | "discuss_live";
 export type PRPartyMergeMethod = "merge" | "squash" | "rebase";
 
+/**
+ * Where the reviewer merges from — *not* how GitHub merges (R11).
+ *
+ * `dashboard` puts a merge button on the card; `manual` replaces it with a link
+ * to the PR. Distinct from `PRPartyMergeMethod`, which is GitHub's merge/squash/
+ * rebase choice and is never what `settings.merge_default` carries.
+ */
+export type PRPartyMergePlacement = "dashboard" | "manual";
+
 export interface PRPartyCredentialHealth {
   expires_at: string | null;
   last_validated_at: string | null;
@@ -173,7 +182,7 @@ export interface PRPartyCredentialRevokeResponse {
 }
 
 export interface PRPartySettings {
-  merge_default: PRPartyMergeMethod;
+  merge_default: PRPartyMergePlacement;
   ntfy_topic: string | null;
   ntfy_base_url?: string | null;
 }
