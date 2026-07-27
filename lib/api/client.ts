@@ -15,8 +15,17 @@ export class ApiError extends Error {
   }
 }
 
-interface RequestOptions extends RequestInit {
+export interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
+  /**
+   * Retry 5xx responses (default true).
+   *
+   * Actuations — anything that submits a review, merges, or posts a comment —
+   * must pass `false`. React Query's `retry: false` cannot reach this loop:
+   * the retries happen *inside* a single mutationFn call, so a flaky 500 would
+   * silently submit the same action up to three times.
+   */
+  retryOn5xx?: boolean;
 }
 
 async function request<T>(
@@ -26,7 +35,12 @@ async function request<T>(
   // Pull the caller's optional AbortSignal out so we can combine it with the
   // internal per-attempt timeout controller (we can't pass two signals to
   // fetch directly).
-  const { params, signal: externalSignal, ...fetchOptions } = options;
+  const {
+    params,
+    signal: externalSignal,
+    retryOn5xx = true,
+    ...fetchOptions
+  } = options;
 
   // Build URL with query params
   const url = new URL(`${API_BASE}${endpoint}`);
@@ -77,7 +91,7 @@ async function request<T>(
 
       return JSON.parse(text);
     } catch (error) {
-      if (error instanceof ApiError && error.status >= 500 && attempt < 2) {
+      if (retryOn5xx && error instanceof ApiError && error.status >= 500 && attempt < 2) {
         await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
         continue;
       }
