@@ -3,10 +3,11 @@
 import { useMemo, useState } from "react";
 import { signIn, useSession } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, LogIn } from "lucide-react";
+import Link from "next/link";
+import { AlertCircle, LogIn, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePRPartyCapabilities } from "@/lib/hooks/usePRPartyCapabilities";
-import { usePRPartyQueue } from "@/lib/hooks/usePRPartyQueue";
+import { usePRPartyQueue, usePRPartySettings } from "@/lib/hooks/usePRPartyQueue";
 import type { PRPartyQueueCard } from "@/lib/api/prParty";
 import { PRPartyCard } from "./PRPartyCard";
 import { QueueTabs, type PRPartyTab } from "./QueueTabs";
@@ -82,6 +83,9 @@ export function PRPartyQueueView({ renderCardDetail }: PRPartyQueueViewProps = {
     expandedChoice.param === cardParam ? expandedChoice.cardId : cardParam;
 
   const queue = usePRPartyQueue({ enabled: isReviewer });
+  // Merge placement is a reviewer preference, so it is fetched once here and
+  // handed to every card rather than fetched per card.
+  const { settings } = usePRPartySettings({ enabled: isReviewer });
 
   const groups = useMemo(() => {
     const result: Record<PRPartyTab, PRPartyQueueCard[]> = {
@@ -164,15 +168,24 @@ export function PRPartyQueueView({ renderCardDetail }: PRPartyQueueViewProps = {
 
   return (
     <div>
-      <QueueTabs
-        value={tab}
-        onChange={setTab}
-        counts={{
-          queue: groups.queue.length,
-          agenda: groups.agenda.length,
-          done: groups.done.length,
-        }}
-      />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <QueueTabs
+          value={tab}
+          onChange={setTab}
+          counts={{
+            queue: groups.queue.length,
+            agenda: groups.agenda.length,
+            done: groups.done.length,
+          }}
+        />
+        <Link
+          href="/pr-party/settings"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-slate-600 hover:text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:text-slate-400 dark:hover:text-slate-100"
+        >
+          <Settings className="h-4 w-4" aria-hidden="true" />
+          Settings
+        </Link>
+      </div>
 
       {degraded && (
         <p
@@ -233,6 +246,7 @@ export function PRPartyQueueView({ renderCardDetail }: PRPartyQueueViewProps = {
                   })
                 }
                 detailSlot={renderCardDetail?.(card)}
+                mergePlacement={settings?.merge_default === "manual" ? "manual" : "dashboard"}
                 onSubmitAction={queue.submitAction}
                 onUnpark={queue.unparkCard}
                 onRerunReview={queue.rerunReview}

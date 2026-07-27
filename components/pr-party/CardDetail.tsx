@@ -35,17 +35,6 @@ import type { PRPartyQueueCard } from "@/lib/api/prParty";
  * links only when they are github.com URLs (R21).
  */
 
-/**
- * `merge_default` is a placement preference — dashboard-merge or GitHub-manual.
- * U10 typed the field as `PRPartyMergeMethod`, which is the *method* enum, so it
- * is read through this narrowing helper rather than compared directly; see the
- * note in the U12 report. Anything unrecognised falls back to the dashboard
- * button, which is the affordance the server can still refuse.
- */
-export function prefersManualMerge(mergeDefault: string | null | undefined): boolean {
-  return mergeDefault === "manual";
-}
-
 type MergeOutcomeKind = "merged" | "skipped" | "failed";
 
 interface MergeOutcome {
@@ -113,7 +102,10 @@ export function CardDetail({ card }: CardDetailProps) {
   }
 
   const briefLinks = (detail.brief_links ?? []).filter(isTrustedGitHubLink);
-  const manualMerge = prefersManualMerge(settings?.merge_default);
+  // `merge_default` is a *placement* preference (`PRPartyMergePlacement`), not
+  // GitHub's merge method. Anything other than an explicit `manual` falls back
+  // to the dashboard button, which is the affordance the server can still refuse.
+  const manualMerge = settings?.merge_default === "manual";
   // Own PRs (R18) already carry their own merge button on the card itself, which
   // appears only once the counterpart has approved. Rendering a second one here
   // would put two merge buttons on one card.
