@@ -14,6 +14,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
 import { cn } from "@/lib/utils";
+import { isTrustedGitHubLink, trustedGitHubUrl } from "@/lib/prPartyLinks";
+export { isTrustedGitHubLink } from "@/lib/prPartyLinks";
 import {
   isPRPartyDriftError,
   isPRPartyInFlightError,
@@ -46,11 +48,6 @@ import { VerdictControls, type VerdictSubmission } from "./VerdictControls";
  * does not retry: the whole hazard of drift is a reviewer approving code they
  * did not read, and an automatic retry is exactly that with the human removed.
  */
-
-/** Defence in depth: only github.com links from a brief become anchors. */
-export function isTrustedGitHubLink(url: string): boolean {
-  return typeof url === "string" && url.startsWith("https://github.com/");
-}
 
 /** Same three-way outcome vocabulary CardDetail uses, for the same reason (C5). */
 type MergeOutcomeKind = "merged" | "skipped" | "failed";
@@ -145,6 +142,7 @@ export function PRPartyCard({
   const active: PRPartyQueueCard = driftCard ?? card;
   const activeDetail: PRPartyCardDetail | null = driftCard ?? detail;
   const label = active.title ?? `${active.repo_full_name}#${active.pr_number}`;
+  const safePrUrl = trustedGitHubUrl(active.pr_url);
 
   // The queue polls; a fresh row means whatever was in flight has landed (or
   // failed loudly elsewhere), so the in-flight lock should not outlive it.
@@ -177,11 +175,12 @@ export function PRPartyCard({
       });
       setDriftCard(null);
       if (response.degraded) {
-        setDegradedLink(response.deep_link ?? null);
+        const safeDeepLink = trustedGitHubUrl(response.deep_link);
+        setDegradedLink(safeDeepLink);
         // Take the reviewer where the work has to be finished. The rendered
         // link below is the fallback for when a popup blocker eats this.
-        if (response.deep_link) {
-          window.open(response.deep_link, "_blank", "noopener,noreferrer");
+        if (safeDeepLink) {
+          window.open(safeDeepLink, "_blank", "noopener,noreferrer");
         }
       }
 
@@ -253,7 +252,7 @@ export function PRPartyCard({
       setMergeOutcome({
         kind: "skipped",
         message: `Not merged — GitHub recorded the request (${status}) without merging. Finish it there.`,
-        link: response.deep_link ?? active.pr_url,
+        link: trustedGitHubUrl(response.deep_link) ?? trustedGitHubUrl(active.pr_url),
       });
       announce(`${label} was not merged. Finish it on GitHub.`, "assertive");
     } catch (err) {
@@ -263,7 +262,7 @@ export function PRPartyCard({
       setMergeOutcome({
         kind: "failed",
         message: `Not merged. ${message}`,
-        link: active.pr_url,
+        link: trustedGitHubUrl(active.pr_url),
       });
       announce(`Merge failed for ${label}: ${message}`, "assertive");
     } finally {
@@ -463,9 +462,9 @@ export function PRPartyCard({
           active.other_reviewer.has_approved &&
           // R11 — where a merge happens is the reviewer's own setting. With
           // `manual` there is no button to press, only the link out.
-          (mergePlacement === "manual" ? (
+          (mergePlacement === "manual" && safePrUrl ? (
             <a
-              href={active.pr_url}
+              href={safePrUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-sm font-medium text-primary-700 underline dark:text-primary-300"
@@ -473,6 +472,10 @@ export function PRPartyCard({
               <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               Merge it on GitHub
             </a>
+          ) : mergePlacement === "manual" ? (
+            <span className="text-sm text-slate-500 dark:text-slate-400">
+              The GitHub merge link is unavailable.
+            </span>
           ) : (
             <Button
               type="button"
@@ -551,26 +554,28 @@ export function PRPartyCard({
 }
 
 function PRLinks({ card }: { card: PRPartyQueueCard }) {
+  const prUrl = trustedGitHubUrl(card.pr_url);
+  const diffUrl = trustedGitHubUrl(card.diff_url);
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm">
-      <a
-        href={card.pr_url}
+      {prUrl && <a
+        href={prUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center gap-1 text-primary-700 underline dark:text-primary-300"
       >
         <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
         Open on GitHub
-      </a>
-      <a
-        href={card.diff_url}
+      </a>}
+      {diffUrl && <a
+        href={diffUrl}
         target="_blank"
         rel="noopener noreferrer"
         className="inline-flex items-center gap-1 text-primary-700 underline dark:text-primary-300"
       >
         <FileDiff className="h-3.5 w-3.5" aria-hidden="true" />
         View the diff
-      </a>
+      </a>}
     </div>
   );
 }

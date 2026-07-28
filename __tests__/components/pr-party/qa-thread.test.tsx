@@ -249,6 +249,24 @@ describe("QAThread", () => {
     expect(writeText).toHaveBeenCalledWith("Why poll?\n\n— asked from OntoKit");
   });
 
+  it("omits a hostile degraded Q&A link and hostile PR fallback", async () => {
+    const user = userEvent.setup();
+    const { container } = renderThread({
+      prUrl: "https://ontokit.example/pr-party",
+      onAsk: vi.fn().mockResolvedValue(
+        makeCommentResponse({
+          posted: false,
+          degraded: true,
+          deep_link: "https://github.com\\@attacker.example/x",
+        }),
+      ),
+    });
+    await user.type(screen.getByRole("textbox"), "Why?");
+    await user.click(screen.getByRole("button", { name: /ask on the pull request/i }));
+    await screen.findByTestId("pr-party-question-degraded");
+    expect(container.querySelector("a")).toBeNull();
+  });
+
   it("keeps the draft when nothing was posted", async () => {
     const user = userEvent.setup();
     const onAsk = vi.fn().mockResolvedValue(

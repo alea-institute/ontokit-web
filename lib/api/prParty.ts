@@ -3,12 +3,10 @@
  *
  * Two contracts live here and nowhere else:
  *
- * 1. **Idempotency.** Every actuation carries a client-minted key that is
- *    *derived*, not remembered: the same intent (card + action + head sha +
- *    verdict) produces the same key by construction, so a user re-tap after a
- *    network hiccup replays the server's stored receipt instead of submitting
- *    a second review. A remembered key (a module-level Map) would be lost on
- *    reload — exactly when the user is most likely to retry.
+ * 1. **Idempotency.** Every actuation attempt carries a high-entropy key. It is
+ *    retained while the outcome is uncertain, then discarded as soon as a
+ *    definitive response arrives. A network retry replays the uncertain
+ *    attempt; a later identical action is a genuinely new attempt.
  *
  * 2. **No 5xx retry on actuations.** The shared client retries 5xx three times
  *    inside one call. For a verdict or a merge that is a double-actuation
@@ -218,55 +216,63 @@ function actuationOptions(token: string) {
 /** What the server accepts as an `Idempotency-Key`. */
 export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
-/** FNV-1a 32-bit — a stable, dependency-free digest. Not a security hash. */
-function fnv1a32(input: string): string {
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i);
-    hash = Math.imul(hash, 0x01000193) >>> 0;
-  }
-  return hash.toString(36);
-}
+const pendingAttemptKeys = new Map<string, string>();
+const PENDING_ATTEMPT_PREFIX = "pr-party:pending-attempt:";
 
-function sanitize(value: string): string {
-  return value.replace(/[^A-Za-z0-9_-]/g, "");
-}
-
-/**
- * Derive the idempotency key for one actuation intent.
- *
- * Deterministic by construction: the same intent always yields the same key, so
- * a retry — including one after a page reload — is recognised by the server as a
- * replay rather than a second action. The readable prefix keeps server logs
- * diagnosable; the digest carries the uniqueness that truncation would
- * otherwise cost.
- *
- * The *whole* intent goes into the digest, `body` and `override` included. They
- * are not decoration: a reviewer who sends "accept with suggestions", rewrites
- * the note and sends again means a second, different review, and a key blind to
- * the body would hand them back the first receipt with the old text — silently
- * discarding what they just wrote. Same for an override, which is a reviewer
- * deliberately proceeding past a block the first attempt respected.
- */
-export function deriveIdempotencyKey(
+async function attemptFingerprint(
   cardId: string,
-  actionKind: PRPartyActionKind,
-  headSha: string,
-  verdict?: PRPartyVerdict | null,
-  body?: string | null,
-  override?: boolean,
-): string {
-  const digest = fnv1a32(
-    `${cardId}:${actionKind}:${headSha}:${verdict ?? ""}:${body ?? ""}:${override ? "1" : "0"}`,
+  input: PRPartyActionInput,
+): Promise<string> {
+  const intent = JSON.stringify([
+    cardId,
+    input.action_kind,
+    input.head_sha,
+    input.verdict ?? null,
+    input.body ?? null,
+    input.override ?? false,
+    input.merge_method ?? null,
+  ]);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(intent));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
   );
-  const suffix = `-${digest}`;
-  const prefix = [
-    sanitize(cardId).slice(0, 16),
-    sanitize(actionKind).slice(0, 8),
-    sanitize(headSha).slice(0, 12),
-    sanitize(verdict ?? "none").slice(0, 12),
-  ].join("-");
-  return `${prefix.slice(0, 64 - suffix.length)}${suffix}`.padEnd(8, "0");
+}
+
+/** A UUID carries 122 random bits and fits the server's key grammar. */
+export function mintIdempotencyKey(): string {
+  return `attempt_${crypto.randomUUID().replaceAll("-", "")}`;
+}
+
+function outcomeIsUncertain(error: unknown): boolean {
+  return !(error instanceof ApiError) || error.status >= 500;
+}
+
+function readPendingAttempt(fingerprint: string): string | null {
+  const memoryKey = pendingAttemptKeys.get(fingerprint);
+  if (memoryKey) return memoryKey;
+  try {
+    return window.sessionStorage.getItem(`${PENDING_ATTEMPT_PREFIX}${fingerprint}`);
+  } catch {
+    return null;
+  }
+}
+
+function writePendingAttempt(fingerprint: string, key: string): void {
+  pendingAttemptKeys.set(fingerprint, key);
+  try {
+    window.sessionStorage.setItem(`${PENDING_ATTEMPT_PREFIX}${fingerprint}`, key);
+  } catch {
+    // In-memory replay protection still covers this page lifetime.
+  }
+}
+
+function clearPendingAttempt(fingerprint: string): void {
+  pendingAttemptKeys.delete(fingerprint);
+  try {
+    window.sessionStorage.removeItem(`${PENDING_ATTEMPT_PREFIX}${fingerprint}`);
+  } catch {
+    // Storage may be unavailable; the in-memory key is already gone.
+  }
 }
 
 // --- Error shapes ---
@@ -334,24 +340,30 @@ export const prPartyApi = {
    * The PR identity comes from the server-side row `cardId` names — never from
    * client-supplied repo/number (A4).
    */
-  submitAction: (cardId: string, input: PRPartyActionInput, token: string) =>
-    api.post<PRPartyActionResponse>(
-      `${BASE}/cards/${encodeURIComponent(cardId)}/actions`,
-      {
-        ...input,
-        idempotency_key:
-          input.idempotency_key ??
-          deriveIdempotencyKey(
-            cardId,
-            input.action_kind,
-            input.head_sha,
-            input.verdict,
-            input.body,
-            input.override,
-          ),
-      },
-      actuationOptions(token),
-    ),
+  submitAction: async (cardId: string, input: PRPartyActionInput, token: string) => {
+    if (input.idempotency_key) {
+      return api.post<PRPartyActionResponse>(
+        `${BASE}/cards/${encodeURIComponent(cardId)}/actions`,
+        input,
+        actuationOptions(token),
+      );
+    }
+    const fingerprint = await attemptFingerprint(cardId, input);
+    const idempotencyKey = readPendingAttempt(fingerprint) ?? mintIdempotencyKey();
+    writePendingAttempt(fingerprint, idempotencyKey);
+    try {
+      const response = await api.post<PRPartyActionResponse>(
+        `${BASE}/cards/${encodeURIComponent(cardId)}/actions`,
+        { ...input, idempotency_key: idempotencyKey },
+        actuationOptions(token),
+      );
+      clearPendingAttempt(fingerprint);
+      return response;
+    } catch (error) {
+      if (!outcomeIsUncertain(error)) clearPendingAttempt(fingerprint);
+      throw error;
+    }
+  },
 
   /** Return a parked card to the queue for its concluding verdict (R9). */
   unpark: (cardId: string, token: string) =>
@@ -392,7 +404,11 @@ export const prPartyApi = {
    * authenticates the call. Never swap them.
    */
   setCredential: (pat: string, token: string) =>
-    api.put<PRPartyMe>(`${BASE}/credential`, { token: pat }, actuationOptions(token)),
+    api.put<PRPartyCredentialHealth>(
+      `${BASE}/credential`,
+      { token: pat },
+      actuationOptions(token),
+    ),
 
   /** Forget the stored PAT. Revoking it at GitHub is the reviewer's job. */
   revokeCredential: (token: string) =>

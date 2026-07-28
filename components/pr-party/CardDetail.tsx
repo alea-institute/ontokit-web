@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ExternalLink, FileDiff, GitMerge, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
-import { isTrustedGitHubLink } from "@/components/pr-party/PRPartyCard";
+import { isTrustedGitHubLink, trustedGitHubUrl } from "@/lib/prPartyLinks";
 import { QAThread } from "@/components/pr-party/QAThread";
 import {
   usePRPartyCard,
@@ -83,20 +83,21 @@ export function CardDetail({ card }: CardDetailProps) {
   }
 
   if (isError || !detail) {
+    const safePrUrl = trustedGitHubUrl(card.pr_url);
     return (
       <div className="py-2">
         <p role="alert" className="text-sm text-red-700 dark:text-red-400">
           The full review could not be loaded. Read it on GitHub instead.
         </p>
-        <a
-          href={card.pr_url}
+        {safePrUrl && <a
+          href={safePrUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-primary-700 underline dark:text-primary-300"
         >
           <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
           Open on GitHub
-        </a>
+        </a>}
       </div>
     );
   }
@@ -110,6 +111,9 @@ export function CardDetail({ card }: CardDetailProps) {
   // appears only once the counterpart has approved. Rendering a second one here
   // would put two merge buttons on one card.
   const showMerge = detail.state === "open" && !detail.read_only;
+  const hasApproval = detail.other_reviewer.has_approved;
+  const safePrUrl = trustedGitHubUrl(detail.pr_url);
+  const safeDiffUrl = trustedGitHubUrl(detail.diff_url);
 
   async function handleMerge() {
     if (!detail) return;
@@ -130,26 +134,18 @@ export function CardDetail({ card }: CardDetailProps) {
       }
 
       const status = response.action?.status ?? "unknown";
-      const link = response.deep_link ?? detail.pr_url;
-      if (status === "skipped") {
-        setOutcome({
-          kind: "skipped",
-          message: `Not merged — GitHub declined the merge (${status}). Finish it there.`,
-          link,
-        });
-      } else {
-        setOutcome({
-          kind: "skipped",
-          message: `Not merged — GitHub recorded the request (${status}) without merging. Finish it there.`,
-          link,
-        });
-      }
+      const link = trustedGitHubUrl(response.deep_link) ?? safePrUrl;
+      setOutcome({
+        kind: "skipped",
+        message: `Not merged — GitHub recorded the request (${status}) without merging. Finish it there.`,
+        link,
+      });
       announce(`${label} was not merged. Finish it on GitHub.`, "assertive");
     } catch (err) {
       const message =
         parsePRPartyError(err)?.message ||
         (err instanceof Error ? err.message : "The merge failed");
-      setOutcome({ kind: "failed", message: `Not merged. ${message}`, link: detail.pr_url });
+      setOutcome({ kind: "failed", message: `Not merged. ${message}`, link: safePrUrl });
       announce(`Merge failed for ${label}: ${message}`, "assertive");
     } finally {
       setMerging(false);
@@ -196,24 +192,24 @@ export function CardDetail({ card }: CardDetailProps) {
 
       {/* Deep links — the brief is a summary, not the source. */}
       <div className="flex flex-wrap items-center gap-3 text-sm">
-        <a
-          href={detail.pr_url}
+        {safePrUrl && <a
+          href={safePrUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-primary-700 underline dark:text-primary-300"
         >
           <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
           Open the pull request
-        </a>
-        <a
-          href={detail.diff_url}
+        </a>}
+        {safeDiffUrl && <a
+          href={safeDiffUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-primary-700 underline dark:text-primary-300"
         >
           <FileDiff className="h-3.5 w-3.5" aria-hidden="true" />
           Read the diff
-        </a>
+        </a>}
       </div>
 
       {briefLinks.length > 0 && (
@@ -246,9 +242,13 @@ export function CardDetail({ card }: CardDetailProps) {
             Merge
           </h3>
 
-          {manualMerge ? (
+          {!hasApproval ? (
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              Merge is unavailable until the other reviewer approves this revision.
+            </p>
+          ) : manualMerge && safePrUrl ? (
             <a
-              href={detail.pr_url}
+              href={safePrUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-primary-700 underline dark:text-primary-300"
@@ -256,6 +256,10 @@ export function CardDetail({ card }: CardDetailProps) {
               <GitMerge className="h-3.5 w-3.5" aria-hidden="true" />
               Merge it on GitHub
             </a>
+          ) : manualMerge ? (
+            <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+              The GitHub merge link is unavailable.
+            </p>
           ) : (
             <Button
               type="button"

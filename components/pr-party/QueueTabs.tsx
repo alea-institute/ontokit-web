@@ -21,7 +21,7 @@ const OPTIONS: {
   {
     value: "done",
     label: "Done",
-    hint: "Concluded in the last 14 days, then archived",
+    hint: "Concluded reviews; closed and merged pull requests are archived",
     icon: CheckCheck,
   },
 ];

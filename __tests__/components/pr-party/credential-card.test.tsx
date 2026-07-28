@@ -264,6 +264,19 @@ describe("PR Party settings page", () => {
     ).toBe("https://github.com/settings/tokens");
   });
 
+  it("does not link an untrusted credential revoke URL", async () => {
+    setCapabilities({ credential: makeCredential() });
+    revokeCredential.mockResolvedValueOnce({
+      revoked_locally: true,
+      revoke_url: "https://github.com.attacker.example/settings/tokens",
+    });
+    renderPage();
+    await userEvent.click(screen.getByRole("button", { name: /remove token/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /remove it/i }));
+    await screen.findByTestId("pr-party-settings-success");
+    expect(screen.queryByRole("link", { name: /finish revoking/i })).toBeNull();
+  });
+
   it("refuses an unusable ntfy topic before it reaches the server", async () => {
     renderPage();
     const topic = screen.getByLabelText(/ntfy topic/i);

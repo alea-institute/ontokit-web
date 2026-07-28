@@ -57,7 +57,7 @@ const EMPTY_COPY: Record<PRPartyTab, { title: string; body: string }> = {
   },
   done: {
     title: "No concluded reviews yet",
-    body: "Cards you have concluded stay here for 14 days, then archive.",
+    body: "Reviews you conclude stay here until the pull request is closed or merged.",
   },
 };
 
