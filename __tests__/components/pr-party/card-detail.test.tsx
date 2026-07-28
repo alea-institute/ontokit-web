@@ -214,6 +214,24 @@ describe("CardDetail", () => {
     expect(hrefs).not.toContain("https://evil.test/x");
   });
 
+  it("omits hostile API-derived PR and diff navigation targets", () => {
+    setup({
+      detail: makeDetail({
+        pr_url: "javascript:alert(1)",
+        diff_url: "https://github.com.attacker.example/files",
+      }),
+    });
+    const { container } = renderDetail();
+    expect(container.querySelectorAll("a")).toHaveLength(0);
+  });
+
+  it("explains why merge is unavailable until the other reviewer approves", () => {
+    setup({ detail: makeDetail({ other_reviewer: { has_approved: false, has_pending_intent: false } }) });
+    renderDetail();
+    expect(screen.queryByRole("button", { name: /merge pull request/i })).toBeNull();
+    expect(screen.getByText(/unavailable until the other reviewer approves/i)).toBeTruthy();
+  });
+
   it("shows a loading state while the detail is in flight", () => {
     setup({ detail: null, isLoading: true });
     renderDetail();

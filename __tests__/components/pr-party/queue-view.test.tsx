@@ -518,6 +518,33 @@ describe("PR Party verdict controls", () => {
     expect(openSpy).toHaveBeenCalled();
     openSpy.mockRestore();
   });
+
+  it.each([
+    "javascript:alert(1)",
+    "https://ontokit.example/pr-party",
+    "https://github.com.attacker.example/x",
+    "https://github.com\\@attacker.example/x",
+  ])("does not open or link a hostile degraded deep link: %s", async (deepLink) => {
+    const onSubmitAction = vi.fn().mockResolvedValue({
+      action: {},
+      card: makeDetail(),
+      degraded: true,
+      deep_link: deepLink,
+    });
+    const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+    renderCard({ degraded: true, onSubmitAction });
+
+    await userEvent.click(screen.getByRole("button", { name: /record \+ open github/i }));
+    await waitFor(() => expect(onSubmitAction).toHaveBeenCalled());
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(
+      Array.from(document.querySelectorAll<HTMLAnchorElement>("a")).some(
+        (anchor) => anchor.href === deepLink,
+      ),
+    ).toBe(false);
+    openSpy.mockRestore();
+  });
 });
 
 // --- Replayed receipts ---
@@ -791,6 +818,19 @@ describe("PR Party brief rendering", () => {
     expect(isTrustedGitHubLink("https://github.com.evil.test/org/repo")).toBe(false);
     expect(isTrustedGitHubLink("http://github.com/org/repo")).toBe(false);
     expect(isTrustedGitHubLink("javascript:alert(1)")).toBe(false);
+  });
+
+  it("omits hostile PR and diff links from the queue card", () => {
+    const { container } = render(
+      <PRPartyCard
+        card={makeCard({
+          pr_url: "javascript:alert(1)",
+          diff_url: "https://github.com.attacker.example/files",
+        })}
+        onSubmitAction={vi.fn()}
+      />,
+    );
+    expect(container.querySelectorAll("a")).toHaveLength(0);
   });
 
   it("says so when the diff was truncated, and keeps the links", () => {

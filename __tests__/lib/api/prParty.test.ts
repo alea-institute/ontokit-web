@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   prPartyApi,
-  deriveIdempotencyKey,
+  mintIdempotencyKey,
   parsePRPartyError,
   isPRPartyDriftError,
   isPRPartyInFlightError,
@@ -97,7 +97,7 @@ describe("prPartyApi actuations", () => {
     expect(body.idempotency_key).toMatch(IDEMPOTENCY_KEY_PATTERN);
   });
 
-  it("submitAction mints the SAME key for a retry of the same intent", async () => {
+  it("an identical action after definitive success creates a NEW attempt", async () => {
     mockOk({});
     await prPartyApi.submitAction(
       "card-1",
@@ -109,6 +109,26 @@ describe("prPartyApi actuations", () => {
     mockOk({});
     await prPartyApi.submitAction(
       "card-1",
+      { action_kind: "review", verdict: "approve", head_sha: "abc123" },
+      "tok",
+    );
+    expect(lastCall().body.idempotency_key).not.toBe(first);
+  });
+
+  it("an uncertain retry reuses its attempt key", async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError("network connection lost"));
+    await expect(
+      prPartyApi.submitAction(
+        "uncertain-card",
+        { action_kind: "review", verdict: "approve", head_sha: "abc123" },
+        "tok",
+      ),
+    ).rejects.toThrow("network connection lost");
+    const first = lastCall().body.idempotency_key;
+
+    mockOk({});
+    await prPartyApi.submitAction(
+      "uncertain-card",
       { action_kind: "review", verdict: "approve", head_sha: "abc123" },
       "tok",
     );
@@ -359,74 +379,15 @@ describe("5xx retry posture", () => {
   );
 });
 
-describe("deriveIdempotencyKey", () => {
-  it("is deterministic for the same intent", () => {
-    const a = deriveIdempotencyKey("card-1", "review", "abc123", "approve");
-    const b = deriveIdempotencyKey("card-1", "review", "abc123", "approve");
-    expect(a).toBe(b);
-  });
-
-  it("differs when any element of the intent differs", () => {
-    const base = deriveIdempotencyKey("card-1", "review", "abc123", "approve");
-    expect(deriveIdempotencyKey("card-2", "review", "abc123", "approve")).not.toBe(base);
-    expect(deriveIdempotencyKey("card-1", "merge", "abc123", "approve")).not.toBe(base);
-    expect(deriveIdempotencyKey("card-1", "review", "def456", "approve")).not.toBe(base);
-    expect(deriveIdempotencyKey("card-1", "review", "abc123", "request_changes")).not.toBe(
-      base,
-    );
-  });
-
-  it("differs when the reviewer's note differs — a rewritten note is a different review", () => {
-    // Without the body in the digest, a reviewer who sends "accept with
-    // suggestions", rewrites the note and sends again gets the *first* receipt
-    // back as a replay: their new text is dropped and nothing says so.
-    const base = deriveIdempotencyKey("card-1", "review", "abc123", "approve", "lgtm");
-    expect(deriveIdempotencyKey("card-1", "review", "abc123", "approve", "lgtm")).toBe(base);
-    expect(
-      deriveIdempotencyKey("card-1", "review", "abc123", "approve", "rename the helper"),
-    ).not.toBe(base);
-    expect(deriveIdempotencyKey("card-1", "review", "abc123", "approve")).not.toBe(base);
-  });
-
-  it("differs when the override differs — proceeding past a block is a new intent", () => {
-    const plain = deriveIdempotencyKey("card-1", "review", "abc123", "approve", "lgtm", false);
-    const overridden = deriveIdempotencyKey(
-      "card-1",
-      "review",
-      "abc123",
-      "approve",
-      "lgtm",
-      true,
-    );
-    expect(overridden).not.toBe(plain);
-    expect(deriveIdempotencyKey("card-1", "review", "abc123", "approve", "lgtm")).toBe(plain);
-  });
-
+describe("mintIdempotencyKey", () => {
   it("always produces a server-acceptable key", () => {
-    const keys = [
-      deriveIdempotencyKey("card-1", "review", "abc123", "approve"),
-      deriveIdempotencyKey("", "merge", "", null),
-      deriveIdempotencyKey(
-        "urn:card:a-very-long-identifier/with/slashes#and-fragments",
-        "review",
-        "0123456789abcdef0123456789abcdef01234567",
-        "approve",
-      ),
-      // A long note must not push the key past the server's 64-char ceiling.
-      deriveIdempotencyKey(
-        "urn:card:a-very-long-identifier/with/slashes#and-fragments",
-        "review",
-        "0123456789abcdef0123456789abcdef01234567",
-        "approve",
-        "x".repeat(5000),
-        true,
-      ),
-    ];
+    const keys = Array.from({ length: 20 }, () => mintIdempotencyKey());
     keys.forEach((k) => {
       expect(k).toMatch(IDEMPOTENCY_KEY_PATTERN);
       expect(k.length).toBeGreaterThanOrEqual(8);
       expect(k.length).toBeLessThanOrEqual(64);
     });
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });
 

@@ -32,6 +32,7 @@ import {
   usePRPartySettings,
 } from "@/lib/hooks/usePRPartyQueue";
 import { parsePRPartyError, prPartyApi, type PRPartyMergePlacement } from "@/lib/api/prParty";
+import { trustedGitHubUrl } from "@/lib/prPartyLinks";
 import { cn } from "@/lib/utils";
 
 /** ntfy topics are path segments and are effectively a shared secret. */
@@ -273,11 +274,11 @@ export default function PRPartySettingsPage() {
           className="mb-6 rounded-lg bg-green-50 p-4 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400"
         >
           {success}
-          {revokeUrl && (
+          {trustedGitHubUrl(revokeUrl) && (
             <>
               {" "}
               <a
-                href={revokeUrl}
+                href={trustedGitHubUrl(revokeUrl)!}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="font-medium underline"

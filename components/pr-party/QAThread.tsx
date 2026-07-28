@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ExternalLink, Loader2, MessageCircleQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
-import { isTrustedGitHubLink } from "@/components/pr-party/PRPartyCard";
+import { isTrustedGitHubLink, trustedGitHubUrl } from "@/lib/prPartyLinks";
 import type { PRPartyCommentResponse, PRPartyQAEntry } from "@/lib/api/prParty";
 import { cn } from "@/lib/utils";
 
@@ -129,7 +129,7 @@ export function QAThread({ cardId, entries, prUrl, onAsk }: QAThreadProps) {
         // try again once the token is back — and hand over the exact body.
         setCompose({
           body: response.body ?? question,
-          deepLink: response.deep_link ?? prUrl,
+          deepLink: trustedGitHubUrl(response.deep_link) ?? trustedGitHubUrl(prUrl) ?? "",
         });
         announce(
           "Your question was not posted. Copy it and post it on GitHub yourself.",
@@ -313,7 +313,7 @@ export function QAThread({ cardId, entries, prUrl, onAsk }: QAThreadProps) {
             >
               {copied ? "Copied" : "Copy the question"}
             </Button>
-            <a
+            {compose.deepLink && <a
               href={compose.deepLink}
               target="_blank"
               rel="noopener noreferrer"
@@ -321,7 +321,7 @@ export function QAThread({ cardId, entries, prUrl, onAsk }: QAThreadProps) {
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               Post it yourself on GitHub
-            </a>
+            </a>}
           </div>
         </div>
       )}
