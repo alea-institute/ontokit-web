@@ -53,6 +53,9 @@ export function reverseMap(prefixes: PrefixMap): Map<string, string> {
 
 /** Convert a full IRI to shortest Turtle form using available prefixes */
 export function toTurtle(iri: string, rev: Map<string, string>): string {
+  if (!iri || /[\u0000-\u0020<>"{}|^`\\]/u.test(iri)) {
+    throw new Error("Invalid IRI: unsafe characters are not allowed");
+  }
   for (const [ns, alias] of rev) {
     if (iri.startsWith(ns)) {
       const local = iri.slice(ns.length);

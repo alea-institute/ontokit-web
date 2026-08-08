@@ -97,6 +97,12 @@ describe("toTurtle", () => {
     );
   });
 
+  it("rejects an IRI that can break out of Turtle angle brackets", () => {
+    expect(() =>
+      toTurtle("http://example.org/x> . <http://evil.test/i", rev),
+    ).toThrow(/invalid iri/i);
+  });
+
   it("falls back to full IRI when local name is not valid QName", () => {
     // local part contains invalid characters for a QName
     expect(toTurtle("http://example.org/ont#123invalid", rev)).toBe(
