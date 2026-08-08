@@ -180,6 +180,14 @@ export function LLMSettingsSection({
   const isLocalProvider = selectedProvider.isLocal;
   const currentIndex = PROVIDERS.findIndex((p) => p.value === provider);
   const providerModels = knownModels.filter((item) => item.provider === provider);
+  const isModelValid =
+    model.trim().length > 0 &&
+    (providerModels.length === 0 || providerModels.some((item) => item.model_id === model));
+
+  const selectProvider = (nextProvider: LLMProviderType) => {
+    setProvider(nextProvider);
+    setModel("");
+  };
 
   const handleDropdownKeyDown = (e: React.KeyboardEvent) => {
     if (!isDropdownOpen) {
@@ -202,7 +210,7 @@ export function LLMSettingsSection({
       case "Enter":
         e.preventDefault();
         if (focusedOption >= 0) {
-          setProvider(PROVIDERS[focusedOption].value);
+          selectProvider(PROVIDERS[focusedOption].value);
           setIsDropdownOpen(false);
           setFocusedOption(-1);
         }
@@ -367,7 +375,7 @@ export function LLMSettingsSection({
                   aria-selected={opt.value === provider}
                   data-focused={idx === focusedOption}
                   onClick={() => {
-                    setProvider(opt.value);
+                    selectProvider(opt.value);
                     setIsDropdownOpen(false);
                     setFocusedOption(-1);
                   }}
@@ -646,7 +654,7 @@ export function LLMSettingsSection({
       <div>
         <Button
           onClick={handleSave}
-          disabled={isUpdating || validationStatus === "validating" || !model.trim()}
+          disabled={isUpdating || validationStatus === "validating" || !isModelValid}
           className="flex items-center gap-2"
         >
           {isUpdating ? (

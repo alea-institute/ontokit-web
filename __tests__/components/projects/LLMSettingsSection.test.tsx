@@ -54,4 +54,16 @@ describe("LLMSettingsSection", () => {
       expect.objectContaining({ provider: "openai", model: "gpt-5-mini" }),
     );
   });
+
+  it("clears a model when the provider changes", async () => {
+    const user = userEvent.setup();
+    render(<LLMSettingsSection projectId="project-1" accessToken="token" />);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: /generation model/i }), "gpt-5-mini");
+    await user.click(screen.getByRole("button", { name: /llm provider/i }));
+    await user.click(screen.getByRole("option", { name: /anthropic/i }));
+
+    expect((screen.getByRole("combobox", { name: /generation model/i }) as HTMLSelectElement).value).toBe("");
+    expect((screen.getByRole("button", { name: /save ai settings/i }) as HTMLButtonElement).disabled).toBe(true);
+  });
 });

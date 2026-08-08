@@ -4,6 +4,8 @@
 
 import { api } from "./client";
 
+export const LLM_STATUS_INVALIDATION_EVENT = "ontokit:llm-status-invalidated";
+
 // ── Provider Types ────────────────────────────────────────────────────
 export type LLMProviderType =
   | "openai"

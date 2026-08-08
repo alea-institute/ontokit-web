@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { llmApi } from "@/lib/api/llm";
 import type { ProjectRole } from "@/lib/api/projects";
-import { LLM_STATUS_INVALIDATION_EVENT } from "@/lib/hooks/useSuggestions";
+import { LLM_STATUS_INVALIDATION_EVENT } from "@/lib/api/llm";
 
 const LLM_ACCESS_ROLES: ProjectRole[] = [
   "owner",
@@ -36,7 +36,6 @@ export function useLLMGate(
   // The API currently returns the role's static allowance, not live usage.
   // Do not disable the affordance from this advisory field; dispatch remains
   // authoritative and a 429 refreshes this status.
-  const dailyExhausted = false;
 
   const invalidateStatus = useCallback(
     () =>
@@ -58,12 +57,10 @@ export function useLLMGate(
     canUseLLM:
       hasAccess &&
       (status?.configured ?? false) &&
-      !(status?.budget_exhausted ?? false) &&
-      !dailyExhausted,
+      !(status?.budget_exhausted ?? false),
 
     // Individual states for UI rendering
     budgetExhausted: status?.budget_exhausted ?? false,
-    dailyExhausted,
     // Only claim "not configured" when the server actually said so — while
     // loading or on a fetch error this must NOT masquerade as unconfigured.
     notConfigured: status ? !status.configured : false,

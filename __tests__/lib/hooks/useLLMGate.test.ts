@@ -10,6 +10,7 @@ vi.mock("next-auth/react", () => ({
 }));
 
 vi.mock("@/lib/api/llm", () => ({
+  LLM_STATUS_INVALIDATION_EVENT: "ontokit:llm-status-invalidated",
   llmApi: {
     getStatus: vi.fn(),
   },
@@ -188,7 +189,6 @@ describe("useLLMGate", () => {
     });
 
     await waitFor(() => expect(result.current.canUseLLM).toBe(true));
-    expect(result.current.dailyExhausted).toBe(false);
     expect(result.current.hasRoleAccess).toBe(true);
     expect(result.current.budgetExhausted).toBe(false);
   });
