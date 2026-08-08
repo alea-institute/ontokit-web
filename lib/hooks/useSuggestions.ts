@@ -45,8 +45,12 @@ export function generationErrorMessage(error: unknown): string {
       return "Your project role does not allow AI suggestions.";
     case 429:
       return "The AI request limit has been reached. Wait before trying again.";
+    case 500:
+      return "The AI service encountered an unexpected error. Try again, and contact support if the problem continues.";
     case 502:
       return "The configured AI provider is unavailable. Check the provider connection and try again.";
+    case 503:
+      return "Model pricing is unavailable. Choose a registry model or a local provider in project AI settings.";
     default:
       return "Could not generate suggestions.";
   }
