@@ -4,7 +4,7 @@
 
 import { api } from "./client";
 
-export type EmbeddingProvider = "local" | "openai" | "voyage" | "anthropic";
+export type EmbeddingProvider = "local" | "openai" | "voyage";
 
 export interface EmbeddingConfig {
   provider: EmbeddingProvider;

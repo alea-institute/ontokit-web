@@ -3152,14 +3152,12 @@ const PROVIDER_OPTIONS: { value: EmbeddingProvider; label: string; description: 
   { value: "local", label: "Local (CPU)", description: "all-MiniLM-L6-v2 — no API key needed" },
   { value: "openai", label: "OpenAI", description: "text-embedding-3-small" },
   { value: "voyage", label: "Voyage AI", description: "voyage-3-lite" },
-  { value: "anthropic", label: "Anthropic", description: "voyager-instruct-3" },
 ];
 
 const MODEL_DEFAULTS: Record<EmbeddingProvider, string> = {
   local: "all-MiniLM-L6-v2",
   openai: "text-embedding-3-small",
   voyage: "voyage-3-lite",
-  anthropic: "voyager-instruct-3",
 };
 
 function EmbeddingSettingsSection({
