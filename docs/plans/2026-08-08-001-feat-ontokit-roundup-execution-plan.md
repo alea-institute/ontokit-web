@@ -76,7 +76,7 @@ Months of built features (v0.4.0 LLM suggestions, trust ladder, PR Party) sat un
 
 - KD1. Commit identity: bot pushes with contributor attribution (session-settled: user-directed — chosen over pure-bot and per-user GitHub accounts: preserves Fr. John's authorship/recognition requirement without GitHub-account friction). Ratifies `commit_identity.py` + `mirror_credential.py` as built. Governs R1, R8.
 - KD2. Change bundling: two regimes — developer features one-issue-one-PR; user suggestion sessions clustered per session/topic (session-settled: user-directed — chosen over molecules-everywhere: Fr. John explicitly asked for small PRs). Governs R14, R15.
-- KD3. Demo mode ships this round with the in-app toggle, seeded by the two dummy repos (session-settled: user-directed — chosen over dummy-repo-only: Damien wants demoable UI now). Governs R7, R8.
+- KD3. Demo mode ships this round as a cloned demo project (entry/exit navigation), seeded by the two dummy repos (session-settled: user-directed — chosen over dummy-repo-only: Damien wants demoable UI now). Governs R7, R8.
 - KD4. Topology: FOLIO DEV live on the CPX41 behind the `*.dev.openlegalstandard.org` wildcard now; FOLIO DEV+PROD consolidate onto the ALEA-funded AWS box when Mike grants access; the Damien-funded Hetzner box carries Catholic DEV + the picker (session-settled: user-directed — chosen over Hetzner-PROD cutover: ALEA pays for AWS, Damien pays for Hetzner). Governs R11, R12, R16, R18.
 - KD5. Harness: CE-forward — this plan + ce-work; no new GSD (session-settled: user-directed — chosen over native-GSD resumption: v0.4.0 milestone closed, practice already CE). Governs the execution profile.
 - KD6. DEV→PROD promotion is automatic on green checks, never manual-gated (session-settled: user-directed — chosen over a human promote button). Governs R12.
@@ -100,9 +100,10 @@ Months of built features (v0.4.0 LLM suggestions, trust ladder, PR Party) sat un
 
 - KTD1. Persona UAT uses Zitadel inside the DEV compose stack (the api repo's existing zitadel + login-v2 profile) with throwaway test users — not the foundation VPS's live Zitadel. Keeps DEV self-contained and John's infra untouched; trade-off is one-time OIDC setup on DEV (scripted by `scripts/setup-zitadel.sh`).
 - KTD2. DEV runs two auth configurations. Terminal state is **auth-enabled** (Zitadel): `AUTH_MODE=disabled` is used only for the initial functional UAT loop and MUST sit behind a network-level gate (traefik basic-auth on the hetzner-dev route) for its entire window — an auth-disabled OntoKit on a public URL is a full-access principal against a live GitHub write path (found live in review; gate applied 2026-08-08). The auth-enabled sweep is the DoD-bearing one. Standing up Zitadel is NOT a mere env flip — see KTD9.
-- KTD9. Zitadel on DEV is real infra, not a profile toggle: the api repo's `zitadel`/`login` services are unconditional and hardcoded to `localhost` (`ZITADEL_EXTERNALDOMAIN: localhost`, `EXTERNALSECURE: false`, LoginV2 URIs at `localhost:8081`), and `setup-zitadel.sh` defaults to localhost + a sibling-checkout `.env` path. U7 must add the services to the DEV compose, override external domain/port/secure and the four LoginV2/OIDC base URIs to the DEV hostname over TLS, route the login UI, parameterize the setup script, harden the imported dev defaults (generated masterkey + admin password, shortened PAT expiries, suppressed secret echo), and set the web `ZITADEL_*`/`NEXTAUTH_*` from the server-side `.env`.
+- KTD9. Zitadel on DEV is real infra, not a profile toggle: the api repo's `zitadel`/`login` services are unconditional and hardcoded to `localhost` (`ZITADEL_EXTERNALDOMAIN: localhost`, `EXTERNALSECURE: false`, LoginV2 URIs at `localhost:8081`), and `setup-zitadel.sh` defaults to localhost + a sibling-checkout `.env` path. U7 adds the services to the **running server-side DEV compose** (which exists on the box today; U12 later captures the whole compose into repo IaC — U7 does not create `compose.dev.yaml`), overrides external domain/port/secure and the four LoginV2/OIDC base URIs to the DEV hostname over TLS, routes the login UI, parameterizes the setup script, hardens the imported dev defaults (generated masterkey + admin password, shortened PAT expiries, suppressed secret echo), and sets the web `ZITADEL_*`/`NEXTAUTH_*` from the server-side `.env`.
 - KTD3. Demo mode is a **cloned demo project** (session-settled: user-directed — chosen over same-project target-switch and snapshot-and-reset: strongest, DB-level isolation — the live project is never touched by a demo session). Entering demo mode routes the user to a demo project whose `GitHubIntegration` points at the dummy repo; demo edits live in the demo project's own rows and branches, so nothing a demo session authors can ever reach the live project or its repo. Flip-back is just navigation — there is no in-flight-content merge risk to resolve. Defense-in-depth still applies at the credential layer: a separate `GITHUB_DEMO_MIRROR_TOKEN` (fine-grained PAT scoped to the two demo repos only) backs demo pushes, and the push seam is deny-by-default against any target not on `DEMO_REPO_ALLOWLIST`, so even a mis-wired demo project cannot push to a live repo. Governs R8 mechanics under KD3.
-- KTD3-a. The dummy repos are **kept fresh by a cron** (session-settled: user-directed): a scheduled job (default daily) re-clones the live repo content into each dummy repo, so demo data tracks real-world data over time rather than freezing at the U8 seed. The cron is the only writer of the live→dummy direction; it is read-only against live (clone/pull), never the reverse.
+- KTD3-a. The dummy repos are **kept fresh by a cron** (session-settled: user-directed): a scheduled job (default daily) refreshes each dummy repo from live. Precise semantics (so the refresh cannot corrupt a demo session): the job refreshes **only the default branch** of the dummy repo (force-updates it to match live); **demo-authored branches are never touched**, so a demo session's work survives a refresh. Reading live and writing dummy use **separate credentials** — a source `contents:read`-only credential for live (the CatholicOS Semantic Canon source may be private; the source identity provably cannot push) and the destination-only `GITHUB_DEMO_MIRROR_TOKEN` for the dummy repo; the two are never the same token. The refresh and the demo-project resync run under one serialized step so a demo project never reads a half-updated dummy repo.
+- KTD3-b. Demo isolation is enforced by **one project-aware target-authorizer** — a single function every outbound GitHub mutation calls before it writes (`resolve_mirror_credential`, `PullRequestService._get_github_token`, `pr_party_github`, `github_sync`, `bare_repository.push`). This seam does not exist yet; U9 creates it. It resolves (credential, allowed-targets) from the project's demo/live status and denies any target off the project's allowlist. The "all writes are covered" guarantee is only as good as the enumeration, so U9 carries an exhaustive test that every outbound-mutation call site routes through it.
 - KTD4. CI and DEV auto-deploy land now on GitHub Actions in the fork repos; the PROD-promotion workflow is written but wired to a disabled environment until R16 lands. Chosen over waiting-for-PROD: DEV automation pays for itself immediately and the promotion gate gets exercised against DEV first.
 - KTD5. Upstream molecule map is derived from the actual commit graph and feature plans (trust-ladder plan, PR Party plan, v0.4.0 phases), not from raw `git log` slicing — tranche boundaries follow feature seams so each CatholicOS PR reviews as one coherent capability (KD2's dev-regime).
 - KTD6. The retrospective alignment review (R6/U6) runs as an independent-context review pass (fresh reviewers per lens: requirements-trace, brainstorm-trace, plan-trace, best-practices) with orchestrator adversarial verification — same standard as the LLM-subsystem review that caught the fix rounds' defects.
@@ -113,7 +114,7 @@ Months of built features (v0.4.0 LLM suggestions, trust ladder, PR Party) sat un
 
 ### Assumptions
 
-- The five agent decisions (KTD1 Zitadel-in-stack, KTD3 toggle-as-write-target, KTD4 CI-now/promotion-later, KTD7 picker-as-static-site, R15 gated-sends) went through an adversarial cross-model doc review (5 in-process + 3 independent Codex reviewers). Outcomes folded in: KTD1 corrected (Zitadel is real infra, not a profile flip — now KTD9); KTD3 hardened (guard moved to the shared credential seam, deny-by-default allowlist, schema migration, demo-scoped token); the others held. The one genuine fork (demo-content behavior) was resolved by Damien 2026-08-08: cloned demo project + cron-refreshed dummy repos (now KTD3 / KTD3-a).
+- The five agent decisions (KTD1 Zitadel-in-stack, KTD3 cloned-demo-project, KTD4 CI-now/promotion-later, KTD7 picker-as-static-site, R15 gated-sends) went through an adversarial cross-model doc review (5 in-process + 3 independent Codex reviewers). Outcomes folded in: KTD1 corrected (Zitadel is real infra, not a profile flip — now KTD9); KTD3 hardened (guard moved to the shared credential seam, deny-by-default allowlist, schema migration, demo-scoped token); the others held. The one genuine fork (demo-content behavior) was resolved by Damien 2026-08-08: cloned demo project + cron-refreshed dummy repos (now KTD3 / KTD3-a).
 - hetzner-dev's traefik continues to front `*.dev.openlegalstandard.org`; its ~3.3GB free RAM is never asked to host the OntoKit stack itself. CPX41 headroom for the added Zitadel services + CI redeploy loop is unmeasured — watch it in U7/U12.
 - The FOLIO DEV seed project (18,566 entities) is representative enough for UAT; no additional ontologies needed for this round.
 - U8 copies Catholic Semantic Canon content from a CatholicOS source into an alea-institute repo. The perimeter gates cover sends *to* `catholicos`, not extraction *from* it — flagged for Damien's awareness; snapshot is public-domain-derived ontology structure, not privileged content.
@@ -133,7 +134,7 @@ flowchart LR
   end
   ci[GitHub Actions fork CI\ntests -> DEV auto-deploy] --> dev
   ci -.->|"promotion gate (dormant, KTD4)"| aws
-  demo[Dummy repos x2\nalea-institute private] ---|"demo-mode write target"| dev
+  demo[Dummy repos x2\nalea-institute private] ---|"cloned demo project"| dev
   upstream[Molecule map\ntranche drafts] -.->|"per-tranche go (R15)"| catholicos[(CatholicOS org)]
 ```
 
@@ -152,16 +153,17 @@ Sequencing: Phase A (verify & harden) → Phase B (demo & UX) and Phase C (pipel
 | U5 | A | Suggestion lifecycle live UAT (dup-block, external parent, approve→trust) | ontokit-api + DEV | U1 |
 | U6 | A | Retrospective alignment review | both + infra | U1–U3 |
 | U7 | A | Zitadel persona pass on DEV (terminal auth-on sweep) | infra + both | U4 |
-| U8 | B | Dummy repos: create + seed | infra (gh) | — |
-| U9 | B | Demo/live toggle | both | U8 |
+| U8 | B | Dummy repos: create, seed, refresh cron | infra (gh) | — |
+| U9 | B | Demo mode: cloned demo project + target-authorizer | both | U8 |
 | U10 | B | Auto-save preference | ontokit-web | — |
 | U11 | C | Test CI, both repos | both (gh actions) | — |
-| U12 | C | DEV auto-deploy + infra-as-code | infra + both | U11 |
+| U12 | C | DEV auto-deploy + infra-as-code (owns compose.dev.yaml + cron IaC home) | infra + both | U7, U8, U11 |
 | U13 | C | PROD promotion gate (dormant) | infra | U12 |
-| U14 | D | Upstream molecule map + tranche-1 drafts | docs + gh | U6 |
+| U14 | D | Upstream molecule map + tranche-1 drafts | docs + gh | U6, U7, U9, U10 |
 | U15 | E | AWS PROD rebuild — BLOCKED (Mike) | infra | U12, gate |
 | U16 | E | PR Party live E2E — BLOCKED (Fr. John, after demo) | both | U4, U9, gate |
 | U17 | E | ontokit.org picker — BLOCKED (domain) | infra | gate |
+| U18 | D | Closeout: gate-status ask, Cockpit, ce-compound learning | docs + cockpit | U14 |
 
 **Prerequisites (Damien-performed, before their units start):** U12 needs a dedicated deploy keypair — public half in `ontokit-dev`'s `authorized_keys` (forced-command), private half + known-hosts as GitHub Environment secrets on both forks (credential material is out of scope for Codex workers). U7 needs the DEV auth-gate credential rotated into the runbook.
 
@@ -239,9 +241,9 @@ Sequencing: Phase A (verify & harden) → Phase B (demo & UX) and Phase C (pipel
 
 **Goal:** R8 shipped per KTD3: entering demo mode routes to a cloned demo project pointed at the dummy repo, a visible demo banner, and a credential-layer guarantee that no demo session can write to a live repo. No in-flight-content merge path (isolation is by separate project, not target-switch).
 **Requirements:** R8 (KD3, KTD3, KTD3-a; KD1 identity still applies in demo pushes).
-**Files:** `ontokit-api`: demo-project provisioning (clone/link a project to a dummy repo, marked demo), the deny-by-default guard in the **shared** credential/target resolution covering ALL write seams — `pull_request_service._get_github_token` + its 7+ `create_pull_request` sites, `pr_party_github`, `github_sync`, `bare_repository.push` — so a demo project can only reach `DEMO_REPO_ALLOWLIST`; demo pushes use `GITHUB_DEMO_MIRROR_TOKEN`. `ontokit-web`: demo entry/exit navigation + persistent demo banner. Tests both sides.
+**Files:** `ontokit-api`: (1) an alembic migration adding an `is_demo` marker to `projects` (and a link from a demo project to its dummy repo); (2) **idempotent deploy-time provisioning** that creates exactly one demo `Project` per dummy repo (two demo projects — FOLIO, Semantic Canon), each with its own `GitHubIntegration` pointing at that dummy repo, re-runnable without duplicating; (3) the **single project-aware target-authorizer** from KTD3-b, wired into every enumerated outbound-mutation call site (`resolve_mirror_credential`, `pull_request_service._get_github_token` + its 7+ `create_pull_request` sites, `pr_party_github`, `github_sync`, `bare_repository.push`) so a demo project resolves the demo token + demo allowlist and a live project cannot reach a demo repo. `ontokit-web`: demo entry/exit navigation (routes to the demo project) + persistent demo banner. Tests both sides.
 **Test scenarios:** a demo project pushes only to its dummy repo; **three refusal tests** — a live PR-create, a PR-Party REST write, and a mirror push are each refused server-side when the project is demo and the target is off-allowlist; the live mirror token is never selected for a demo project; the demo banner reflects server truth after reload; a demo project's edits never appear in any live project or repo (the isolation assertion).
-**Execution note:** The deny-by-default guard at the shared seam is defense-in-depth behind the project-level isolation; prove each of the three write paths refuses for a demo project.
+**Execution note:** The single target-authorizer is the unit's heart — one seam every write calls; carry an exhaustive test that each enumerated call site routes through it (the guarantee is only as strong as the enumeration). Provisioning must be idempotent (re-running the deploy does not create duplicate demo projects).
 **Verification:** live DEV demo flow writes only to `ontokit-demo-folio`; UAT log evidence.
 
 ### U10. Auto-save preference
@@ -285,9 +287,17 @@ Sequencing: Phase A (verify & harden) → Phase B (demo & UX) and Phase C (pipel
 **Goal:** R14 + R15: the fork's undelivered work partitioned into reviewable tranches; tranche 1 drafted end-to-end, sends awaiting Damien.
 **Requirements:** R14, R15 (KD2, KTD5).
 **Files:** `docs/roundup-2026-08/UPSTREAM-DELIVERY-MAP.md`: tranche table (feature seam → commit ranges → target repo → issue draft → PR scope → dependency order → review-size estimate); tranche-1 issue bodies + PR descriptions as files.
-**Approach:** Derive seams from the feature plans (trust-ladder, PR Party, v0.4.0 phases) per KTD5; respect the existing open upstream PRs (#57/#27) as already-in-flight prefixes, not re-sends.
-**Test scenarios:** Test expectation: none — docs deliverable; the map's dependency order is validated by checking each tranche builds green when cherry-picked onto upstream `dev` in a scratch worktree (spot-check tranche 1 only).
-**Verification:** Damien can read the map and approve tranche 1 in one sitting; nothing was sent.
+**Approach:** Derive seams from the feature plans (trust-ladder, PR Party, v0.4.0 phases) per KTD5; respect the existing open upstream PRs (#57/#27) as already-in-flight prefixes, not re-sends. **Commit cutoff:** the map is built against a recorded HEAD after U7/U9/U10 land (this unit depends on them) so no later code-producing unit adds commits the map misses.
+**Test scenarios:** Test expectation: none — docs deliverable; tranche 1's dependency order is validated by cherry-picking onto upstream `dev` in a scratch worktree. Tranches beyond 1 are marked **provisional** in the map (order asserted, not yet cherry-pick-verified) — R14's whole-map claim is satisfied by the provisional labeling, not by claiming every tranche was tested.
+**Verification:** Damien can read the map and approve tranche 1 in one sitting; nothing was sent; later tranches carry the provisional marker.
+
+### U18. Closeout — gate-status ask, Cockpit, and the compounding learning
+
+**Goal:** The DoD's cross-cutting deliverables have an owner: the `briefs/qa` ask that surfaces the three external gates (R16–R18) and their status, the Cockpit on-deck/asks refresh, and a `ce-compound` learning capturing the GSD-code-verification lesson (unit tests that mock every seam prove nothing — the live-Postgres integration harness and the F2/F3 blockers found only in real-data UAT are the evidence).
+**Requirements:** DoD items (Cockpit visibility, closeout).
+**Files:** `briefs/qa/ontokit-web-<date>-external-gates.json`; `briefs/on-deck.json` update; a learning under `docs/solutions/`.
+**Test scenarios:** Test expectation: none — docs/cockpit deliverable; proof is the ask rendering on the board with the three gates and the learning committed.
+**Verification:** board shows the gate-status ask; `docs/solutions/` learning exists and links the review + fix-round dispositions.
 
 ### U15. AWS PROD rebuild — BLOCKED on Mike's access
 
