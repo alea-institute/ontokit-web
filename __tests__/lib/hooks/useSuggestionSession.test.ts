@@ -49,6 +49,7 @@ describe("useSuggestionSession", () => {
       session_id: "sess-1",
       branch: "suggest/sess-1",
       created_at: "2024-01-01T00:00:00Z",
+      beacon_token: "signed-beacon-token",
     });
 
     const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
@@ -60,7 +61,7 @@ describe("useSuggestionSession", () => {
     expect(result.current.status).toBe("active");
     expect(result.current.sessionId).toBe("sess-1");
     expect(result.current.branch).toBe("suggest/sess-1");
-    expect(result.current.beaconToken).toBe("sess-1");
+    expect(result.current.beaconToken).toBe("signed-beacon-token");
     expect(result.current.isActive).toBe(true);
     expect(mockedCreateSession).toHaveBeenCalledWith("proj-1", "token-123");
   });
