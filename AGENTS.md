@@ -2,6 +2,42 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Repository Relationship and Remotes
+
+This local checkout is the **FOLIO/Alea downstream fork** of CatholicOS OntoKit Web. It is
+one working directory with two Git remotes, not a separate clone for each organization:
+
+- `origin` — FOLIO/Alea downstream: `https://github.com/alea-institute/ontokit-web.git`
+- `catholicos` — authoritative CatholicOS upstream:
+  `https://github.com/CatholicOS/ontokit-web.git`
+
+Agents should push FOLIO work and feature branches to `origin`. Treat `catholicos` as the
+source for upstream changes; do not push to it unless the user explicitly requests that
+specific action and confirms authorization. Before syncing or publishing, verify the
+configuration with `git remote -v` rather than inferring a remote from the repository name.
+
+To incorporate upstream changes into the downstream default branch, fetch `catholicos`,
+fast-forward or merge its default branch into the local downstream branch as appropriate,
+and then push the result to `origin`. Inspect branch names and divergence first; do not
+assume both repositories currently use a branch named `main`.
+
+### BAU Upstream Contribution Workflow
+
+FOLIO/Alea is the working downstream where Damien builds features and fixes problems.
+CatholicOS is the upstream project to which suitable improvements are proposed. The normal
+business-as-usual correlation between them is:
+
+1. Develop and validate the feature or fix in the FOLIO/Alea downstream repository.
+2. Before opening an upstream PR, create an issue in the corresponding CatholicOS repository
+   describing the problem, need, or desired feature to be solved. The issue establishes the
+   upstream problem independently of FOLIO's implementation.
+3. Open a CatholicOS PR as a **potential solution** to that issue, and explicitly link the PR
+   to the issue. Do not present the downstream implementation as an assumed upstream decision.
+
+Agents preparing CatholicOS contributions should preserve this issue-first ordering and the
+problem/solution distinction. Do not open an upstream PR without first identifying or creating
+its CatholicOS issue, unless the user explicitly directs otherwise.
+
 ## Build & Development Commands
 
 ```bash
