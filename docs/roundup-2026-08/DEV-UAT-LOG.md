@@ -197,6 +197,24 @@ the app loads. **`ontokit-api.dev` is still served by the resurrected stale Cool
 decommission the Coolify app vs bring-it-under-gate — is **Damien's phase-gate decision**
 (U6 disposition), along with rotating the creds that live in the stale container env.
 
+### F6 CLOSED DURABLY (Damien approved the durable fix at the phase gate)
+Root problem: Coolify's reconciler keeps resurrecting the stale triad (apps id 7 =
+`ue6k…` api on `ontokit-api.dev`, id 9 = `hlcjgyv9z…` web on `ontokit.dev`, + worker),
+so a `docker stop` never holds. Durable, Coolify-proof, non-destructive fix — all at the
+**file provider** (`/data/coolify/proxy/dynamic/ontokit-dev.yaml`, which Coolify never
+touches), which always wins over docker-label routers via explicit priority:
+- `ontokit.dev` web/api routers pinned `priority: 10000/20000` → CPX41 always wins.
+- NEW `ontokit-api-dev-gate` router `priority: 30000` for `Host(ontokit-api.dev…)` →
+  basic-auth middleware + a **deadend service** (empty server list → 503). The stale api
+  is now unreachable via traefik regardless of the zombie container.
+Verified: `ontokit.dev` authed 200 / unauth 401; `ontokit-api.dev` unauth **401**, authed
+**503** (deadend). Backup of the prior config at `.ontokit-dev.yaml.bak`. The file was
+rewritten from a validated dict (an earlier hand-edit malformed the YAML and traefik
+dropped it — caught + fixed immediately; basic-auth users preserved).
+**Remaining (cosmetic, needs Damien's Coolify login):** delete Coolify apps 7/9/worker
+via the UI to reclaim resources. The exposure + flapping are already closed; U12 folds
+these routers into IaC.
+
 ### F7 + F8 verified live (both FIXED)
 After the `add33b20` web deploy (+ the routing fix above): the editor route
 `/projects/{id}/editor?classIri=…` now LOADS with full editing affordances under
