@@ -5,10 +5,17 @@ export function useLLMConfig(projectId: string, accessToken?: string) {
   const queryClient = useQueryClient();
 
   const configQuery = useQuery({
-    queryKey: ["llm-config", projectId],
+    queryKey: ["llm-config", projectId, accessToken ?? null],
     queryFn: () => llmApi.getConfig(projectId, accessToken!),
     enabled: !!accessToken && !!projectId,
     staleTime: 5 * 60_000, // 5 min — config changes rarely
+    retry: false, // An unconfigured project intentionally returns 404.
+  });
+
+  const modelsQuery = useQuery({
+    queryKey: ["llm-known-models"],
+    queryFn: llmApi.getKnownModels,
+    staleTime: 60 * 60_000,
   });
 
   const updateMutation = useMutation({
@@ -27,7 +34,9 @@ export function useLLMConfig(projectId: string, accessToken?: string) {
 
   return {
     config: configQuery.data as LLMConfigResponse | undefined,
+    knownModels: modelsQuery.data ?? [],
     isLoading: configQuery.isLoading,
+    isModelsLoading: modelsQuery.isLoading,
     error: configQuery.error,
     updateConfig: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
