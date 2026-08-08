@@ -81,7 +81,7 @@ export function LLMSettingsSection({
   projectId: string;
   accessToken?: string;
 }) {
-  const { config, isLoading, updateConfig, isUpdating, testConnection } =
+  const { config, knownModels, isLoading, isModelsLoading, updateConfig, isUpdating, testConnection } =
     useLLMConfig(projectId, accessToken);
 
   const byoKeyStore = useByoKeyStore();
@@ -91,6 +91,7 @@ export function LLMSettingsSection({
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [modelTier, setModelTier] = useState<ModelTier>("quality");
+  const [model, setModel] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [monthlyBudget, setMonthlyBudget] = useState("");
   const [dailyCap, setDailyCap] = useState("");
@@ -116,6 +117,7 @@ export function LLMSettingsSection({
   useEffect(() => {
     if (config) {
       setProvider(config.provider);
+      setModel(config.model ?? "");
       setModelTier(config.model_tier);
       setBaseUrl(config.base_url ?? "");
       setMonthlyBudget(
@@ -177,6 +179,7 @@ export function LLMSettingsSection({
     PROVIDERS.find((p) => p.value === provider) ?? PROVIDERS[0];
   const isLocalProvider = selectedProvider.isLocal;
   const currentIndex = PROVIDERS.findIndex((p) => p.value === provider);
+  const providerModels = knownModels.filter((item) => item.provider === provider);
 
   const handleDropdownKeyDown = (e: React.KeyboardEvent) => {
     if (!isDropdownOpen) {
@@ -270,6 +273,7 @@ export function LLMSettingsSection({
 
       await updateConfig({
         provider,
+        model,
         model_tier: modelTier,
         ...(apiKey.trim() ? { api_key: apiKey.trim() } : {}),
         ...(isLocalProvider && baseUrl.trim()
@@ -480,6 +484,44 @@ export function LLMSettingsSection({
         </div>
       </div>
 
+      <div>
+        <label
+          htmlFor="llm-generation-model"
+          className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300"
+        >
+          Generation model
+        </label>
+        {providerModels.length > 0 ? (
+          <select
+            id="llm-generation-model"
+            value={model}
+            onChange={(event) => setModel(event.target.value)}
+            disabled={isModelsLoading}
+            required
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+          >
+            <option value="">Select a model</option>
+            {providerModels.map((item) => (
+              <option key={item.model_id} value={item.model_id}>
+                {item.display_name} ({item.tier})
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            id="llm-generation-model"
+            value={model}
+            onChange={(event) => setModel(event.target.value)}
+            placeholder="Enter the provider model ID"
+            required
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+          />
+        )}
+        <p className="mt-1 text-xs text-slate-500">
+          Generation requests use this exact provider model ID.
+        </p>
+      </div>
+
       {/* Budget fields */}
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
@@ -604,7 +646,7 @@ export function LLMSettingsSection({
       <div>
         <Button
           onClick={handleSave}
-          disabled={isUpdating || validationStatus === "validating"}
+          disabled={isUpdating || validationStatus === "validating" || !model.trim()}
           className="flex items-center gap-2"
         >
           {isUpdating ? (
