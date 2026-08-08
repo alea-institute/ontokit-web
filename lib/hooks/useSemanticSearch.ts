@@ -39,10 +39,11 @@ export function useSemanticSearch(
           limit
         );
       } catch (error) {
-        // A 404 means semantic indexing is not configured for this project.
-        // Authentication, authorization, and server failures must remain
-        // visible instead of being silently disguised as text results.
-        if ((error as { status?: number }).status !== 404) throw error;
+        // Budget exhaustion (402) and unavailable embeddings (503) can still
+        // produce useful text results. Authorization and other failures must
+        // remain visible instead of being silently disguised as text results.
+        const status = (error as { status?: number }).status;
+        if (status !== 402 && status !== 503) throw error;
         const response = await projectOntologyApi.searchEntities(
           projectId,
           query,
