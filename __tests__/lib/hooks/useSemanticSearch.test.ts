@@ -101,8 +101,8 @@ describe("useSemanticSearch", () => {
     );
   });
 
-  it("falls back to text search when semantic search fails", async () => {
-    mockedSemanticSearch.mockRejectedValue(Object.assign(new Error("Embeddings not configured"), { status: 404 }));
+  it.each([402, 503])("falls back to text search when semantic search returns %s", async (status) => {
+    mockedSemanticSearch.mockRejectedValue(Object.assign(new Error("Embeddings unavailable"), { status }));
     mockedSearchEntities.mockResolvedValue(textSearchResponse);
 
     const { result } = renderHook(
@@ -133,6 +133,18 @@ describe("useSemanticSearch", () => {
     expect(mockedSearchEntities).not.toHaveBeenCalled();
   });
 
+  it("surfaces 404 failures without falling back", async () => {
+    mockedSemanticSearch.mockRejectedValue(Object.assign(new Error("Not found"), { status: 404 }));
+
+    const { result } = renderHook(
+      () => useSemanticSearch("proj-1", "test query", true, "token", "main", "semantic"),
+      { wrapper: createWrapper() },
+    );
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(mockedSearchEntities).not.toHaveBeenCalled();
+  });
+
   it("uses text search directly in text mode", async () => {
     mockedSearchEntities.mockResolvedValue(textSearchResponse);
 
@@ -148,7 +160,7 @@ describe("useSemanticSearch", () => {
   });
 
   it("returns error when both semantic and text search fail in semantic mode", async () => {
-    mockedSemanticSearch.mockRejectedValue(Object.assign(new Error("fail"), { status: 404 }));
+    mockedSemanticSearch.mockRejectedValue(Object.assign(new Error("fail"), { status: 503 }));
     mockedSearchEntities.mockRejectedValue(new Error("also fail"));
 
     const { result } = renderHook(
