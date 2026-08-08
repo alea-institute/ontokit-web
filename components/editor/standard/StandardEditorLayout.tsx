@@ -177,7 +177,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   const llmGate = useLLMGate(projectId, userRole);
 
   // Suggestion store for pending count badge
-  const pendingCount = useSuggestionStore((s) => s.getPendingCount());
+  const pendingCount = useSuggestionStore((s) =>
+    s.getPendingCount({ projectId, branch: activeBranch ?? "main" })
+  );
   const byoEntry = useByoKeyStore((s) => s.getEntry(projectId));
 
   const scrollToFirstPending = useCallback(() => {

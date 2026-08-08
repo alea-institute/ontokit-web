@@ -88,20 +88,17 @@ describe("suggestionStore", () => {
     useSuggestionStore.getState().rejectSuggestion(SCOPE, "http://ex.org/Foo", "children", 1);
 
     // 1 pending in Foo::children + 1 pending in Bar::annotations = 2
-    expect(useSuggestionStore.getState().getPendingCount()).toBe(2);
+    expect(useSuggestionStore.getState().getPendingCount(SCOPE)).toBe(2);
   });
 
-  it("clearSuggestions removes all suggestions for a given entityIri", () => {
+  it("getPendingCount excludes other projects and branches", () => {
     useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [makeSuggestion()]);
-    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "annotations", [makeSuggestion()]);
-    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Bar", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions({ projectId: "p2", branch: "main" }, "http://ex.org/Foo", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions({ projectId: "p1", branch: "draft" }, "http://ex.org/Foo", "children", [makeSuggestion()]);
 
-    useSuggestionStore.getState().clearSuggestions(SCOPE, "http://ex.org/Foo");
-
-    const state = useSuggestionStore.getState().suggestions;
-    expect(state["p1::main::http://ex.org/Foo::children"]).toBeUndefined();
-    expect(state["p1::main::http://ex.org/Foo::annotations"]).toBeUndefined();
-    expect(state["p1::main::http://ex.org/Bar::children"]).toHaveLength(1);
+    expect(useSuggestionStore.getState().getPendingCount(SCOPE)).toBe(1);
+    expect(useSuggestionStore.getState().getPendingCount({ projectId: "p2", branch: "main" })).toBe(1);
+    expect(useSuggestionStore.getState().getPendingCount({ projectId: "p1", branch: "draft" })).toBe(1);
   });
 
   it("clearAllSuggestions empties the entire store", () => {

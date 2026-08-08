@@ -96,7 +96,7 @@ describe("useSuggestions", () => {
 
     expect(error).toBe("Network failure");
     // Store should remain empty on error
-    expect(useSuggestionStore.getState().getPendingCount()).toBe(0);
+    expect(useSuggestionStore.getState().getPendingCount(SCOPE)).toBe(0);
   });
 
   it.each([
