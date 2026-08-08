@@ -16,6 +16,7 @@ export function useLLMConfig(projectId: string, accessToken?: string) {
     queryKey: ["llm-known-models"],
     queryFn: llmApi.getKnownModels,
     staleTime: 60 * 60_000,
+    retry: false,
   });
 
   const updateMutation = useMutation({

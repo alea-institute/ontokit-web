@@ -70,6 +70,13 @@ describe("LLMSettingsSection", () => {
     );
   });
 
+  it("does not offer custom models for a normal registry configuration", () => {
+    render(<LLMSettingsSection projectId="project-1" accessToken="token" />);
+
+    expect(screen.queryByRole("option", { name: /custom model/i })).toBeNull();
+    expect(screen.queryByRole("textbox", { name: /generation model/i })).toBeNull();
+  });
+
   it("clears a model when the provider changes", async () => {
     const user = userEvent.setup();
     render(<LLMSettingsSection projectId="project-1" accessToken="token" />);

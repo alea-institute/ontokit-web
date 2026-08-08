@@ -145,5 +145,7 @@ export const llmApi = {
     api.get<LLMProviderInfo[]>(`/api/v1/llm/providers`),
 
   getKnownModels: () =>
-    api.get<LLMKnownModel[]>(`/api/v1/llm/known-models`),
+    api.get<LLMKnownModel[]>(`/api/v1/llm/known-models`, {
+      retryOn5xx: false,
+    }),
 };
