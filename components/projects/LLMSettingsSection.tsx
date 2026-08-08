@@ -515,14 +515,7 @@ export function LLMSettingsSection({
           <select
             id="llm-generation-model"
             value={model}
-            onChange={(event) => {
-              if (event.target.value === "__custom__") {
-                setModel("");
-                setCustomModelOverride(true);
-              } else {
-                setModel(event.target.value);
-              }
-            }}
+            onChange={(event) => setModel(event.target.value)}
             disabled={isModelsLoading || !!modelsError}
             required
             className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
@@ -535,7 +528,6 @@ export function LLMSettingsSection({
                 {item.display_name} ({item.tier})
               </option>
             ))}
-            {!isModelsLoading && !modelsError && <option value="__custom__">Custom model…</option>}
           </select>
         ) : (
           <div className="flex gap-2">
