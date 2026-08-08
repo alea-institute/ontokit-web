@@ -92,7 +92,7 @@ export function LLMSettingsSection({
   const [showApiKey, setShowApiKey] = useState(false);
   const [modelTier, setModelTier] = useState<ModelTier>("quality");
   const [model, setModel] = useState("");
-  const [isCustomModel, setIsCustomModel] = useState(false);
+  const [customModelOverride, setCustomModelOverride] = useState<boolean | null>(null);
   const [baseUrl, setBaseUrl] = useState("");
   const [monthlyBudget, setMonthlyBudget] = useState("");
   const [dailyCap, setDailyCap] = useState("");
@@ -119,6 +119,7 @@ export function LLMSettingsSection({
     if (config) {
       setProvider(config.provider);
       setModel(config.model ?? "");
+      setCustomModelOverride(null);
       setModelTier(config.model_tier);
       setBaseUrl(config.base_url ?? "");
       setMonthlyBudget(
@@ -182,24 +183,22 @@ export function LLMSettingsSection({
   const isRegistryProvider = !isLocalProvider;
   const currentIndex = PROVIDERS.findIndex((p) => p.value === provider);
   const providerModels = knownModels.filter((item) => item.provider === provider);
+  const savedModel = config?.provider === provider ? config.model?.trim() : undefined;
+  const savedModelMissingFromRegistry =
+    isRegistryProvider &&
+    !isModelsLoading &&
+    !modelsError &&
+    !!savedModel &&
+    !providerModels.some((item) => item.model_id === savedModel);
+  const isCustomModel = customModelOverride ?? savedModelMissingFromRegistry;
   const isModelValid =
     model.trim().length > 0 &&
     (isLocalProvider || isCustomModel || providerModels.some((item) => item.model_id === model));
 
-  useEffect(() => {
-    if (!config || config.provider !== provider || isModelsLoading || modelsError) return;
-    const savedModel = config.model?.trim();
-    setIsCustomModel(
-      isRegistryProvider &&
-        !!savedModel &&
-        !providerModels.some((item) => item.model_id === savedModel)
-    );
-  }, [config, provider, knownModels, isModelsLoading, modelsError, isRegistryProvider]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const selectProvider = (nextProvider: LLMProviderType) => {
     setProvider(nextProvider);
     setModel("");
-    setIsCustomModel(false);
+    setCustomModelOverride(false);
   };
 
   const handleDropdownKeyDown = (e: React.KeyboardEvent) => {
@@ -519,7 +518,7 @@ export function LLMSettingsSection({
             onChange={(event) => {
               if (event.target.value === "__custom__") {
                 setModel("");
-                setIsCustomModel(true);
+                setCustomModelOverride(true);
               } else {
                 setModel(event.target.value);
               }
@@ -553,7 +552,7 @@ export function LLMSettingsSection({
                 type="button"
                 onClick={() => {
                   setModel("");
-                  setIsCustomModel(false);
+                  setCustomModelOverride(false);
                 }}
                 className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
               >
