@@ -16,6 +16,24 @@ Worktree: `.worktrees/pr-party`
 | Web type drift | Removed unsupported `anthropic` embedding provider from the TS contract and settings choices. | `9e941f33` | `npm run type-check` failed after narrowing the contract because the stale settings option still existed. | `npm run type-check`: passed. |
 | React Query stale/retry states | User-scoped LLM config/usage/search keys; no retry for intentional config 404, LLM gate status, or semantic search; semantic fallback only on not-configured 404, while 401/403/5xx remain visible. The gate no longer treats the API's static `daily_remaining` allowance as live exhaustion. | `0324a47b`, `95d8dfea` | Existing semantic-search test demonstrated catch-all fallback; review identified boolean-only user keys and repeated 4xx retries. | Semantic-search and LLM-gate focused suites passed, including 403 propagation and static-allowance behavior. |
 
+## Round 2 — adversarial verification follow-up
+
+| Finding | Disposition | Fix commit | Red evidence | Green evidence |
+|---|---|---|---|---|
+| P1-15 completion | Maps fail-closed 503 pricing failures to guidance that names registry models and local providers, and maps generic 500 responses to actionable retry/support copy. | `9d426bca` | `useSuggestions.test.ts`: the new 500 and 503 cases both received `Could not generate suggestions.` | Focused hook suite: 11 passed. |
+| D1 / D2 | Registry providers retain a disabled model select while models load or fail; registry failures render a visible alert. A saved registry-provider model missing from the registry opens as an explicit custom-model input and can be re-saved. | `9201aa56` | `LLMSettingsSection.test.tsx`: loading rendered a textbox, registry failure had no alert, and an absent saved model had no custom escape. | Focused component suite: 5 passed; `npm run type-check`: passed. |
+| D4 | Extracted the existing `toTurtle` unsafe-IRI guard as `assertSafeTurtleIri` and reused it in `toPrefixedOrFull` for both subjects and parents. | `c58306f3` | Snippet-generator subject and parent breakout cases did not throw. | Turtle snippet/utils suites: 93 passed; `npm run type-check`: passed. |
+| D5 | Semantic search degrades to text results only for the API's real recoverable statuses, 402 and 503. Authorization 403 and the dead 404 case remain visible errors. | `60031f64` | New 402/503 fallback cases errored, while 404 incorrectly invoked text search. | Focused semantic-search suite: 12 passed; `npm run type-check`: passed. |
+| P1-14 completion | `getPendingCount(scope)` filters by project and branch, and both editor-layout badges pass their active scope. Removed the zero-caller `clearSuggestions` store API. | `4b80e3a3` | Cross-project/branch count returned 3 instead of 1; TypeScript rejected the new scoped accessor calls. | Store and suggestions-hook suites: 25 passed; `npm run type-check`: passed. |
+
+The post-implementation review found two follow-ups, fixed in `a24a889a`: the
+custom-model escape is now limited to saved models absent from the registry, and
+the known-models request disables retries in both React Query and the API client
+so its visible failure state is prompt and does not amplify traffic.
+
+D3 remains API-owned. The web does not mask it: generation 503 responses surface the
+honest model-pricing guidance above.
+
 ## API-owned findings skipped here
 
 | Finding | Disposition |
@@ -32,6 +50,8 @@ Worktree: `.worktrees/pr-party`
 - `npm run type-check` — passed.
 - `npm run test` — passed under `CI=1`; authoritative non-watch run: `npm test -- --run`.
 - `npm run lint` — exited successfully with 19 warnings and zero errors. No new error was introduced; the warning set consists of existing `react-hooks/set-state-in-effect` findings.
-- Simplification review: reuse 0 applied, quality 3 applied (provider/model consistency, neutral event contract, dead gate state), efficiency 0 applied; 2 low-value structural suggestions skipped because they would broaden test/layout churn without improving the reviewed contract.
+- Simplification review found no reuse or quality defects. It replaced the
+  live pending-count selector's allocation-heavy collection pipeline with one
+  scoped loop and simplified derived custom-model state in `99c2217e`.
 
 No files under `components/pr-party/**` or `app/pr-party/**` were changed. No push or PR was created.
