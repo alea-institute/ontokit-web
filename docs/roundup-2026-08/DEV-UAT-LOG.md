@@ -209,6 +209,31 @@ before F8 it showed "0 nodes, 0 edges" and issued no fetch. U4 sweep complete: p
 list, editor tree, class detail, edit affordances, graph, model-picker (LLM access chip),
 all pass with clean console on happy paths.
 
+### U5 — suggestion lifecycle, live on DEV (mechanics PASS; KD1 split carries to U7)
+All exercised live against the seeded FOLIO project (local bare repo; `github_integrations`=0):
+- **UAT-2 (true duplicate blocks):** minting a NEW IRI with an EXACT existing label
+  ("Area of Law") → submit **409** `"Suggestion duplicates an existing entity label"`. PASS.
+- **UAT-3 (external-IRI parent accepted):** parent `https://schema.org/Thing` → save 200,
+  submit **200**, PR #4 opened. Validates U1's VALID-04 (well-formed external IRIs are
+  legitimate parents). PASS.
+- **Branch accumulation:** saves land on the contributor branch
+  `suggest/anonymou/s_485b…` (commits `e423cf5`, `6e6c2f5`); `main` stayed at the initial
+  import `077092d` until approve. PASS — a save never touches the default branch.
+- **Submit opens a PR:** PR #3/#4 created; `pr_url: null` because no GitHub integration is
+  wired (local bare-repo PR). The PR/branch assertion holds locally.
+- **Approve → merge:** approve → 204; `main` advanced to `ac922b1`
+  "Merge suggestion: s_485b…" carrying the contributor branch. PASS.
+- **Trust credit:** `accepted_count` 0 → **1** after the approved merge. PASS
+  (reject→no-credit not separately exercised this pass; API contract covers it).
+- **KD1 attribution (author=contributor, committer=bot) — CARRIES TO U7.** The
+  commit-identity system IS engaged: it minted a per-user noreply author
+  `Anonymous <anonymous-88b71c83@users.noreply.ontokit.local>` (not a raw system identity),
+  proving `commit_identity.py` runs. But under `AUTH_MODE=disabled` the actor is anonymous,
+  so author == committer == "Anonymous" — the distinct contributor-author-vs-bot-committer
+  split is only observable under a **real named persona**, which is exactly U7's Zitadel
+  pass. This is the KD1 ratification gate U6 (lens-3/lens-5) flagged; it closes in U7, not
+  here. Recorded honestly rather than claimed.
+
 ### Status after Phase A U1–U3 + F5 (2026-08-08 evening, api `23aab106`, web `3aacf5e9` no-cache)
 - **F3/U1: FIXED, verified live.** UAT-1 re-run end-to-end on a fresh session
   (`s_1d048ab48c778ae1`): FOLIO-parent mint → save 200 (15s, commit `ce27eb9d`,
