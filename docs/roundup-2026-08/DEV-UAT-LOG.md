@@ -181,6 +181,34 @@ still 200. This is the textbook "coverage set, not mechanism" lesson from
 enumerate every address family and every ingress mechanism (DNAT vs userland proxy), not
 just the one you tested.
 
+### F6 REOPENED then re-closed durably (P1) — Coolify reconciler resurrects the stale triad
+Re-verifying F7/F8 in-browser exposed that the F6 `docker stop` did NOT hold: Coolify's
+reconciler restarted all three stale containers (`Up 10 min`, `restart=true`), so traefik
+had TWO routers matching `Host(ontokit.dev)` — the file-provider one (→CPX41) and the
+resurrected Coolify docker-label one (→stale web) — and tie-flapped between them. Symptom:
+the project-detail page 404'd because the stale web bundle calls the (also-resurrected)
+`ontokit-api.dev` host. A second `docker stop` would just lose to Coolify again. Durable,
+reconcile-proof fix I control: set `priority: 10000` (web) / `20000` (api) on the
+**file-provider** routers in `/data/coolify/proxy/dynamic/ontokit-dev.yaml` (Coolify never
+touches that file), so CPX41 deterministically wins `ontokit.dev`. Verified: a chunk absent
+from the CPX41 image now 404s (no longer served stale), project GET returns FOLIO DEV, and
+the app loads. **`ontokit-api.dev` is still served by the resurrected stale Coolify api**
+(empty DB, Zitadel-gated — lower risk; CPX41 does not depend on it). The DURABLE fix —
+decommission the Coolify app vs bring-it-under-gate — is **Damien's phase-gate decision**
+(U6 disposition), along with rotating the creds that live in the stale container env.
+
+### F7 + F8 verified live (both FIXED)
+After the `add33b20` web deploy (+ the routing fix above): the editor route
+`/projects/{id}/editor?classIri=…` now LOADS with full editing affordances under
+`AUTH_MODE=disabled` (editable Label/Definition, Add entity, Add subclass per node, Add
+parent, +Add relationship, Auto-save on + Save/Cancel, "Admin — unlimited" LLM access) —
+before F7 it bounced to the read-only viewer. Console clean. The relationship graph now
+renders the focus node ("Actor / Player", 6 children; header "1 nodes, 0 edges (2
+resolved)" — the BFS runs and resolves focus+parent; `owl:Thing` is external so no edge) —
+before F8 it showed "0 nodes, 0 edges" and issued no fetch. U4 sweep complete: projects
+list, editor tree, class detail, edit affordances, graph, model-picker (LLM access chip),
+all pass with clean console on happy paths.
+
 ### Status after Phase A U1–U3 + F5 (2026-08-08 evening, api `23aab106`, web `3aacf5e9` no-cache)
 - **F3/U1: FIXED, verified live.** UAT-1 re-run end-to-end on a fresh session
   (`s_1d048ab48c778ae1`): FOLIO-parent mint → save 200 (15s, commit `ce27eb9d`,
