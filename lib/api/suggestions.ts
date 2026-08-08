@@ -20,6 +20,7 @@ export interface SuggestionSession {
   session_id: string;
   branch: string;
   created_at: string;
+  beacon_token: string;
 }
 
 export interface SuggestionSaveResponse {
@@ -176,7 +177,7 @@ export const suggestionsApi = {
     api.post<SuggestionSession>(
       `/api/v1/projects/${projectId}/suggestions/sessions`,
       undefined,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -192,7 +193,7 @@ export const suggestionsApi = {
     api.put<SuggestionSaveResponse>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/save`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -207,7 +208,7 @@ export const suggestionsApi = {
     api.post<SuggestionSubmitResponse>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/submit`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -226,7 +227,7 @@ export const suggestionsApi = {
     api.post<void>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/discard`,
       undefined,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -271,7 +272,7 @@ export const suggestionsApi = {
     api.post<void>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/dismiss`,
       undefined,
-      { headers: { Authorization: `Bearer ${token}` }, params: note ? { note } : undefined },
+      { headers: { Authorization: `Bearer ${token}` }, params: note ? { note } : undefined, retryOn5xx: false },
     ),
 
   /**
@@ -285,7 +286,7 @@ export const suggestionsApi = {
     api.post<BulkReviewResponse>(
       `/api/v1/projects/${projectId}/suggestions/bulk-review`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -295,7 +296,7 @@ export const suggestionsApi = {
     api.post<void>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/approve`,
       undefined,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -310,7 +311,7 @@ export const suggestionsApi = {
     api.post<void>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/reject`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -325,7 +326,7 @@ export const suggestionsApi = {
     api.post<void>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/request-changes`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -340,7 +341,7 @@ export const suggestionsApi = {
     api.post<SuggestionSubmitResponse>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/resubmit`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 };
 

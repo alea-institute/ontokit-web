@@ -78,6 +78,7 @@ export const generationApi = {
         // Forwarded so an aborted controller (e.g. navigating away) actually
         // cancels the underlying fetch rather than orphaning it.
         signal,
+        retryOn5xx: false,
       },
     ),
 };
