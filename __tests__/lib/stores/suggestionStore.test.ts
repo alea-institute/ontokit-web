@@ -2,6 +2,8 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 import type { GeneratedSuggestion } from "@/lib/api/generation";
 
+const SCOPE = { projectId: "p1", branch: "main" };
+
 function makeSuggestion(overrides: Partial<GeneratedSuggestion> = {}): GeneratedSuggestion {
   return {
     iri: "http://example.org/Child1",
@@ -25,9 +27,9 @@ describe("suggestionStore", () => {
 
   it("setSuggestions stores suggestions keyed by entityIri::suggestionType", () => {
     const items = [makeSuggestion(), makeSuggestion({ iri: "http://example.org/Child2", label: "Child 2" })];
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "annotations", items);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "annotations", items);
 
-    const stored = useSuggestionStore.getState().suggestions["http://ex.org/Foo::annotations"];
+    const stored = useSuggestionStore.getState().suggestions["p1::main::http://ex.org/Foo::annotations"];
     expect(stored).toHaveLength(2);
     expect(stored[0].status).toBe("pending");
     expect(stored[0].suggestion.label).toBe("Child 1");
@@ -35,62 +37,76 @@ describe("suggestionStore", () => {
     expect(stored[1].suggestion.label).toBe("Child 2");
   });
 
+  it("keeps identical IRIs isolated across projects and branches", () => {
+    const otherProject = { projectId: "p2", branch: "main" };
+    const otherBranch = { projectId: "p1", branch: "draft" };
+    const iri = "http://ex.org/Foo";
+
+    useSuggestionStore.getState().setSuggestions(SCOPE, iri, "children", [makeSuggestion({ label: "P1" })]);
+    useSuggestionStore.getState().setSuggestions(otherProject, iri, "children", [makeSuggestion({ label: "P2" })]);
+    useSuggestionStore.getState().setSuggestions(otherBranch, iri, "children", [makeSuggestion({ label: "Draft" })]);
+
+    expect(useSuggestionStore.getState().getPendingSuggestions(SCOPE, iri, "children")[0].suggestion.label).toBe("P1");
+    expect(useSuggestionStore.getState().getPendingSuggestions(otherProject, iri, "children")[0].suggestion.label).toBe("P2");
+    expect(useSuggestionStore.getState().getPendingSuggestions(otherBranch, iri, "children")[0].suggestion.label).toBe("Draft");
+  });
+
   it("acceptSuggestion changes status to accepted", () => {
     const items = [makeSuggestion()];
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "annotations", items);
-    useSuggestionStore.getState().acceptSuggestion("http://ex.org/Foo", "annotations", 0);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "annotations", items);
+    useSuggestionStore.getState().acceptSuggestion(SCOPE, "http://ex.org/Foo", "annotations", 0);
 
-    const stored = useSuggestionStore.getState().suggestions["http://ex.org/Foo::annotations"];
+    const stored = useSuggestionStore.getState().suggestions["p1::main::http://ex.org/Foo::annotations"];
     expect(stored[0].status).toBe("accepted");
   });
 
   it("rejectSuggestion changes status to rejected", () => {
     const items = [makeSuggestion()];
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "annotations", items);
-    useSuggestionStore.getState().rejectSuggestion("http://ex.org/Foo", "annotations", 0);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "annotations", items);
+    useSuggestionStore.getState().rejectSuggestion(SCOPE, "http://ex.org/Foo", "annotations", 0);
 
-    const stored = useSuggestionStore.getState().suggestions["http://ex.org/Foo::annotations"];
+    const stored = useSuggestionStore.getState().suggestions["p1::main::http://ex.org/Foo::annotations"];
     expect(stored[0].status).toBe("rejected");
   });
 
   it("editSuggestion sets editedValue on the stored suggestion", () => {
     const items = [makeSuggestion()];
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "annotations", items);
-    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "annotations", 0, "new val");
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "annotations", items);
+    useSuggestionStore.getState().editSuggestion(SCOPE, "http://ex.org/Foo", "annotations", 0, "new val");
 
-    const stored = useSuggestionStore.getState().suggestions["http://ex.org/Foo::annotations"];
+    const stored = useSuggestionStore.getState().suggestions["p1::main::http://ex.org/Foo::annotations"];
     expect(stored[0].editedValue).toBe("new val");
   });
 
   it("getPendingCount returns count of suggestions with status pending", () => {
     const items = [makeSuggestion(), makeSuggestion({ label: "B" }), makeSuggestion({ label: "C" })];
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", items);
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Bar", "annotations", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", items);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Bar", "annotations", [makeSuggestion()]);
 
     // Accept one, reject one
-    useSuggestionStore.getState().acceptSuggestion("http://ex.org/Foo", "children", 0);
-    useSuggestionStore.getState().rejectSuggestion("http://ex.org/Foo", "children", 1);
+    useSuggestionStore.getState().acceptSuggestion(SCOPE, "http://ex.org/Foo", "children", 0);
+    useSuggestionStore.getState().rejectSuggestion(SCOPE, "http://ex.org/Foo", "children", 1);
 
     // 1 pending in Foo::children + 1 pending in Bar::annotations = 2
     expect(useSuggestionStore.getState().getPendingCount()).toBe(2);
   });
 
   it("clearSuggestions removes all suggestions for a given entityIri", () => {
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [makeSuggestion()]);
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "annotations", [makeSuggestion()]);
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Bar", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "annotations", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Bar", "children", [makeSuggestion()]);
 
-    useSuggestionStore.getState().clearSuggestions("http://ex.org/Foo");
+    useSuggestionStore.getState().clearSuggestions(SCOPE, "http://ex.org/Foo");
 
     const state = useSuggestionStore.getState().suggestions;
-    expect(state["http://ex.org/Foo::children"]).toBeUndefined();
-    expect(state["http://ex.org/Foo::annotations"]).toBeUndefined();
-    expect(state["http://ex.org/Bar::children"]).toHaveLength(1);
+    expect(state["p1::main::http://ex.org/Foo::children"]).toBeUndefined();
+    expect(state["p1::main::http://ex.org/Foo::annotations"]).toBeUndefined();
+    expect(state["p1::main::http://ex.org/Bar::children"]).toHaveLength(1);
   });
 
   it("clearAllSuggestions empties the entire store", () => {
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [makeSuggestion()]);
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Bar", "annotations", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Bar", "annotations", [makeSuggestion()]);
 
     useSuggestionStore.getState().clearAllSuggestions();
 
@@ -98,22 +114,22 @@ describe("suggestionStore", () => {
   });
 
   it("getFirstPendingRef returns the key of the first entity with pending suggestions", () => {
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [makeSuggestion()]);
     // Accept all in Foo::children so there are no pending there
-    useSuggestionStore.getState().acceptSuggestion("http://ex.org/Foo", "children", 0);
+    useSuggestionStore.getState().acceptSuggestion(SCOPE, "http://ex.org/Foo", "children", 0);
 
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Bar", "annotations", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Bar", "annotations", [makeSuggestion()]);
 
     // Foo has no pending, Bar has 1 pending
     const ref = useSuggestionStore.getState().getFirstPendingRef();
-    expect(ref).toBe("http://ex.org/Bar::annotations");
+    expect(ref).toBe("p1::main::http://ex.org/Bar::annotations");
   });
 
   it("getFirstPendingRef returns null when no pending suggestions exist", () => {
     expect(useSuggestionStore.getState().getFirstPendingRef()).toBeNull();
 
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [makeSuggestion()]);
-    useSuggestionStore.getState().acceptSuggestion("http://ex.org/Foo", "children", 0);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().acceptSuggestion(SCOPE, "http://ex.org/Foo", "children", 0);
 
     expect(useSuggestionStore.getState().getFirstPendingRef()).toBeNull();
   });
@@ -125,29 +141,29 @@ describe("suggestionStore provenance tracking", () => {
   });
 
   it("editSuggestion flips provenance to user-edited-from-llm when the text changes", () => {
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [makeSuggestion()]);
 
-    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "children", 0, "Renamed Child");
+    useSuggestionStore.getState().editSuggestion(SCOPE, "http://ex.org/Foo", "children", 0, "Renamed Child");
 
-    const item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::children"][0];
+    const item = useSuggestionStore.getState().suggestions["p1::main::http://ex.org/Foo::children"][0];
     expect(item.editedValue).toBe("Renamed Child");
     expect(item.suggestion.provenance).toBe("user-edited-from-llm");
   });
 
   it("editSuggestion back to the original text restores llm-proposed and clears editedValue", () => {
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [makeSuggestion()]);
-    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "children", 0, "Renamed Child");
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [makeSuggestion()]);
+    useSuggestionStore.getState().editSuggestion(SCOPE, "http://ex.org/Foo", "children", 0, "Renamed Child");
 
     // Restore the exact original label
-    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "children", 0, "Child 1");
+    useSuggestionStore.getState().editSuggestion(SCOPE, "http://ex.org/Foo", "children", 0, "Child 1");
 
-    const item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::children"][0];
+    const item = useSuggestionStore.getState().suggestions["p1::main::http://ex.org/Foo::children"][0];
     expect(item.editedValue).toBeUndefined();
     expect(item.suggestion.provenance).toBe("llm-proposed");
   });
 
   it("editSuggestion on an annotation compares against value, not label", () => {
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "annotations", [
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "annotations", [
       makeSuggestion({
         suggestion_type: "annotations",
         property_iri: "http://www.w3.org/2000/01/rdf-schema#label",
@@ -156,24 +172,24 @@ describe("suggestionStore provenance tracking", () => {
     ]);
 
     // Same as value → no provenance flip
-    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "annotations", 0, "Original value");
-    let item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::annotations"][0];
+    useSuggestionStore.getState().editSuggestion(SCOPE, "http://ex.org/Foo", "annotations", 0, "Original value");
+    let item = useSuggestionStore.getState().suggestions["p1::main::http://ex.org/Foo::annotations"][0];
     expect(item.suggestion.provenance).toBe("llm-proposed");
 
     // Different from value → flip
-    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "annotations", 0, "New value");
-    item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::annotations"][0];
+    useSuggestionStore.getState().editSuggestion(SCOPE, "http://ex.org/Foo", "annotations", 0, "New value");
+    item = useSuggestionStore.getState().suggestions["p1::main::http://ex.org/Foo::annotations"][0];
     expect(item.suggestion.provenance).toBe("user-edited-from-llm");
     expect(item.editedValue).toBe("New value");
   });
 
   it("model and prompt_template provenance metadata survive the store round-trip", () => {
-    useSuggestionStore.getState().setSuggestions("http://ex.org/Foo", "children", [
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [
       makeSuggestion({ model: "gpt-4o-mini", prompt_template: "children" }),
     ]);
-    useSuggestionStore.getState().editSuggestion("http://ex.org/Foo", "children", 0, "Renamed");
+    useSuggestionStore.getState().editSuggestion(SCOPE, "http://ex.org/Foo", "children", 0, "Renamed");
 
-    const item = useSuggestionStore.getState().suggestions["http://ex.org/Foo::children"][0];
+    const item = useSuggestionStore.getState().suggestions["p1::main::http://ex.org/Foo::children"][0];
     expect(item.suggestion.model).toBe("gpt-4o-mini");
     expect(item.suggestion.prompt_template).toBe("children");
   });

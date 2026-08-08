@@ -1,6 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { generationApi, type GeneratedSuggestion, type SuggestionType } from "@/lib/api/generation";
-import { useSuggestionStore, type StoredSuggestion } from "@/lib/stores/suggestionStore";
+import { storeKey, useSuggestionStore, type StoredSuggestion } from "@/lib/stores/suggestionStore";
 
 export interface UseSuggestionsOptions {
   projectId: string;
@@ -41,9 +41,10 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
   const abortRef = useRef<AbortController | null>(null);
 
   const store = useSuggestionStore;
+  const scope = useMemo(() => ({ projectId, branch }), [projectId, branch]);
   const items = useSuggestionStore((s) =>
     entityIri
-      ? (s.suggestions[`${entityIri}::${suggestionType}`] ?? NO_SUGGESTIONS)
+      ? (s.suggestions[storeKey(scope, entityIri, suggestionType)] ?? NO_SUGGESTIONS)
       : NO_SUGGESTIONS
   );
 
@@ -69,7 +70,7 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
         controller.signal,
       );
       if (!controller.signal.aborted) {
-        store.getState().setSuggestions(entityIri, suggestionType, response.suggestions);
+        store.getState().setSuggestions(scope, entityIri, suggestionType, response.suggestions);
       }
     } catch (err) {
       if (!controller.signal.aborted) {
@@ -83,20 +84,20 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
 
   const accept = useCallback((index: number) => {
     if (!entityIri) return;
-    const stored = store.getState().suggestions[`${entityIri}::${suggestionType}`]?.[index];
+    const stored = store.getState().suggestions[storeKey(scope, entityIri, suggestionType)]?.[index];
     if (!stored) return;
-    store.getState().acceptSuggestion(entityIri, suggestionType, index);
+    store.getState().acceptSuggestion(scope, entityIri, suggestionType, index);
     onAccepted?.(stored.suggestion, stored.editedValue);
   }, [entityIri, suggestionType, store, onAccepted]);
 
   const reject = useCallback((index: number) => {
     if (!entityIri) return;
-    store.getState().rejectSuggestion(entityIri, suggestionType, index);
+    store.getState().rejectSuggestion(scope, entityIri, suggestionType, index);
   }, [entityIri, suggestionType, store]);
 
   const edit = useCallback((index: number, value: string) => {
     if (!entityIri) return;
-    store.getState().editSuggestion(entityIri, suggestionType, index, value);
+    store.getState().editSuggestion(scope, entityIri, suggestionType, index, value);
   }, [entityIri, suggestionType, store]);
 
   return { items, isLoading, error, request, accept, reject, edit };

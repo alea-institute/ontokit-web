@@ -1,7 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { useSuggestionStore } from "@/lib/stores/suggestionStore";
+import { storeKey, useSuggestionStore } from "@/lib/stores/suggestionStore";
 import { generationApi } from "@/lib/api/generation";
 import type { GeneratedSuggestion, GenerateSuggestionsResponse } from "@/lib/api/generation";
+
+const SCOPE = { projectId: "p1", branch: "main" };
 
 // Mock the generation API
 vi.mock("@/lib/api/generation", () => ({
@@ -61,9 +63,9 @@ describe("useSuggestions", () => {
       token,
     );
 
-    useSuggestionStore.getState().setSuggestions(entityIri, suggestionType, response.suggestions);
+    useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, suggestionType, response.suggestions);
 
-    const stored = useSuggestionStore.getState().suggestions[`${entityIri}::${suggestionType}`];
+    const stored = useSuggestionStore.getState().suggestions[storeKey(SCOPE, entityIri, suggestionType)];
     expect(stored).toHaveLength(2);
     expect(stored[0].status).toBe("pending");
     expect(stored[0].suggestion.label).toBe("Child 1");
@@ -100,22 +102,22 @@ describe("useSuggestions", () => {
     const entityIri = "http://ex.org/Foo";
     const suggestionType = "annotations" as const;
 
-    useSuggestionStore.getState().setSuggestions(entityIri, suggestionType, items);
-    useSuggestionStore.getState().editSuggestion(entityIri, suggestionType, 0, "edited label");
+    useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, suggestionType, items);
+    useSuggestionStore.getState().editSuggestion(SCOPE, entityIri, suggestionType, 0, "edited label");
 
     // Simulate what the hook's accept() does
-    const stored = useSuggestionStore.getState().suggestions[`${entityIri}::${suggestionType}`]?.[0];
+    const stored = useSuggestionStore.getState().suggestions[storeKey(SCOPE, entityIri, suggestionType)]?.[0];
     expect(stored).toBeDefined();
 
     const onAccepted = vi.fn();
-    useSuggestionStore.getState().acceptSuggestion(entityIri, suggestionType, 0);
+    useSuggestionStore.getState().acceptSuggestion(SCOPE, entityIri, suggestionType, 0);
     onAccepted(stored!.suggestion, stored!.editedValue);
 
     expect(onAccepted).toHaveBeenCalledWith(
       expect.objectContaining({ label: "Child 1" }),
       "edited label",
     );
-    expect(useSuggestionStore.getState().suggestions[`${entityIri}::${suggestionType}`][0].status).toBe("accepted");
+    expect(useSuggestionStore.getState().suggestions[storeKey(SCOPE, entityIri, suggestionType)][0].status).toBe("accepted");
   });
 
   it("reject() sets suggestion status to rejected in store", () => {
@@ -123,12 +125,12 @@ describe("useSuggestions", () => {
     const entityIri = "http://ex.org/Foo";
     const suggestionType = "children" as const;
 
-    useSuggestionStore.getState().setSuggestions(entityIri, suggestionType, items);
+    useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, suggestionType, items);
 
     // Simulate what the hook's reject() does
-    useSuggestionStore.getState().rejectSuggestion(entityIri, suggestionType, 0);
+    useSuggestionStore.getState().rejectSuggestion(SCOPE, entityIri, suggestionType, 0);
 
-    const stored = useSuggestionStore.getState().suggestions[`${entityIri}::${suggestionType}`][0];
+    const stored = useSuggestionStore.getState().suggestions[storeKey(SCOPE, entityIri, suggestionType)][0];
     expect(stored.status).toBe("rejected");
   });
 });
