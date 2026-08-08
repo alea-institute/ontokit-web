@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { generationApi, type GeneratedSuggestion, type SuggestionType } from "@/lib/api/generation";
 import { ApiError } from "@/lib/api/client";
+import { LLM_STATUS_INVALIDATION_EVENT } from "@/lib/api/llm";
 import { storeKey, useSuggestionStore, type StoredSuggestion } from "@/lib/stores/suggestionStore";
 
 export interface UseSuggestionsOptions {
@@ -30,7 +31,6 @@ export interface UseSuggestionsReturn {
 // useSyncExternalStore's getSnapshot unstable and React 19 aborts the
 // render ("The result of getSnapshot should be cached").
 const NO_SUGGESTIONS: StoredSuggestion[] = [];
-export const LLM_STATUS_INVALIDATION_EVENT = "ontokit:llm-status-invalidated";
 
 export function generationErrorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) {
