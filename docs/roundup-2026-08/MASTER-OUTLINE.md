@@ -19,6 +19,19 @@ repos (Semantic Canon snapshot + FOLIO.owl snapshot) · Q4 Railway superseded �
 Hetzner hosts FOLIO DEV and Catholic DEV; Catholic PROD on the foundation VPS
 · Q5 CE-forward hybrid · Q6 gated DEV→PROD auto-promotion on green checks.
 
+**Topology revision (Damien, 2026-08-08 pm):** one Hetzner CPX41 (`ontokit-dev`,
+178.156.208.239, Ashburn) hosts Catholic DEV + FOLIO DEV + the future `ontokit.org`
+picker site. FOLIO PROD **stays on AWS** (ontokit.openlegalstandard.org — currently the
+stripped April folio-adapter build; must be rebuilt with the full stack before it can
+run the new features). Catholic PROD on the foundation VPS, unchanged. The earlier
+point-the-domain-at-Hetzner directive is withdrawn. `ontokit.org` not yet registered.
+
+**Review gate (2026-08-08):** the LLM-subsystem second-opinion review returned
+NOT-DEPLOYABLE — 6 P0 / 15 P1 (report: ontokit-api
+`docs/residual-review-findings/2026-08-08-llm-subsystem-review.md`). Two Codex fix
+workers dispatched (api + web, live-Postgres integration harness required); DEV
+deploy for Damien's UAT waits on their green + re-verification.
+
 ---
 
 - **Fork alignment first** `[O2]`
