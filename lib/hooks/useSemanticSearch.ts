@@ -12,7 +12,7 @@ export function useSemanticSearch(
   limit = 20
 ) {
   return useQuery({
-    queryKey: ["search", mode, projectId, query, !!accessToken, branch, limit],
+    queryKey: ["search", mode, projectId, query, accessToken ?? null, branch, limit],
     queryFn: async () => {
       if (mode === "text") {
         const response = await projectOntologyApi.searchEntities(
@@ -38,8 +38,11 @@ export function useSemanticSearch(
           branch,
           limit
         );
-      } catch {
-        // Fall back to text search if semantic search unavailable
+      } catch (error) {
+        // A 404 means semantic indexing is not configured for this project.
+        // Authentication, authorization, and server failures must remain
+        // visible instead of being silently disguised as text results.
+        if ((error as { status?: number }).status !== 404) throw error;
         const response = await projectOntologyApi.searchEntities(
           projectId,
           query,
@@ -57,5 +60,6 @@ export function useSemanticSearch(
     },
     enabled: enabled && !!query.trim() && !!projectId,
     staleTime: 10_000,
+    retry: false,
   });
 }

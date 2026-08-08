@@ -177,7 +177,7 @@ describe("useLLMGate", () => {
     expect(result.current.roleLimitLabel).toBe(expected);
   });
 
-  it("returns canUseLLM=false when the daily cap is consumed (server would 402)", async () => {
+  it("does not treat the API's static daily allowance as live exhaustion", async () => {
     mockedUseSession.mockReturnValue(authedSession());
     mockedGetStatus.mockResolvedValueOnce(
       statusResponse({ daily_remaining: 0 })
@@ -187,8 +187,8 @@ describe("useLLMGate", () => {
       wrapper: createWrapper(),
     });
 
-    await waitFor(() => expect(result.current.dailyExhausted).toBe(true));
-    expect(result.current.canUseLLM).toBe(false);
+    await waitFor(() => expect(result.current.canUseLLM).toBe(true));
+    expect(result.current.dailyExhausted).toBe(false);
     expect(result.current.hasRoleAccess).toBe(true);
     expect(result.current.budgetExhausted).toBe(false);
   });

@@ -1,8 +1,9 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { llmApi } from "@/lib/api/llm";
 import type { ProjectRole } from "@/lib/api/projects";
+import { LLM_STATUS_INVALIDATION_EVENT } from "@/lib/hooks/useSuggestions";
 
 const LLM_ACCESS_ROLES: ProjectRole[] = [
   "owner",
@@ -26,20 +27,31 @@ export function useLLMGate(
     queryFn: () => llmApi.getStatus(projectId, session!.accessToken!),
     enabled: !!session?.accessToken && !!projectId && !isAnonymous,
     staleTime: 60_000, // 1 min — advisory, not authoritative
+    retry: false,
   });
 
   const status = statusQuery.data;
   const hasAccess =
     !isAnonymous && userRole != null && LLM_ACCESS_ROLES.includes(userRole);
-  // daily_remaining: null = unlimited; 0 = today's per-role cap consumed.
-  // The server 402s on dispatch when the cap is hit, so the gate must too.
-  const dailyExhausted = status?.daily_remaining === 0;
+  // The API currently returns the role's static allowance, not live usage.
+  // Do not disable the affordance from this advisory field; dispatch remains
+  // authoritative and a 429 refreshes this status.
+  const dailyExhausted = false;
 
   const invalidateStatus = useCallback(
     () =>
       queryClient.invalidateQueries({ queryKey: ["llm-status", projectId] }),
     [queryClient, projectId]
   );
+
+  useEffect(() => {
+    const handleInvalidation = (event: Event) => {
+      const detail = (event as CustomEvent<{ projectId?: string }>).detail;
+      if (detail?.projectId === projectId) void invalidateStatus();
+    };
+    window.addEventListener(LLM_STATUS_INVALIDATION_EVENT, handleInvalidation);
+    return () => window.removeEventListener(LLM_STATUS_INVALIDATION_EVENT, handleInvalidation);
+  }, [invalidateStatus, projectId]);
 
   return {
     // Core access decision
