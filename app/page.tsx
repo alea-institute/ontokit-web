@@ -61,7 +61,10 @@ export default function HomePage() {
       const nextSkip = lastPage.skip + lastPage.limit;
       return nextSkip < lastPage.total ? nextSkip : undefined;
     },
-    enabled: status !== "loading" && !((filter === "mine" || filter === "private") && !isAuthenticated),
+    enabled:
+      filter === "public" ||
+      filter === "all" ||
+      (status !== "loading" && isAuthenticated),
   });
 
   const projects = data?.pages.flatMap((page) => page.items) ?? [];
