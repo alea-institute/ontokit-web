@@ -91,11 +91,14 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
   getPendingCount: (scope) => {
     const { suggestions } = get();
     const scopePrefix = `${scope.projectId}::${scope.branch}::`;
-    return Object.entries(suggestions)
-      .filter(([key]) => key.startsWith(scopePrefix))
-      .map(([, items]) => items)
-      .flat()
-      .filter((s) => s.status === "pending").length;
+    let count = 0;
+    for (const [key, items] of Object.entries(suggestions)) {
+      if (!key.startsWith(scopePrefix)) continue;
+      for (const item of items) {
+        if (item.status === "pending") count += 1;
+      }
+    }
+    return count;
   },
   getPendingSuggestions: (scope, entityIri, suggestionType) => {
     const key = storeKey(scope, entityIri, suggestionType);
