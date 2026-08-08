@@ -25,9 +25,8 @@ interface SuggestionStoreState {
   acceptSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
   rejectSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
   editSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number, value: string) => void;
-  clearSuggestions: (scope: SuggestionScope, entityIri: string) => void;
   clearAllSuggestions: () => void;
-  getPendingCount: () => number;
+  getPendingCount: (scope: SuggestionScope) => number;
   getPendingSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string) => StoredSuggestion[];
   getFirstPendingRef: () => string | null;
 }
@@ -88,25 +87,13 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
       return { suggestions: { ...state.suggestions, [key]: arr } };
     });
   },
-  clearSuggestions: (scope, entityIri) =>
-    set((state) => {
-      const next = { ...state.suggestions };
-      for (const key of Object.keys(next)) {
-        if (key.startsWith(`${scope.projectId}::${scope.branch}::${entityIri}::`)) delete next[key];
-      }
-      return { suggestions: next };
-    }),
   clearAllSuggestions: () => set({ suggestions: {} }),
-  getPendingCount: () => {
-    // L-1: this counts pending suggestions across EVERY entity ever visited in
-    // the session, so the badge accumulates as the user navigates. Clearing on
-    // navigation would discard in-progress review that the user may return to,
-    // so leaving the accumulation for now.
-    // TODO(L-1): scope the pending badge to the active entity (or expire stale
-    // per-entity suggestion sets) once we have a clear signal for "review
-    // abandoned" vs "navigated but will return".
+  getPendingCount: (scope) => {
     const { suggestions } = get();
-    return Object.values(suggestions)
+    const scopePrefix = `${scope.projectId}::${scope.branch}::`;
+    return Object.entries(suggestions)
+      .filter(([key]) => key.startsWith(scopePrefix))
+      .map(([, items]) => items)
       .flat()
       .filter((s) => s.status === "pending").length;
   },
