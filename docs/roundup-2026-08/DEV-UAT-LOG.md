@@ -44,3 +44,14 @@ paths for the same bnode trap.
   duplicate warnings.
 - Re-run UAT-1 after round-3; then UAT-2 (true-duplicate block), UAT-3 (external
   parent accept), UAT-4 (approve→merge→trust).
+
+### F3 (P1, open — into the plan) — submit 422s via ValidationService with swallowed detail
+After the round-3 bnode fix deployed (9489b536), UAT-1's submit fails differently:
+422 "Suggestion failed server-side entity validation"
+(`suggestion_service.py:293-306` → `ValidationService.validate_entity` on the minted
+class). The specific `errors` list is discarded — the response carries no detail, so
+the cause (IRI-shape rule? namespace rule? label rule?) is invisible to UI and UAT
+alike. Two tracked items: (a) diagnose/right-size the mint validation rules for real
+FOLIO-style projects; (b) return the validation errors in the 422 payload — the
+generic message contradicts the P1-15 error-surfacing work. Round-3 regression guard
+(malformed parent still rejected) not yet re-verified live; UAT-2/3/4 blocked on (a).
