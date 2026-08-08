@@ -654,7 +654,7 @@ export function ClassDetailPanel({
       )}
       {suggestions.error && (
         <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-          Could not generate suggestions. <button onClick={suggestions.request} className="underline">Retry</button>
+          {suggestions.error} <button onClick={suggestions.request} className="underline">Retry</button>
         </div>
       )}
       {suggestions.items.filter((s) => s.status !== "rejected").length > 0 && (

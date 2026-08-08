@@ -2,6 +2,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { storeKey, useSuggestionStore } from "@/lib/stores/suggestionStore";
 import { generationApi } from "@/lib/api/generation";
 import type { GeneratedSuggestion, GenerateSuggestionsResponse } from "@/lib/api/generation";
+import { ApiError } from "@/lib/api/client";
+import { generationErrorMessage } from "@/lib/hooks/useSuggestions";
 
 const SCOPE = { projectId: "p1", branch: "main" };
 
@@ -95,6 +97,16 @@ describe("useSuggestions", () => {
     expect(error).toBe("Network failure");
     // Store should remain empty on error
     expect(useSuggestionStore.getState().getPendingCount()).toBe(0);
+  });
+
+  it.each([
+    [400, "No generation model is configured"],
+    [402, "AI budget has been exhausted"],
+    [403, "role does not allow"],
+    [429, "request limit has been reached"],
+    [502, "AI provider is unavailable"],
+  ])("maps API status %s to actionable copy", (status, expected) => {
+    expect(generationErrorMessage(new ApiError(status, "Error", "raw"))).toContain(expected);
   });
 
   it("accept() calls onAccepted callback with suggestion and editedValue", () => {

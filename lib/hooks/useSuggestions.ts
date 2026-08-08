@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { generationApi, type GeneratedSuggestion, type SuggestionType } from "@/lib/api/generation";
+import { ApiError } from "@/lib/api/client";
 import { storeKey, useSuggestionStore, type StoredSuggestion } from "@/lib/stores/suggestionStore";
 
 export interface UseSuggestionsOptions {
@@ -29,6 +30,27 @@ export interface UseSuggestionsReturn {
 // useSyncExternalStore's getSnapshot unstable and React 19 aborts the
 // render ("The result of getSnapshot should be cached").
 const NO_SUGGESTIONS: StoredSuggestion[] = [];
+export const LLM_STATUS_INVALIDATION_EVENT = "ontokit:llm-status-invalidated";
+
+export function generationErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return error instanceof Error ? error.message : "Could not generate suggestions.";
+  }
+  switch (error.status) {
+    case 400:
+      return "No generation model is configured. Choose a model in project AI settings.";
+    case 402:
+      return "This project's AI budget has been exhausted. Ask a project admin to review the budget.";
+    case 403:
+      return "Your project role does not allow AI suggestions.";
+    case 429:
+      return "The AI request limit has been reached. Wait before trying again.";
+    case 502:
+      return "The configured AI provider is unavailable. Check the provider connection and try again.";
+    default:
+      return "Could not generate suggestions.";
+  }
+}
 
 export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsReturn {
   const {
@@ -74,13 +96,17 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
       }
     } catch (err) {
       if (!controller.signal.aborted) {
-        const msg = err instanceof Error ? err.message : "Could not generate suggestions";
-        setError(msg);
+        setError(generationErrorMessage(err));
+        if (err instanceof ApiError && (err.status === 402 || err.status === 429)) {
+          window.dispatchEvent(
+            new CustomEvent(LLM_STATUS_INVALIDATION_EVENT, { detail: { projectId } }),
+          );
+        }
       }
     } finally {
       if (!controller.signal.aborted) setIsLoading(false);
     }
-  }, [projectId, entityIri, branch, suggestionType, batchSize, canUseLLM, accessToken, byoKey, store]);
+  }, [projectId, entityIri, branch, suggestionType, batchSize, canUseLLM, accessToken, byoKey, store, scope]);
 
   const accept = useCallback((index: number) => {
     if (!entityIri) return;
@@ -88,17 +114,17 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     if (!stored) return;
     store.getState().acceptSuggestion(scope, entityIri, suggestionType, index);
     onAccepted?.(stored.suggestion, stored.editedValue);
-  }, [entityIri, suggestionType, store, onAccepted]);
+  }, [entityIri, suggestionType, store, onAccepted, scope]);
 
   const reject = useCallback((index: number) => {
     if (!entityIri) return;
     store.getState().rejectSuggestion(scope, entityIri, suggestionType, index);
-  }, [entityIri, suggestionType, store]);
+  }, [entityIri, suggestionType, store, scope]);
 
   const edit = useCallback((index: number, value: string) => {
     if (!entityIri) return;
     store.getState().editSuggestion(scope, entityIri, suggestionType, index, value);
-  }, [entityIri, suggestionType, store]);
+  }, [entityIri, suggestionType, store, scope]);
 
   return { items, isLoading, error, request, accept, reject, edit };
 }
