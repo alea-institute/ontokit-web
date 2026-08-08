@@ -19,12 +19,17 @@ repos (Semantic Canon snapshot + FOLIO.owl snapshot) · Q4 Railway superseded �
 Hetzner hosts FOLIO DEV and Catholic DEV; Catholic PROD on the foundation VPS
 · Q5 CE-forward hybrid · Q6 gated DEV→PROD auto-promotion on green checks.
 
-**Topology revision (Damien, 2026-08-08 pm):** one Hetzner CPX41 (`ontokit-dev`,
-178.156.208.239, Ashburn) hosts Catholic DEV + FOLIO DEV + the future `ontokit.org`
-picker site. FOLIO PROD **stays on AWS** (ontokit.openlegalstandard.org — currently the
-stripped April folio-adapter build; must be rebuilt with the full stack before it can
-run the new features). Catholic PROD on the foundation VPS, unchanged. The earlier
-point-the-domain-at-Hetzner directive is withdrawn. `ontokit.org` not yet registered.
+**Topology (final ruling, Damien, 2026-08-08 evening — supersedes both earlier
+versions; decided on cost allocation, personal vs nonprofit):** **FOLIO DEV *and*
+PROD both live on the ALEA-funded AWS box** (54.224.195.12 /
+ontokit.openlegalstandard.org — currently the stripped April folio-adapter build on
+8GB ARM64; needs Docker, likely an instance upsize, and the full-stack rebuild).
+Mike Bommarito holds the AWS credentials; access request sent. The Damien-funded
+Hetzner CPX41 (`ontokit-dev`, 178.156.208.239, Ashburn — provisioned + hardened
+2026-08-08) hosts **Catholic DEV + the future `ontokit.org` picker**. Catholic PROD
+on the foundation VPS, unchanged. `ontokit.org` not yet registered. The twin-secrets
+vault's AWS keys are dead (InvalidClientTokenId) — fresh scoped IAM keys come from
+Mike.
 
 **Review gate (2026-08-08):** the LLM-subsystem second-opinion review returned
 NOT-DEPLOYABLE — 6 P0 / 15 P1 (report: ontokit-api
