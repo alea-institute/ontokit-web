@@ -104,7 +104,9 @@ describe("useSuggestions", () => {
     [402, "AI budget has been exhausted"],
     [403, "role does not allow"],
     [429, "request limit has been reached"],
+    [500, "unexpected error"],
     [502, "AI provider is unavailable"],
+    [503, "registry model or a local provider"],
   ])("maps API status %s to actionable copy", (status, expected) => {
     expect(generationErrorMessage(new ApiError(status, "Error", "raw"))).toContain(expected);
   });
