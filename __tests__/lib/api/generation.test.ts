@@ -59,6 +59,7 @@ describe("generationApi", () => {
     expect(options?.headers).toEqual(
       expect.objectContaining({ Authorization: "Bearer tok-abc" })
     );
+    expect(options?.retryOn5xx).toBe(false);
   });
 
   it("generateSuggestions includes X-BYO-API-Key header when byoKey provided", async () => {
