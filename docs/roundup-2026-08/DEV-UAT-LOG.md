@@ -215,6 +215,18 @@ dropped it — caught + fixed immediately; basic-auth users preserved).
 via the UI to reclaim resources. The exposure + flapping are already closed; U12 folds
 these routers into IaC.
 
+**UPDATE — fully decommissioned (Damien asked me to delete them, 2026-08-08).** Minted no
+API token (Coolify's team-scoped Sanctum override balked); instead invoked Coolify's OWN
+teardown, `App\Jobs\DeleteResourceJob::dispatchSync($app, true,true,true,true)`, via
+`php artisan tinker` in the `coolify` container, for exactly application ids 7
+(ontokit-api), 8 (ontokit-worker), 9 (ontokit-web) — the other 9 apps (folio-*,
+alea-intake, mootloop-*, hello-wildcard) untouched. Then force-removed the one exited
+remnant container + the three stale images (`ue6k…`/`hlcjgyv9z…`/`os1bd0zh…`). Verified:
+app rows 7/8/9 gone, 9 apps remain, no stale containers/images left, `ontokit.dev`
+authed 200 (CPX41) / `ontokit-api.dev` 503 (deadend). The file-provider priority pin +
+deadend router are now defensive-only (no competing Coolify router remains) — harmless,
+and U12 formalizes them. Resurrection is impossible now: the app records are gone.
+
 ### F7 + F8 verified live (both FIXED)
 After the `add33b20` web deploy (+ the routing fix above): the editor route
 `/projects/{id}/editor?classIri=…` now LOADS with full editing affordances under
