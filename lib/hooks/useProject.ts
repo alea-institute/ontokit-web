@@ -64,12 +64,14 @@ export function useProject(projectId: string, accessToken?: string) {
 export function derivePermissions(
   project: Project | null,
   accessToken?: string,
-  capabilities?: { can_mint_entities: boolean } | null,
+  capabilities?: { can_suggest?: boolean; can_mint_entities: boolean } | null,
 ) {
   const canManage = project?.user_role === "owner" || project?.user_role === "admin" || !!project?.is_superadmin;
   const hasExplicitRole = !!project?.user_role;
   const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || !!project?.is_superadmin;
-  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!accessToken);
+  const isSuggester = project?.user_role === "suggester" ||
+    (!canEdit && capabilities?.can_suggest === true) ||
+    (!hasExplicitRole && !!accessToken);
   const canSuggest = canEdit || isSuggester;
   const hasValidAccess = !!accessToken;
   const hasOntology = !!project?.source_file_path;
@@ -77,4 +79,22 @@ export function derivePermissions(
   const canMintEntities = capabilities?.can_mint_entities === true;
 
   return { canManage, canEdit, canSuggest, canMintEntities, isSuggester, isSuggestionMode, hasValidAccess, hasOntology, hasExplicitRole };
+}
+
+export function shouldRedirectFromEditor({
+  sessionStatus,
+  projectLoaded,
+  canSuggest,
+  canPropose,
+  capabilitiesSettled,
+}: {
+  sessionStatus: "loading" | "authenticated" | "unauthenticated";
+  projectLoaded: boolean;
+  canSuggest: boolean;
+  canPropose: boolean;
+  capabilitiesSettled: boolean;
+}) {
+  if (!capabilitiesSettled || canPropose) return false;
+  return (sessionStatus === "unauthenticated" && !canSuggest) ||
+    (projectLoaded && !canSuggest);
 }

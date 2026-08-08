@@ -223,7 +223,7 @@ export function useGraphData({
 
   // Initial load when focus changes
   useEffect(() => {
-    if (!focusIri || !accessToken) {
+    if (!focusIri) {
       setGraphData(null);
       return;
     }

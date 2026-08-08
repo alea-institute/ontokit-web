@@ -51,6 +51,7 @@ import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
 import type { TrustGate } from "@/components/editor/TrustExplainer";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+import { shouldRedirectFromEditor } from "@/lib/hooks/useProject";
 
 /**
  * True when a suggestion card (role="listitem") currently owns focus. Used to
@@ -100,6 +101,11 @@ export default function EditorPage() {
   const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
 
+  // Server capabilities also describe the auth-disabled development principal.
+  // Fetch before deriving viewer permissions so an absent NextAuth session does
+  // not erase permissions the API explicitly grants.
+  const trust = useTrustCapabilities(projectId);
+
   // Branch state
   const queryClient = useQueryClient();
   const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
@@ -111,6 +117,7 @@ export default function EditorPage() {
     sessionStatus: status,
     activeBranch,
     enableWebSocket: true,
+    capabilities: trust.capabilities,
   });
 
   const {
@@ -148,7 +155,7 @@ export default function EditorPage() {
     isError: isTrustError,
     promotionProgress,
     refetch: refetchTrust,
-  } = useTrustCapabilities(projectId);
+  } = trust;
 
   const trustGate: TrustGate = useMemo(
     () => ({
@@ -1116,7 +1123,14 @@ export default function EditorPage() {
   // Auth guard: redirect unauthenticated or unauthorized users to the viewer —
   // UNLESS anonymous proposal mode applies (AUTH_MODE != required + public
   // project): those users are this page's audience in propose mode (PR-7).
-  if ((status === "unauthenticated" || (project && !canSuggest)) && !canPropose) {
+  const capabilitiesSettled = !isTrustLoading && !isTrustError;
+  if (shouldRedirectFromEditor({
+    sessionStatus: status,
+    projectLoaded: !!project,
+    canSuggest,
+    canPropose,
+    capabilitiesSettled,
+  })) {
     router.replace(`/projects/${projectId}`);
     return (
       <>

@@ -9,6 +9,7 @@ import { usePendingSuggestionCount } from "@/lib/hooks/usePendingSuggestionCount
 import { revisionsApi } from "@/lib/api/revisions";
 import type { TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import type { IriPosition } from "@/lib/editor/indexWorker";
+import type { SuggestionCapabilities } from "@/lib/api/trust";
 
 export interface UseProjectViewerOptions {
   projectId: string;
@@ -17,6 +18,7 @@ export interface UseProjectViewerOptions {
   activeBranch?: string;
   /** Enable WebSocket connections (lint status, collaboration). Defaults to false. */
   enableWebSocket?: boolean;
+  capabilities?: SuggestionCapabilities | null;
 }
 
 export function useProjectViewer({
@@ -25,12 +27,13 @@ export function useProjectViewer({
   sessionStatus,
   activeBranch,
   enableWebSocket = false,
+  capabilities,
 }: UseProjectViewerOptions) {
   // Project data from shared React Query cache
   const {
     project, isLoading, error, errorKind,
   } = useProject(projectId, accessToken);
-  const permissions = derivePermissions(project, accessToken);
+  const permissions = derivePermissions(project, accessToken, capabilities);
   const {
     canManage, canEdit, canSuggest, isSuggester, isSuggestionMode,
     hasValidAccess: _hasValidAccess, hasOntology, hasExplicitRole,

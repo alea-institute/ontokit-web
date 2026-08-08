@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
-import { derivePermissions, useProject } from "@/lib/hooks/useProject";
+import { derivePermissions, shouldRedirectFromEditor, useProject } from "@/lib/hooks/useProject";
 import { ApiError } from "@/lib/api/client";
 import type { Project } from "@/lib/api/projects";
 
@@ -42,6 +42,28 @@ function makeProject(overrides: Partial<Project> = {}): Project {
 // derivePermissions
 // ---------------------------------------------------------------------------
 describe("derivePermissions", () => {
+  it("uses anonymous auth-disabled capabilities for suggestion affordances", () => {
+    const perms = derivePermissions(
+      makeProject({ user_role: undefined }),
+      undefined,
+      { can_suggest: true, can_mint_entities: true },
+    );
+
+    expect(perms.canSuggest).toBe(true);
+    expect(perms.canEdit).toBe(false);
+    expect(perms.isSuggestionMode).toBe(true);
+    expect(perms.canMintEntities).toBe(true);
+  });
+
+  it("does not bounce an unauthenticated principal granted suggestion capability", () => {
+    expect(shouldRedirectFromEditor({
+      sessionStatus: "unauthenticated",
+      projectLoaded: true,
+      canSuggest: true,
+      canPropose: false,
+      capabilitiesSettled: true,
+    })).toBe(false);
+  });
   it("returns all false/falsy when project is null", () => {
     const perms = derivePermissions(null);
     expect(perms.canManage).toBe(false);

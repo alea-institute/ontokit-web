@@ -20,6 +20,7 @@ import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { useToast } from "@/lib/context/ToastContext";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
 
 export default function ProjectViewerPage() {
   const { data: session, status } = useSession();
@@ -182,12 +183,14 @@ function ViewerContent({
   // Use the default branch from the BranchProvider context
   const { defaultBranch, isLoading: isBranchLoading } = useBranch();
   const resolvedBranch = isBranchLoading ? undefined : defaultBranch;
+  const { capabilities } = useTrustCapabilities(projectId);
 
   const viewer = useProjectViewer({
     projectId,
     accessToken,
     sessionStatus,
     activeBranch: resolvedBranch,
+    capabilities,
   });
 
   const {
