@@ -55,3 +55,31 @@ alike. Two tracked items: (a) diagnose/right-size the mint validation rules for 
 FOLIO-style projects; (b) return the validation errors in the 422 payload — the
 generic message contradicts the P1-15 error-surfacing work. Round-3 regression guard
 (malformed parent still rejected) not yet re-verified live; UAT-2/3/4 blocked on (a).
+
+### F4 (P2, open) — public projects list renders empty despite API returning the seed
+Browser sweep of `https://ontokit.dev.openlegalstandard.org/` (auth-disabled): the
+projects list shows "No projects available" while `GET /api/v1/projects` returns FOLIO
+DEV (200, one item). Console shows two 404s + an authjs AutoError (NextAuth calling a
+proxied `/api/auth/*` that the initial traefik rule swallowed — since fixed by narrowing
+the API rule to `/api/v1`). Feasibility review found the list lives in `app/page.tsx`
+(not the `app/projects/page.tsx` redirect stub), which flattens `page.items` correctly —
+so the live candidates are a session-gated `useInfiniteQuery` disabled under
+`AUTH_MODE=disabled`, or an SSR fetch using an in-container URL. Fix scoped in plan U3.
+
+### SECURITY FIX (applied to live DEV) — network gate over AUTH_MODE=disabled
+The doc-review security lens (in-process + independent cross-model, both P0/100) found
+the running DEV box exposed: `AUTH_MODE=disabled` on the public URL made any internet
+visitor a full-access principal against a real GitHub write path. Closed immediately by
+adding a traefik basic-auth middleware on both `ontokit-dev` routers at the hetzner-dev
+proxy — the public surface now returns 401 without credentials (verified: no-auth 401,
+with-auth 200). This must become infrastructure-as-code in plan U12/R13; the credential
+is held server-side only. The plan's KTD2 is amended to require this gate for the whole
+auth-disabled window.
+
+### Status after round-3 deploy
+- F2 (bnode submit blocker): FIXED (round-3 `45b82a42`, deployed) — superseded by F3.
+- F3 (mint validation 422 with swallowed detail): OPEN — plan U1 owns the fix.
+- F1 (default-branch tree): OPEN — plan U2.
+- F4 (empty projects list): OPEN — plan U3.
+- Suggestion save works live (200, real commit on the suggestion branch); submit blocked
+  only by F3's validation gate.
