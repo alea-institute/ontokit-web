@@ -81,7 +81,7 @@ export function LLMSettingsSection({
   projectId: string;
   accessToken?: string;
 }) {
-  const { config, knownModels, isLoading, isModelsLoading, updateConfig, isUpdating, testConnection } =
+  const { config, knownModels, isLoading, isModelsLoading, modelsError, updateConfig, isUpdating, testConnection } =
     useLLMConfig(projectId, accessToken);
 
   const byoKeyStore = useByoKeyStore();
@@ -92,6 +92,7 @@ export function LLMSettingsSection({
   const [showApiKey, setShowApiKey] = useState(false);
   const [modelTier, setModelTier] = useState<ModelTier>("quality");
   const [model, setModel] = useState("");
+  const [isCustomModel, setIsCustomModel] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
   const [monthlyBudget, setMonthlyBudget] = useState("");
   const [dailyCap, setDailyCap] = useState("");
@@ -178,15 +179,27 @@ export function LLMSettingsSection({
   const selectedProvider =
     PROVIDERS.find((p) => p.value === provider) ?? PROVIDERS[0];
   const isLocalProvider = selectedProvider.isLocal;
+  const isRegistryProvider = !isLocalProvider;
   const currentIndex = PROVIDERS.findIndex((p) => p.value === provider);
   const providerModels = knownModels.filter((item) => item.provider === provider);
   const isModelValid =
     model.trim().length > 0 &&
-    (providerModels.length === 0 || providerModels.some((item) => item.model_id === model));
+    (isLocalProvider || isCustomModel || providerModels.some((item) => item.model_id === model));
+
+  useEffect(() => {
+    if (!config || config.provider !== provider || isModelsLoading || modelsError) return;
+    const savedModel = config.model?.trim();
+    setIsCustomModel(
+      isRegistryProvider &&
+        !!savedModel &&
+        !providerModels.some((item) => item.model_id === savedModel)
+    );
+  }, [config, provider, knownModels, isModelsLoading, modelsError, isRegistryProvider]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selectProvider = (nextProvider: LLMProviderType) => {
     setProvider(nextProvider);
     setModel("");
+    setIsCustomModel(false);
   };
 
   const handleDropdownKeyDown = (e: React.KeyboardEvent) => {
@@ -499,31 +512,60 @@ export function LLMSettingsSection({
         >
           Generation model
         </label>
-        {providerModels.length > 0 ? (
+        {isRegistryProvider && !isCustomModel ? (
           <select
             id="llm-generation-model"
             value={model}
-            onChange={(event) => setModel(event.target.value)}
-            disabled={isModelsLoading}
+            onChange={(event) => {
+              if (event.target.value === "__custom__") {
+                setModel("");
+                setIsCustomModel(true);
+              } else {
+                setModel(event.target.value);
+              }
+            }}
+            disabled={isModelsLoading || !!modelsError}
             required
             className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
           >
-            <option value="">Select a model</option>
+            <option value="">
+              {isModelsLoading ? "Loading models…" : modelsError ? "Models unavailable" : "Select a model"}
+            </option>
             {providerModels.map((item) => (
               <option key={item.model_id} value={item.model_id}>
                 {item.display_name} ({item.tier})
               </option>
             ))}
+            {!isModelsLoading && !modelsError && <option value="__custom__">Custom model…</option>}
           </select>
         ) : (
-          <input
-            id="llm-generation-model"
-            value={model}
-            onChange={(event) => setModel(event.target.value)}
-            placeholder="Enter the provider model ID"
-            required
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-          />
+          <div className="flex gap-2">
+            <input
+              id="llm-generation-model"
+              value={model}
+              onChange={(event) => setModel(event.target.value)}
+              placeholder="Enter the provider model ID"
+              required
+              className="min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+            />
+            {isRegistryProvider && (
+              <button
+                type="button"
+                onClick={() => {
+                  setModel("");
+                  setIsCustomModel(false);
+                }}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+              >
+                Choose a registry model
+              </button>
+            )}
+          </div>
+        )}
+        {modelsError && isRegistryProvider && (
+          <p role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+            Could not load the model registry. Try reloading this page before choosing a model.
+          </p>
         )}
         <p className="mt-1 text-xs text-slate-500">
           Generation requests use this exact provider model ID.

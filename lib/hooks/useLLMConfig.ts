@@ -37,6 +37,7 @@ export function useLLMConfig(projectId: string, accessToken?: string) {
     knownModels: modelsQuery.data ?? [],
     isLoading: configQuery.isLoading,
     isModelsLoading: modelsQuery.isLoading,
+    modelsError: modelsQuery.error,
     error: configQuery.error,
     updateConfig: updateMutation.mutateAsync,
     isUpdating: updateMutation.isPending,
