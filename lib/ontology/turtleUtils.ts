@@ -51,11 +51,16 @@ export function reverseMap(prefixes: PrefixMap): Map<string, string> {
   return rev;
 }
 
-/** Convert a full IRI to shortest Turtle form using available prefixes */
-export function toTurtle(iri: string, rev: Map<string, string>): string {
+/** Reject characters that can escape or corrupt a Turtle IRI reference. */
+export function assertSafeTurtleIri(iri: string): void {
   if (!iri || /[\u0000-\u0020<>"{}|^`\\]/u.test(iri)) {
     throw new Error("Invalid IRI: unsafe characters are not allowed");
   }
+}
+
+/** Convert a full IRI to shortest Turtle form using available prefixes */
+export function toTurtle(iri: string, rev: Map<string, string>): string {
+  assertSafeTurtleIri(iri);
   for (const [ns, alias] of rev) {
     if (iri.startsWith(ns)) {
       const local = iri.slice(ns.length);

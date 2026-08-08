@@ -6,6 +6,7 @@
  */
 
 import type { EntityType } from "./iriGeneration";
+import { assertSafeTurtleIri } from "./turtleUtils";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ function toPrefixedOrFull(
   ontologyPrefix?: string,
   ontologyNamespace?: string,
 ): string {
+  assertSafeTurtleIri(iri);
   if (ontologyPrefix && ontologyNamespace && iri.startsWith(ontologyNamespace)) {
     const localName = iri.slice(ontologyNamespace.length);
     return `${ontologyPrefix}:${localName}`;

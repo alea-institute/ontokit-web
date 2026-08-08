@@ -160,6 +160,17 @@ describe("generateTurtleSnippet", () => {
     expect(snippet).toContain("<http://other.org/ont#Animal>");
   });
 
+  it.each([
+    { iri: "http://example.org/Foo> . <http://evil.test/injected" },
+    { iri: "http://example.org/Foo", parentIri: "http://example.org/Bad Parent" },
+  ])("rejects unsafe subject and parent IRIs", (overrides) => {
+    expect(() => generateTurtleSnippet({
+      ...overrides,
+      label: "Foo",
+      entityType: "class",
+    })).toThrow("Invalid IRI: unsafe characters are not allowed");
+  });
+
   // ── Label escaping ───────────────────────────────────────────────
 
   it("escapes double quotes in labels", () => {
