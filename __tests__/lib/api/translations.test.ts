@@ -81,4 +81,65 @@ describe("translationsApi", () => {
       { headers: { Authorization: "Bearer token" }, retryOn5xx: false },
     );
   });
+
+  it("centralizes coverage and backfill routes and sends era filters without retries", async () => {
+    vi.mocked(api.get).mockResolvedValue({ languages: [], total_entities: 0 });
+    vi.mocked(api.post).mockResolvedValue({ job_id: "job-1" });
+
+    await translationsApi.getCoverage("project-1", "feature/translations", "token");
+    await translationsApi.previewBackfill(
+      "project-1",
+      {
+        branch: "feature/translations",
+        language: "fr",
+        era_before: "2026-12-31",
+        never_confirmed: true,
+      },
+      "token",
+    );
+    await translationsApi.launchBackfill(
+      "project-1",
+      {
+        branch: "feature/translations",
+        language: "fr",
+        era_before: "2026-12-31",
+        never_confirmed: true,
+      },
+      "token",
+    );
+    await translationsApi.getBackfillStatus("project-1", "feature/translations", "token");
+
+    expect(api.get).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/projects/project-1/translation/coverage",
+      expect.objectContaining({ params: { branch: "feature/translations" } }),
+    );
+    expect(api.get).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/projects/project-1/translation/backfill/preview",
+      expect.objectContaining({
+        params: {
+          branch: "feature/translations",
+          language: "fr",
+          era_before: "2026-12-31",
+          never_confirmed: true,
+        },
+      }),
+    );
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/projects/project-1/translation/backfill",
+      {
+        branch: "feature/translations",
+        language: "fr",
+        era_before: "2026-12-31",
+        never_confirmed: true,
+      },
+      { headers: { Authorization: "Bearer token" }, retryOn5xx: false },
+    );
+    expect(api.get).toHaveBeenNthCalledWith(
+      3,
+      "/api/v1/projects/project-1/translation/backfill/status",
+      expect.objectContaining({ params: { branch: "feature/translations" } }),
+    );
+  });
 });

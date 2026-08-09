@@ -59,12 +59,53 @@ export interface TranslationEntityStateResponse {
 
 export type OnDemandTranslationPredicate = "skos:definition" | "skos:example";
 
+export interface TranslationCoverageLanguage {
+  language: string;
+  verified: number;
+  provisional: number;
+  pending: number;
+  missing: number;
+  total: number;
+}
+
+export interface TranslationCoverageResponse {
+  branch: string;
+  languages: TranslationCoverageLanguage[];
+  total_entities: number;
+}
+
+export interface TranslationBackfillFilters {
+  branch: string;
+  language?: string;
+  era_before?: string;
+  never_confirmed?: boolean;
+}
+
+export interface TranslationBackfillPreview {
+  literal_count: number;
+  expected_cost_usd: number;
+  upper_bound_cost_usd: number;
+  batch_discount_applied: boolean;
+}
+
+export interface TranslationBackfillStatus {
+  job_id: string;
+  status: "pending" | "running" | "completed" | "failed";
+  total: number;
+  completed: number;
+  error: string | null;
+}
+
 const configPath = (projectId: string) =>
   `/api/v1/projects/${projectId}/translation/config`;
 const entityStatePath = (projectId: string) =>
   `/api/v1/projects/${projectId}/translation/entity-state`;
 const translateFieldPath = (projectId: string) =>
   `/api/v1/projects/${projectId}/translation/entities/translate-field`;
+const coveragePath = (projectId: string) =>
+  `/api/v1/projects/${projectId}/translation/coverage`;
+const backfillPath = (projectId: string) =>
+  `/api/v1/projects/${projectId}/translation/backfill`;
 
 export const translationsApi = {
   getConfig: (projectId: string, token: string) =>
@@ -104,5 +145,42 @@ export const translationsApi = {
     api.post<{ job_id: string }>(translateFieldPath(projectId), body, {
       headers: { Authorization: `Bearer ${token}` },
       retryOn5xx: false,
+    }),
+
+  getCoverage: (projectId: string, branch: string, token: string) =>
+    api.get<TranslationCoverageResponse>(coveragePath(projectId), {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { branch },
+    }),
+
+  previewBackfill: (
+    projectId: string,
+    filters: TranslationBackfillFilters,
+    token: string,
+  ) =>
+    api.get<TranslationBackfillPreview>(`${backfillPath(projectId)}/preview`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: {
+        branch: filters.branch,
+        language: filters.language,
+        era_before: filters.era_before,
+        never_confirmed: filters.never_confirmed,
+      },
+    }),
+
+  launchBackfill: (
+    projectId: string,
+    filters: TranslationBackfillFilters,
+    token: string,
+  ) =>
+    api.post<{ job_id: string }>(backfillPath(projectId), filters, {
+      headers: { Authorization: `Bearer ${token}` },
+      retryOn5xx: false,
+    }),
+
+  getBackfillStatus: (projectId: string, branch: string, token: string) =>
+    api.get<TranslationBackfillStatus | null>(`${backfillPath(projectId)}/status`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { branch },
     }),
 };
