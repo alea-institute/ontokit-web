@@ -18,6 +18,7 @@ import {
   X,
   Inbox,
   Languages,
+  BadgeCheck,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import {
   type MyJoinRequestResponse,
 } from "@/lib/api/joinRequests";
 import { cn, formatDate } from "@/lib/utils";
+import { translationsApi } from "@/lib/api/translations";
 
 export default function ProjectDashboardPage() {
   const { data: session, status } = useSession();
@@ -45,6 +47,7 @@ export default function ProjectDashboardPage() {
   const [isSubmittingJoin, setIsSubmittingJoin] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [pendingJoinCount, setPendingJoinCount] = useState(0);
+  const [reviewerLanguages, setReviewerLanguages] = useState<string[]>([]);
 
   const isAuthenticated = status === "authenticated";
 
@@ -62,6 +65,15 @@ export default function ProjectDashboardPage() {
         .catch(() => { /* ignore */ });
     }
   }, [project, projectId, session?.accessToken, canManage]);
+
+  useEffect(() => {
+    if (!session?.accessToken || !project?.user_role) return;
+    let cancelled = false;
+    translationsApi.getMyReviewerLanguages(projectId, session.accessToken)
+      .then(({ languages }) => { if (!cancelled) setReviewerLanguages(languages); })
+      .catch(() => { if (!cancelled) setReviewerLanguages([]); });
+    return () => { cancelled = true; };
+  }, [project?.user_role, projectId, session?.accessToken]);
 
   const showJoinRequestSection =
     isAuthenticated &&
@@ -447,6 +459,23 @@ export default function ProjectDashboardPage() {
                 </h3>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   Track multilingual completeness and pending translations
+                </p>
+              </Link>
+            )}
+
+            {(canManage || reviewerLanguages.length > 0) && (
+              <Link
+                href={`/projects/${project.id}/translations/review`}
+                className="rounded-lg border border-slate-200 bg-white p-5 transition-all hover:border-primary-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-primary-600"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+                  <BadgeCheck className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <h3 className="mt-3 font-semibold text-slate-900 dark:text-white">
+                  Translation Review
+                </h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Confirm or reject provisional native-language translations
                 </p>
               </Link>
             )}

@@ -142,4 +142,45 @@ describe("translationsApi", () => {
       expect.objectContaining({ params: { branch: "feature/translations" } }),
     );
   });
+
+  it("centralizes reviewer queue routes and disables retries for every actuation", async () => {
+    vi.mocked(api.get).mockResolvedValue([]);
+    vi.mocked(api.post).mockResolvedValue({ record_id: "record-1" });
+
+    await translationsApi.listProvisional("project-1", "sw", "main", "token");
+    await translationsApi.getMyReviewerLanguages("project-1", "token");
+    await translationsApi.confirmRecord("project-1", "record-1", "main", "token");
+    await translationsApi.rejectRecord("project-1", "record-1", "main", "token");
+    await translationsApi.confirmBulk("project-1", ["record-1", "record-2"], "main", "token");
+
+    expect(api.get).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/projects/project-1/translation/provisional",
+      { headers: { Authorization: "Bearer token" }, params: { language: "sw", branch: "main" } },
+    );
+    expect(api.get).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/projects/project-1/translation/my-reviewer-languages",
+      { headers: { Authorization: "Bearer token" } },
+    );
+    const actuationOptions = { headers: { Authorization: "Bearer token" }, retryOn5xx: false };
+    expect(api.post).toHaveBeenNthCalledWith(
+      1,
+      "/api/v1/projects/project-1/translation/records/record-1/confirm",
+      { branch: "main" },
+      actuationOptions,
+    );
+    expect(api.post).toHaveBeenNthCalledWith(
+      2,
+      "/api/v1/projects/project-1/translation/records/record-1/reject",
+      { branch: "main" },
+      actuationOptions,
+    );
+    expect(api.post).toHaveBeenNthCalledWith(
+      3,
+      "/api/v1/projects/project-1/translation/records/confirm-bulk",
+      { branch: "main", record_ids: ["record-1", "record-2"] },
+      actuationOptions,
+    );
+  });
 });

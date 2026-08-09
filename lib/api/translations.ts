@@ -96,6 +96,34 @@ export interface TranslationBackfillStatus {
   error: string | null;
 }
 
+export interface ProvisionalTranslationRecord {
+  record_id: string;
+  entity_iri: string;
+  predicate: string;
+  language: string;
+  source_value: string;
+  proposed_value: string;
+  model_name: string;
+  method: string;
+  score: number;
+  created_at: string;
+}
+
+export interface ReviewerLanguagesResponse {
+  languages: string[];
+}
+
+export interface TranslationRecordSummary {
+  record_id: string;
+  [key: string]: unknown;
+}
+
+export interface BulkTranslationConfirmResult {
+  record_id: string;
+  ok: boolean;
+  error: string | null;
+}
+
 const configPath = (projectId: string) =>
   `/api/v1/projects/${projectId}/translation/config`;
 const entityStatePath = (projectId: string) =>
@@ -106,8 +134,44 @@ const coveragePath = (projectId: string) =>
   `/api/v1/projects/${projectId}/translation/coverage`;
 const backfillPath = (projectId: string) =>
   `/api/v1/projects/${projectId}/translation/backfill`;
+const translationPath = (projectId: string) =>
+  `/api/v1/projects/${projectId}/translation`;
+const translationRecordPath = (projectId: string, recordId: string) =>
+  `${translationPath(projectId)}/records/${recordId}`;
 
 export const translationsApi = {
+  listProvisional: (projectId: string, language: string, branch: string, token: string) =>
+    api.get<ProvisionalTranslationRecord[]>(`${translationPath(projectId)}/provisional`, {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { language, branch },
+    }),
+
+  getMyReviewerLanguages: (projectId: string, token: string) =>
+    api.get<ReviewerLanguagesResponse>(`${translationPath(projectId)}/my-reviewer-languages`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  confirmRecord: (projectId: string, recordId: string, branch: string, token: string) =>
+    api.post<TranslationRecordSummary>(`${translationRecordPath(projectId, recordId)}/confirm`, { branch }, {
+      headers: { Authorization: `Bearer ${token}` },
+      retryOn5xx: false,
+    }),
+
+  rejectRecord: (projectId: string, recordId: string, branch: string, token: string) =>
+    api.post<TranslationRecordSummary>(`${translationRecordPath(projectId, recordId)}/reject`, { branch }, {
+      headers: { Authorization: `Bearer ${token}` },
+      retryOn5xx: false,
+    }),
+
+  confirmBulk: (projectId: string, recordIds: string[], branch: string, token: string) =>
+    api.post<{ results: BulkTranslationConfirmResult[] }>(`${translationPath(projectId)}/records/confirm-bulk`, {
+      branch,
+      record_ids: recordIds,
+    }, {
+      headers: { Authorization: `Bearer ${token}` },
+      retryOn5xx: false,
+    }),
+
   getConfig: (projectId: string, token: string) =>
     api.get<TranslationConfigResponse>(configPath(projectId), {
       headers: { Authorization: `Bearer ${token}` },
