@@ -30,6 +30,8 @@ const config: TranslationConfigResponse = {
   translate_examples: false,
   speed_mode: "batch",
   provisional_gate: true,
+  primary_provider: "anthropic",
+  primary_model: "claude-sonnet-4-5",
   verifier_provider: "openai",
   verifier_model: "gpt-5-mini",
   verifier_api_key_set: true,
@@ -105,6 +107,25 @@ describe("TranslationSettingsSection", () => {
     await user.click(screen.getByRole("button", { name: /save translation settings/i }));
     expect((await screen.findByRole("alert")).textContent).toContain("Provider rejected the model");
     expect(model.value).toBe("bad-model");
+  });
+
+  it("allows an empty primary model, shows the required-to-run hint, and saves both primary fields", async () => {
+    const user = userEvent.setup();
+    render(<TranslationSettingsSection projectId="project-1" accessToken="token" canManage />);
+
+    const provider = screen.getByLabelText(/primary provider/i) as HTMLInputElement;
+    const model = screen.getByLabelText(/primary model/i) as HTMLInputElement;
+    await user.clear(provider);
+    await user.clear(model);
+
+    expect(screen.getByText(/project's LLM provider/i)).toBeDefined();
+    expect(screen.getByText(/primary model is required for translation to run/i)).toBeDefined();
+    expect((screen.getByRole("button", { name: /save translation settings/i }) as HTMLButtonElement).disabled).toBe(false);
+
+    await user.click(screen.getByRole("button", { name: /save translation settings/i }));
+    expect(updateConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ primary_provider: null, primary_model: null }),
+    );
   });
 
   it("operates grouped controls from the keyboard", async () => {

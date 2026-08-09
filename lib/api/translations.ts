@@ -12,6 +12,8 @@ export interface TranslationConfigResponse {
   translate_examples: boolean;
   speed_mode: TranslationSpeedMode;
   provisional_gate: boolean;
+  primary_provider: string | null;
+  primary_model: string | null;
   verifier_provider: string | null;
   verifier_model: string | null;
   verifier_api_key_set: boolean;
@@ -26,6 +28,8 @@ export interface TranslationConfigUpdate {
   translate_examples: boolean;
   speed_mode: TranslationSpeedMode;
   provisional_gate: boolean;
+  primary_provider: string | null;
+  primary_model: string | null;
   verifier_provider: string | null;
   verifier_model: string | null;
   verifier_api_key?: string;
