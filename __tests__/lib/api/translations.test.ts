@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "@/lib/api/client";
 
 vi.mock("@/lib/api/client", () => ({
-  api: { get: vi.fn(), put: vi.fn() },
+  api: { get: vi.fn(), put: vi.fn(), post: vi.fn() },
 }));
 
 import { translationsApi } from "@/lib/api/translations";
@@ -53,6 +53,31 @@ describe("translationsApi", () => {
     expect(api.put).toHaveBeenCalledWith(
       "/api/v1/projects/project-1/translation/config",
       expect.objectContaining({ primary_provider: "openai", primary_model: "gpt-5" }),
+      { headers: { Authorization: "Bearer token" }, retryOn5xx: false },
+    );
+  });
+
+  it("centralizes entity state and on-demand field translation routes", async () => {
+    vi.mocked(api.get).mockResolvedValue({ entity_iri: "ex:Person", branch: "dev", items: [] });
+    vi.mocked(api.post).mockResolvedValue({ job_id: "job-1" });
+
+    await translationsApi.getEntityState("project-1", "ex:Person", "dev", "token");
+    await translationsApi.translateField(
+      "project-1",
+      { entity_iri: "ex:Person", predicate: "skos:definition", branch: "dev" },
+      "token",
+    );
+
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/projects/project-1/translation/entity-state",
+      {
+        headers: { Authorization: "Bearer token" },
+        params: { entity_iri: "ex:Person", branch: "dev" },
+      },
+    );
+    expect(api.post).toHaveBeenCalledWith(
+      "/api/v1/projects/project-1/translation/entities/translate-field",
+      { entity_iri: "ex:Person", predicate: "skos:definition", branch: "dev" },
       { headers: { Authorization: "Bearer token" }, retryOn5xx: false },
     );
   });

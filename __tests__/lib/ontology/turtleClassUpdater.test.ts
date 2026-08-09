@@ -9,6 +9,147 @@ describe("updateClassInTurtle", () => {
     parent_iris: ["http://example.org/ont#Animal"],
   };
 
+  describe("characterization: class block regeneration", () => {
+    it("regenerates the target block in the existing canonical order and indentation", () => {
+      const source = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:Dog a owl:Class ;
+    rdfs:comment "old comment"@en ;
+    rdfs:label "old label"@en .
+
+ex:Cat a owl:Class .`;
+
+      const result = updateClassInTurtle(source, "http://example.org/ont#Dog", {
+        labels: [
+          { value: "Dog", lang: "en" },
+          { value: "Hund", lang: "de" },
+        ],
+        comments: [{ value: "A canine", lang: "en" }],
+        parent_iris: ["http://example.org/ont#Animal"],
+        annotations: [
+          {
+            property_iri: "http://www.w3.org/2004/02/skos/core#altLabel",
+            values: [{ value: "Hound", lang: "en" }],
+          },
+        ],
+      });
+
+      expect(result).toBe(`@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:Dog a owl:Class ;
+    rdfs:label "Dog"@en ;
+    rdfs:label "Hund"@de ;
+    rdfs:comment "A canine"@en ;
+    rdfs:subClassOf ex:Animal ;
+    skos:altLabel "Hound"@en .
+
+ex:Cat a owl:Class .`);
+    });
+
+    it("replaces all continuation lines without consuming the following block", () => {
+      const source = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:Dog
+    a owl:Class ;
+    rdfs:label "Dog"@en ;
+    rdfs:comment "line one"@en ;
+    rdfs:subClassOf
+        ex:Animal .
+ex:Cat a owl:Class ;
+    rdfs:label "Cat"@en .`;
+
+      const result = updateClassInTurtle(source, "http://example.org/ont#Dog", {
+        labels: [{ value: "Updated dog", lang: "en" }],
+        comments: [],
+        parent_iris: [],
+      });
+
+      expect(result).toContain(`ex:Dog a owl:Class ;
+    rdfs:label "Updated dog"@en .`);
+      expect(result).not.toContain("line one");
+      expect(result).toContain(`ex:Cat a owl:Class ;
+    rdfs:label "Cat"@en .`);
+    });
+  });
+
+  describe("translation provenance axiom blocks", () => {
+    const sourceWithAxioms = `@prefix ex: <http://example.org/ont#> .
+@prefix ontokit: <https://ontokit.org/ns#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:Dog a owl:Class ;
+    rdfs:label "Dog"@en ;
+    rdfs:label "Chien"@fr ;
+    skos:altLabel "Toutou"@fr .
+
+[] a owl:Axiom ;
+    owl:annotatedSource ex:Dog ;
+    owl:annotatedProperty rdfs:label ;
+    owl:annotatedTarget "Chien"@fr ;
+    ontokit:translationState "verified" ;
+    ontokit:recordDigest "label-digest" .
+
+[] a owl:Axiom ;
+    owl:annotatedSource ex:Dog ;
+    owl:annotatedProperty skos:altLabel ;
+    owl:annotatedTarget "Toutou"@fr ;
+    ontokit:translationState "provisional" ;
+    ontokit:recordDigest "alt-digest" .
+
+[] a owl:Axiom ;
+    owl:annotatedSource ex:Cat ;
+    owl:annotatedProperty rdfs:label ;
+    owl:annotatedTarget "Chat"@fr ;
+    ontokit:recordDigest "cat-digest" .`;
+
+    it("retains every matching axiom block when an unrelated annotation changes", () => {
+      const result = updateClassInTurtle(sourceWithAxioms, "http://example.org/ont#Dog", {
+        labels: [
+          { value: "Dog", lang: "en" },
+          { value: "Chien", lang: "fr" },
+        ],
+        comments: [{ value: "A domesticated canine", lang: "en" }],
+        parent_iris: [],
+        annotations: [
+          {
+            property_iri: "http://www.w3.org/2004/02/skos/core#altLabel",
+            values: [{ value: "Toutou", lang: "fr" }],
+          },
+        ],
+      });
+
+      expect(result).toContain('ontokit:recordDigest "label-digest"');
+      expect(result).toContain('ontokit:recordDigest "alt-digest"');
+      expect(result).toContain('ontokit:recordDigest "cat-digest"');
+    });
+
+    it("drops the deleted translated literal's axiom and retains the others", () => {
+      const result = updateClassInTurtle(sourceWithAxioms, "http://example.org/ont#Dog", {
+        labels: [
+          { value: "Dog", lang: "en" },
+          { value: "Chien", lang: "fr" },
+        ],
+        comments: [],
+        parent_iris: [],
+        annotations: [],
+      });
+
+      expect(result).toContain('ontokit:recordDigest "label-digest"');
+      expect(result).not.toContain('ontokit:recordDigest "alt-digest"');
+      expect(result).toContain('ontokit:recordDigest "cat-digest"');
+    });
+  });
+
   it("updates a class and preserves other blocks", () => {
     const result = updateClassInTurtle(
       TURTLE_FIXTURE,
