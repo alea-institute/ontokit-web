@@ -23,6 +23,8 @@ function config() {
     translate_examples: false,
     speed_mode: "batch" as const,
     provisional_gate: true,
+    primary_provider: null,
+    primary_model: "gpt-5-mini",
     verifier_provider: null,
     verifier_model: null,
     verifier_api_key_set: false,

@@ -186,6 +186,15 @@ export function TranslationSettingsSection({
       <Check label="Require the provisional translation gate" checked={form.provisional_gate} onChange={(checked) => patchForm({ provisional_gate: checked })} />
 
       <div className="grid gap-4 sm:grid-cols-2">
+        <Field id="translation-primary-provider" label="Primary provider" value={form.primary_provider ?? ""} onChange={(value) => patchForm({ primary_provider: value || null })} describedBy="translation-primary-provider-hint" />
+        <Field id="translation-primary-model" label="Primary model" value={form.primary_model ?? ""} onChange={(value) => patchForm({ primary_model: value || null })} describedBy={!form.primary_model?.trim() ? "translation-primary-model-hint" : undefined} />
+      </div>
+      <div className="-mt-4 grid gap-1 sm:grid-cols-2">
+        <p id="translation-primary-provider-hint" className="text-xs text-slate-500 dark:text-slate-400">Leave blank to use the project&apos;s LLM provider.</p>
+        {!form.primary_model?.trim() && <p id="translation-primary-model-hint" className="text-xs text-slate-500 dark:text-slate-400">Primary model is required for translation to run.</p>}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field id="translation-verifier-provider" label="Verifier provider" value={form.verifier_provider ?? ""} onChange={(value) => patchForm({ verifier_provider: value || null })} />
         <Field id="translation-verifier-model" label="Verifier model" value={form.verifier_model ?? ""} onChange={(value) => patchForm({ verifier_model: value || null })} invalid={modelError} />
       </div>
@@ -209,6 +218,6 @@ function Check({ label, checked, onChange }: { label: string; checked: boolean; 
   return <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm text-slate-700 dark:text-slate-300"><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-4 w-4 rounded focus:ring-primary-500" />{label}</label>;
 }
 
-function Field({ id, label, value, onChange, type = "text", invalid, autoComplete }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string; invalid?: boolean; autoComplete?: string }) {
-  return <div><label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{label}</label><input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={invalid} autoComplete={autoComplete} className={inputClass} /></div>;
+function Field({ id, label, value, onChange, type = "text", invalid, autoComplete, describedBy }: { id: string; label: string; value: string; onChange: (value: string) => void; type?: string; invalid?: boolean; autoComplete?: string; describedBy?: string }) {
+  return <div><label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-slate-700 dark:text-slate-300">{label}</label><input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} aria-invalid={invalid} aria-describedby={describedBy} autoComplete={autoComplete} className={inputClass} /></div>;
 }
