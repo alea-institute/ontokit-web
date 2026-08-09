@@ -50,7 +50,7 @@ import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import { useTranslationConfig } from "@/lib/hooks/useTranslationConfig";
 import { useTranslationState } from "@/lib/hooks/useTranslationState";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
-import type { OnDemandTranslationPredicate, TranslationEntityStateItem } from "@/lib/api/translations";
+import { getTranslationErrorMessage, type OnDemandTranslationPredicate, type TranslationEntityStateItem } from "@/lib/api/translations";
 import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
 import type { GeneratedSuggestion } from "@/lib/api/generation";
 import { provenanceFromSuggestion, type AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
@@ -155,7 +155,7 @@ export function ClassDetailPanel({
     () => translationState.state?.items ?? [],
     [translationState.state?.items],
   );
-  const languagesConfigured = (translationConfig.config?.language_set.length ?? 0) > 0;
+  const languagesConfigured = (translationConfig.config?.language_tags.length ?? 0) > 0;
   const announcedProvisionalRef = useRef("");
 
   const requestFieldTranslation = useCallback(async (
@@ -773,7 +773,11 @@ export function ClassDetailPanel({
     hasSourceValue: boolean,
   ) => {
     if (!hasSourceValue || !languagesConfigured || !canUseLLM) return undefined;
-    const isPending = requestedTranslation === predicate || translationValues(predicate).some((item) => item.state === "pending");
+    const isPending = !translationState.pendingNotice && (
+      requestedTranslation === predicate ||
+      translationState.isTranslationPending ||
+      translationValues(predicate).some((item) => item.state === "pending")
+    );
     return (
       <button
         type="button"
@@ -981,7 +985,12 @@ export function ClassDetailPanel({
           )}
           {translationState.translateError && failedTranslation && (
             <p role="alert" className="text-xs text-red-600">
-              Translation failed. <button className="underline" onClick={() => void requestFieldTranslation(failedTranslation, failedTranslation === "skos:definition" ? "definition" : "example")}>Retry</button>
+              {getTranslationErrorMessage(translationState.translateError, "Translation failed.")} <button className="underline" onClick={() => void requestFieldTranslation(failedTranslation, failedTranslation === "skos:definition" ? "definition" : "example")}>Retry</button>
+            </p>
+          )}
+          {translationState.pendingNotice && (
+            <p role="alert" className="text-xs text-amber-700">
+              {translationState.pendingNotice}{requestedTranslation && <> <button className="underline" onClick={() => void requestFieldTranslation(requestedTranslation, requestedTranslation === "skos:definition" ? "definition" : "example")}>Retry</button></>}
             </p>
           )}
           {/* Lint Issues (always read-only) */}

@@ -15,7 +15,7 @@ vi.mock("@/lib/api/translations", () => ({
 
 function config() {
   return {
-    language_set: ["fr"],
+    language_tags: ["fr"],
     verification_mechanism: "consensus" as const,
     consensus_threshold: 0.8,
     confidence_threshold: 0.9,
@@ -35,7 +35,7 @@ describe("useTranslationConfig", () => {
   it("loads config and palette, then invalidates config after a save", async () => {
     vi.mocked(translationsApi.getConfig).mockResolvedValue(config());
     vi.mocked(translationsApi.getPalette).mockResolvedValue([
-      { tag: "fr", name: "French", native_name: "Français" },
+      { tag: "fr", english_name: "French", native_name: "Français" },
     ]);
     vi.mocked(translationsApi.updateConfig).mockResolvedValue(config());
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

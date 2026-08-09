@@ -19,7 +19,7 @@ vi.mock("@/lib/context/ToastContext", () => ({
 }));
 
 vi.mock("@/lib/hooks/useTranslationConfig", () => ({
-  useTranslationConfig: () => ({ config: { language_set: [] } }),
+  useTranslationConfig: () => ({ config: { language_tags: [] } }),
 }));
 vi.mock("@/lib/hooks/useTranslationState", () => ({
   useTranslationState: () => ({
@@ -27,6 +27,8 @@ vi.mock("@/lib/hooks/useTranslationState", () => ({
     translateField: vi.fn(),
     isTranslating: false,
     translateError: null,
+    isTranslationPending: false,
+    pendingNotice: null,
     resetTranslation: vi.fn(),
   }),
 }));

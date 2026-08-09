@@ -63,7 +63,7 @@ vi.mock("@/components/editor/LanguageFlag", () => ({
   LanguageFlag: ({ lang }: { lang: string }) => <span aria-label={`Language: ${lang}`}>flag</span>,
 }));
 vi.mock("@/lib/hooks/useTranslationConfig", () => ({
-  useTranslationConfig: () => ({ config: { language_set: ["fr"] } }),
+  useTranslationConfig: () => ({ config: { language_tags: ["fr"] } }),
 }));
 vi.mock("@/lib/hooks/useTranslationState", () => ({
   useTranslationState: () => ({
@@ -71,6 +71,8 @@ vi.mock("@/lib/hooks/useTranslationState", () => ({
     translateField: mockTranslateField,
     isTranslating: false,
     translateError: translationError,
+    isTranslationPending: false,
+    pendingNotice: null,
     resetTranslation: mockResetTranslation,
   }),
 }));
@@ -264,7 +266,7 @@ describe("ClassDetailPanel", () => {
     render(<ClassDetailPanel {...DEFAULT_PROPS} canUseLLM />);
     await user.click(await screen.findByRole("button", { name: "Translate Definition" }));
 
-    expect((await screen.findByRole("alert")).textContent).toContain("Translation failed");
+    expect((await screen.findByRole("alert")).textContent).toContain("provider unavailable");
     expect((screen.getByRole("button", { name: "Retry" }) as HTMLButtonElement).disabled).toBe(false);
     expect(mockAnnounce).toHaveBeenCalledWith("definition translation failed. You can retry.", "assertive");
   });

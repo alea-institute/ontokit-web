@@ -4,7 +4,7 @@ export type TranslationVerificationMechanism = "consensus" | "confidence";
 export type TranslationSpeedMode = "batch" | "fast";
 
 export interface TranslationConfigResponse {
-  language_set: string[];
+  language_tags: string[];
   verification_mechanism: TranslationVerificationMechanism;
   consensus_threshold: number;
   confidence_threshold: number;
@@ -20,7 +20,7 @@ export interface TranslationConfigResponse {
 }
 
 export interface TranslationConfigUpdate {
-  language_set: string[];
+  language_tags: string[];
   verification_mechanism: TranslationVerificationMechanism;
   consensus_threshold: number;
   confidence_threshold: number;
@@ -37,8 +37,8 @@ export interface TranslationConfigUpdate {
 
 export interface TranslationLanguage {
   tag: string;
-  name: string;
-  native_name?: string;
+  english_name: string;
+  native_name: string | null;
 }
 
 export type TranslationEntityState = "verified" | "provisional" | "pending" | "missing";
@@ -114,8 +114,40 @@ export interface ReviewerLanguagesResponse {
 }
 
 export interface TranslationRecordSummary {
-  record_id: string;
-  [key: string]: unknown;
+  id: string;
+  project_id: string;
+  entity_iri: string;
+  predicate: string;
+  language: string;
+  proposed_value: string | null;
+  state: string;
+  confirming_member_id: string | null;
+}
+
+export interface TranslationReviewer {
+  member_id: string;
+  user_id: string;
+  languages: string[];
+}
+
+export function getTranslationErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) return fallback;
+  if (error.name === "ApiError") {
+    try {
+      const parsed: unknown = JSON.parse(error.message);
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        "detail" in parsed &&
+        typeof parsed.detail === "string"
+      ) {
+        return parsed.detail;
+      }
+    } catch {
+      // ApiError messages are not always JSON.
+    }
+  }
+  return error.message || fallback;
 }
 
 export interface BulkTranslationConfirmResult {
@@ -136,15 +168,26 @@ const translationRecordPath = (projectId: string, recordId: string) =>
   `${translationPath(projectId)}/records/${recordId}`;
 
 export const translationsApi = {
-  listProvisional: (projectId: string, language: string, branch: string, token: string) =>
+  listProvisional: (projectId: string, language: string | undefined, branch: string, token: string) =>
     api.get<ProvisionalTranslationRecord[]>(`${translationPath(projectId)}/provisional`, {
       headers: { Authorization: `Bearer ${token}` },
-      params: { language, branch },
+      params: language ? { language, branch } : { branch },
     }),
 
   getMyReviewerLanguages: (projectId: string, token: string) =>
     api.get<ReviewerLanguagesResponse>(`${translationPath(projectId)}/my-reviewer-languages`, {
       headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  listReviewers: (projectId: string, token: string) =>
+    api.get<TranslationReviewer[]>(`${translationPath(projectId)}/reviewers`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
+  updateReviewer: (projectId: string, memberId: string, languages: string[], token: string) =>
+    api.put<TranslationReviewer>(`${translationPath(projectId)}/reviewers/${memberId}`, { languages }, {
+      headers: { Authorization: `Bearer ${token}` },
+      retryOn5xx: false,
     }),
 
   confirmRecord: (projectId: string, recordId: string, branch: string, token: string) =>
