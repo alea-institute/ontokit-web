@@ -82,6 +82,7 @@ import { LLMSettingsSection } from "@/components/projects/LLMSettingsSection";
 import { LLMUsageSection } from "@/components/projects/LLMUsageSection";
 import { LintConfigSection } from "@/components/projects/LintConfigSection";
 import { DistinctEntityDecisionsSection } from "@/components/projects/DistinctEntityDecisionsSection";
+import { TranslationSettingsSection } from "@/components/projects/TranslationSettingsSection";
 
 // Dynamically import the diff viewer to avoid SSR issues with Monaco
 const NormalizationDiffViewer = dynamic(
@@ -2070,6 +2071,17 @@ export default function ProjectSettingsPage() {
               <LLMSettingsSection
                 projectId={projectId}
                 accessToken={session?.accessToken}
+              />
+              <hr className="my-6 border-slate-200 dark:border-slate-700" />
+              <div className="mb-4">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                  Translations
+                </h3>
+              </div>
+              <TranslationSettingsSection
+                projectId={projectId}
+                accessToken={session?.accessToken}
+                canManage={!!canManage}
               />
               <hr className="my-6 border-slate-200 dark:border-slate-700" />
               <LLMUsageSection
