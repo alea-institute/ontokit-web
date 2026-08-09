@@ -99,7 +99,12 @@ describe("Translation coverage page", () => {
       upper_bound_cost_usd: 0.5,
       batch_discount_applied: true,
     });
-    launchBackfill.mockRejectedValue(new ApiError(409, "Conflict", "active"));
+    launchBackfill.mockImplementation(async () => {
+      // Mirror the real hook: the mutation records the error the page renders.
+      const err = new ApiError(409, "Conflict", "active");
+      coverageState.launchError = err;
+      throw err;
+    });
     const user = userEvent.setup();
     render(<TranslationCoveragePage />);
 
@@ -116,6 +121,9 @@ describe("Translation coverage page", () => {
       era_before: "2026-12-31",
       never_confirmed: true,
     });
+    // The mocked hook is not reactive; nudge a re-render so the page reads
+    // the mutation error the real React Query subscription would push.
+    await user.type(screen.getByLabelText(/language/i), "r");
     expect((await screen.findByRole("alert")).textContent).toMatch(/already active/i);
   });
 

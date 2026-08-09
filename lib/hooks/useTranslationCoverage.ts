@@ -1,11 +1,10 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   translationsApi,
   type TranslationBackfillFilters,
 } from "@/lib/api/translations";
-
-export const translationCoverageQueryKey = (projectId: string, branch: string) =>
-  ["translation-coverage", projectId, branch] as const;
+import { translationQueryKeys } from "@/lib/hooks/useTranslationConfig";
 
 export function useTranslationCoverage(
   projectId: string,
@@ -13,17 +12,18 @@ export function useTranslationCoverage(
   accessToken?: string,
 ) {
   const queryClient = useQueryClient();
-  const coverageKey = translationCoverageQueryKey(projectId, branch);
+  const coverageKey = translationQueryKeys.coverage(projectId, branch);
   const coverageQuery = useQuery({
     queryKey: [...coverageKey, accessToken ?? null],
     queryFn: () => translationsApi.getCoverage(projectId, branch, accessToken!),
     enabled: !!projectId && !!branch && !!accessToken,
     retry: false,
-    refetchInterval: (query) =>
-      query.state.data?.languages.some((language) => language.pending > 0) ? 2_000 : false,
   });
   const jobQuery = useQuery({
-    queryKey: ["translation-backfill-status", projectId, branch, accessToken ?? null],
+    queryKey: [
+      ...translationQueryKeys.backfillStatus(projectId, branch),
+      accessToken ?? null,
+    ],
     queryFn: () => translationsApi.getBackfillStatus(projectId, branch, accessToken!),
     enabled: !!projectId && !!branch && !!accessToken,
     retry: false,
@@ -32,6 +32,27 @@ export function useTranslationCoverage(
       return status === "pending" || status === "running" ? 2_000 : false;
     },
   });
+  const observedJob = useRef<{
+    jobId: string;
+    completed: number;
+    terminal: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const job = jobQuery.data;
+    if (!job) return;
+
+    const terminal = job.status === "completed" || job.status === "failed";
+    const previous = observedJob.current;
+    const sameJob = previous?.jobId === job.job_id;
+    const progressChanged = sameJob && previous.completed !== job.completed;
+    const reachedTerminal = terminal && (!sameJob || !previous.terminal);
+
+    observedJob.current = { jobId: job.job_id, completed: job.completed, terminal };
+    if (progressChanged || reachedTerminal) {
+      void queryClient.invalidateQueries({ queryKey: coverageKey });
+    }
+  }, [coverageKey, jobQuery.data, queryClient]);
   const previewMutation = useMutation({
     mutationFn: (filters: TranslationBackfillFilters) =>
       translationsApi.previewBackfill(projectId, filters, accessToken!),
@@ -56,9 +77,11 @@ export function useTranslationCoverage(
     previewBackfill: previewMutation.mutateAsync,
     isPreviewing: previewMutation.isPending,
     previewError: previewMutation.error,
+    resetPreview: previewMutation.reset,
     launchBackfill: launchMutation.mutateAsync,
     isLaunching: launchMutation.isPending,
     launchError: launchMutation.error,
+    resetLaunch: launchMutation.reset,
     job: jobQuery.data,
   };
 }

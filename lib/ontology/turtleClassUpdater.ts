@@ -15,14 +15,11 @@ import {
   isIriValue,
   iriTurtleForms,
   scanToBlockEnd,
+  escapeRegex,
 } from "@/lib/ontology/turtleUtils";
 
 const RDFS_LABEL_IRI = "http://www.w3.org/2000/01/rdf-schema#label";
 const RDFS_COMMENT_IRI = "http://www.w3.org/2000/01/rdf-schema#comment";
-
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
 
 function retainedLiteralPatterns(
   data: TurtleClassUpdateData,
@@ -48,14 +45,14 @@ function retainedLiteralPatterns(
 }
 
 function pruneDeletedLiteralAxioms(
-  source: string,
+  lines: string[],
   classIri: string,
   data: TurtleClassUpdateData,
+  declarations: ReturnType<typeof parseDeclarations>,
 ): string {
-  const { prefixes, base } = parseDeclarations(source);
+  const { prefixes, base } = declarations;
   const sourceForms = iriTurtleForms(classIri, prefixes, base);
   const retained = retainedLiteralPatterns(data, prefixes);
-  const lines = source.split("\n");
   const remove = new Set<number>();
 
   for (let start = 0; start < lines.length; start++) {
@@ -195,7 +192,8 @@ export function updateClassInTurtle(
   classIri: string,
   data: TurtleClassUpdateData,
 ): string {
-  const { prefixes, base } = parseDeclarations(source);
+  const declarations = parseDeclarations(source);
+  const { prefixes, base } = declarations;
   const rev = reverseMap(prefixes);
   const lines = source.split("\n");
 
@@ -212,8 +210,9 @@ export function updateClassInTurtle(
   const after = lines.slice(block.endLine + 1);
 
   return pruneDeletedLiteralAxioms(
-    [...before, newBlock, ...after].join("\n"),
+    [...before, newBlock, ...after],
     classIri,
     data,
+    declarations,
   );
 }
