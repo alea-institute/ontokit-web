@@ -2,17 +2,23 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Plus, X } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { LanguagePicker } from "@/components/editor/LanguagePicker";
 import { useTranslationConfig } from "@/lib/hooks/useTranslationConfig";
 import type {
   TranslationConfigResponse,
   TranslationConfigUpdate,
+  TranslationLanguage,
 } from "@/lib/api/translations";
+import { getTranslationErrorMessage, translationsApi } from "@/lib/api/translations";
+import type { ProjectMember } from "@/lib/api/projects";
+import { useMembers } from "@/lib/hooks/useMembers";
 
 const BCP47_PATTERN = /^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/;
 const inputClass =
   "w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white";
+const NO_REVIEWER_LANGUAGES: string[] = [];
 
 function editableConfig(config: TranslationConfigResponse): TranslationConfigUpdate {
   const { verifier_api_key_set: _keySet, ...editable } = config;
@@ -58,7 +64,7 @@ export function TranslationSettingsSection({
   if (error || !form || !config) {
     return (
       <p role="alert" className="text-sm text-red-600 dark:text-red-400">
-        Couldn&apos;t load translation settings. Reload the page and try again.
+        {getTranslationErrorMessage(error, "Couldn't load translation settings. Reload the page and try again.")}
       </p>
     );
   }
@@ -70,8 +76,8 @@ export function TranslationSettingsSection({
   const modelError =
     !!form.verifier_provider?.trim() && !form.verifier_model?.trim();
   const languageError =
-    form.language_set.length === 0 ||
-    form.language_set.some((tag) => !BCP47_PATTERN.test(tag));
+    form.language_tags.length === 0 ||
+    form.language_tags.some((tag) => !BCP47_PATTERN.test(tag));
   const thresholdError = threshold < 0 || threshold > 1;
   const valid = !modelError && !languageError && !thresholdError;
 
@@ -82,8 +88,8 @@ export function TranslationSettingsSection({
   };
   const addLanguage = () => {
     const tag = languageDraft.trim();
-    if (!BCP47_PATTERN.test(tag) || form.language_set.includes(tag)) return;
-    patchForm({ language_set: [...form.language_set, tag] });
+    if (!BCP47_PATTERN.test(tag) || form.language_tags.includes(tag)) return;
+    patchForm({ language_tags: [...form.language_tags, tag] });
     setLanguageDraft("");
     setAddingLanguage(false);
   };
@@ -97,7 +103,7 @@ export function TranslationSettingsSection({
       setSaved(true);
     } catch (caught) {
       setSaveError(
-        caught instanceof Error ? caught.message : "Translation settings could not be saved.",
+        getTranslationErrorMessage(caught, "Translation settings could not be saved."),
       );
     }
   };
@@ -112,13 +118,13 @@ export function TranslationSettingsSection({
       <fieldset className="space-y-2">
         <legend className="text-sm font-semibold text-slate-700 dark:text-slate-300">Target languages</legend>
         <div className="flex flex-wrap gap-2">
-          {form.language_set.map((tag) => {
+          {form.language_tags.map((tag) => {
             const language = paletteByTag.get(tag);
-            const label = language?.name ?? tag;
+            const label = language?.english_name ?? tag;
             return (
               <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-700 dark:bg-slate-700 dark:text-slate-200">
                 {label} <span className="text-xs text-slate-500">({tag})</span>
-                <button type="button" aria-label={`Remove ${label}`} onClick={() => patchForm({ language_set: form.language_set.filter((item) => item !== tag) })} className="rounded p-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <button type="button" aria-label={`Remove ${label}`} onClick={() => patchForm({ language_tags: form.language_tags.filter((item) => item !== tag) })} className="rounded p-0.5 focus:outline-none focus:ring-2 focus:ring-primary-500">
                   <X className="h-3.5 w-3.5" />
                 </button>
               </span>
@@ -129,13 +135,13 @@ export function TranslationSettingsSection({
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <LanguagePicker value={languageDraft} onChange={setLanguageDraft} />
-              <Button type="button" variant="outline" onClick={addLanguage} disabled={!BCP47_PATTERN.test(languageDraft) || form.language_set.includes(languageDraft)} aria-label="Add selected language">Add</Button>
+              <Button type="button" variant="outline" onClick={addLanguage} disabled={!BCP47_PATTERN.test(languageDraft) || form.language_tags.includes(languageDraft)} aria-label="Add selected language">Add</Button>
               <Button type="button" variant="ghost" onClick={() => setAddingLanguage(false)}>Cancel</Button>
             </div>
             <div aria-label="Language palette" className="flex flex-wrap gap-1.5">
-              {palette.filter((language) => !form.language_set.includes(language.tag)).map((language) => (
+              {palette.filter((language) => !form.language_tags.includes(language.tag)).map((language) => (
                 <button key={language.tag} type="button" onClick={() => setLanguageDraft(language.tag)} aria-pressed={languageDraft === language.tag} className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-600 hover:border-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-500 aria-pressed:border-primary-500 aria-pressed:text-primary-700 dark:border-slate-600 dark:text-slate-300">
-                  {language.name} ({language.tag})
+                  {language.english_name} ({language.tag})
                 </button>
               ))}
             </div>
@@ -210,6 +216,102 @@ export function TranslationSettingsSection({
         {isUpdating && <Loader2 className="h-4 w-4 animate-spin" />}
         {isUpdating ? "Saving…" : "Save translation settings"}
       </Button>
+
+      <ReviewerSettings projectId={projectId} accessToken={accessToken} palette={palette} />
+    </div>
+  );
+}
+
+function ReviewerSettings({
+  projectId,
+  accessToken,
+  palette,
+}: {
+  projectId: string;
+  accessToken?: string;
+  palette: TranslationLanguage[];
+}) {
+  const queryClient = useQueryClient();
+  const queryKey = ["translation-reviewers", projectId, accessToken ?? null] as const;
+  const membersQuery = useMembers(projectId, accessToken);
+  const reviewersQuery = useQuery({
+    queryKey,
+    queryFn: () => translationsApi.listReviewers(projectId, accessToken!),
+    enabled: !!accessToken,
+    retry: false,
+  });
+  const updateMutation = useMutation({
+    mutationFn: ({ memberId, languages }: { memberId: string; languages: string[] }) =>
+      translationsApi.updateReviewer(projectId, memberId, languages, accessToken!),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["translation-reviewers", projectId] }),
+  });
+
+  if (membersQuery.isLoading || reviewersQuery.isLoading) {
+    return <p role="status" className="text-sm text-slate-500">Loading native-speaker reviewers…</p>;
+  }
+  if (membersQuery.error || reviewersQuery.error) {
+    return <p role="alert" className="text-sm text-red-600">{getTranslationErrorMessage(membersQuery.error || reviewersQuery.error, "Reviewers could not be loaded.")}</p>;
+  }
+
+  const assignments = new Map(reviewersQuery.data?.map((reviewer) => [reviewer.member_id, reviewer.languages]));
+  return (
+    <section aria-labelledby="translation-reviewers-heading" className="border-t border-slate-200 pt-5 dark:border-slate-700">
+      <h3 id="translation-reviewers-heading" className="text-sm font-semibold text-slate-700 dark:text-slate-300">Native-speaker reviewers</h3>
+      <p className="mt-1 text-xs text-slate-500">Assign the language tags each project member may review.</p>
+      <div className="mt-3 space-y-3">
+        {membersQuery.data?.items.map((member) => (
+          <ReviewerRow
+            key={member.id}
+            member={member}
+            initialLanguages={assignments.get(member.id) ?? NO_REVIEWER_LANGUAGES}
+            palette={palette}
+            save={(languages) => updateMutation.mutateAsync({ memberId: member.id, languages })}
+            saving={updateMutation.isPending && updateMutation.variables?.memberId === member.id}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ReviewerRow({ member, initialLanguages, palette, save, saving }: {
+  member: ProjectMember;
+  initialLanguages: string[];
+  palette: TranslationLanguage[];
+  save: (languages: string[]) => Promise<unknown>;
+  saving: boolean;
+}) {
+  const [languages, setLanguages] = useState(initialLanguages);
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => { setLanguages(initialLanguages); }, [initialLanguages]);
+  const name = member.user?.name || member.user?.email || member.user_id;
+  const dirty = JSON.stringify(languages) !== JSON.stringify(initialLanguages);
+  const add = () => {
+    const tag = draft.trim();
+    if (!BCP47_PATTERN.test(tag) || languages.includes(tag)) return;
+    setLanguages((current) => [...current, tag]);
+    setDraft(""); setSaved(false); setError(null);
+  };
+  const handleSave = async () => {
+    setError(null); setSaved(false);
+    try { await save(languages); setSaved(true); }
+    catch (caught) { setError(getTranslationErrorMessage(caught, `Reviewer languages for ${name} could not be saved.`)); }
+  };
+  return (
+    <div className="rounded-md border border-slate-200 p-3 dark:border-slate-700">
+      <div className="mb-2 text-sm font-medium">{name}</div>
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {languages.map((tag) => <span key={tag} className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs dark:bg-slate-700">{palette.find((item) => item.tag === tag)?.english_name ?? tag} ({tag})<button type="button" aria-label={`Remove ${tag} from ${name}`} onClick={() => { setLanguages((current) => current.filter((item) => item !== tag)); setSaved(false); }}><X className="h-3 w-3" /></button></span>)}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="min-w-48 flex-1"><LanguagePicker value={draft} onChange={setDraft} ariaLabel={`Language tag for ${name}`} /></div>
+        <Button type="button" size="sm" variant="outline" onClick={add} disabled={!BCP47_PATTERN.test(draft) || languages.includes(draft)}>Add</Button>
+        <Button type="button" size="sm" onClick={handleSave} disabled={!dirty || saving}>{saving ? "Saving…" : "Save reviewer"}</Button>
+      </div>
+      {error && <p role="alert" className="mt-2 text-xs text-red-600">{error}</p>}
+      {saved && <p role="status" className="mt-2 text-xs text-green-700">Reviewer languages saved.</p>}
     </div>
   );
 }

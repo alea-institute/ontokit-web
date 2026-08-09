@@ -13,6 +13,7 @@ import type {
   TranslationBackfillFilters,
   TranslationBackfillPreview,
 } from "@/lib/api/translations";
+import { getTranslationErrorMessage } from "@/lib/api/translations";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import { useTranslationCoverage } from "@/lib/hooks/useTranslationCoverage";
@@ -28,16 +29,12 @@ function TranslationCoverageContent({ projectId, token }: { projectId: string; t
   const [neverConfirmed, setNeverConfirmed] = useState(false);
   const [preview, setPreview] = useState<TranslationBackfillPreview | null>(null);
   const previewError = coverageState.previewError
-    ? coverageState.previewError instanceof Error
-      ? coverageState.previewError.message
-      : "Cost preview failed."
+    ? getTranslationErrorMessage(coverageState.previewError, "Cost preview failed.")
     : null;
   const launchError = coverageState.launchError
     ? coverageState.launchError instanceof ApiError && coverageState.launchError.status === 409
       ? "A translation backfill is already active for this project."
-      : coverageState.launchError instanceof Error
-        ? coverageState.launchError.message
-        : "Backfill could not be launched."
+      : getTranslationErrorMessage(coverageState.launchError, "Backfill could not be launched.")
     : null;
 
   const filters = (): TranslationBackfillFilters => ({
@@ -99,7 +96,7 @@ function TranslationCoverageContent({ projectId, token }: { projectId: string; t
           {coverageState.isLoading ? (
             <p role="status">Loading translation coverage…</p>
           ) : coverageState.error ? (
-            <p role="alert" className="text-sm text-red-600">Translation coverage could not be loaded.</p>
+            <p role="alert" className="text-sm text-red-600">{getTranslationErrorMessage(coverageState.error, "Translation coverage could not be loaded.")}</p>
           ) : (
             <div className="overflow-x-auto">
               <table aria-label="Translation coverage" tabIndex={0} className="w-full min-w-[640px] border-collapse text-left text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500">

@@ -1,8 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render as rtlRender, screen, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import type { TranslationConfigResponse } from "@/lib/api/translations";
 import { TranslationSettingsSection } from "@/components/projects/TranslationSettingsSection";
+
+function render(ui: React.ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 vi.hoisted(() => {
   globalThis.ResizeObserver = class {
@@ -13,7 +19,12 @@ vi.hoisted(() => {
   HTMLElement.prototype.scrollIntoView = vi.fn();
 });
 
-const updateConfig = vi.fn();
+const { updateConfig, listReviewers, updateReviewer, listMembers } = vi.hoisted(() => ({
+  updateConfig: vi.fn(),
+  listReviewers: vi.fn(),
+  updateReviewer: vi.fn(),
+  listMembers: vi.fn(),
+}));
 const state = vi.hoisted(() => ({
   isLoading: false,
   error: null as Error | null,
@@ -22,7 +33,7 @@ const state = vi.hoisted(() => ({
 }));
 
 const config: TranslationConfigResponse = {
-  language_set: ["fr"],
+  language_tags: ["fr"],
   verification_mechanism: "consensus",
   consensus_threshold: 0.8,
   confidence_threshold: 0.9,
@@ -41,8 +52,8 @@ vi.mock("@/lib/hooks/useTranslationConfig", () => ({
   useTranslationConfig: () => ({
     config,
     palette: [
-      { tag: "fr", name: "French", native_name: "Français" },
-      { tag: "es", name: "Spanish", native_name: "Español" },
+      { tag: "fr", english_name: "French", native_name: "Français" },
+      { tag: "es", english_name: "Spanish", native_name: "Español" },
     ],
     isLoading: state.isLoading,
     error: state.error,
@@ -51,6 +62,11 @@ vi.mock("@/lib/hooks/useTranslationConfig", () => ({
     updateError: state.updateError,
   }),
 }));
+vi.mock("@/lib/api/translations", () => ({
+  translationsApi: { listReviewers, updateReviewer },
+  getTranslationErrorMessage: (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback,
+}));
+vi.mock("@/lib/api/projects", () => ({ projectApi: { listMembers } }));
 
 describe("TranslationSettingsSection", () => {
   beforeEach(() => {
@@ -60,6 +76,9 @@ describe("TranslationSettingsSection", () => {
     state.isUpdating = false;
     state.updateError = null;
     updateConfig.mockResolvedValue(config);
+    listReviewers.mockResolvedValue([]);
+    updateReviewer.mockImplementation((_projectId, memberId, languages) => Promise.resolve({ member_id: memberId, user_id: "user-1", languages }));
+    listMembers.mockResolvedValue({ items: [], total: 0 });
   });
 
   it("renders the saved config without echoing the verifier key and starts pristine", () => {
@@ -89,7 +108,7 @@ describe("TranslationSettingsSection", () => {
     await user.click(screen.getByRole("button", { name: /save translation settings/i }));
 
     expect(updateConfig).toHaveBeenCalledWith(
-      expect.objectContaining({ language_set: ["es", "grc"] }),
+      expect.objectContaining({ language_tags: ["es", "grc"] }),
     );
   });
 
@@ -138,6 +157,23 @@ describe("TranslationSettingsSection", () => {
     expect((confidence as HTMLInputElement).checked).toBe(true);
     await user.tab();
     expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it("lists project members and updates reviewer languages", async () => {
+    const user = userEvent.setup();
+    listMembers.mockResolvedValue({ items: [{ id: "member-1", project_id: "project-1", user_id: "user-1", role: "editor", user: { id: "user-1", name: "Ada Reviewer" }, created_at: "2026-08-09" }], total: 1 });
+    listReviewers.mockResolvedValue([{ member_id: "member-1", user_id: "user-1", languages: ["fr"] }]);
+    render(<TranslationSettingsSection projectId="project-1" accessToken="token" canManage />);
+
+    expect(await screen.findByText("Ada Reviewer")).toBeDefined();
+    await user.click(screen.getByRole("button", { name: /remove fr from ada reviewer/i }));
+    const reviewer = screen.getByText("Ada Reviewer").parentElement!;
+    await user.click(within(reviewer).getByLabelText("Language tag for Ada Reviewer"));
+    await user.type(within(reviewer).getByPlaceholderText("Search languages..."), "es");
+    await user.click(await screen.findByText("Spanish"));
+    await user.click(within(reviewer).getByRole("button", { name: "Add" }));
+    await user.click(within(reviewer).getByRole("button", { name: /save reviewer/i }));
+    expect(updateReviewer).toHaveBeenCalledWith("project-1", "member-1", ["es"], "token");
   });
 
   it("renders no card for a non-admin", () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -11,59 +11,27 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { BranchProvider, useBranch } from "@/lib/context/BranchContext";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
-import {
-  translationsApi,
-  type ProvisionalTranslationRecord,
-} from "@/lib/api/translations";
+import { getTranslationErrorMessage, type ProvisionalTranslationRecord } from "@/lib/api/translations";
+import { useTranslationReview } from "@/lib/hooks/useTranslationReview";
 
 type PendingAction =
   | { kind: "confirm" | "reject"; record: ProvisionalTranslationRecord }
   | { kind: "bulk"; recordIds: string[] }
   | null;
 
-function errorMessage(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback;
-}
-
 function TranslationReviewContent({ projectId, token }: { projectId: string; token?: string }) {
   const { currentBranch } = useBranch();
   const projectHomeHref = useProjectHomeHref(projectId);
   const { project, isLoading: isProjectLoading } = useProject(projectId, token);
   const { canManage } = derivePermissions(project, token);
-  const [reviewerLanguages, setReviewerLanguages] = useState<string[]>([]);
-  const [records, setRecords] = useState<ProvisionalTranslationRecord[]>([]);
+  const review = useTranslationReview(projectId, currentBranch, canManage, token);
+  const { reviewerLanguages, records } = review;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [languageFilter, setLanguageFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
-
-  const loadQueue = useCallback(async () => {
-    if (!token || !project?.id) return;
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const { languages } = await translationsApi.getMyReviewerLanguages(projectId, token);
-      setReviewerLanguages(languages);
-      const queryLanguages = canManage ? [""] : languages;
-      const queues = await Promise.all(
-        queryLanguages.map((language) =>
-          translationsApi.listProvisional(projectId, language, currentBranch, token),
-        ),
-      );
-      const unique = new Map(queues.flat().map((record) => [record.record_id, record]));
-      setRecords([...unique.values()]);
-    } catch (error) {
-      setLoadError(errorMessage(error, "Translation review queue could not be loaded."));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [canManage, currentBranch, project?.id, projectId, token]);
-
-  useEffect(() => { void loadQueue(); }, [loadQueue]);
 
   const visibleRecords = useMemo(() => records.filter((record) => {
     if (languageFilter !== "all" && record.language !== languageFilter) return false;
@@ -74,7 +42,7 @@ function TranslationReviewContent({ projectId, token }: { projectId: string; tok
   const canActOn = (record: ProvisionalTranslationRecord) => reviewerLanguages.includes(record.language);
   const removeRecords = (recordIds: string[]) => {
     const removed = new Set(recordIds);
-    setRecords((current) => current.filter((record) => !removed.has(record.record_id)));
+    review.removeRecords(recordIds);
     setSelectedIds((current) => new Set([...current].filter((id) => !removed.has(id))));
   };
 
@@ -82,7 +50,7 @@ function TranslationReviewContent({ projectId, token }: { projectId: string; tok
     if (!pendingAction || !token) return;
     if (pendingAction.kind === "bulk") {
       try {
-        const response = await translationsApi.confirmBulk(projectId, pendingAction.recordIds, currentBranch, token);
+        const response = await review.confirmBulk(pendingAction.recordIds);
         const succeeded = response.results.filter((result) => result.ok).map((result) => result.record_id);
         const failures = Object.fromEntries(
           response.results.filter((result) => !result.ok).map((result) => [result.record_id, result.error || "Confirmation failed."]),
@@ -91,7 +59,7 @@ function TranslationReviewContent({ projectId, token }: { projectId: string; tok
         setErrors((current) => ({ ...current, ...failures }));
         setAnnouncement(`${succeeded.length} confirmed; ${Object.keys(failures).length} failed.`);
       } catch (error) {
-        const message = errorMessage(error, "Bulk confirmation failed.");
+        const message = getTranslationErrorMessage(error, "Bulk confirmation failed.");
         setErrors((current) => ({ ...current, ...Object.fromEntries(pendingAction.recordIds.map((id) => [id, message])) }));
         setAnnouncement(`0 confirmed; ${pendingAction.recordIds.length} failed.`);
         throw error;
@@ -102,14 +70,14 @@ function TranslationReviewContent({ projectId, token }: { projectId: string; tok
     const { kind, record } = pendingAction;
     try {
       if (kind === "confirm") {
-        await translationsApi.confirmRecord(projectId, record.record_id, currentBranch, token);
+        await review.confirmRecord(record.record_id);
       } else {
-        await translationsApi.rejectRecord(projectId, record.record_id, currentBranch, token);
+        await review.rejectRecord(record.record_id);
       }
       removeRecords([record.record_id]);
       setAnnouncement(`${record.proposed_value} ${kind === "confirm" ? "confirmed" : "rejected"}.`);
     } catch (error) {
-      setErrors((current) => ({ ...current, [record.record_id]: errorMessage(error, `${kind} failed.`) }));
+      setErrors((current) => ({ ...current, [record.record_id]: getTranslationErrorMessage(error, `${kind} failed.`) }));
       setAnnouncement(`${kind === "confirm" ? "Confirmation" : "Rejection"} failed for ${record.proposed_value}.`);
       throw error;
     }
@@ -135,7 +103,7 @@ function TranslationReviewContent({ projectId, token }: { projectId: string; tok
           </div>
         </div>
 
-        {canManage && reviewerLanguages.length === 0 && !isLoading && (
+        {canManage && reviewerLanguages.length === 0 && !review.isLoading && (
           <p className="mb-5 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             View-only admin access. A reviewer language tag is required to confirm or reject translations.
           </p>
@@ -163,10 +131,10 @@ function TranslationReviewContent({ projectId, token }: { projectId: string; tok
           </div>
         )}
 
-        {isProjectLoading || isLoading ? (
+        {isProjectLoading || review.isLoading ? (
           <p>Loading provisional translations…</p>
-        ) : loadError ? (
-          <p role="alert" className="text-sm text-red-600">{loadError}</p>
+        ) : review.error ? (
+          <p role="alert" className="text-sm text-red-600">{getTranslationErrorMessage(review.error, "Translation review queue could not be loaded.")}</p>
         ) : !canManage && reviewerLanguages.length === 0 ? (
           <p role="alert" className="rounded-lg border border-slate-200 bg-white p-8 text-center text-slate-600 dark:bg-slate-900">
             Translation Review is limited to project admins and native-speaker reviewers.

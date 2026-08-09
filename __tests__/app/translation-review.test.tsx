@@ -1,4 +1,5 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render as rtlRender, screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -39,9 +40,15 @@ vi.mock("@/lib/api/translations", () => ({
     rejectRecord,
     confirmBulk,
   },
+  getTranslationErrorMessage: (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback,
 }));
 
 import TranslationReviewPage from "@/app/projects/[id]/translations/review/page";
+
+function render(ui: React.ReactNode) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return rtlRender(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 const swahili = {
   record_id: "sw-1",
@@ -88,6 +95,7 @@ describe("Translation review queue", () => {
 
     expect(await screen.findByText("Dhamana")).toBeDefined();
     expect(screen.getByText("Dépôt")).toBeDefined();
+    expect(listProvisional).toHaveBeenCalledWith("project-1", undefined, "main", "token");
     expect((screen.getByRole("button", { name: /confirm dhamana/i }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: /reject dhamana/i }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/view-only/i)).toBeDefined();

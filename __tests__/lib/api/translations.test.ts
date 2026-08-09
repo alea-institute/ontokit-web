@@ -5,11 +5,11 @@ vi.mock("@/lib/api/client", () => ({
   api: { get: vi.fn(), put: vi.fn(), post: vi.fn() },
 }));
 
-import { translationsApi } from "@/lib/api/translations";
+import { getTranslationErrorMessage, translationsApi } from "@/lib/api/translations";
 import type { TranslationConfigResponse, TranslationConfigUpdate } from "@/lib/api/translations";
 
 const config: TranslationConfigResponse = {
-  language_set: ["fr"],
+  language_tags: ["fr"],
   verification_mechanism: "consensus",
   consensus_threshold: 0.8,
   confidence_threshold: 0.9,
@@ -182,5 +182,43 @@ describe("translationsApi", () => {
       { branch: "main", record_ids: ["record-1", "record-2"] },
       actuationOptions,
     );
+  });
+
+  it("lists and updates native-speaker reviewer assignments", async () => {
+    const reviewer = { member_id: "member-1", user_id: "user-1", languages: ["fr"] };
+    vi.mocked(api.get).mockResolvedValue([reviewer]);
+    vi.mocked(api.put).mockResolvedValue({ ...reviewer, languages: ["fr", "es"] });
+
+    const listed = await translationsApi.listReviewers("project-1", "token");
+    const updated = await translationsApi.updateReviewer("project-1", "member-1", ["fr", "es"], "token");
+
+    expect(listed).toEqual([reviewer]);
+    expect(updated.languages).toEqual(["fr", "es"]);
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/projects/project-1/translation/reviewers",
+      { headers: { Authorization: "Bearer token" } },
+    );
+    expect(api.put).toHaveBeenCalledWith(
+      "/api/v1/projects/project-1/translation/reviewers/member-1",
+      { languages: ["fr", "es"] },
+      { headers: { Authorization: "Bearer token" }, retryOn5xx: false },
+    );
+  });
+
+  it("omits the optional language filter for an admin queue", async () => {
+    vi.mocked(api.get).mockResolvedValue([]);
+    await translationsApi.listProvisional("project-1", undefined, "main", "token");
+    expect(api.get).toHaveBeenCalledWith(
+      "/api/v1/projects/project-1/translation/provisional",
+      { headers: { Authorization: "Bearer token" }, params: { branch: "main" } },
+    );
+  });
+
+  it("extracts FastAPI detail without exposing raw JSON", () => {
+    const error = new Error('{"detail":"Reviewer language is required"}');
+    error.name = "ApiError";
+    expect(getTranslationErrorMessage(error, "fallback")).toBe("Reviewer language is required");
+    expect(getTranslationErrorMessage(new Error("plain failure"), "fallback")).toBe("plain failure");
+    expect(getTranslationErrorMessage(null, "fallback")).toBe("fallback");
   });
 });
