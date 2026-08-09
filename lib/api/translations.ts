@@ -41,8 +41,30 @@ export interface TranslationLanguage {
   native_name?: string;
 }
 
+export type TranslationEntityState = "verified" | "provisional" | "pending" | "missing";
+
+export interface TranslationEntityStateItem {
+  predicate: string;
+  language: string;
+  state: TranslationEntityState;
+  value: string | null;
+  record_id: string | null;
+}
+
+export interface TranslationEntityStateResponse {
+  entity_iri: string;
+  branch: string;
+  items: TranslationEntityStateItem[];
+}
+
+export type OnDemandTranslationPredicate = "skos:definition" | "skos:example";
+
 const configPath = (projectId: string) =>
   `/api/v1/projects/${projectId}/translation/config`;
+const entityStatePath = (projectId: string) =>
+  `/api/v1/projects/${projectId}/translation/entity-state`;
+const translateFieldPath = (projectId: string) =>
+  `/api/v1/projects/${projectId}/translation/entities/translate-field`;
 
 export const translationsApi = {
   getConfig: (projectId: string, token: string) =>
@@ -62,4 +84,25 @@ export const translationsApi = {
 
   getPalette: () =>
     api.get<TranslationLanguage[]>("/api/v1/translation/palette"),
+
+  getEntityState: (
+    projectId: string,
+    entityIri: string,
+    branch: string,
+    token: string,
+  ) =>
+    api.get<TranslationEntityStateResponse>(entityStatePath(projectId), {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { entity_iri: entityIri, branch },
+    }),
+
+  translateField: (
+    projectId: string,
+    body: { entity_iri: string; predicate: OnDemandTranslationPredicate; branch: string },
+    token: string,
+  ) =>
+    api.post<{ job_id: string }>(translateFieldPath(projectId), body, {
+      headers: { Authorization: `Bearer ${token}` },
+      retryOn5xx: false,
+    }),
 };
