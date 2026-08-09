@@ -18,6 +18,19 @@ vi.mock("@/lib/context/ToastContext", () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
 
+vi.mock("@/lib/hooks/useTranslationConfig", () => ({
+  useTranslationConfig: () => ({ config: { language_set: [] } }),
+}));
+vi.mock("@/lib/hooks/useTranslationState", () => ({
+  useTranslationState: () => ({
+    state: null,
+    translateField: vi.fn(),
+    isTranslating: false,
+    translateError: null,
+    resetTranslation: vi.fn(),
+  }),
+}));
+
 vi.mock("@/lib/hooks/useAutoSave", () => ({
   useAutoSave: () => ({
     saveStatus: "idle",
