@@ -17,6 +17,7 @@ import {
   XCircle,
   X,
   Inbox,
+  Languages,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -429,6 +430,23 @@ export default function ProjectDashboardPage() {
                 </h3>
                 <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   {canEdit ? "Edit classes, properties, and individuals" : "Suggest changes to classes, properties, and individuals"}
+                </p>
+              </Link>
+            )}
+
+            {(project.user_role || project.is_superadmin) && (
+              <Link
+                href={`/projects/${project.id}/translations`}
+                className="rounded-lg border border-slate-200 bg-white p-5 transition-all hover:border-primary-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-primary-600"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300">
+                  <Languages className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <h3 className="mt-3 font-semibold text-slate-900 dark:text-white">
+                  Translation Coverage
+                </h3>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Track multilingual completeness and pending translations
                 </p>
               </Link>
             )}
