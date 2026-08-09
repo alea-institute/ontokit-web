@@ -3,12 +3,7 @@ import {
   translationsApi,
   type OnDemandTranslationPredicate,
 } from "@/lib/api/translations";
-
-export const translationStateQueryKey = (
-  projectId: string,
-  entityIri: string | null,
-  branch: string,
-) => ["translation-entity-state", projectId, entityIri, branch] as const;
+import { translationQueryKeys } from "@/lib/hooks/useTranslationConfig";
 
 export function useTranslationState(
   projectId: string,
@@ -17,7 +12,7 @@ export function useTranslationState(
   accessToken?: string,
 ) {
   const queryClient = useQueryClient();
-  const queryKey = translationStateQueryKey(projectId, entityIri, branch);
+  const queryKey = translationQueryKeys.entityState(projectId, entityIri, branch);
   const stateQuery = useQuery({
     queryKey: [...queryKey, accessToken ?? null],
     queryFn: () => translationsApi.getEntityState(projectId, entityIri!, branch, accessToken!),

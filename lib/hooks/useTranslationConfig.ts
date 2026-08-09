@@ -7,6 +7,12 @@ import {
 export const translationQueryKeys = {
   config: (projectId: string) => ["translation-config", projectId] as const,
   palette: ["translation-palette"] as const,
+  entityState: (projectId: string, entityIri: string | null, branch: string) =>
+    ["translation-entity-state", projectId, entityIri, branch] as const,
+  coverage: (projectId: string, branch: string) =>
+    ["translation-coverage", projectId, branch] as const,
+  backfillStatus: (projectId: string, branch: string) =>
+    ["translation-backfill-status", projectId, branch] as const,
 };
 
 export function useTranslationConfig(projectId: string, accessToken?: string) {

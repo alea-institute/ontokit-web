@@ -124,18 +124,14 @@ export interface BulkTranslationConfirmResult {
   error: string | null;
 }
 
-const configPath = (projectId: string) =>
-  `/api/v1/projects/${projectId}/translation/config`;
-const entityStatePath = (projectId: string) =>
-  `/api/v1/projects/${projectId}/translation/entity-state`;
-const translateFieldPath = (projectId: string) =>
-  `/api/v1/projects/${projectId}/translation/entities/translate-field`;
-const coveragePath = (projectId: string) =>
-  `/api/v1/projects/${projectId}/translation/coverage`;
-const backfillPath = (projectId: string) =>
-  `/api/v1/projects/${projectId}/translation/backfill`;
 const translationPath = (projectId: string) =>
   `/api/v1/projects/${projectId}/translation`;
+const configPath = (projectId: string) => `${translationPath(projectId)}/config`;
+const entityStatePath = (projectId: string) => `${translationPath(projectId)}/entity-state`;
+const translateFieldPath = (projectId: string) =>
+  `${translationPath(projectId)}/entities/translate-field`;
+const coveragePath = (projectId: string) => `${translationPath(projectId)}/coverage`;
+const backfillPath = (projectId: string) => `${translationPath(projectId)}/backfill`;
 const translationRecordPath = (projectId: string, recordId: string) =>
   `${translationPath(projectId)}/records/${recordId}`;
 

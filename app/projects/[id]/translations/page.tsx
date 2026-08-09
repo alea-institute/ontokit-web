@@ -27,8 +27,18 @@ function TranslationCoverageContent({ projectId, token }: { projectId: string; t
   const [eraBefore, setEraBefore] = useState("");
   const [neverConfirmed, setNeverConfirmed] = useState(false);
   const [preview, setPreview] = useState<TranslationBackfillPreview | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-  const [launchError, setLaunchError] = useState<string | null>(null);
+  const previewError = coverageState.previewError
+    ? coverageState.previewError instanceof Error
+      ? coverageState.previewError.message
+      : "Cost preview failed."
+    : null;
+  const launchError = coverageState.launchError
+    ? coverageState.launchError instanceof ApiError && coverageState.launchError.status === 409
+      ? "A translation backfill is already active for this project."
+      : coverageState.launchError instanceof Error
+        ? coverageState.launchError.message
+        : "Backfill could not be launched."
+    : null;
 
   const filters = (): TranslationBackfillFilters => ({
     branch: currentBranch,
@@ -38,30 +48,24 @@ function TranslationCoverageContent({ projectId, token }: { projectId: string; t
   });
   const resetPreview = () => {
     setPreview(null);
-    setPreviewError(null);
-    setLaunchError(null);
+    coverageState.resetPreview?.();
+    coverageState.resetLaunch?.();
   };
   const handlePreview = async () => {
     resetPreview();
     try {
       setPreview(await coverageState.previewBackfill(filters()));
-    } catch (error) {
-      setPreviewError(error instanceof Error ? error.message : "Cost preview failed.");
+    } catch {
+      // The mutation exposes the error used by the rendered message.
     }
   };
   const handleLaunch = async () => {
     if (!preview) return;
-    setLaunchError(null);
+    coverageState.resetLaunch?.();
     try {
       await coverageState.launchBackfill(filters());
-    } catch (error) {
-      setLaunchError(
-        error instanceof ApiError && error.status === 409
-          ? "A translation backfill is already active for this project."
-          : error instanceof Error
-            ? error.message
-            : "Backfill could not be launched.",
-      );
+    } catch {
+      // The mutation exposes the error used by the rendered message.
     }
   };
 
