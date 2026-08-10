@@ -66,12 +66,7 @@ describe("useSuggestionOutcomes", () => {
       await result.current.fetchNextPage();
     });
 
-    expect(mockedListOutcomes).toHaveBeenNthCalledWith(
-      1,
-      "p1",
-      { cursor: undefined, limit: 25 },
-      "tok",
-    );
+    expect(mockedListOutcomes).toHaveBeenNthCalledWith(1, "p1", { limit: 25 }, "tok");
     expect(mockedListOutcomes).toHaveBeenNthCalledWith(
       2,
       "p1",

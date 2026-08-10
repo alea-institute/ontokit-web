@@ -21,13 +21,14 @@ export function useSuggestionOutcomes(
     queryFn: ({ pageParam }) =>
       trustApi.listOutcomes(
         projectId,
-        { cursor: pageParam, limit: 25 },
+        pageParam ? { cursor: pageParam, limit: 25 } : { limit: 25 },
         accessToken!,
       ),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     enabled: !!projectId && canManage && !!accessToken,
     staleTime: 30_000,
+    refetchOnWindowFocus: false,
   });
 
   const pages = query.data?.pages;
