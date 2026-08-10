@@ -166,8 +166,13 @@ export function AuditLogSection({ projectId, accessToken, canManage }: AuditLogS
       {outcomes.isError ? (
         <div className="mt-4 flex items-center gap-3">
           <p className="text-sm text-red-600 dark:text-red-400">Couldn&apos;t load more</p>
-          <Button size="sm" variant="outline" onClick={() => outcomes.fetchNextPage()}>
-            Retry
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={outcomes.isFetchingNextPage}
+            onClick={() => outcomes.fetchNextPage()}
+          >
+            {outcomes.isFetchingNextPage ? "Retrying…" : "Retry"}
           </Button>
         </div>
       ) : outcomes.hasNextPage ? (
