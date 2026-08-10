@@ -79,10 +79,12 @@ describe("applyThemeToDOM", () => {
 
 describe("useEditorModeStore", () => {
   beforeEach(() => {
+    localStorage.clear();
     useEditorModeStore.setState({
       editorMode: "standard",
       theme: "system",
-      hideSaveButton: false,
+      showManualSaveButton: true,
+      hasSeenAutoSaveToast: false,
       preferEditMode: false,
     });
   });
@@ -92,8 +94,11 @@ describe("useEditorModeStore", () => {
       const state = useEditorModeStore.getState();
       expect(state.editorMode).toBe("standard");
       expect(state.theme).toBe("system");
-      expect(state.hideSaveButton).toBe(false);
+      expect(state.showManualSaveButton).toBe(true);
+      expect(state.hasSeenAutoSaveToast).toBe(false);
       expect(state.preferEditMode).toBe(false);
+      expect("hideSaveButton" in state).toBe(false);
+      expect("autoSaveEnabled" in state).toBe(false);
     });
   });
 
@@ -133,16 +138,64 @@ describe("useEditorModeStore", () => {
     });
   });
 
-  describe("setHideSaveButton", () => {
-    it("hides the save button", () => {
-      useEditorModeStore.getState().setHideSaveButton(true);
-      expect(useEditorModeStore.getState().hideSaveButton).toBe(true);
+  describe("setShowManualSaveButton", () => {
+    it("hides the optional manual save button without disabling auto-save", () => {
+      useEditorModeStore.getState().setShowManualSaveButton(false);
+      expect(useEditorModeStore.getState().showManualSaveButton).toBe(false);
+      expect("autoSaveEnabled" in useEditorModeStore.getState()).toBe(false);
     });
 
     it("shows the save button again", () => {
-      useEditorModeStore.getState().setHideSaveButton(true);
-      useEditorModeStore.getState().setHideSaveButton(false);
-      expect(useEditorModeStore.getState().hideSaveButton).toBe(false);
+      useEditorModeStore.getState().setShowManualSaveButton(false);
+      useEditorModeStore.getState().setShowManualSaveButton(true);
+      expect(useEditorModeStore.getState().showManualSaveButton).toBe(true);
+    });
+
+    it("persists the preference through the real localStorage layer", async () => {
+      useEditorModeStore.getState().setShowManualSaveButton(false);
+      expect(JSON.parse(localStorage.getItem("ontokit-editor-preferences")!).state.showManualSaveButton).toBe(false);
+
+      const persisted = localStorage.getItem("ontokit-editor-preferences")!;
+      useEditorModeStore.setState({ showManualSaveButton: true });
+      localStorage.setItem("ontokit-editor-preferences", persisted);
+      await useEditorModeStore.persist.rehydrate();
+
+      expect(useEditorModeStore.getState().showManualSaveButton).toBe(false);
+    });
+
+    it("migrates a legacy hidden-button blob to safe auto-save-only state", async () => {
+      localStorage.setItem("ontokit-editor-preferences", JSON.stringify({
+        state: { editorMode: "standard", theme: "system", hideSaveButton: true, preferEditMode: false },
+        version: 0,
+      }));
+
+      await useEditorModeStore.persist.rehydrate();
+
+      const state = useEditorModeStore.getState();
+      expect(state.showManualSaveButton).toBe(false);
+      expect("hideSaveButton" in state).toBe(false);
+      expect("autoSaveEnabled" in state).toBe(false);
+    });
+
+    it("migrates a blob predating hideSaveButton to the visible legacy default", async () => {
+      localStorage.setItem("ontokit-editor-preferences", JSON.stringify({
+        state: { editorMode: "developer", theme: "dark" },
+        version: 0,
+      }));
+
+      await useEditorModeStore.persist.rehydrate();
+
+      expect(useEditorModeStore.getState().showManualSaveButton).toBe(true);
+    });
+  });
+
+  describe("claimAutoSaveTeachingToast", () => {
+    it("uses the dedicated storage marker to coordinate across stale tabs", async () => {
+      localStorage.setItem("ontokit-auto-save-toast-seen", "true");
+      useEditorModeStore.setState({ hasSeenAutoSaveToast: false });
+
+      await expect(useEditorModeStore.getState().claimAutoSaveTeachingToast()).resolves.toBe(false);
+      expect(useEditorModeStore.getState().hasSeenAutoSaveToast).toBe(false);
     });
   });
 
