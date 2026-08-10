@@ -46,6 +46,7 @@ import { SimilarConceptsPanel } from "@/components/editor/SimilarConceptsPanel";
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { useToast } from "@/lib/context/ToastContext";
+import { AUTO_SAVE_TEACHING_TOAST } from "@/lib/editor/autoSave";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import { useTranslationConfig } from "@/lib/hooks/useTranslationConfig";
 import { useTranslationState } from "@/lib/hooks/useTranslationState";
@@ -232,6 +233,10 @@ export function ClassDetailPanel({
     canEdit: !!canEdit && !!onUpdateClass,
     onUpdateClass,
     onError: (msg) => toast.error(msg),
+    onFirstAutoSave: () => toast.info(
+      AUTO_SAVE_TEACHING_TOAST.title,
+      AUTO_SAVE_TEACHING_TOAST.description,
+    ),
   });
 
   // Keep editStateRef in sync with current edit state (only when editing)
@@ -341,7 +346,7 @@ export function ClassDetailPanel({
   // Manual save: flush the current draft to git. Stays in edit mode.
   const flushDraftToGit = useCallback(async () => {
     triggerSave();
-    await flushToGit();
+    await flushToGit("manual");
   }, [triggerSave, flushToGit]);
 
   // Auto-enter edit mode based on continuous editing or restored draft
@@ -976,7 +981,7 @@ export function ClassDetailPanel({
           status={saveStatus}
           error={saveError}
           validationError={validationError}
-          onRetry={() => flushToGit()}
+          onRetry={() => flushToGit("manual")}
           onManualSave={flushDraftToGit}
           onCancel={cancelEditMode}
         />

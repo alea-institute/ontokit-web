@@ -7,6 +7,8 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useDraftStore, draftKey, type AnyDraftEntry } from "@/lib/stores/draftStore";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import type { SaveOrigin } from "@/lib/editor/autoSave";
 
 export type SaveStatus = "idle" | "draft" | "saving" | "saved" | "error";
 
@@ -17,6 +19,8 @@ interface UseEntityAutoSaveOptions {
   canEdit: boolean;
   onFlush?: (iri: string) => Promise<void>;
   onError?: (msg: string) => void;
+  /** Announces the first successful navigate-away auto-save for this browser profile. */
+  onFirstAutoSave?: () => void;
   /** Build a draft entry from the current edit state */
   buildDraftEntry: () => AnyDraftEntry | null;
   /** Validate before saving — return error message or null */
@@ -28,7 +32,7 @@ export interface UseEntityAutoSaveReturn {
   saveError: string | null;
   validationError: string | null;
   triggerSave: () => void;
-  flushToGit: () => Promise<boolean>;
+  flushToGit: (origin?: SaveOrigin) => Promise<boolean>;
   discardDraft: () => void;
   restoredDraft: AnyDraftEntry | null;
   clearRestoredDraft: () => void;
@@ -41,12 +45,15 @@ export function useEntityAutoSave({
   canEdit,
   onFlush,
   onError,
+  onFirstAutoSave,
   buildDraftEntry,
   validate,
 }: UseEntityAutoSaveOptions): UseEntityAutoSaveReturn {
   const { setDraft, clearDraft, getDraft } = useDraftStore();
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  const onFirstAutoSaveRef = useRef(onFirstAutoSave);
+  onFirstAutoSaveRef.current = onFirstAutoSave;
   const onFlushRef = useRef(onFlush);
   onFlushRef.current = onFlush;
   const buildDraftEntryRef = useRef(buildDraftEntry);
@@ -116,7 +123,7 @@ export function useEntityAutoSave({
 
   // Flush draft to git (Tier 2: commit on navigate away)
   // Returns true on success, false on error or no-op
-  const flushToGit = useCallback(async (): Promise<boolean> => {
+  const flushToGit = useCallback(async (origin: SaveOrigin = "auto"): Promise<boolean> => {
     if (flushingRef.current) return false;
     if (!entityIri || !branch || !canEdit || !onFlushRef.current) return false;
 
@@ -141,6 +148,13 @@ export function useEntityAutoSave({
       await onFlushRef.current(entityIri);
       clearDraft(key);
       setSaveStatus("saved");
+
+      if (
+        origin === "auto" &&
+        await useEditorModeStore.getState().claimAutoSaveTeachingToast()
+      ) {
+        onFirstAutoSaveRef.current?.();
+      }
 
       savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
       return true;
