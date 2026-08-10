@@ -51,6 +51,32 @@ export interface ProjectTrustSettings {
 
 export type ProjectTrustSettingsUpdate = Partial<ProjectTrustSettings>;
 
+/** One immutable submitter snapshot paired with its suggestion outcome. */
+export interface SuggestionOutcomeItem {
+  user_id: string | null;
+  is_anonymous: boolean;
+  submitter_name: string | null;
+  submitter_email: string | null;
+  snapshot_tier: TrustTier | null;
+  snapshot_role: string | null;
+  snapshot_captured_at: string | null;
+  outcome: string;
+  decided_by: string | null;
+  decided_by_name: string | null;
+  created_at: string;
+}
+
+export interface SuggestionOutcomesResponse {
+  items: SuggestionOutcomeItem[];
+  total: number;
+  next_cursor: string | null;
+}
+
+export interface SuggestionOutcomesParams {
+  cursor?: string;
+  limit?: number;
+}
+
 // --- Helpers ---
 
 function authHeaders(token?: string): Record<string, string> {
@@ -79,6 +105,20 @@ export const trustApi = {
     api.get<MemberTrust[]>(`/api/v1/projects/${projectId}/trust/members`, {
       headers: authHeaders(token),
     }),
+
+  /** Submission outcomes with captured-at-submit identity and trust (owner/admin only). */
+  listOutcomes: (
+    projectId: string,
+    { cursor, limit }: SuggestionOutcomesParams,
+    token: string,
+  ) =>
+    api.get<SuggestionOutcomesResponse>(
+      `/api/v1/projects/${projectId}/trust/outcomes`,
+      {
+        headers: authHeaders(token),
+        params: { cursor, limit },
+      },
+    ),
 
   /** Grant, refuse, revoke, or clear a member's trusted status (owner/admin only). */
   setMemberTrust: (
