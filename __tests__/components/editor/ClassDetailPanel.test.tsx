@@ -13,6 +13,11 @@ const mockEditStateRef = { current: null as Record<string, unknown> | null };
 let autoSaveOverrides: Record<string, unknown> = {};
 
 let editorModeOverrides: Record<string, unknown> = {};
+const mockTranslateField = vi.fn();
+const mockResetTranslation = vi.fn();
+const mockAnnounce = vi.fn();
+let translationItems: Array<Record<string, unknown>> = [];
+let translationError: Error | null = null;
 
 // ── Mocks (must be before component import) ──
 
@@ -55,7 +60,24 @@ vi.mock("@/lib/stores/editorModeStore", () => ({
 
 // Stub child components
 vi.mock("@/components/editor/LanguageFlag", () => ({
-  LanguageFlag: () => null,
+  LanguageFlag: ({ lang }: { lang: string }) => <span aria-label={`Language: ${lang}`}>flag</span>,
+}));
+vi.mock("@/lib/hooks/useTranslationConfig", () => ({
+  useTranslationConfig: () => ({ config: { language_tags: ["fr"] } }),
+}));
+vi.mock("@/lib/hooks/useTranslationState", () => ({
+  useTranslationState: () => ({
+    state: { entity_iri: "http://example.org/ontology#Person", branch: "main", items: translationItems },
+    translateField: mockTranslateField,
+    isTranslating: false,
+    translateError: translationError,
+    isTranslationPending: false,
+    pendingNotice: null,
+    resetTranslation: mockResetTranslation,
+  }),
+}));
+vi.mock("@/components/ui/ScreenReaderAnnouncer", () => ({
+  useAnnounce: () => ({ announce: mockAnnounce }),
 }));
 vi.mock("@/components/editor/LanguagePicker", () => ({
   LanguagePicker: ({ value, onChange }: { value: string; onChange: (code: string) => void }) => (
@@ -182,11 +204,81 @@ describe("ClassDetailPanel", () => {
     mockSearchEntities.mockResolvedValue({ results: [] });
     autoSaveOverrides = {};
     editorModeOverrides = {};
+    translationItems = [];
+    translationError = null;
+    mockTranslateField.mockResolvedValue({ job_id: "job-1" });
     mockEditStateRef.current = null;
     mockFlushToGit.mockResolvedValue(true);
     capturedAnnotationRowProps = [];
     capturedInlineAnnotationAdderProps = null;
     capturedRelationshipSectionProps = null;
+  });
+
+  it("shows language flags and calm provisional values without committing them", async () => {
+    translationItems = [{
+      predicate: "rdfs:label",
+      language: "fr",
+      state: "provisional",
+      value: "Personne",
+      record_id: "record-1",
+    }];
+    const onUpdateClass = vi.fn();
+
+    render(<ClassDetailPanel {...DEFAULT_PROPS} onUpdateClass={onUpdateClass} />);
+
+    expect(await screen.findByText("Personne")).toBeDefined();
+    expect(screen.getAllByLabelText("Language: en").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Language: fr")).toBeDefined();
+    expect(screen.getByLabelText("fr translation provisional")).toBeDefined();
+    await waitFor(() => expect(mockAnnounce).toHaveBeenCalledWith("Provisional machine translations are available."));
+    expect(onUpdateClass).not.toHaveBeenCalled();
+  });
+
+  it("runs the confirmed on-demand lifecycle and clears pending when a value arrives", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockGetClassDetail.mockResolvedValue(makeClassDetail({
+      annotations: [{ property_iri: "http://www.w3.org/2004/02/skos/core#definition", values: [{ value: "A person", lang: "en" }] }],
+    }));
+    const view = render(<ClassDetailPanel {...DEFAULT_PROPS} canUseLLM />);
+
+    await user.click(await screen.findByRole("button", { name: "Translate Definition" }));
+    expect(window.confirm).toHaveBeenCalled();
+    expect(mockTranslateField).toHaveBeenCalledWith("skos:definition");
+    expect((screen.getByRole("button", { name: "Definition translation pending" }) as HTMLButtonElement).disabled).toBe(true);
+
+    translationItems = [{ predicate: "skos:definition", language: "fr", state: "provisional", value: "Une personne", record_id: "record-1" }];
+    view.rerender(<ClassDetailPanel {...DEFAULT_PROPS} canUseLLM />);
+    expect(await screen.findByText("Une personne")).toBeDefined();
+    await waitFor(() => expect((screen.getByRole("button", { name: "Translate Definition" }) as HTMLButtonElement).disabled).toBe(false));
+    expect(mockAnnounce).toHaveBeenCalledWith("Definition translations arrived.");
+  });
+
+  it("shows a retryable typed-error path for on-demand translation", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockTranslateField.mockRejectedValueOnce(new Error("provider unavailable"));
+    mockGetClassDetail.mockResolvedValue(makeClassDetail({
+      annotations: [{ property_iri: "http://www.w3.org/2004/02/skos/core#definition", values: [{ value: "A person", lang: "en" }] }],
+    }));
+    translationError = new Error("provider unavailable");
+
+    render(<ClassDetailPanel {...DEFAULT_PROPS} canUseLLM />);
+    await user.click(await screen.findByRole("button", { name: "Translate Definition" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("provider unavailable");
+    expect((screen.getByRole("button", { name: "Retry" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(mockAnnounce).toHaveBeenCalledWith("definition translation failed. You can retry.", "assertive");
+  });
+
+  it("clears the entity pending indicator when translations arrive", async () => {
+    translationItems = [{ predicate: "rdfs:label", language: "fr", state: "pending", value: null, record_id: null }];
+    const view = render(<ClassDetailPanel {...DEFAULT_PROPS} />);
+    expect(await screen.findByText("Translations pending for this entity")).toBeDefined();
+
+    translationItems = [{ predicate: "rdfs:label", language: "fr", state: "provisional", value: "Personne", record_id: "record-1" }];
+    view.rerender(<ClassDetailPanel {...DEFAULT_PROPS} />);
+    await waitFor(() => expect(screen.queryByText("Translations pending for this entity")).toBeNull());
   });
 
   // ── Empty / placeholder state ──

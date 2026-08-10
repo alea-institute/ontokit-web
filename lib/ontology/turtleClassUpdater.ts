@@ -13,7 +13,86 @@ import {
   findBlock,
   literal,
   isIriValue,
+  iriTurtleForms,
+  scanToBlockEnd,
+  escapeRegex,
 } from "@/lib/ontology/turtleUtils";
+
+const RDFS_LABEL_IRI = "http://www.w3.org/2000/01/rdf-schema#label";
+const RDFS_COMMENT_IRI = "http://www.w3.org/2000/01/rdf-schema#comment";
+
+function retainedLiteralPatterns(
+  data: TurtleClassUpdateData,
+  prefixes: ReturnType<typeof parseDeclarations>["prefixes"],
+): Array<{ propertyForms: string[]; target: string }> {
+  const patterns: Array<{ propertyForms: string[]; target: string }> = [];
+  const add = (propertyIri: string, values: LocalizedString[]) => {
+    for (const value of values) {
+      if (!value.value.trim() || (!value.lang && isIriValue(value.value))) continue;
+      patterns.push({
+        propertyForms: iriTurtleForms(propertyIri, prefixes),
+        target: literal(value.value, value.lang),
+      });
+    }
+  };
+
+  add(RDFS_LABEL_IRI, data.labels);
+  add(RDFS_COMMENT_IRI, data.comments);
+  for (const annotation of data.annotations ?? []) {
+    add(annotation.property_iri, annotation.values);
+  }
+  return patterns;
+}
+
+function pruneDeletedLiteralAxioms(
+  lines: string[],
+  classIri: string,
+  data: TurtleClassUpdateData,
+  declarations: ReturnType<typeof parseDeclarations>,
+): string {
+  const { prefixes, base } = declarations;
+  const sourceForms = iriTurtleForms(classIri, prefixes, base);
+  const retained = retainedLiteralPatterns(data, prefixes);
+  const remove = new Set<number>();
+
+  for (let start = 0; start < lines.length; start++) {
+    const trimmed = lines[start].trim();
+    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("@")) continue;
+
+    const end = scanToBlockEnd(lines, start);
+    const block = lines.slice(start, end + 1).join("\n");
+    if (!/(?:^|[;\s])a\s+owl:Axiom\b/.test(block)) {
+      start = end;
+      continue;
+    }
+
+    const annotatesClass = sourceForms.some((form) =>
+      new RegExp(`owl:annotatedSource\\s+${escapeRegex(form)}(?=\\s*[;.])`).test(block),
+    );
+    if (!annotatesClass) {
+      start = end;
+      continue;
+    }
+
+    const stillExists = retained.some(({ propertyForms, target }) => {
+      const hasProperty = propertyForms.some((form) =>
+        new RegExp(`owl:annotatedProperty\\s+${escapeRegex(form)}(?=\\s*[;.])`).test(block),
+      );
+      return (
+        hasProperty &&
+        new RegExp(`owl:annotatedTarget\\s+${escapeRegex(target)}(?=\\s*[;.])`).test(block)
+      );
+    });
+
+    if (!stillExists) {
+      for (let line = start; line <= end; line++) remove.add(line);
+      if (end + 1 < lines.length && lines[end + 1].trim() === "") remove.add(end + 1);
+    }
+    start = end;
+  }
+
+  return lines.filter((_, index) => !remove.has(index)).join("\n");
+}
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -113,7 +192,8 @@ export function updateClassInTurtle(
   classIri: string,
   data: TurtleClassUpdateData,
 ): string {
-  const { prefixes, base } = parseDeclarations(source);
+  const declarations = parseDeclarations(source);
+  const { prefixes, base } = declarations;
   const rev = reverseMap(prefixes);
   const lines = source.split("\n");
 
@@ -129,5 +209,10 @@ export function updateClassInTurtle(
   const before = lines.slice(0, block.startLine);
   const after = lines.slice(block.endLine + 1);
 
-  return [...before, newBlock, ...after].join("\n");
+  return pruneDeletedLiteralAxioms(
+    [...before, newBlock, ...after],
+    classIri,
+    data,
+    declarations,
+  );
 }

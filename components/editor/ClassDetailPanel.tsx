@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import {
   ExternalLink,
   AlertTriangle,
@@ -47,6 +47,10 @@ import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { useToast } from "@/lib/context/ToastContext";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
+import { useTranslationConfig } from "@/lib/hooks/useTranslationConfig";
+import { useTranslationState } from "@/lib/hooks/useTranslationState";
+import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
+import { getTranslationErrorMessage, type OnDemandTranslationPredicate, type TranslationEntityStateItem } from "@/lib/api/translations";
 import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
 import type { GeneratedSuggestion } from "@/lib/api/generation";
 import { provenanceFromSuggestion, type AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
@@ -137,6 +141,66 @@ export function ClassDetailPanel({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resolvedTargetLabels, setResolvedTargetLabels] = useState<Record<string, string>>({});
+  const [requestedTranslation, setRequestedTranslation] = useState<OnDemandTranslationPredicate | null>(null);
+  const [failedTranslation, setFailedTranslation] = useState<OnDemandTranslationPredicate | null>(null);
+  const { announce } = useAnnounce();
+  const translationConfig = useTranslationConfig(projectId, accessToken);
+  const translationState = useTranslationState(
+    projectId,
+    classIri,
+    branch || "main",
+    accessToken,
+  );
+  const translationItems = useMemo(
+    () => translationState.state?.items ?? [],
+    [translationState.state?.items],
+  );
+  const languagesConfigured = (translationConfig.config?.language_tags.length ?? 0) > 0;
+  const announcedProvisionalRef = useRef("");
+
+  const requestFieldTranslation = useCallback(async (
+    predicate: OnDemandTranslationPredicate,
+    fieldLabel: string,
+  ) => {
+    translationState.resetTranslation();
+    setFailedTranslation(null);
+    if (!window.confirm(`Translate this ${fieldLabel} into the configured languages?`)) return;
+    setRequestedTranslation(predicate);
+    announce(`${fieldLabel} translation requested and pending.`);
+    try {
+      await translationState.translateField(predicate);
+    } catch {
+      setRequestedTranslation(null);
+      setFailedTranslation(predicate);
+      announce(`${fieldLabel} translation failed. You can retry.`, "assertive");
+    }
+  }, [announce, translationState]);
+
+  useEffect(() => {
+    if (!requestedTranslation) return;
+    const arrived = translationItems.some(
+      (item) => item.predicate === requestedTranslation &&
+        item.value !== null &&
+        (item.state === "provisional" || item.state === "verified"),
+    );
+    if (arrived) {
+      const label = requestedTranslation === "skos:definition" ? "Definition" : "Example";
+      setRequestedTranslation(null);
+      announce(`${label} translations arrived.`);
+    }
+  }, [announce, requestedTranslation, translationItems]);
+
+  useEffect(() => {
+    const provisionalSignature = translationItems
+      .filter((item) => item.state === "provisional" && item.value !== null)
+      .map((item) => `${item.predicate}:${item.language}:${item.value}`)
+      .sort()
+      .join("|");
+    if (provisionalSignature && provisionalSignature !== announcedProvisionalRef.current) {
+      announce("Provisional machine translations are available.");
+    }
+    announcedProvisionalRef.current = provisionalSignature;
+  }, [announce, translationItems]);
 
   // Edit mode: explicit state (default read-only)
   const [isEditing, setIsEditing] = useState(false);
@@ -689,6 +753,44 @@ export function ClassDetailPanel({
     </>
   ), []);
 
+  const translationValues = (predicate: string) =>
+    translationItems.filter((item) => item.predicate === predicate);
+
+  const translationItemFor = (predicate: string, value: LocalizedString) =>
+    translationValues(predicate).find(
+      (item) => item.language === value.lang && item.value === value.value,
+    );
+
+  const provisionalOnly = (predicate: string, committed: LocalizedString[]) =>
+    translationValues(predicate).filter(
+      (item) => item.state === "provisional" && item.value !== null &&
+        !committed.some((value) => value.lang === item.language && value.value === item.value),
+    );
+
+  const fieldTranslationAction = (
+    predicate: OnDemandTranslationPredicate,
+    label: string,
+    hasSourceValue: boolean,
+  ) => {
+    if (!hasSourceValue || !languagesConfigured || !canUseLLM) return undefined;
+    const isPending = !translationState.pendingNotice && (
+      requestedTranslation === predicate ||
+      translationState.isTranslationPending ||
+      translationValues(predicate).some((item) => item.state === "pending")
+    );
+    return (
+      <button
+        type="button"
+        onClick={() => void requestFieldTranslation(predicate, label.toLowerCase())}
+        disabled={isPending || translationState.isTranslating}
+        className="rounded px-1.5 py-0.5 text-[11px] text-primary-700 hover:bg-primary-50 disabled:text-slate-400 dark:text-primary-300 dark:hover:bg-primary-900/20"
+        aria-label={isPending ? `${label} translation pending` : `Translate ${label}`}
+      >
+        {isPending ? "Pending…" : "Translate"}
+      </button>
+    );
+  };
+
   // ── Render: empty state ──
   if (!classIri) {
     return (
@@ -875,6 +977,22 @@ export function ClassDetailPanel({
 
         {/* Content */}
         <div className="p-4 space-y-3">
+          {translationItems.some((item) => item.state === "pending") && (
+            <div role="status" className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <Clock className="h-3.5 w-3.5" />
+              Translations pending for this entity
+            </div>
+          )}
+          {translationState.translateError && failedTranslation && (
+            <p role="alert" className="text-xs text-red-600">
+              {getTranslationErrorMessage(translationState.translateError, "Translation failed.")} <button className="underline" onClick={() => void requestFieldTranslation(failedTranslation, failedTranslation === "skos:definition" ? "definition" : "example")}>Retry</button>
+            </p>
+          )}
+          {translationState.pendingNotice && (
+            <p role="alert" className="text-xs text-amber-700">
+              {translationState.pendingNotice}{requestedTranslation && <> <button className="underline" onClick={() => void requestFieldTranslation(requestedTranslation, requestedTranslation === "skos:definition" ? "definition" : "example")}>Retry</button></>}
+            </p>
+          )}
           {/* Lint Issues (always read-only) */}
           {classIssues.length > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/10">
@@ -933,8 +1051,13 @@ export function ClassDetailPanel({
               <div className="space-y-1">
                 {classDetail.labels.map((label, index) => (
                   <div key={index} className="flex items-center gap-2">
+                    {label.lang && <LanguageFlag lang={label.lang} />}
                     <span className="text-sm text-slate-700 dark:text-slate-300">{label.value}</span>
+                    <TranslationStateBadge item={translationItemFor("rdfs:label", label)} />
                   </div>
+                ))}
+                {provisionalOnly("rdfs:label", classDetail.labels).map((item) => (
+                  <ProvisionalTranslationValue key={`${item.language}:${item.value}`} item={item} />
                 ))}
               </div>
             </Section>
@@ -954,7 +1077,10 @@ export function ClassDetailPanel({
                   tooltip="skos:definition"
                   icon={<BookOpen className="h-4 w-4" />}
                   headerActions={canUseLLM ? (
-                    <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
+                    <span className="flex items-center gap-1">
+                      {fieldTranslationAction("skos:definition", "Definition", defAnnotation?.values.some((value) => value.value.trim()) ?? false)}
+                      <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
+                    </span>
                   ) : undefined}
                 >
                   <div className="space-y-2">
@@ -988,7 +1114,10 @@ export function ClassDetailPanel({
                   tooltip="skos:definition"
                   icon={<BookOpen className="h-4 w-4" />}
                   headerActions={canUseLLM ? (
-                    <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
+                    <span className="flex items-center gap-1">
+                      {fieldTranslationAction("skos:definition", "Definition", defAnnotation.values.some((value) => value.value.trim()))}
+                      <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
+                    </span>
                   ) : undefined}
                 >
                   <div className="space-y-1">
@@ -996,7 +1125,11 @@ export function ClassDetailPanel({
                       <div key={vIndex} className="flex items-start gap-2">
                         {val.lang && <LanguageFlag lang={val.lang} />}
                         <span className="text-sm text-slate-700 dark:text-slate-300">{val.value}</span>
+                        <TranslationStateBadge item={translationItemFor("skos:definition", val)} />
                       </div>
+                    ))}
+                    {provisionalOnly("skos:definition", defAnnotation.values).map((item) => (
+                      <ProvisionalTranslationValue key={`${item.language}:${item.value}`} item={item} />
                     ))}
                   </div>
                   {renderSuggestionSlot(annotationsSuggestions)}
@@ -1101,13 +1234,25 @@ export function ClassDetailPanel({
                   }
 
                   return (
-                    <Section key={annotation.property_iri} title={propInfo.displayLabel} tooltip={propInfo.curie} icon={icon}>
+                    <Section
+                      key={annotation.property_iri}
+                      title={propInfo.displayLabel}
+                      tooltip={propInfo.curie}
+                      icon={icon}
+                      headerActions={annotation.property_iri === "http://www.w3.org/2004/02/skos/core#example"
+                        ? fieldTranslationAction("skos:example", "Example", annotation.values.some((value) => value.value.trim()))
+                        : undefined}
+                    >
                       <div className="space-y-1">
                         {annotation.values.map((val, vIdx) => (
                           <div key={vIdx} className="flex items-center gap-2">
                             {val.lang && <LanguageFlag lang={val.lang} />}
                             <span className="text-sm text-slate-700 dark:text-slate-300">{val.value}</span>
+                            <TranslationStateBadge item={translationItemFor(propInfo.curie, val)} />
                           </div>
+                        ))}
+                        {provisionalOnly(propInfo.curie, annotation.values).map((item) => (
+                          <ProvisionalTranslationValue key={`${item.language}:${item.value}`} item={item} />
                         ))}
                       </div>
                     </Section>
@@ -1380,6 +1525,34 @@ const ANNOTATION_ICON_MAP: Record<string, React.ReactNode> = {
 
 function getAnnotationIcon(propertyIri: string): React.ReactNode {
   return ANNOTATION_ICON_MAP[propertyIri] || <FileText className="h-4 w-4" />;
+}
+
+function TranslationStateBadge({ item }: { item?: TranslationEntityStateItem }) {
+  if (!item || item.state === "missing") return null;
+  const styles = {
+    verified: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300",
+    provisional: "bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300",
+    pending: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
+  }[item.state];
+  return (
+    <span
+      className={cn("inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium", styles)}
+      aria-label={`${item.language || "untagged"} translation ${item.state}`}
+    >
+      {item.state}
+    </span>
+  );
+}
+
+function ProvisionalTranslationValue({ item }: { item: TranslationEntityStateItem }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-sky-50/60 px-1.5 py-1 dark:bg-sky-900/10">
+      {item.language && <LanguageFlag lang={item.language} />}
+      <span className="text-sm text-slate-700 dark:text-slate-300">{item.value}</span>
+      <TranslationStateBadge item={item} />
+      <span className="sr-only">Provisional machine translation</span>
+    </div>
+  );
 }
 
 // ── Sub-components ──────────────────────────────────────────────────

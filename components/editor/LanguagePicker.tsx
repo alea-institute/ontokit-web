@@ -15,6 +15,7 @@ interface LanguagePickerProps {
   value: string;
   onChange: (code: string) => void;
   disabled?: boolean;
+  ariaLabel?: string;
 }
 
 /** Set of codes that appear in the "Frequently used" group */
@@ -46,7 +47,7 @@ const GROUP_HEADING_CLASS =
  * language, a "Use custom code" option appears so users can enter arbitrary
  * BCP 47 tags (e.g. `grc`, `cu`, `sga`).
  */
-export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProps) {
+export function LanguagePicker({ value, onChange, disabled, ariaLabel = "Language tag" }: LanguagePickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -115,7 +116,7 @@ export function LanguagePicker({ value, onChange, disabled }: LanguagePickerProp
         type="button"
         onClick={() => !disabled && setOpen((prev) => !prev)}
         disabled={disabled}
-        aria-label="Language tag"
+        aria-label={ariaLabel}
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
