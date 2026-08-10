@@ -19,9 +19,16 @@ COPY . .
 # Build arguments for environment variables
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_WS_URL
+# next.config.ts reads these at build time to bake NEXT_PUBLIC_* flags; deliberately omit the client secret so it is never baked into an image layer.
+ARG AUTH_MODE
+ARG ZITADEL_ISSUER
+ARG ZITADEL_CLIENT_ID
 
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_WS_URL=$NEXT_PUBLIC_WS_URL
+ENV AUTH_MODE=$AUTH_MODE
+ENV ZITADEL_ISSUER=$ZITADEL_ISSUER
+ENV ZITADEL_CLIENT_ID=$ZITADEL_CLIENT_ID
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
