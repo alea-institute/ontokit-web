@@ -28,21 +28,21 @@ function formatTimeAgo(date: Date): string {
 }
 
 function TierSnapshot({ item }: { item: SuggestionOutcomeItem }) {
-  if (item.is_anonymous) {
-    return (
-      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-        Anonymous
-      </span>
-    );
-  }
-
-  if (!item.snapshot_captured_at) {
+  if (item.snapshot_captured_at === null) {
     return (
       <span
         className="text-sm text-slate-400 dark:text-slate-500"
         title="Recorded before audit snapshots were captured"
       >
         —
+      </span>
+    );
+  }
+
+  if (item.is_anonymous) {
+    return (
+      <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+        Anonymous
       </span>
     );
   }
@@ -107,7 +107,7 @@ export function AuditLogSection({ projectId, accessToken, canManage }: AuditLogS
 
   if (!canManage) return null;
 
-  if (outcomes.isError) {
+  if (outcomes.isError && outcomes.items.length === 0) {
     return (
       <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
         <p className="text-sm text-red-600 dark:text-red-400">
@@ -117,7 +117,7 @@ export function AuditLogSection({ projectId, accessToken, canManage }: AuditLogS
     );
   }
 
-  if (outcomes.isLoading) {
+  if (outcomes.isLoading || !outcomes.data) {
     return (
       <section className="mb-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
         <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
@@ -128,7 +128,7 @@ export function AuditLogSection({ projectId, accessToken, canManage }: AuditLogS
     );
   }
 
-  if (outcomes.total === 0) {
+  if (outcomes.items.length === 0) {
     return (
       <section className="mb-8 rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
         <ClipboardList className="mx-auto h-12 w-12 text-slate-400" aria-hidden="true" />
@@ -163,7 +163,14 @@ export function AuditLogSection({ projectId, accessToken, canManage }: AuditLogS
         ))}
       </ul>
 
-      {outcomes.items.length < outcomes.total && (
+      {outcomes.isError ? (
+        <div className="mt-4 flex items-center gap-3">
+          <p className="text-sm text-red-600 dark:text-red-400">Couldn&apos;t load more</p>
+          <Button size="sm" variant="outline" onClick={() => outcomes.fetchNextPage()}>
+            Retry
+          </Button>
+        </div>
+      ) : outcomes.hasNextPage ? (
         <Button
           className="mt-4"
           size="sm"
@@ -173,7 +180,7 @@ export function AuditLogSection({ projectId, accessToken, canManage }: AuditLogS
         >
           {outcomes.isFetchingNextPage ? "Loading…" : "Load more"}
         </Button>
-      )}
+      ) : null}
     </section>
   );
 }
