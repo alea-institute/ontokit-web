@@ -351,3 +351,92 @@ UAT: Damien's DoD-bearing enablement, gate disposition/rotation, persona creatio
 four-persona plus R4 sweep (including KD1 author-vs-committer proof), and optional
 post-UAT secret rotation remain explicitly deferred to the **Auth-on flip checklist
 (Damien)** in `DEV-RUNBOOK.md`.
+
+### U7 TERMINAL (auth-on flip + 4-persona sweep) — DoD COMPLETE; KD1 attribution proven; 1 bug fixed live, 2 findings open
+
+The terminal flip was executed on 2026-08-10. `/opt/ontokit/compose.yaml` now sets
+`AUTH_MODE: optional` for api and web, with pre-flip backup
+`compose.yaml.bak-preflip-20260810`. The first attempt used the plan's shorthand
+`enabled`; the api's pydantic `required | optional | disabled` Literal rejected it at
+startup, so fail-fast worked as designed. `optional` is the actual terminal DEV mode:
+anonymous users can browse and suggest, while authenticated roles gain their assigned
+capabilities. The web then exposed a repository defect: `next.config.ts` bakes
+`NEXT_PUBLIC_AUTH_MODE` from `AUTH_MODE` and `NEXT_PUBLIC_ZITADEL_CONFIGURED` from the
+issuer plus client id, but the Dockerfile declared none of those build args, so no
+Docker build could produce the auth UI. Commit `cfa91623` on
+`feat/u7-web-auth-buildargs` (base deployed SHA `add33b20`, pushed to the
+alea-institute fork) adds `ARG`/`ENV` for `AUTH_MODE`, `ZITADEL_ISSUER`, and
+`ZITADEL_CLIENT_ID`, deliberately excluding the client secret. The box checked out
+`cfa91623`, compose received the `optional`/issuer/client-id build args, and
+`docker compose build --no-cache web` produced a clean F6 stale-chunk check plus the
+expected sign-in UI and notification bell.
+
+Per Damien's q1 decision in `ontokit-web-2026-08-09-u7-flip-gate`, the temporary
+basic-auth gate was dropped after enforcement was proved. `ontokit-dev-auth` was
+removed from `ontokit-dev-web`, `ontokit-dev-api`, `ontokit-api-dev-gate`,
+`ontokit-auth-login`, and `ontokit-auth-zitadel`, then deleted from the middlewares
+block; the proxy backup is `.ontokit-dev.yaml.bak-preflip`, and the `ClientIP` internal
+router remains. Verification showed the app returns 200 without gate credentials,
+unauthenticated `POST /api/v1/projects` returns 401, the `ontokit-api.dev` deadend still
+returns 503, and auth-host discovery returns 200. The old gate credential is no longer
+used by anything, so rotation is moot.
+
+Zitadel management API created `uat-suggester` (id `385647439601729545`),
+`uat-editor` (`385647442336415753`), and `uat-admin`
+(`385647445054324745`); the admin id was appended to `SUPERADMIN_USER_IDS`. Acting as
+`uat-admin`, the application's own members API added the suggester and editor project
+roles, both with 201. These disposable DEV persona accounts remain for future UAT;
+passwords are intentionally omitted and can be reset in the Zitadel console at
+`/ui/console`.
+
+The four-persona sweep passed its authorization boundaries. Anonymous project listing
+returned 200, project creation and source PUT returned 401, and suggestion capabilities
+reported `tier=anonymous`, `can_suggest=true`, `can_mint_entities=false`; anonymous
+session creation returned 201, leaving harmless empty probe session
+`s_d9958c61e0175529`. The suggester completed a full browser OIDC round trip and saw
+Suggesting mode, the `Suggester — 100/day` LLM chip, and My Suggestions. Its save
+produced commit `451b861`, authored
+`UAT suggester <uat-suggester-edb0d6d7@users.noreply.ontokit.local>` under R14's
+synthetic-alias rule, with no real email in history; submit opened pending PR #5 after
+the F-b repair below, while approve returned 403 `Editor access or above required` and
+direct source PUT returned 403. The editor displayed its project role chip, reported
+`tier=reviewer, can_mint_entities=true`, and a direct source PUT returned 200 and
+created main commit `6d54d3c` authored by UAT editor; member add correctly returned 403
+`Only owner or admin can add members`. The admin's browser exposed members, trust
+configuration, lint, LLM, and danger-zone settings; its review queue showed the
+suggester PR, and approve returned 204. The resulting merge commit `31dc941` was
+authored and committed by UAT admin with suggester-authored `451b861` beneath it: the
+required KD1 contributor-author versus committer attribution proof is complete.
+
+**F-b (fixed live):** authenticated suggester submit initially returned 500 with
+`sqlalchemy.exc.MissingGreenlet` in
+`suggestion_service.py::_create_pr_for_session`. The suggester tier takes the
+403-fallback `_create_pr_directly`, which returned an ORM `PullRequest`; later commits
+expired its attributes, and the notification block's `pr_response.title` access
+attempted synchronous IO in the async context. Editor submit returns pydantic and the
+anonymous lifecycle uses another route, so only authenticated non-editors exercised
+the defect, which the prior U5 anonymous lifecycle could not reveal. Api commit
+`20cb6aa7` on `feat/u7-zitadel-standup` snapshots the scalars before expiring work on
+both the main and existing-PR-retry paths. Its regression test was red against the
+pre-fix code and green after; the suggestion-service module passed 81/81. DEV was
+rebuilt at `20cb6aa7`, and re-submit succeeded.
+
+**F-c (open, repo bug):** federated logout clears NextAuth and then dead-ends at
+localhost because `components/auth/user-menu.tsx` reads the unset
+`NEXT_PUBLIC_ZITADEL_ISSUER` and falls back to `http://localhost:8080`; it is absent
+from `next.config.ts` env and all Dockerfile/compose paths. The workaround is the real
+issuer's `/oidc/v1/end_session` URL with client id and post-logout redirect. Fix by
+deriving it from `ZITADEL_ISSUER` through `next.config` plus the build arg, or by reading
+the issuer server-side. **F-d (open, needs repro):** in two browser attempts, suggester
+Save showed the `Suggested update to …` toast and POSTed `/suggestions/sessions` with
+201 but never issued the `…/save` PUT, so no commit landed; API-level save is proven.
+Investigate `useAutoSave`'s suggestion-mode flush path before relying on browser
+suggester saves.
+
+The auth-enabled R4 happy path also passed: project list; editor tree with 18,327
+classes; class detail and edit affordances; suggestions review; relationship graph
+`1 nodes, 0 edges (2 resolved)`, matching U4's verified state; Login V2 pages; and the
+Zitadel console. Final deployed SHAs are api `20cb6aa7`
+(`feat/u7-zitadel-standup`) and web `cfa91623`
+(`feat/u7-web-auth-buildargs`). U7 is DoD complete, and U12 IaC capture plus U14
+upstream mapping are unblocked.

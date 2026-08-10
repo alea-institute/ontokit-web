@@ -43,6 +43,10 @@ names below when operating the stack.
   `ontokit-auth.dev.openlegalstandard.org`. A `fetch`-based healthcheck is invalid here:
   undici drops Host overrides, while Login V2 derives service configuration from the
   request headers.
+- The web image now requires build args for `AUTH_MODE`, `ZITADEL_ISSUER`, and
+  `ZITADEL_CLIENT_ID`; these are baked into the Next.js client flags. Never pass the
+  client secret as a build arg. DEV currently deploys web `cfa91623` and api
+  `20cb6aa7`.
 
 ### Secrets & env contract
 
@@ -62,8 +66,10 @@ runbook. The Zitadel/OIDC contract consists of these key names:
 The same env already contains `AUTH_SECRET`, `SECRET_KEY`, and
 `GITHUB_TOKEN_ENCRYPTION_KEY`. Both api (`settings.zitadel_issuer`, with optional
 `zitadel_internal_url`) and web (`lib/env.ts` and `auth.ts`) consume the issuer contract.
-The api, worker, and web have been recreated with the new env, but `AUTH_MODE` remains
-disabled until Damien performs the checklist below.
+The terminal DEV mode is now `AUTH_MODE=optional` for api and web. The api's pydantic
+enum is `required | optional | disabled`; `optional`, not the planning shorthand
+`enabled`, is the state in which anonymous users can browse and suggest while
+authenticated roles receive their additional capabilities.
 
 When re-initializing Zitadel against the existing postgres volume, first align the
 pre-existing `zitadel` role's login password with `ZITADEL_DB_PASSWORD` from the env.
@@ -78,15 +84,20 @@ pre-existing router and middleware. Relevant routes are:
 | Router | Match / priority | Middleware | Upstream |
 | --- | --- | --- | --- |
 | `ontokit-auth-internal` | Auth Host + `ClientIP(178.156.208.239)`, 50000 | None | CPX41 `:8080` |
-| `ontokit-auth-login` | Auth Host + `PathPrefix(/ui/v2/login)`, 45000 | `ontokit-dev-auth` | CPX41 `:8081` |
-| `ontokit-auth-zitadel` | Auth Host, 40000 | `ontokit-dev-auth` | CPX41 `:8080` |
+| `ontokit-auth-login` | Auth Host + `PathPrefix(/ui/v2/login)`, 45000 | None | CPX41 `:8081` |
+| `ontokit-auth-zitadel` | Auth Host, 40000 | None | CPX41 `:8080` |
 | `ontokit-auth-http` | Auth Host on HTTP entrypoint | HTTPS redirect | HTTPS auth host |
 
 The internal router is intentionally ungated so Login V2 and, after the flip, the api
 can validate tokens without basic auth. It relies on Traefik v3.6's `ClientIP` matcher.
-The preserved routes include web priority 10000, api priority 20000, the
-`ontokit-api-dev-gate` dead-end priority 30000, and the `ontokit-dev-auth` basic-auth
-middleware.
+The preserved routes include web priority 10000, api priority 20000, and the
+`ontokit-api-dev-gate` dead-end priority 30000. Per Damien's q1 decision, the
+`ontokit-dev-auth` basic-auth middleware has been deleted from the middlewares block
+and removed from all five routers that used it: `ontokit-dev-web`, `ontokit-dev-api`,
+`ontokit-api-dev-gate`, `ontokit-auth-login`, and `ontokit-auth-zitadel`. The
+`ClientIP` internal router remains. The pre-flip proxy backup is
+`.ontokit-dev.yaml.bak-preflip`; gate-credential rotation is moot because nothing uses
+that credential.
 
 ### Firewall
 
@@ -120,23 +131,43 @@ script without copying credential values. The run created the `OntoKit` project 
 first "Failed to create project" message was a parse failure after the project had in
 fact been created.
 
-### Auth-on flip checklist (Damien)
+### Auth-on flip checklist — EXECUTED 2026-08-10
 
-Do not perform this checklist as part of the credential-free U7 standup.
+The flip and terminal sweep are complete. `/opt/ontokit/compose.yaml` has
+`AUTH_MODE: optional` for api and web, with backup
+`compose.yaml.bak-preflip-20260810`. The first attempt used the plan's shorthand
+`enabled`; the api rejected that invalid literal at startup, demonstrating the
+configuration's fail-fast behavior. Correcting it to the api enum's `optional` value
+established the intended terminal DEV behavior.
 
-1. In `/opt/ontokit/compose.yaml`, set `AUTH_MODE=enabled` for api and web, then recreate
-   api, worker, and web with `docker compose up -d api worker web`.
-2. Decide the basic-auth gate's terminal state. Browser OIDC authorize and Login V2
-   endpoints must be reachable by testers: either remove the gate, as KTD2 required it
-   only for the auth-disabled window, or retain it and accept a double prompt.
-   Server-side token calls already bypass it through `ontokit-auth-internal`.
-3. Create persona users. The admin exists; create suggester and editor test users via
-   the console or setup automation.
-4. Rotate the gate credential as previously stated, or remove the middleware entirely.
-5. Run the terminal four-persona sweep and the auth-on R4 sweep. This is where KD1's
-   contributor author distinct from bot committer must be proven.
-6. If the OIDC client secret should rotate after UAT, consider rerunning
-   `/opt/ontokit/setup-zitadel-dev.sh` with `--force-secrets`.
+The web client flags are build-time values. Commit `cfa91623` on
+`feat/u7-web-auth-buildargs` adds the required Dockerfile `ARG`/`ENV` declarations for
+`AUTH_MODE`, `ZITADEL_ISSUER`, and `ZITADEL_CLIENT_ID`; the client secret is
+deliberately excluded. The live compose supplies those build args, and the web was
+rebuilt with `docker compose build --no-cache web`. The F6 stale-chunk check was clean,
+and the sign-in UI and notification bell appeared. Current deployed SHAs are api
+`20cb6aa7` (`feat/u7-zitadel-standup`) and web `cfa91623`
+(`feat/u7-web-auth-buildargs`).
+
+After anonymous write enforcement was verified, the basic-auth gate was removed as
+recorded in the Traefik section. The four-persona sweep and auth-enabled R4 happy-path
+sweep passed; KD1's contributor-author versus admin-committer split was proven. U7 is
+DoD complete, and U12 infrastructure-as-code capture and U14 upstream mapping are
+unblocked. If the OIDC client secret should rotate after UAT, consider rerunning
+`/opt/ontokit/setup-zitadel-dev.sh` with `--force-secrets`.
+
+### UAT personas
+
+Three named DEV users remain in Zitadel for future UAT:
+
+- `uat-suggester` — project role `suggester`.
+- `uat-editor` — project role `editor`.
+- `uat-admin` — superadmin through `SUPERADMIN_USER_IDS` in `/opt/ontokit/.env`.
+
+The suggester and editor project memberships were added through the application's own
+members API while acting as `uat-admin`. Their passwords are throwaway DEV
+credentials; do not record them here. Reset them in the Zitadel console at
+`/ui/console` when needed.
 
 ### Known residuals
 
@@ -155,3 +186,14 @@ Do not perform this checklist as part of the credential-free U7 standup.
   before then.
 - U12 must capture compose, Traefik, and firewall configuration as repository IaC,
   including `deploy/compose.dev.yaml` and the corresponding proxy/systemd assets.
+- **F-c (open, repo bug):** federated logout clears the NextAuth session and then
+  redirects to localhost. `components/auth/user-menu.tsx` reads
+  `NEXT_PUBLIC_ZITADEL_ISSUER`, which is not supplied by `next.config.ts`, Dockerfile,
+  or compose, so it falls back to `http://localhost:8080`. The operational workaround
+  is the real issuer's `/oidc/v1/end_session` URL with the client id and post-logout
+  redirect. Fix by deriving the public issuer from `ZITADEL_ISSUER` through the build
+  contract, or by reading it server-side.
+- **F-d (open, needs repro):** browser suggester auto-save created a session and showed
+  the success toast but did not issue the `…/save` PUT, so no commit landed in two
+  attempts. API-level save works. Investigate `useAutoSave`'s suggestion-mode flush
+  path before relying on browser suggester saves.
