@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useEntityAutoSave } from "@/lib/hooks/useEntityAutoSave";
 import type { AnyDraftEntry } from "@/lib/stores/draftStore";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 
 // Mock the draft store with stable function references
 const mockDrafts: Record<string, AnyDraftEntry> = {};
@@ -28,6 +29,8 @@ beforeEach(() => {
   for (const key of Object.keys(mockDrafts)) {
     delete mockDrafts[key];
   }
+  localStorage.removeItem("ontokit-auto-save-toast-seen");
+  useEditorModeStore.setState({ hasSeenAutoSaveToast: false });
 });
 
 function makeDraftEntry(): AnyDraftEntry {
@@ -154,6 +157,46 @@ describe("useEntityAutoSave", () => {
 
     const key = "proj-1:main:http://example.org/myProp";
     expect(mockDrafts[key]).toBeUndefined();
+  });
+
+  it("teaches on only the first successful default auto-save", async () => {
+    const onFlush = vi.fn().mockResolvedValue(undefined);
+    const onFirstAutoSave = vi.fn();
+    const { result } = renderHook(() =>
+      useEntityAutoSave({ ...BASE_OPTIONS, onFlush, onFirstAutoSave }),
+    );
+
+    act(() => result.current.triggerSave());
+    await act(async () => {
+      await result.current.flushToGit();
+    });
+    act(() => result.current.triggerSave());
+    await act(async () => {
+      await result.current.flushToGit();
+    });
+
+    expect(onFlush).toHaveBeenCalledTimes(2);
+    expect(onFirstAutoSave).toHaveBeenCalledOnce();
+    expect(useEditorModeStore.getState().hasSeenAutoSaveToast).toBe(true);
+  });
+
+  it("does not consume the teaching toast for a manual save", async () => {
+    const onFirstAutoSave = vi.fn();
+    const { result } = renderHook(() =>
+      useEntityAutoSave({
+        ...BASE_OPTIONS,
+        onFlush: vi.fn().mockResolvedValue(undefined),
+        onFirstAutoSave,
+      }),
+    );
+
+    act(() => result.current.triggerSave());
+    await act(async () => {
+      await result.current.flushToGit("manual");
+    });
+
+    expect(onFirstAutoSave).not.toHaveBeenCalled();
+    expect(useEditorModeStore.getState().hasSeenAutoSaveToast).toBe(false);
   });
 
   it("flushToGit handles errors gracefully", async () => {
