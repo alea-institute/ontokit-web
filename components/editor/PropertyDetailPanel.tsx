@@ -29,6 +29,7 @@ import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, SEE_ALSO_IRI, getAnnotationProp
 import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar";
 import { useEntityAutoSave } from "@/lib/hooks/useEntityAutoSave";
 import { useToast } from "@/lib/context/ToastContext";
+import { AUTO_SAVE_TEACHING_TOAST } from "@/lib/editor/autoSave";
 import {
   extractPropertyDetail,
   PROPERTY_CHARACTERISTIC_TYPES,
@@ -226,6 +227,10 @@ export function PropertyDetailPanel({
       });
     } : undefined,
     onError: (msg) => toast.error(msg),
+    onFirstAutoSave: () => toast.info(
+      AUTO_SAVE_TEACHING_TOAST.title,
+      AUTO_SAVE_TEACHING_TOAST.description,
+    ),
     buildDraftEntry,
     validate,
   });
@@ -305,7 +310,7 @@ export function PropertyDetailPanel({
   // Manual save: flush the current draft to git. Stays in edit mode.
   const flushDraftToGit = useCallback(async () => {
     triggerSave();
-    await flushToGit();
+    await flushToGit("manual");
   }, [triggerSave, flushToGit]);
 
   // Auto-enter edit mode
@@ -639,7 +644,7 @@ export function PropertyDetailPanel({
           status={saveStatus}
           error={saveError}
           validationError={validationError}
-          onRetry={() => flushToGit()}
+          onRetry={() => flushToGit("manual")}
           onManualSave={flushDraftToGit}
           onCancel={cancelEditMode}
         />

@@ -3,11 +3,12 @@ import { useDraftStore, draftKey, type DraftEntry } from "@/lib/stores/draftStor
 import type { LocalizedString, AnnotationUpdate, ClassUpdatePayload } from "@/lib/api/client";
 import type { RelationshipGroup } from "@/components/editor/standard/RelationshipSection";
 import type { OWLClassDetail } from "@/lib/api/client";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import type { SaveOrigin } from "@/lib/editor/autoSave";
 
 export type SaveStatus = "idle" | "draft" | "saving" | "saved" | "error";
 
 export type SaveMode = "commit" | "suggest";
-
 interface UseAutoSaveOptions {
   projectId: string;
   branch: string;
@@ -16,6 +17,8 @@ interface UseAutoSaveOptions {
   canEdit: boolean;
   onUpdateClass?: (classIri: string, data: ClassUpdatePayload) => Promise<void>;
   onError?: (msg: string) => void;
+  /** Announces the first successful navigate-away auto-save for this browser profile. */
+  onFirstAutoSave?: () => void;
   /** When "suggest", flushes go through onSuggestSave instead of onUpdateClass */
   saveMode?: SaveMode;
   /** Called when saveMode is "suggest" — saves to suggestion branch */
@@ -36,7 +39,7 @@ export interface UseAutoSaveReturn {
   saveError: string | null;
   validationError: string | null;
   triggerSave: () => void;
-  flushToGit: () => Promise<boolean>;
+  flushToGit: (origin?: SaveOrigin) => Promise<boolean>;
   discardDraft: () => void;
   editStateRef: React.MutableRefObject<EditState | null>;
   classDetailRef: React.MutableRefObject<OWLClassDetail | null>;
@@ -52,12 +55,15 @@ export function useAutoSave({
   canEdit,
   onUpdateClass,
   onError,
+  onFirstAutoSave,
   saveMode = "commit",
   onSuggestSave,
 }: UseAutoSaveOptions): UseAutoSaveReturn {
   const { setDraft, clearDraft, getDraft } = useDraftStore();
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
+  const onFirstAutoSaveRef = useRef(onFirstAutoSave);
+  onFirstAutoSaveRef.current = onFirstAutoSave;
 
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -142,7 +148,7 @@ export function useAutoSave({
 
   // Flush draft to git (Tier 2: commit on navigate away)
   // Returns true on success, false on error or no-op
-  const flushToGit = useCallback(async (): Promise<boolean> => {
+  const flushToGit = useCallback(async (origin: SaveOrigin = "auto"): Promise<boolean> => {
     if (flushingRef.current) return false;
     const canFlush = canEdit || saveMode === "suggest";
     const hasHandler = saveMode === "suggest" ? !!onSuggestSave : !!onUpdateClass;
@@ -207,6 +213,13 @@ export function useAutoSave({
       }
       clearDraft(key);
       setSaveStatus("saved");
+
+      if (
+        origin === "auto" &&
+        await useEditorModeStore.getState().claimAutoSaveTeachingToast()
+      ) {
+        onFirstAutoSaveRef.current?.();
+      }
 
       // Fade "saved" indicator after 2s
       savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);

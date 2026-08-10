@@ -29,6 +29,7 @@ import { LABEL_IRI, COMMENT_IRI, DEFINITION_IRI, SEE_ALSO_IRI, getAnnotationProp
 import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar";
 import { useEntityAutoSave } from "@/lib/hooks/useEntityAutoSave";
 import { useToast } from "@/lib/context/ToastContext";
+import { AUTO_SAVE_TEACHING_TOAST } from "@/lib/editor/autoSave";
 import {
   extractIndividualDetail,
   type ParsedIndividualDetail,
@@ -193,6 +194,10 @@ export function IndividualDetailPanel({
       });
     } : undefined,
     onError: (msg) => toast.error(msg),
+    onFirstAutoSave: () => toast.info(
+      AUTO_SAVE_TEACHING_TOAST.title,
+      AUTO_SAVE_TEACHING_TOAST.description,
+    ),
     buildDraftEntry,
     validate,
   });
@@ -272,7 +277,7 @@ export function IndividualDetailPanel({
   // Manual save: flush the current draft to git. Stays in edit mode.
   const flushDraftToGit = useCallback(async () => {
     triggerSave();
-    await flushToGit();
+    await flushToGit("manual");
   }, [triggerSave, flushToGit]);
 
   useEffect(() => {
@@ -444,7 +449,7 @@ export function IndividualDetailPanel({
           status={saveStatus}
           error={saveError}
           validationError={validationError}
-          onRetry={() => flushToGit()}
+          onRetry={() => flushToGit("manual")}
           onManualSave={flushDraftToGit}
           onCancel={cancelEditMode}
         />

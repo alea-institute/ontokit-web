@@ -195,8 +195,8 @@ function EditorPreferencesSection() {
     const timer = setTimeout(() => setHighlightedSetting(null), 2000);
     return () => clearTimeout(timer);
   }, []);
-  const hideSaveButton = useEditorModeStore((s) => s.hideSaveButton);
-  const setHideSaveButton = useEditorModeStore((s) => s.setHideSaveButton);
+  const showManualSaveButton = useEditorModeStore((s) => s.showManualSaveButton);
+  const setShowManualSaveButton = useEditorModeStore((s) => s.setShowManualSaveButton);
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
@@ -324,7 +324,7 @@ function EditorPreferencesSection() {
         </button>
       </div>
 
-      {/* Hide Save Button */}
+      {/* Manual Save Button */}
       <div
         id="save-button"
         className={cn(
@@ -332,39 +332,39 @@ function EditorPreferencesSection() {
           highlightedSetting === "save-button" && "bg-amber-100 dark:bg-amber-900/30",
         )}
       >
-        <span id="hide-save-button-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
-          Hide Save Button
+        <span id="manual-save-button-label" className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">
+          Show Manual Save Button
         </span>
         <button
           type="button"
           role="switch"
-          aria-checked={hideSaveButton}
-          aria-labelledby="hide-save-button-label"
-          onClick={() => setHideSaveButton(!hideSaveButton)}
+          aria-checked={showManualSaveButton}
+          aria-labelledby="manual-save-button-label"
+          onClick={() => setShowManualSaveButton(!showManualSaveButton)}
           className={cn(
             "flex items-center gap-3 rounded-lg border p-4 text-left transition-colors w-full",
-            hideSaveButton
+            showManualSaveButton
               ? "border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-900/20"
               : "border-slate-200 hover:border-slate-300 dark:border-slate-600 dark:hover:border-slate-500",
           )}
         >
           <Save className={cn(
             "h-5 w-5 flex-shrink-0",
-            hideSaveButton
+            showManualSaveButton
               ? "text-primary-600 dark:text-primary-400"
               : "text-slate-400",
           )} />
           <div>
             <p className={cn(
               "font-medium",
-              hideSaveButton
+              showManualSaveButton
                 ? "text-primary-700 dark:text-primary-300"
                 : "text-slate-900 dark:text-white",
             )}>
-              {hideSaveButton ? "On" : "Off"}
+              {showManualSaveButton ? "On" : "Off"}
             </p>
             <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Hide the Save button in the editor. Auto-save still works when navigating away.
+              Show a Save button for immediate saves. Auto-save always saves when you navigate away.
             </p>
           </div>
         </button>
