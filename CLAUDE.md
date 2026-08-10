@@ -65,6 +65,7 @@ OntoKit Web is a Next.js 15 frontend for collaborative OWL ontology editing. It 
 
 ### Directory Structure Highlights
 
+- `docs/solutions/` - documented solutions to past problems (bugs, best practices, conventions), organized by category with YAML frontmatter (`module`, `tags`, `problem_type`) — relevant when implementing or debugging in documented areas
 - `lib/api/` - Backend API clients (projects, revisions, lint, pullRequests)
 - `lib/editor/` - Monaco editor support (languages, Web Worker indexing)
 - `lib/ontology/types.ts` - OWL entity type definitions (OWLClass, OWLProperty, etc.)
