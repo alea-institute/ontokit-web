@@ -292,3 +292,62 @@ All exercised live against the seeded FOLIO project (local bare repo; `github_in
   remove or rotate at U7 terminal).
 - Environment note: the earlier "web pending round-2" header line is superseded —
   web `3aacf5e9` (U3) is deployed and browser-verified.
+
+### U7 (infra standup, credential-free 80%) — Zitadel + Login V2 live on DEV, auth flip DEFERRED to Damien
+The Zitadel stack is live on CPX41 `ontokit-dev` (`178.156.208.239`) from
+`/opt/ontokit/compose.yaml` (pre-change backup
+`/opt/ontokit/compose.yaml.bak-u7-20260809`): internal-only Mailpit, Zitadel v4.16.3
+at standup, and Login V2 share the existing postgres and are exposed as the single
+external domain `ontokit-auth.dev.openlegalstandard.org`, with the login UI path-split
+at `/ui/v2/login`. Traefik on `hetzner-dev` issued the Let's Encrypt certificate and
+routes browser traffic through the existing basic-auth gate while a higher-priority
+`ClientIP(178.156.208.239)` router permits only CPX41's server-side token traffic to
+reach Zitadel ungated. The parameterized setup script from api commit `504ba5d6` was
+copied to `/opt/ontokit/setup-zitadel-dev.sh` and provisioned the `OntoKit` project and
+`OntoKit Web` OIDC app, including the production-shaped callback on
+`ontokit.dev.openlegalstandard.org`; `/opt/ontokit/.env` remains mode 600 and now holds
+the Zitadel key names documented in `DEV-RUNBOOK.md`. The api, worker, and web were
+recreated with that env, but `AUTH_MODE=disabled` was deliberately left unchanged, so
+application behavior remains identical until Damien performs the terminal flip.
+
+Three startup failures were root-caused and fixed on the box. First, the api repo's
+earlier `scripts/init-db.sh` had already created the shared-postgres `zitadel` role and
+database, causing Zitadel init's user-verification step to skip password creation and
+then crash-loop on SASL authentication; the role password was aligned from the
+`ZITADEL_DB_PASSWORD` value in `/opt/ontokit/.env`, and any re-init against an existing
+volume must do that alignment first. Second, `zitadel-login:latest` no longer accepts
+the repo's `ZITADEL_SERVICE_USER_TOKEN_FILE` contract: token calls failed with "No
+authentication credentials found" and surfaced through lru-cache as `fetch() returned
+undefined`. The live compose now reads `/zitadel-data/login-client.pat` in an entrypoint
+wrapper and exports `ZITADEL_SERVICE_USER_TOKEN` before starting Login V2. Third, the
+login app derives service configuration from request headers, so the stock
+`localhost:3000` healthcheck always failed without the external Host; Node/undici also
+drops attempted `Host` overrides in `fetch`. The live healthcheck now uses
+`http.request` with `Host: ontokit-auth.dev.openlegalstandard.org`, and the ineffective
+`CUSTOM_REQUEST_HEADERS` setting was removed. A diagnostic `localhost` trusted-domain
+entry remains harmless but ineffective because Zitadel cannot match the origin port.
+
+U7 also corrected F9's persistence claim. Although `/etc/iptables/rules.v4` and
+`rules.v6` existed, no `iptables-persistent`, `netfilter-persistent`, or restore unit
+was installed, so the firewall would have disappeared on reboot. The durable fix is
+the idempotent `/usr/local/sbin/ontokit-firewall.sh` plus enabled oneshot
+`ontokit-firewall.service` (`After=docker.service`), covering ports
+`3000/8000/8080/8081` for IPv4 and IPv6 without replaying stale Docker chain state via
+whole-table `iptables-restore`. IPv4 `DOCKER-USER` permits the proxy
+`204.168.246.227` only when the original destination is `178.156.208.239`; IPv6 INPUT
+drops non-loopback access. Off-box direct `:8080` and `:8081` timed out, while the
+proxied paths remained reachable.
+
+Verification passed across every intended path: discovery returned 401 without gate
+credentials and 200 through the gate with issuer
+`https://ontokit-auth.dev.openlegalstandard.org`; CPX41's internal request returned
+200 without the gate; Login V2 rendered the browser-verified "Welcome back!" form and
+`username-text-input`; `/ui/console` returned 200; the main Projects page was unchanged;
+the app and `/health` returned 200; HTTP redirected to HTTPS with 301; direct public
+`:8080`/`:8081` timed out; and all nine containers were healthy. Capacity remained
+comfortable: available RAM moved from 10 GiB before to 13 GiB after while disk usage
+stayed at 37 GiB. U7 therefore completes the credential-free standup, but not auth-on
+UAT: Damien's DoD-bearing enablement, gate disposition/rotation, persona creation,
+four-persona plus R4 sweep (including KD1 author-vs-committer proof), and optional
+post-UAT secret rotation remain explicitly deferred to the **Auth-on flip checklist
+(Damien)** in `DEV-RUNBOOK.md`.
