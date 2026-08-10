@@ -252,6 +252,17 @@ describe("AuditLogSection", () => {
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
+  it("disables Retry while its own retry fetch is in flight", () => {
+    const fetchNextPage = vi.fn();
+    mockQuery([outcome()], { isError: true, isFetchingNextPage: true, fetchNextPage });
+    renderWithQueryClient(<AuditLogSection projectId="p1" accessToken="tok" canManage />);
+
+    const retrying = screen.getByRole("button", { name: "Retrying…" });
+    expect(retrying).toHaveProperty("disabled", true);
+    fireEvent.click(retrying);
+    expect(fetchNextPage).not.toHaveBeenCalled();
+  });
+
   it("formats recent timestamps and falls back to a locale date after seven days", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-08-10T16:00:00Z"));
