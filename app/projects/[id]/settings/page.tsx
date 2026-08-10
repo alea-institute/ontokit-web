@@ -22,6 +22,7 @@ import { ProjectForm } from "@/components/projects/project-form";
 import { MemberList } from "@/components/projects/member-list";
 import { MemberTrustControl } from "@/components/projects/MemberTrustControl";
 import { TrustLadderSection } from "@/components/projects/TrustLadderSection";
+import { AuditLogSection } from "@/components/projects/AuditLogSection";
 import { UserSearchInput } from "@/components/projects/user-search-input";
 import { LabelPreferences } from "@/components/projects/label-preferences";
 import { ApiError, projectOntologyApi, type IndexStatusResponse, type IndexStatus } from "@/lib/api/client";
@@ -1703,6 +1704,7 @@ export default function ProjectSettingsPage() {
             accessToken={session?.accessToken}
             canManage={!!canManage}
           />
+          <AuditLogSection projectId={projectId} accessToken={session?.accessToken} canManage={!!canManage} />
 
           {/* PR Settings Section - only for owners */}
           {isOwner && (
