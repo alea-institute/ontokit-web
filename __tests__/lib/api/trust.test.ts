@@ -1,5 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { trustApi } from "@/lib/api/trust";
+import {
+  trustApi,
+  type SuggestionOutcomeItem,
+  type TrustTier,
+} from "@/lib/api/trust";
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -59,6 +63,59 @@ describe("trustApi", () => {
       const [url, options] = mockFetch.mock.calls[0];
       expect(url).toContain("/api/v1/projects/p1/trust/members");
       expect(options.method).toBe("GET");
+    });
+  });
+
+  describe("listOutcomes", () => {
+    it("calls the outcomes endpoint with cursor, limit, and bearer token", async () => {
+      mockOk({ items: [], total: 0, next_cursor: null });
+
+      await trustApi.listOutcomes(
+        "p1",
+        { cursor: "opaque/cursor+value", limit: 50 },
+        "tok",
+      );
+
+      const [url, options] = mockFetch.mock.calls[0];
+      const requestUrl = new URL(url);
+      expect(requestUrl.pathname).toBe("/api/v1/projects/p1/trust/outcomes");
+      expect(requestUrl.searchParams.get("cursor")).toBe("opaque/cursor+value");
+      expect(requestUrl.searchParams.get("limit")).toBe("50");
+      expect(options.method).toBe("GET");
+      expect(new Headers(options.headers).get("Authorization")).toBe("Bearer tok");
+    });
+
+    it("passes nullable snapshot fields through untransformed", async () => {
+      const item: SuggestionOutcomeItem = {
+        user_id: "u1",
+        is_anonymous: false,
+        submitter_name: null,
+        submitter_email: null,
+        snapshot_tier: null,
+        snapshot_role: null,
+        snapshot_captured_at: null,
+        outcome: "accepted",
+        decided_by: null,
+        decided_by_name: null,
+        created_at: "2026-08-10T12:00:00Z",
+      };
+      mockOk({ items: [item], total: 1, next_cursor: null });
+
+      const result = await trustApi.listOutcomes("p1", { limit: 25 }, "tok");
+
+      expect(result.items[0]).toEqual(item);
+      expect(result.items[0].snapshot_tier).toBeNull();
+      expect(result.items[0].snapshot_role).toBeNull();
+    });
+
+    it("types snapshot_tier as TrustTier or null", () => {
+      type SnapshotTier = SuggestionOutcomeItem["snapshot_tier"];
+      const tier: SnapshotTier = "trusted";
+      const nullableTier: TrustTier | null = tier;
+      const noTier: SnapshotTier = null;
+
+      expect(nullableTier).toBe("trusted");
+      expect(noTier).toBeNull();
     });
   });
 
