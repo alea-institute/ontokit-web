@@ -7,7 +7,7 @@ import { useState, useRef, useEffect } from "react";
 import { shouldShowAuthUI } from "@/lib/auth-mode";
 
 // Zitadel configuration
-const ZITADEL_ISSUER = process.env.NEXT_PUBLIC_ZITADEL_ISSUER || "http://localhost:8080";
+const ZITADEL_ISSUER = process.env.NEXT_PUBLIC_ZITADEL_ISSUER;
 const ZITADEL_CLIENT_ID = process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID || "";
 
 export function UserMenu() {
@@ -22,6 +22,12 @@ export function UserMenu() {
     setIsOpen(false);
     // First clear the NextAuth session
     await signOut({ redirect: false });
+    if (!ZITADEL_ISSUER) {
+      console.error(
+        "Cannot complete federated logout: NEXT_PUBLIC_ZITADEL_ISSUER is not configured",
+      );
+      return;
+    }
     // Then redirect to Zitadel's end_session endpoint with client_id for proper redirect
     const postLogoutRedirectUri = encodeURIComponent(window.location.origin);
     window.location.href = `${ZITADEL_ISSUER}/oidc/v1/end_session?client_id=${ZITADEL_CLIENT_ID}&post_logout_redirect_uri=${postLogoutRedirectUri}`;
