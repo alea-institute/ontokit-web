@@ -54,16 +54,114 @@ describe("useSuggestionSession", () => {
 
     const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
 
+    let createdSessionId: string | undefined;
     await act(async () => {
-      await result.current.startSession();
+      createdSessionId = await result.current.startSession();
     });
 
+    expect(createdSessionId).toBe("sess-1");
     expect(result.current.status).toBe("active");
     expect(result.current.sessionId).toBe("sess-1");
     expect(result.current.branch).toBe("suggest/sess-1");
     expect(result.current.beaconToken).toBe("signed-beacon-token");
     expect(result.current.isActive).toBe(true);
     expect(mockedCreateSession).toHaveBeenCalledWith("proj-1", "token-123");
+  });
+
+  it("creates and immediately saves through callbacks from the same render", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-immediate",
+      branch: "suggest/sess-immediate",
+      created_at: "2024-01-01T00:00:00Z",
+    });
+    mockedSave.mockResolvedValue({
+      commit_hash: "abc123",
+      branch: "suggest/sess-immediate",
+      changes_count: 1,
+    });
+    const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
+    const { startSession, saveToSession } = result.current;
+
+    await act(async () => {
+      await startSession();
+      await saveToSession("content", "http://ex.org/A", "A");
+    });
+
+    expect(mockedSave).toHaveBeenCalledWith(
+      "proj-1",
+      "sess-immediate",
+      {
+        content: "content",
+        entity_iri: "http://ex.org/A",
+        entity_label: "A",
+      },
+      "token-123",
+    );
+  });
+
+  it("prefers an explicit session id over current state", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-state",
+      branch: "suggest/sess-state",
+      created_at: "2024-01-01T00:00:00Z",
+    });
+    mockedSave.mockResolvedValue({
+      commit_hash: "abc123",
+      branch: "suggest/sess-explicit",
+      changes_count: 1,
+    });
+    const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
+
+    await act(async () => {
+      await result.current.startSession();
+    });
+    await act(async () => {
+      await result.current.saveToSession(
+        "content",
+        "http://ex.org/A",
+        "A",
+        "sess-explicit",
+      );
+    });
+
+    expect(mockedSave).toHaveBeenCalledWith(
+      "proj-1",
+      "sess-explicit",
+      expect.any(Object),
+      "token-123",
+    );
+  });
+
+  it("keeps an in-flight save as a silent no-op", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-1",
+      branch: "suggest/sess-1",
+      created_at: "2024-01-01T00:00:00Z",
+    });
+    let resolveSave!: (value: {
+      commit_hash: string;
+      branch: string;
+      changes_count: number;
+    }) => void;
+    mockedSave.mockImplementation(
+      () => new Promise((resolve) => { resolveSave = resolve; }),
+    );
+    const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
+    await act(async () => {
+      await result.current.startSession();
+    });
+
+    let firstSave!: Promise<void>;
+    await act(async () => {
+      firstSave = result.current.saveToSession("one", "http://ex.org/A", "A");
+      await expect(
+        result.current.saveToSession("two", "http://ex.org/B", "B"),
+      ).resolves.toBeUndefined();
+    });
+    expect(mockedSave).toHaveBeenCalledTimes(1);
+
+    resolveSave({ commit_hash: "abc", branch: "suggest/sess-1", changes_count: 1 });
+    await act(async () => { await firstSave; });
   });
 
   it("startSession does nothing when session already exists", async () => {
@@ -172,13 +270,29 @@ describe("useSuggestionSession", () => {
     expect(result.current.entitiesModified).toEqual(["A"]);
   });
 
-  it("saveToSession does nothing without an active session", async () => {
+  it("saveToSession rejects without an active session", async () => {
     const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
 
-    await act(async () => {
-      await result.current.saveToSession("content", "http://ex.org/A", "A");
-    });
+    await expect(
+      result.current.saveToSession("content", "http://ex.org/A", "A"),
+    ).rejects.toThrow("Cannot save suggestion without a session id");
 
+    expect(mockedSave).not.toHaveBeenCalled();
+  });
+
+  it("saveToSession rejects without an access token", async () => {
+    const { result } = renderHook(() =>
+      useSuggestionSession({ projectId: "proj-1" }),
+    );
+
+    await expect(
+      result.current.saveToSession(
+        "content",
+        "http://ex.org/A",
+        "A",
+        "sess-explicit",
+      ),
+    ).rejects.toThrow("Cannot save suggestion without an access token");
     expect(mockedSave).not.toHaveBeenCalled();
   });
 
@@ -200,7 +314,9 @@ describe("useSuggestionSession", () => {
     });
 
     await act(async () => {
-      await result.current.saveToSession("content", "http://ex.org/A", "A");
+      await expect(
+        result.current.saveToSession("content", "http://ex.org/A", "A"),
+      ).rejects.toThrow("Save failed");
     });
 
     expect(result.current.status).toBe("error");
@@ -326,6 +442,29 @@ describe("useSuggestionSession", () => {
     expect(result.current.branch).toBe("suggest/sess-2");
     expect(result.current.status).toBe("active");
     expect(result.current.isResumed).toBe(true);
+  });
+
+  it("saves through a resumed session id", async () => {
+    mockedSave.mockResolvedValue({
+      commit_hash: "abc",
+      branch: "suggest/sess-2",
+      changes_count: 1,
+    });
+    const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
+
+    act(() => {
+      result.current.resumeSession("sess-2", "suggest/sess-2");
+    });
+    await act(async () => {
+      await result.current.saveToSession("content", "http://ex.org/A", "A");
+    });
+
+    expect(mockedSave).toHaveBeenCalledWith(
+      "proj-1",
+      "sess-2",
+      expect.any(Object),
+      "token-123",
+    );
   });
 
   it("resubmitSession submits and resets state", async () => {

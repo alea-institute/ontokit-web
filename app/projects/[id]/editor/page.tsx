@@ -39,7 +39,10 @@ import { commonPrefixes } from "@/lib/editor/languages/turtle";
 import { useKeyboardShortcuts, type ShortcutDefinition } from "@/lib/hooks/useKeyboardShortcuts";
 import { KeyboardShortcutDialog } from "@/components/editor/KeyboardShortcutDialog";
 import { SuggestionSubmitDialog } from "@/components/editor/SuggestionSubmitDialog";
-import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
+import {
+  useSuggestionSession,
+  type UseSuggestionSessionReturn,
+} from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
 import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
 import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
@@ -61,6 +64,33 @@ import { shouldRedirectFromEditor } from "@/lib/hooks/useProject";
 function suggestionCardHasFocus(): boolean {
   return !!document.activeElement?.closest('[role="listitem"]');
 }
+
+type SuggestionPersistence = Pick<
+  UseSuggestionSessionReturn,
+  "sessionId" | "startSession" | "saveToSession"
+>;
+
+export async function persistSuggestionUpdate(
+  suggestionSession: SuggestionPersistence,
+  content: string,
+  entityIri: string,
+  entityLabel: string,
+  onSuccess: () => void,
+): Promise<void> {
+  const sessionId =
+    suggestionSession.sessionId ?? await suggestionSession.startSession();
+  await suggestionSession.saveToSession(
+    content,
+    entityIri,
+    entityLabel,
+    sessionId,
+  );
+  onSuccess();
+}
+
+export const persistClassSuggestionUpdate = persistSuggestionUpdate;
+export const persistPropertySuggestionUpdate = persistSuggestionUpdate;
+export const persistIndividualSuggestionUpdate = persistSuggestionUpdate;
 
 export default function EditorPage() {
   const { data: session, status } = useSession();
@@ -738,11 +768,6 @@ export default function EditorPage() {
     if (!session?.accessToken) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
 
-    // Ensure session exists
-    if (!suggestionSession.sessionId) {
-      await suggestionSession.startSession();
-    }
-
     let source = sourceContent;
     if (!source) {
       const response = await revisionsApi.getFileAtVersion(
@@ -757,24 +782,26 @@ export default function EditorPage() {
     const modifiedSource = updateClassInTurtle(source, classIri, data);
     const label = data.labels[0]?.value || getLocalName(classIri);
 
-    await suggestionSession.saveToSession(modifiedSource, classIri, label);
-
-    setSourceContent(modifiedSource);
-    toast.success(`Suggested update to "${label}"`);
-    updateNodeLabel(classIri, label);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
+    await persistClassSuggestionUpdate(
+      suggestionSession,
+      modifiedSource,
+      classIri,
+      label,
+      () => {
+        setSourceContent(modifiedSource);
+        toast.success(`Suggested update to "${label}"`);
+        updateNodeLabel(classIri, label);
+        setDetailRefreshKey((k) => k + 1);
+        setSourceIriIndex(new Map());
+        iriPatternDetectedRef.current = false;
+      },
+    );
   }, [session, projectId, activeBranch, project, sourceContent, toast, updateNodeLabel, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode property update
   const handleSuggestPropertyUpdate = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
     if (!session?.accessToken) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
-
-    if (!suggestionSession.sessionId) {
-      await suggestionSession.startSession();
-    }
 
     let source = sourceContent;
     if (!source) {
@@ -787,23 +814,25 @@ export default function EditorPage() {
     const modifiedSource = updatePropertyInTurtle(source, propertyIri, data);
     const label = data.labels[0]?.value || getLocalName(propertyIri);
 
-    await suggestionSession.saveToSession(modifiedSource, propertyIri, label);
-
-    setSourceContent(modifiedSource);
-    toast.success(`Suggested update to "${label}"`);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
+    await persistPropertySuggestionUpdate(
+      suggestionSession,
+      modifiedSource,
+      propertyIri,
+      label,
+      () => {
+        setSourceContent(modifiedSource);
+        toast.success(`Suggested update to "${label}"`);
+        setDetailRefreshKey((k) => k + 1);
+        setSourceIriIndex(new Map());
+        iriPatternDetectedRef.current = false;
+      },
+    );
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode individual update
   const handleSuggestIndividualUpdate = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
     if (!session?.accessToken) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
-
-    if (!suggestionSession.sessionId) {
-      await suggestionSession.startSession();
-    }
 
     let source = sourceContent;
     if (!source) {
@@ -816,13 +845,19 @@ export default function EditorPage() {
     const modifiedSource = updateIndividualInTurtle(source, individualIri, data);
     const label = data.labels[0]?.value || getLocalName(individualIri);
 
-    await suggestionSession.saveToSession(modifiedSource, individualIri, label);
-
-    setSourceContent(modifiedSource);
-    toast.success(`Suggested update to "${label}"`);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
+    await persistIndividualSuggestionUpdate(
+      suggestionSession,
+      modifiedSource,
+      individualIri,
+      label,
+      () => {
+        setSourceContent(modifiedSource);
+        toast.success(`Suggested update to "${label}"`);
+        setDetailRefreshKey((k) => k + 1);
+        setSourceIriIndex(new Map());
+        iriPatternDetectedRef.current = false;
+      },
+    );
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle anonymous proposal mode class update
