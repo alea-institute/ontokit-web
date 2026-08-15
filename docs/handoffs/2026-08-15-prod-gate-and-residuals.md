@@ -105,6 +105,23 @@ produced `5 insertions(+), 16 deletions(-)`.
 - **The empty-tree trap:** the editor shows 0 classes until a branch resolves. Load it with an
   explicit `?branch=` before concluding the data is missing.
 
+## A new guard hook is live — read this if a Bash call gets blocked
+
+`~/.claude/hooks/cockpit-stderr-guard.sh`, registered as a PreToolUse(Bash) hook in
+`~/.claude/settings.json`. It **blocks** a command only when all three hold: stderr is
+suppressed (`2>/dev/null` / `2>&-`), **and** the command targets `Coding Projects` /
+`cockpit/` / `briefs/`, **and** there is no `||` or `echo` to make the result
+self-reporting. Ordinary work trips none of these together.
+
+It exists because the "claims carry their evidence" convention in the cockpit `CLAUDE.md`
+was already written and did not prevent a false all-clear (a `git status` run from a
+non-repo directory with stderr discarded). The block message names three ways to proceed;
+the cheapest is appending `; echo "(empty above = none)"`.
+
+Revert by deleting that one entry from `hooks.PreToolUse`; a pre-change backup sits at
+`~/.claude/settings.json.bak-before-stderr-guard-20260815`. Rationale is in the cockpit
+`CLAUDE.md` under "The mechanism, not just the principle".
+
 ## Where things live
 
 - Plan: `docs/plans/2026-08-13-002-fix-annotation-data-loss-plan.md`
