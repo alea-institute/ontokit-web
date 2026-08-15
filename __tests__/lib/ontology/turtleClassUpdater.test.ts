@@ -10,6 +10,123 @@ describe("updateClassInTurtle", () => {
   };
 
   describe("characterization: class block regeneration", () => {
+    it("preserves 13 alt labels across nine languages when only the label is edited", () => {
+      const source = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:Actor a owl:Class ;
+    rdfs:label "Actor / Player" ;
+    skos:altLabel "Actor", "Player", "Player Role",
+        "Schauspieler / Spieler"@de-de, "Actor / Player"@en-gb,
+        "Actor / Jugador"@es-es, "Actor / Jugador"@es-mx,
+        "Acteur / Joueur"@fr-fr, "שחקן"@he,
+        "अभिनेता / खिलाड़ी"@hi, "アクター / プレイヤー"@ja,
+        "Ator / Jogador"@pt-br, "演员 / 参与者"@zh-cn ;
+    rdfs:subClassOf owl:Thing .`;
+
+      const result = updateClassInTurtle(source, "http://example.org/ont#Actor", {
+        labels: [{ value: "Actor and Player", lang: "" }],
+        comments: [],
+        parent_iris: ["http://www.w3.org/2002/07/owl#Thing"],
+      });
+
+      expect(result).toContain(`skos:altLabel "Actor", "Player", "Player Role",
+        "Schauspieler / Spieler"@de-de, "Actor / Player"@en-gb,
+        "Actor / Jugador"@es-es, "Actor / Jugador"@es-mx,
+        "Acteur / Joueur"@fr-fr, "שחקן"@he,
+        "अभिनेता / खिलाड़ी"@hi, "アクター / プレイヤー"@ja,
+        "Ator / Jogador"@pt-br, "演员 / 参与者"@zh-cn`);
+      expect(result.match(/skos:altLabel/g)).toHaveLength(1);
+    });
+
+    it("removes a payload-described annotation when its values are emptied", () => {
+      const source = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:Dog a owl:Class ;
+    rdfs:label "Dog"@en ;
+    skos:altLabel "Hound"@en .`;
+
+      const result = updateClassInTurtle(source, "http://example.org/ont#Dog", {
+        labels: [{ value: "Dog", lang: "en" }],
+        comments: [],
+        parent_iris: [],
+        annotations: [
+          {
+            property_iri: "http://www.w3.org/2004/02/skos/core#altLabel",
+            values: [],
+          },
+        ],
+      });
+
+      expect(result).not.toContain("skos:altLabel");
+    });
+
+    it("preserves datatyped literals and IRI-valued objects absent from the payload", () => {
+      const source = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:Dog a owl:Class ;
+    rdfs:label "Dog"@en ;
+    ex:rank "7"^^xsd:integer ;
+    rdfs:seeAlso <https://example.net/dogs> .`;
+
+      const result = updateClassInTurtle(source, "http://example.org/ont#Dog", {
+        labels: [{ value: "Canine", lang: "en" }],
+        comments: [],
+        parent_iris: [],
+      });
+
+      expect(result).toContain('ex:rank "7"^^xsd:integer');
+      expect(result).toContain("rdfs:seeAlso <https://example.net/dogs>");
+    });
+
+    it("keeps canonical output byte-identical when the class has no extra predicates", () => {
+      const source = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:Dog a owl:Class ;
+    rdfs:label "Dog"@en ;
+    rdfs:comment "A canine"@en ;
+    rdfs:subClassOf ex:Animal .`;
+
+      expect(
+        updateClassInTurtle(source, "http://example.org/ont#Dog", {
+          labels: [{ value: "Dog", lang: "en" }],
+          comments: [{ value: "A canine", lang: "en" }],
+          parent_iris: ["http://example.org/ont#Animal"],
+        }),
+      ).toBe(source);
+    });
+
+    it("changes only the edited field's line when other predicates are present", () => {
+      const source = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:Dog a owl:Class ;
+    rdfs:label "Dog"@en ;
+    skos:altLabel "Hound"@en ;
+    rdfs:seeAlso ex:Canine .`;
+      const expected = source.replace('rdfs:label "Dog"@en', 'rdfs:label "Canine"@en');
+
+      const result = updateClassInTurtle(source, "http://example.org/ont#Dog", {
+        labels: [{ value: "Canine", lang: "en" }],
+        comments: [],
+        parent_iris: [],
+      });
+
+      expect(result).toBe(expected);
+    });
+
     it("regenerates the target block in the existing canonical order and indentation", () => {
       const source = `@prefix ex: <http://example.org/ont#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
