@@ -113,4 +113,3 @@ CatholicOS issue #361 remains open pending upstream delivery.
 - TCP 22 to 54.224.195.12 is closed or filtered from the home box.
 - `ontokit.org` returns DNS NXDOMAIN.
 - PyPI lists `folio-python` 0.3.6; the approved API dependency task remains release-gated.
-
