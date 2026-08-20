@@ -53,8 +53,8 @@ These commits are not part of the 277-commit cutoff. They must be frozen at thei
 
 | Repo | Local branch/head | Delta | Disposition |
 |---|---|---:|---|
-| web | `fix/plan-audit-web-residuals` at `4a4dc5bf` | 5 commits after `83b62b0b` | Fold into T1 and the annotation seam; local-only, tested, not pushed or merged |
-| API | `fix/recent-plan-api-residuals` at `0a54857a`; child `feat/demo-refresh-scaffold` at `e894f20f` | 6 residual/promotion commits plus 1 demo-refresh commit after `435dc393` | Fold audit cursor, annotation parity, FOLIO dependency, deploy-truth, and dormant promotion work into T2/T7/T8; append the refresh scaffold to T10; local-only, tested, not pushed or merged |
+| web | `fix/plan-audit-web-residuals` at `4a4dc5bf`; child `feat/demo-project-ui` at `d7e490ec` | 5 residual commits plus 2 U9 UI commits after `83b62b0b` | Fold residuals into T1/T7/T8 and append the home/source-project entry, badge, exact-target notice, and source-return UI to T10; local-only, tested, not pushed or merged |
+| API | `fix/recent-plan-api-residuals` at `0a54857a`; child `feat/demo-project-isolation` at `b5b13d8f` (including refresh ancestor `e894f20f`) | 6 residual/promotion commits plus 4 U8/U9 commits after `435dc393` | Fold audit cursor, annotation parity, FOLIO dependency, deploy-truth, and dormant promotion work into T2/T7/T8; append refresh, demo identity/provisioning, target authorization, resync, and exact repository identity to T10; local-only, tested, not pushed or merged |
 
 ## Delivery tranches
 
@@ -71,7 +71,7 @@ Existing CatholicOS web PR #57 and API PR #27 are old AUTH_MODE prefixes. Do not
 | T7 | Editor preference and annotation round-trip | W9, W11, A10, annotation portions of local web/API delta | web + API | T1 | small-to-medium | provisional; public two-mode UI check passed, authenticated preference UAT remains |
 | T8 | Cross-feature correctness and dependency residuals | W10 plus remaining local web/API audit-cursor, FOLIO-dependency, build, and hardening commits not already synthesized into their owning tranche | web + API | T1–T7 as applicable | medium, split by repo and owner feature | provisional; direct replay was correctly refused because prerequisite feature files are absent upstream |
 | T9 | Documentation learnings | W8 and documentation-only commits embedded in W3/W4/A3/A4 | appropriate upstream docs or omit with recorded rationale | after code tranches | small | provisional |
-| T10 | Demo mode and picker deltas | U8/U9 implementation and picker assets not present at cutoff | web + API + deployment assets | scoped demo credentials and confirmed domain/DNS control | unknown | future; append before final batch |
+| T10 | Demo mode and picker deltas | API `e894f20f`, `5e3126cc`, `2334b40c`, `b5b13d8f`; web `32f9263d`, `d7e490ec`; picker assets not present at cutoff | web + API + deployment assets | scoped demo credentials and confirmed domain/DNS control | large, split by repo and activation assets | local implementation tested; live repository, credential-scope, deployment, keyboard/responsive, and write-isolation acceptance remain gated |
 
 No commit should be delivered twice. Where a source commit spans multiple seams, the upstream PR must replay its relevant file-level change rather than cherry-pick the mixed commit wholesale; the PR body must name the source commit and the excluded seam.
 

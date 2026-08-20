@@ -40,7 +40,7 @@ Live public browser evidence covers the FOLIO landing/project viewer and both St
 ## Next execution order
 
 1. Activate U8/U9 only after the two private repositories and separately scoped source/destination credentials exist; then install refresh/resync, seed, run the manual scope receipt, and complete live keyboard/responsive/write-isolation acceptance.
-2. Append U9 heads `b5b13d8f` and `d7e490ec` to the upstream map and include them in the final refreshed scratch replay.
+2. Include U9 heads `b5b13d8f` and `d7e490ec`, now recorded in the upstream map, in the final refreshed scratch replay.
 3. Synthesize and scratch-validate T1 against refreshed CatholicOS `dev`; do not send until the final local-work batch is ready.
 4. Run authenticated DEV acceptance for auto-save, translations/audit, personas, and the auto-accept clock when a suitable UAT session/credential is available.
 5. Keep PROD Stage B dormant until branch/environment/CODEOWNERS, smoke credential, AWS access, forced-command, data-path, parallel-host, and UAT gates clear. DNS cutover remains separately approved.
@@ -63,4 +63,4 @@ No secrets, credentials, personal roster data, AWS mutation, DNS mutation, Catho
 
 ## Commit and publication state
 
-Documentation commits through `4f441bbf` are pushed on `feat/roundup-brainstorm`. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf`, API residual branch `fix/recent-plan-api-residuals` at `0a54857a`, API demo-refresh branch `feat/demo-refresh-scaffold` at `e894f20f`, API demo-isolation branch `feat/demo-project-isolation` at `b5b13d8f`, and web demo-UI branch `feat/demo-project-ui` at `d7e490ec` are durable local branches only; none is pushed or merged.
+The documentation branch, including this handoff and the U9 upstream-map update, is committed and pushed on `feat/roundup-brainstorm`. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf`, API residual branch `fix/recent-plan-api-residuals` at `0a54857a`, API demo-refresh branch `feat/demo-refresh-scaffold` at `e894f20f`, API demo-isolation branch `feat/demo-project-isolation` at `b5b13d8f`, and web demo-UI branch `feat/demo-project-ui` at `d7e490ec` are durable local branches only; none is pushed or merged.
