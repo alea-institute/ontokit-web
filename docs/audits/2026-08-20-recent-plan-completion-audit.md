@@ -10,9 +10,9 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 
 ## Executive result
 
-- **39 of 52 formal plan units are complete.**
-- **13 formal units remain queued or gated.** Eight belong to the roundup plan, three to the trigger-gated Google federation plan, one to the U7 sweep-fix tail, and one to the annotation-data-loss serialization tail.
-- **Four additional follow-ups** were created by review or execution evidence and remain open: web #359 and #360, API #208 and #212. API #209 is a fifth follow-up, but it is release-gated on `folio-python` 0.3.7; PyPI still serves 0.3.6.
+- **37 of 52 formal plan units are complete on shared integration history.** Two more formal units—the U7 audit tail and annotation serialization tail—are implemented and fully tested on the local `fix/plan-audit-web-residuals` branch, pending publication/integration.
+- **13 formal units remain queued or gated.** Ten belong to the roundup plan, including strict U11/U12 acceptance gaps, and three belong to the trigger-gated Google federation plan.
+- Of the five additional review/execution follow-ups, web #359 and #360 are implemented and tested on the local residual branch. API #208 and #212 remain open. API #209 is now unblocked: official PyPI metadata lists `folio-python` 0.4.0, released 2026-08-18.
 - The current upstream delta is **277 commits**, not the stale “~690” estimate: 113 web commits and 164 API commits ahead of `catholicos/dev`.
 
 ## Formal plan ledger
@@ -33,8 +33,8 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 | U8 dummy repositories and refresh | **Not complete** | No demo repositories, seed artifacts, or refresh job found. Requires two scoped credentials before execution. |
 | U9 cloned-project demo mode | **Not complete** | No demo marker, provisioning, target-authorizer, entry/exit navigation, or demo banner found in either integration branch. Depends on U8. |
 | U10 auto-save preference | Complete | ALEA web PR #17 merged; store migration and browser behavior verified. |
-| U11 fork CI | Complete | Both integration branches run their real suites; the August 10 handoff records green real-seam CI and actionlint. |
-| U12 DEV deploy and IaC | Complete | ALEA API PRs #17–#21 merged; forced-command deploy is installed and DEV deploys are approval-gated. |
+| U11 fork CI | **Partially complete** | Both integration branches run their real suites and recorded green real-seam CI, but the source plan also requires an intentionally red draft proof and required status checks on the deploy branch. Both `feat/pr-party` branches are currently unprotected, so the workflows are not merge gates. |
+| U12 DEV deploy and IaC | **Partially complete** | ALEA API PRs #17–#21 merged; forced-command deploy is installed and DEV deploys are approval-gated. Strict completion is still open because U12 depends on U8/U11, must capture U8 cron IaC, and lacks the full matched-revision/rollback/security proof required by the source plan. API #211 also records a false-success deploy/status defect. |
 | U13 PROD promotion workflow | **Not complete** | No PROD promotion workflow or immutable DEV-to-PROD revision gate exists. User approved porting U12, but the rollout mechanism remains unsettled. |
 | U14 upstream delivery map | **Not complete** | `docs/roundup-2026-08/UPSTREAM-DELIVERY-MAP.md` is absent. Existing ALEA staging PRs do not satisfy the required recorded-HEAD map, tranche drafts, or cherry-pick proof. |
 | U15 AWS PROD rebuild | **Blocked** | SSH to 54.224.195.12:22 remains closed/filtered on 2026-08-20. PROD itself returns HTTP 200. Requires Mike/AWS access and the rollout-mechanism decision. |
@@ -76,7 +76,7 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 |---|---|---|
 | U1–U2 federated logout | Complete | Commit `cbe58a0b`, regression tests, ALEA web PR #18, deployed DEV proof. |
 | U3–U5 suggester save | Complete | Commit `5826c7f5` covers class, property, and individual handlers; ALEA web PR #18, deployed DEV proof. |
-| U6 audit residuals | **Not complete** | The conditional tail was cheap but skipped. Web #348 still lists five `formatTimeAgo` copies, erasure fallbacks, a type drift, and a type-only test. |
+| U6 audit residuals | **Implemented locally; integration pending** | Local commit `6f5ee59f` centralizes `formatTimeAgo`, adds erasure fallbacks, aligns the type contract, and removes the empty type-only test. Full web gates pass on `fix/plan-audit-web-residuals`; the branch is not pushed or merged. |
 
 CatholicOS issues #344 and #345 remain open because the ALEA fixes have not been delivered upstream. That does not invalidate the plan’s ALEA PR and DEV Definition of Done, but it belongs to the upstream-delivery queue.
 
@@ -89,7 +89,7 @@ CatholicOS issues #344 and #345 remain open because the ALEA fixes have not been
 | U1 indexed label-property fix | Complete | API commit `8a6575d1`; ALEA API PR #22 merged. |
 | U2 indexed/RDFLib parity proof | Complete for the scoped allowlist | API regression coverage merged; broader predicate parity became API #212. |
 | U3 round-trip-safe class writer | Complete | Web commit `72ee0522`; ALEA web PR #19 merged; 13 multilingual altLabels preserved in live DEV UAT. |
-| U4 serialization churn | **Not complete** | Cosmetic subject-form and label-language churn was deliberately split out. It remains autonomous follow-up work. |
+| U4 serialization churn | **Implemented locally; integration pending** | Subject-form preservation was already present in the #361 fix. Local commit `1697e5e7` adds source-aware preservation for unchanged untagged labels and proves a comment edit changes only the comment. Full web gates pass; the branch is not pushed or merged. |
 
 CatholicOS issue #361 remains open pending upstream delivery.
 
@@ -97,12 +97,13 @@ CatholicOS issue #361 remains open pending upstream delivery.
 
 | Item | Authority | Disposition |
 |---|---|---|
-| Audit UI hardening | CatholicOS/ontokit-web#348 | Autonomous web task. |
-| Deterministic Node 25 test storage | CatholicOS/ontokit-web#359 | Autonomous web task. |
-| Server-side Zitadel issuer fail-fast | CatholicOS/ontokit-web#360 | Autonomous web task. |
+| Audit UI hardening | CatholicOS/ontokit-web#348 | Implemented locally in `6f5ee59f`; publication/integration remains. |
+| Deterministic Node 25 test storage | CatholicOS/ontokit-web#359 | Implemented locally in `fea85b6b`; plain Node 25 suite passes. Publication/integration remains. |
+| Server-side Zitadel issuer fail-fast | CatholicOS/ontokit-web#360 | Implemented locally in `5ef55edc`; preserves optional-without-Zitadel and removes the localhost fallback. Publication/integration remains. |
 | Audit API integration hardening | CatholicOS/ontokit-api#208 | Autonomous API task. |
 | Full annotation-path parity | CatholicOS/ontokit-api#212 | Autonomous API task; behavior choice should be verified against round-trip intent. |
-| Pin `folio-python` and remove `owlready2` | CatholicOS/ontokit-api#209 | Approved but externally blocked. PyPI latest remains 0.3.6; wait for 0.3.7. |
+| Pin `folio-python` and remove `owlready2` | CatholicOS/ontokit-api#209 | Autonomous API task. Official PyPI metadata lists 0.4.0, so the release gate is cleared; compatibility, lock, and API gates remain. |
+| Restore production-build validity | Local build evidence | Autonomous web task. Webpack compilation succeeds, then Next.js rejects invalid extra App Router page exports in the PR Party settings, project editor, and project settings pages. This predates the residual branch; move testable helpers/components out of `page.tsx` modules and rerun `npm run build`. |
 
 ## Current external-state receipts
 
@@ -112,4 +113,10 @@ CatholicOS issue #361 remains open pending upstream delivery.
 - `https://ontokit.dev.openlegalstandard.org/health` returns `{"status":"healthy"}`.
 - TCP 22 to 54.224.195.12 is closed or filtered from the home box.
 - `ontokit.org` returns DNS NXDOMAIN.
-- PyPI lists `folio-python` 0.3.6; the approved API dependency task remains release-gated.
+- PyPI lists `folio-python` 0.4.0, released 2026-08-18; the approved API dependency task is unblocked.
+
+## 2026-08-20 autonomous execution receipt
+
+The local `fix/plan-audit-web-residuals` branch now contains four focused commits based on ALEA integration head `83b62b0b`: `6f5ee59f`, `fea85b6b`, `5ef55edc`, and `1697e5e7`. Verification on the final tree: 208 test files and 3,298 tests pass; `npm run type-check` passes; `npm run lint` reports zero errors and 19 pre-existing warnings; `git diff --check` passes. The branch is local only—not pushed or merged.
+
+Production build compilation reaches Next.js route validation, where it exposes the pre-existing invalid page exports cataloged above. That blocker is queued rather than misattributed to these changes.

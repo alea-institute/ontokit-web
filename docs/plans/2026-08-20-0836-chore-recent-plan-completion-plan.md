@@ -16,7 +16,7 @@ execution: code
 ## Goal Capsule
 
 - **Objective:** Every incomplete task from the last 21 days of OntoKit plans is either completed with evidence or held in one durable queue with an exact activation condition.
-- **Means:** Execute autonomous residuals in dependency order, preserve the formal plans as immutable decision artifacts, and route human/external gates through `docs/decision-sheets/2026-08-20-recent-plan-decisions.md` (D1–D7).
+- **Means:** Execute autonomous residuals in dependency order, preserve the formal plans as immutable decision artifacts, and route human/external gates through `docs/decision-sheets/2026-08-20-recent-plan-decisions.md` (D1–D6).
 - **Authority:** The original plan’s R/KD/KTD contracts govern behavior. This reconciliation plan governs ordering, evidence, and handoff only.
 - **Stop conditions:** Do not mutate CatholicOS without tranche-specific approval. Do not create broad demo credentials. Do not touch AWS until access and the PROD rollout mechanism are settled.
 - **Execution profile:** Use `ce-work` on the owning integration branch. Characterize behavior before each bug fix and retain real-seam proof where the source plan requires it.
@@ -107,10 +107,10 @@ flowchart TB
 
 | U-ID | Title | Primary files or target | Depends on |
 |---|---|---|---|
-| U1 | Audit UI residuals | web audit component, trust client, shared utils | — |
-| U2 | Deterministic Node test storage | web test setup and configuration | — |
-| U3 | Zitadel issuer fail-fast | web auth configuration | D7 |
-| U4 | Turtle serialization stability | web Turtle updater | — |
+| U1 | Audit UI residuals — implemented locally in `6f5ee59f` | web audit component, trust client, shared utils | publication/integration |
+| U2 | Deterministic Node test storage — implemented locally in `fea85b6b` | web test setup and configuration | publication/integration |
+| U3 | Zitadel issuer fail-fast — implemented locally in `5ef55edc` | web auth configuration | publication/integration |
+| U4 | Turtle serialization stability — implemented locally in `1697e5e7` | web Turtle updater | publication/integration |
 | U5 | Audit API hardening | API audit integration and route tests | — |
 | U6 | Full annotation-path parity | API ontology detail services | — |
 | U7 | Auto-accept live UAT | DEV + UAT log | deployed trust/audit stack healthy |
@@ -121,7 +121,7 @@ flowchart TB
 | U12 | PR Party external gate | both repos + CatholicOS org | D4/D5 and org gates |
 | U13 | Picker activation | static site + hosting | D6 registration |
 | U14 | Google federation activation | Zitadel config + docs | login-friction trigger + OAuth credentials |
-| U15 | FOLIO dependency change | API dependencies | verified secure `folio-python` release on PyPI |
+| U15 | FOLIO dependency change | API dependencies | gate cleared by verified `folio-python` 0.4.0 release |
 | U16 | Reconciliation closeout | audit, decision sheet, handoff | U1–U15 dispositioned |
 
 ### U1. Close audit UI review residuals
@@ -159,10 +159,12 @@ flowchart TB
 - **Requirements:** R4, R5.
 - **Dependencies:** None.
 - **Files:** `auth.ts` and auth configuration tests.
-- **Approach:** Apply D7. If optional-without-Zitadel remains supported, remove the localhost fallback while keeping the provider list empty when Zitadel is unconfigured. If D7 makes Zitadel mandatory for optional mode, validate the issuer and companion OIDC settings at startup. Preserve the disabled-auth path without inventing an issuer.
+- **Approach:** Preserve the established optional-without-Zitadel contract: remove the localhost fallback, keep the provider list empty when optional mode is unconfigured, validate the coherent OIDC setting set whenever Zitadel is configured or required, and preserve disabled auth without inventing an issuer.
 - **Execution note:** Start with a configuration-matrix regression test for web #360.
 - **Test scenarios:**
-  - Required and optional auth without an issuer fail during configuration.
+  - Required auth without an issuer fails during configuration.
+  - Optional auth without any Zitadel settings initializes with no provider.
+  - A partially configured optional Zitadel setup fails coherently.
   - Disabled auth without an issuer initializes without a localhost provider fallback.
   - A configured issuer is passed through exactly.
 - **Verification:** Auth tests, type-check, lint, and production build configuration checks pass.
@@ -305,11 +307,11 @@ flowchart TB
 - **Test scenarios:** First-time Google user, same-email link, password login, and stable Zitadel identity.
 - **Verification:** Full DEV round-trip and UAT log evidence.
 
-### U15. Apply the approved FOLIO dependency change after release
+### U15. Apply the approved FOLIO dependency change
 
 - **Goal:** Close CatholicOS API #209 without pinning a vulnerable release.
 - **Requirements:** R2, R8.
-- **Dependencies:** A `folio-python` release containing the required security fixes is published to PyPI; re-check the current safe version at activation rather than assuming it will be 0.3.7.
+- **Dependencies:** Cleared on 2026-08-18 by the verified `folio-python` 0.4.0 PyPI release; compatibility still must be proven before pinning.
 - **Files:** API dependency manifest, lockfile, and existing duplicate-check integration tests.
 - **Approach:** Pin the safe release, remove unused `owlready2`, preserve graceful degradation, and regenerate the lock.
 - **Test scenarios:**
@@ -346,7 +348,7 @@ flowchart TB
 
 - Every unit in the audit is complete or has a current, named activation condition.
 - U1–U7 are implemented and verified unless runtime evidence exposes a genuine blocker.
-- The answers to D1–D7 are folded into the owning units without re-asking settled choices.
+- The answers to D1–D6 are folded into the owning units without re-asking settled choices.
 - No user-owned dirty file is committed or published.
 - No CatholicOS mutation occurs without explicit tranche authorization.
 - No secret or broad demo credential enters Git history.

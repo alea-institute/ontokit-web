@@ -1,6 +1,6 @@
 # 21-day plan validation — 2026-07-30 through 2026-08-20
 
-> **Superseded:** This was the preliminary audit committed during the validation run. Use [`2026-08-20-recent-plan-completion-audit.md`](./2026-08-20-recent-plan-completion-audit.md) for the reconciled 52-unit ledger and current PyPI gate. In particular, the preliminary claim that `folio-python` 0.4.0 was published was not supported by the official package index.
+> **Superseded:** This was the preliminary audit committed during the validation run. Use [`2026-08-20-recent-plan-completion-audit.md`](./2026-08-20-recent-plan-completion-audit.md) for the reconciled 52-unit ledger and current execution receipts. A later official PyPI metadata check confirmed the preliminary observation that `folio-python` 0.4.0 was published.
 
 **Audit date:** 2026-08-20  
 **Scope:** every task-bearing plan, handoff, outline, residual-review record, and reachable branch in `ontokit-web` during the inclusive 21-day window; implementation evidence in the ALEA `ontokit-web` and `ontokit-api` forks; current GitHub PR/issue state; current Cockpit answers where an old handoff pointed to them.

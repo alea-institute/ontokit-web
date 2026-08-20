@@ -1,8 +1,9 @@
 # Decision Sheet — Recent OntoKit Plan Residuals
 
 Created: 2026-08-20
+Updated: 2026-08-20 after autonomous residual execution
 
-The recommended choices are first. Reply with short answers such as `D1 = 1; D2 = 1; D7 = 1`.
+The recommended choices are first. Reply with short answers such as `D1 = 1; D2 = 1; D3 = 1; D4 = 1; D5 = 1; D6 = 2`.
 
 ## D1. How should the main line reach PROD?
 
@@ -64,19 +65,15 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 
 **Your answer:** `D6 = 1, 2, or 3`
 
-## D7. Must optional auth still work without Zitadel?
+## Resolved autonomously: optional auth without Zitadel
 
-**Why this matters:** Current `AUTH_MODE=optional` deliberately supports anonymous browsing when Zitadel is not configured. Web #360 instead proposes failing startup whenever optional mode lacks an issuer. Both avoid the bad localhost fallback, but they define different deployment contracts.
+Current `AUTH_MODE=optional` deliberately supports anonymous browsing when Zitadel is not configured. The web #360 implementation preserves that established contract: an unconfigured optional deployment registers no provider, while any configured or required Zitadel setup is validated coherently and never falls back to localhost.
 
-1. **Keep optional-without-Zitadel — recommended.** Remove the localhost fallback, register no provider when Zitadel is absent, and keep anonymous browsing available. This preserves the current contract.
-2. Require Zitadel in optional mode. Missing issuer/client settings fail startup; optional means anonymous browsing plus a working sign-in path.
-3. Retire optional-without-Zitadel after a documented deprecation window. Warn first, then adopt option 2 in a later release.
-
-**Your answer:** `D7 = 1, 2, or 3`
+No user decision is required unless you want to change that contract.
 
 ## Defaults that do not need a decision
 
 - Google federation remains parked until a real login-friction complaint fires its documented trigger.
-- `folio-python` remains unpinned until a release containing the required security fixes is published; PyPI still serves 0.3.6, and the exact future version must be rechecked rather than assumed.
-- Web #348/#359/#360, API #208/#212, the auto-accept live UAT, and cosmetic Turtle churn stay in the autonomous queue.
+- `folio-python` 0.4.0 is published and the approved pin/remove-`owlready2` task is now in the autonomous API queue.
+- Web #348/#359/#360 and cosmetic Turtle churn are implemented on a tested local branch; publication/integration remains. API #208/#209/#212, the auto-accept live UAT, and the production-build blocker stay in the autonomous queue.
 - No push, issue, PR, or other mutation is sent to CatholicOS without an explicit authorization that names the tranche.
