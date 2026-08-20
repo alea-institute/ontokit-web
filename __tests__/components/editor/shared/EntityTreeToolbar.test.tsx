@@ -2,21 +2,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// Provide localStorage before component imports (jsdom may not have it ready)
-vi.hoisted(() => {
-  if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() { return store.size; },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
-});
-
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
 
 describe("EntityTreeToolbar", () => {

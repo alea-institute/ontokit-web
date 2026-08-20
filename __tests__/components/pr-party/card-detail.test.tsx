@@ -18,25 +18,6 @@ import type {
   PRPartyQueueCard,
 } from "@/lib/api/prParty";
 
-// The embedded Q&A composer persists its draft; this jsdom ships an incomplete
-// localStorage.
-vi.hoisted(() => {
-  const store = new Map<string, string>();
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, String(value)),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() {
-        return store.size;
-      },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    },
-  });
-});
-
 vi.mock("@/lib/hooks/usePRPartyQueue", () => ({
   usePRPartyCard: vi.fn(),
   usePRPartyQueue: vi.fn(),

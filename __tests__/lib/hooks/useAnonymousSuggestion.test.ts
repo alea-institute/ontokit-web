@@ -1,23 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 
-// Provide localStorage before the anonymousCreditStore module loads (Zustand
-// persist captures it at import time) — useAnonymousSuggestion imports the
-// token store transitively.
-vi.hoisted(() => {
-  if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() { return store.size; },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
-});
-
 // Mock the anonymousSuggestionsApi module — X-Anonymous-Token header
 // threading itself lives inside lib/api/suggestions.ts (already covered by
 // reading the client code); here we verify the hook passes the right

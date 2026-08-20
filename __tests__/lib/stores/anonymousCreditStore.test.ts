@@ -1,19 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
-
-// Provide localStorage before the store module loads (Zustand persist captures it at import time)
-vi.hoisted(() => {
-  if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() { return store.size; },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
-});
+import { describe, expect, it, beforeEach } from "vitest";
 
 import {
   useAnonymousCreditStore,
