@@ -1,0 +1,116 @@
+# Recent Plan Completion Audit — 2026-08-20
+
+## Scope and method
+
+This audit covers plan artifacts created or changed from 2026-07-30 through 2026-08-20, inclusive. It searched the current tree and every local or remote Git ref after refreshing `origin` and `catholicos`. It also reviewed the roundup master outline, UAT log, surviving handoffs, ALEA pull requests, CatholicOS issues, and the sibling `ontokit-api` history when a web-owned plan assigned units to that repo.
+
+Seven formal plan artifacts were found. Five are visible on `feat/roundup-brainstorm`; two August 13 fix plans exist on the merged `origin/feat/pr-party` history. The root `PLAN-ontology-atomization*.md` documents were excluded because their latest plan history is 2026-03-10, outside the 21-day window.
+
+Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-state evidence, and current external state. Checkbox or prose claims alone do not count.
+
+## Executive result
+
+- **39 of 52 formal plan units are complete.**
+- **13 formal units remain queued or gated.** Eight belong to the roundup plan, three to the trigger-gated Google federation plan, one to the U7 sweep-fix tail, and one to the annotation-data-loss serialization tail.
+- **Four additional follow-ups** were created by review or execution evidence and remain open: web #359 and #360, API #208 and #212. API #209 is a fifth follow-up, but it is release-gated on `folio-python` 0.3.7; PyPI still serves 0.3.6.
+- The current upstream delta is **277 commits**, not the stale “~690” estimate: 113 web commits and 164 API commits ahead of `catholicos/dev`.
+
+## Formal plan ledger
+
+### 1. OntoKit Roundup Execution
+
+**Plan:** `docs/plans/2026-08-08-001-feat-ontokit-roundup-execution-plan.md`
+
+| Unit | Result | Evidence or queue disposition |
+|---|---|---|
+| U1 F3 validation and 422 detail | Complete | DEV UAT log records successful mint/save/submit; API red-then-green evidence and gates green. |
+| U2 default-branch reads | Complete | Symbolic-HEAD fix and curl parity recorded in the UAT log. |
+| U3 public projects list | Complete | Web fix `3aacf5e9`; browser verification in the UAT log. |
+| U4 browser UAT sweep | Complete | F7/F8 fixed and a clean happy-path sweep recorded. |
+| U5 suggestion lifecycle UAT | Complete | Duplicate block, external parent, personal branch, PR, merge, and trust credit recorded live. |
+| U6 retrospective alignment review | Complete | `docs/residual-review-findings/2026-08-08-retrospective-alignment-review.md` plus five lens reports; confirmed high findings were dispositioned. |
+| U7 Zitadel persona pass | Complete | `DEV-UAT-LOG.md` “U7 TERMINAL”; four-persona sweep and author/committer split proven. |
+| U8 dummy repositories and refresh | **Not complete** | No demo repositories, seed artifacts, or refresh job found. Requires two scoped credentials before execution. |
+| U9 cloned-project demo mode | **Not complete** | No demo marker, provisioning, target-authorizer, entry/exit navigation, or demo banner found in either integration branch. Depends on U8. |
+| U10 auto-save preference | Complete | ALEA web PR #17 merged; store migration and browser behavior verified. |
+| U11 fork CI | Complete | Both integration branches run their real suites; the August 10 handoff records green real-seam CI and actionlint. |
+| U12 DEV deploy and IaC | Complete | ALEA API PRs #17–#21 merged; forced-command deploy is installed and DEV deploys are approval-gated. |
+| U13 PROD promotion workflow | **Not complete** | No PROD promotion workflow or immutable DEV-to-PROD revision gate exists. User approved porting U12, but the rollout mechanism remains unsettled. |
+| U14 upstream delivery map | **Not complete** | `docs/roundup-2026-08/UPSTREAM-DELIVERY-MAP.md` is absent. Existing ALEA staging PRs do not satisfy the required recorded-HEAD map, tranche drafts, or cherry-pick proof. |
+| U15 AWS PROD rebuild | **Blocked** | SSH to 54.224.195.12:22 remains closed/filtered on 2026-08-20. PROD itself returns HTTP 200. Requires Mike/AWS access and the rollout-mechanism decision. |
+| U16 PR Party live E2E | **Blocked** | The four org gates remain open. The prior claim that the org answerer is already live needs re-validation before treating it as a security urgency. |
+| U17 ontokit.org picker | **Blocked** | DNS returns NXDOMAIN on 2026-08-20. The permitted availability preflight is complete; registration remains a human purchase. |
+| U18 closeout | **Partially complete** | The real-seam learning and decision-sheet infrastructure exist. Final closeout still depends on U13/U14 and refreshed external-gate tracking. |
+
+### 2. Multilingual Translation Annotations
+
+**Plan:** `docs/plans/2026-08-09-001-feat-translations-annotation-plan.md`
+
+**Result: all U1–U14 complete.** API commits implement the provenance store, configuration, engine, OWL axiom annotations, gated commits, jobs, backfill, coverage, review authorization, and real-seam lifecycle proof. Web commits implement U10–U13. ALEA API and web PR #12 merged into `feat/pr-party` on 2026-08-10. The real-Postgres/git integration module `tests/integration/test_translation_lifecycle.py` covers the plan’s AE1–AE5 lifecycle.
+
+### 3. N-Day Auto-Accept Closure Audit
+
+**Plan:** `docs/plans/2026-08-09-002-audit-intent2-auto-accept-closure.md`
+
+**Result: complete as scoped.** The generic suggestion-session mechanism, admin configuration, and UI merged through the translation branches into `feat/pr-party`. The plan correctly excluded translation review. A dedicated live quiet-period UAT remains desirable operational evidence, but it is not missing product implementation from this closure audit.
+
+### 4. Submission Audit Snapshot
+
+**Plan:** `docs/plans/2026-08-09-003-feat-submission-audit-snapshot-plan.md`
+
+**Result: all U1–U6 complete.** API commits `a859c205`, `b07c803c`, `208907e9`, `a2c8bc82`, and review fix `8b0541cc` implement storage through the real-seam proof. Web commits `6951dc43`, `486157c1`, `deed6eef`, and `7711470a` implement the client, cursor hook, audit section, and review fixes. ALEA PR #13 merged in both repos.
+
+**Residual queue:** CatholicOS API #208 and web #348 contain non-blocking review hardening not required by the original Definition of Done. Web #348 is also the conditional U6 tail in the later U7 sweep-fix plan.
+
+### 5. Google Federation via Zitadel
+
+**Plan:** `docs/plans/2026-08-10-001-feat-google-federation-zitadel-plan.md`
+
+**Result: all U1–U3 remain intentionally trigger-gated.** No evidence shows the activation condition—live user login friction—has fired. CatholicOS API #206 remains open as the backlog record. Execution also requires a Google OAuth client and its secret. This is queued conditional work, not a missed current commitment.
+
+### 6. U7 Sweep Bugs
+
+**Plan:** `docs/plans/2026-08-13-001-fix-u7-sweep-bugs-plan.md` at Git object `4cd3c0df`
+
+| Unit | Result | Evidence or queue disposition |
+|---|---|---|
+| U1–U2 federated logout | Complete | Commit `cbe58a0b`, regression tests, ALEA web PR #18, deployed DEV proof. |
+| U3–U5 suggester save | Complete | Commit `5826c7f5` covers class, property, and individual handlers; ALEA web PR #18, deployed DEV proof. |
+| U6 audit residuals | **Not complete** | The conditional tail was cheap but skipped. Web #348 still lists five `formatTimeAgo` copies, erasure fallbacks, a type drift, and a type-only test. |
+
+CatholicOS issues #344 and #345 remain open because the ALEA fixes have not been delivered upstream. That does not invalidate the plan’s ALEA PR and DEV Definition of Done, but it belongs to the upstream-delivery queue.
+
+### 7. Annotation Data Loss
+
+**Plan:** `docs/plans/2026-08-13-002-fix-annotation-data-loss-plan.md` at Git object `8040c149`
+
+| Unit | Result | Evidence or queue disposition |
+|---|---|---|
+| U1 indexed label-property fix | Complete | API commit `8a6575d1`; ALEA API PR #22 merged. |
+| U2 indexed/RDFLib parity proof | Complete for the scoped allowlist | API regression coverage merged; broader predicate parity became API #212. |
+| U3 round-trip-safe class writer | Complete | Web commit `72ee0522`; ALEA web PR #19 merged; 13 multilingual altLabels preserved in live DEV UAT. |
+| U4 serialization churn | **Not complete** | Cosmetic subject-form and label-language churn was deliberately split out. It remains autonomous follow-up work. |
+
+CatholicOS issue #361 remains open pending upstream delivery.
+
+## Additional open work discovered by the audit
+
+| Item | Authority | Disposition |
+|---|---|---|
+| Audit UI hardening | CatholicOS/ontokit-web#348 | Autonomous web task. |
+| Deterministic Node 25 test storage | CatholicOS/ontokit-web#359 | Autonomous web task. |
+| Server-side Zitadel issuer fail-fast | CatholicOS/ontokit-web#360 | Autonomous web task. |
+| Audit API integration hardening | CatholicOS/ontokit-api#208 | Autonomous API task. |
+| Full annotation-path parity | CatholicOS/ontokit-api#212 | Autonomous API task; behavior choice should be verified against round-trip intent. |
+| Pin `folio-python` and remove `owlready2` | CatholicOS/ontokit-api#209 | Approved but externally blocked. PyPI latest remains 0.3.6; wait for 0.3.7. |
+
+## Current external-state receipts
+
+- `origin/feat/pr-party` is 113 web commits ahead of refreshed `catholicos/dev`.
+- `origin/feat/pr-party` is 164 API commits ahead of refreshed `catholicos/dev`.
+- `https://ontokit.openlegalstandard.org/` returns HTTP 200.
+- `https://ontokit.dev.openlegalstandard.org/health` returns `{"status":"healthy"}`.
+- TCP 22 to 54.224.195.12 is closed or filtered from the home box.
+- `ontokit.org` returns DNS NXDOMAIN.
+- PyPI lists `folio-python` 0.3.6; the approved API dependency task remains release-gated.
+

@@ -1,5 +1,7 @@
 # Decision Sheet — finish the 21-day OntoKit plan queue
 
+> **Superseded:** Use [`2026-08-20-recent-plan-decisions.md`](./2026-08-20-recent-plan-decisions.md). The newer sheet preserves the verified `folio-python` release gate, adds the optional-auth contract decision, and uses the IDs referenced by the execution plan.
+
 **Prepared:** 2026-08-20  
 **How to answer:** reply with the decision IDs and your choices, for example `D1 A, D2 A, D3 B`. Notes are welcome. Previously answered decisions are not repeated.
 
