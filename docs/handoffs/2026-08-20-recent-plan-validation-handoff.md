@@ -29,14 +29,16 @@ Web U1–U4 plus the production-build repair are implemented in commits `6f5ee59
 
 The sibling API's durable local branch `fix/recent-plan-api-residuals` ends at `0a54857a`. It contains six commits for project-bound audit cursors, declaration-aware annotation parity, `folio-python==0.4.0` with `owlready2` removed, truthful preflight/runtime deploy status, a dormant fail-closed PROD promotion scaffold, and its immutable release pair. The complete API suite passes 2,738 tests against real PostgreSQL and Redis; Ruff, mypy across 182 source files, both deploy harnesses, lock validation, and diff checks pass. No push or merge occurred.
 
+The child API branch `feat/demo-refresh-scaffold` ends at `e894f20f`. It prepares U8 without weakening D3: only the two approved source/destination routes, distinct token enforcement, ambient credential-helper disablement, default-branch-only refresh, preserved demo branches, token-scrubbed resync, nonoverlap lock, inert cron, and runbook. Six focused tests pass, including a real local Git branch-preservation proof. Activation still requires the two private repos, two scoped tokens, the U9 resync executable, manual scope receipts, and host installation. No external or host state changed.
+
 The initial upstream map and T1 drafts now exist under `docs/roundup-2026-08/`. They account for all 277 cutoff commits. Web PR #57's nine feature commits replay cleanly onto current CatholicOS `dev` and all 2,749 scratch tests pass, but the current issuer hardening conflicts and must be synthesized. The unchanged upstream `TurtleEditor.tsx` also prevents a clean type-check signal with the installed toolchain. API replay and final T1 synthesis remain.
 
 Live public browser evidence covers the FOLIO landing/project viewer and both Standard and Developer layouts with no errors or warnings. Authenticated auto-save, translation/audit views, personas, and the auto-accept clock remain credential-gated acceptance work.
 
 ## Next execution order
 
-1. Prepare U8's credential-separated refresh assets locally; repository creation and seeding wait for the two scoped credentials selected in D3.
-2. Build U9's server-enforced demo isolation and web entry/banner on isolated branches, then perform live acceptance only after U8 exists.
+1. Build U9's server-enforced demo isolation and web entry/banner on isolated branches; its resync executable will complete the local U8 contract. Live repository creation, seeding, and acceptance still wait for D3's two scoped credentials.
+2. Re-run the complete API/web gates after the U9 branches settle and append their exact heads to the upstream map.
 3. Synthesize and scratch-validate T1 against refreshed CatholicOS `dev`; do not send until the final local-work batch is ready.
 4. Run authenticated DEV acceptance for auto-save, translations/audit, personas, and the auto-accept clock when a suitable UAT session/credential is available.
 5. Keep PROD Stage B dormant until branch/environment/CODEOWNERS, smoke credential, AWS access, forced-command, data-path, parallel-host, and UAT gates clear. DNS cutover remains separately approved.
@@ -59,4 +61,4 @@ No secrets, credentials, personal roster data, AWS mutation, DNS mutation, Catho
 
 ## Commit and publication state
 
-Documentation commits through `59111470` were already pushed on `feat/roundup-brainstorm`; this audit/map/handoff update is also committed and pushed on that branch as a focused documentation change. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf` and API residual branch `fix/recent-plan-api-residuals` at `0a54857a` are durable local branches only; neither is pushed or merged.
+Documentation commits through `10117ae8` were already pushed on `feat/roundup-brainstorm`; this U8 audit/map/handoff update is also committed and pushed on that branch as a focused documentation change. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf`, API residual branch `fix/recent-plan-api-residuals` at `0a54857a`, and API demo-refresh branch `feat/demo-refresh-scaffold` at `e894f20f` are durable local branches only; none is pushed or merged.

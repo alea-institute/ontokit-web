@@ -54,7 +54,7 @@ These commits are not part of the 277-commit cutoff. They must be frozen at thei
 | Repo | Local branch/head | Delta | Disposition |
 |---|---|---:|---|
 | web | `fix/plan-audit-web-residuals` at `4a4dc5bf` | 5 commits after `83b62b0b` | Fold into T1 and the annotation seam; local-only, tested, not pushed or merged |
-| API | `fix/recent-plan-api-residuals` | provisional | Fold audit cursor, annotation parity, FOLIO dependency, deploy-truth, and dormant promotion work into T1/T6/T8; freeze after final integration gates |
+| API | `fix/recent-plan-api-residuals` at `0a54857a`; child `feat/demo-refresh-scaffold` at `e894f20f` | 6 residual/promotion commits plus 1 demo-refresh commit after `435dc393` | Fold audit cursor, annotation parity, FOLIO dependency, deploy-truth, and dormant promotion work into T2/T7/T8; append the refresh scaffold to T10; local-only, tested, not pushed or merged |
 
 ## Delivery tranches
 
