@@ -53,4 +53,4 @@ No secrets, credentials, personal roster data, AWS mutation, DNS mutation, Catho
 
 ## Commit and publication state
 
-The original audit/queue/handoff commits are local on `feat/roundup-brainstorm`. Web residual commits are local on `fix/plan-audit-web-residuals`. Nothing from this validation session has been pushed or merged.
+Documentation commits through `56c6b51c` are pushed on `feat/roundup-brainstorm`. Commits `b4429cbd` and `29c4f099` are local only and are not pushed or merged. The web residual branch `fix/plan-audit-web-residuals` is also local only and is not pushed or merged.
