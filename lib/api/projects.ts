@@ -41,6 +41,7 @@ export interface Project {
   is_superadmin?: boolean;  // Whether the current user is a superadmin
   is_demo?: boolean;
   demo_source_project_id?: string;
+  demo_repository_full_name?: string;
   // Import-related fields (optional, only set when project was created via import)
   source_file_path?: string;
   git_ontology_path?: string;

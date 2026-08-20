@@ -123,3 +123,25 @@ export function DemoProjectEntry({
     </section>
   );
 }
+
+export function DemoProjectLink({ sourceProjectId }: { sourceProjectId: string }) {
+  const query = useQuery({
+    queryKey: ["demo-projects"],
+    queryFn: loadDemoProjects,
+    staleTime: 5 * 60 * 1000,
+  });
+  const demo = query.data?.projects.find(
+    (project) => project.demo_source_project_id === sourceProjectId,
+  );
+
+  if (!demo) return null;
+
+  return (
+    <Link href={`/projects/${demo.id}`}>
+      <Button variant="outline" size="sm" className="gap-1.5">
+        <FlaskConical className="h-4 w-4" />
+        Try demo
+      </Button>
+    </Link>
+  );
+}

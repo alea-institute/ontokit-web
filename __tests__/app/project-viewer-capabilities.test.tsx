@@ -84,6 +84,7 @@ vi.mock("@/lib/context/ToastContext", () => ({
 vi.mock("@/components/layout/header", () => ({ Header: () => <header /> }));
 vi.mock("@/components/editor/ModeSwitcher", () => ({ ModeSwitcher: () => null }));
 vi.mock("@/components/editor/ShareButton", () => ({ ShareButton: () => null }));
+vi.mock("@/components/projects/demo-project-entry", () => ({ DemoProjectLink: () => null }));
 vi.mock("@/components/editor/standard/StandardEditorLayout", () => ({ StandardEditorLayout: () => null }));
 vi.mock("@/components/editor/developer/DeveloperEditorLayout", () => ({ DeveloperEditorLayout: () => null }));
 vi.mock("@/lib/stores/editorModeStore", () => ({ useEditorModeStore: () => "standard" }));

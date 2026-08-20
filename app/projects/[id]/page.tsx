@@ -6,6 +6,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Settings, FileCode, LogIn, LayoutDashboard } from "lucide-react";
 import { ShareButton } from "@/components/editor/ShareButton";
+import { DemoProjectLink } from "@/components/projects/demo-project-entry";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
@@ -98,6 +99,7 @@ export default function ProjectViewerPage() {
                 <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               </div>
               <div className="flex items-center gap-2">
+                <DemoProjectLink sourceProjectId={projectId} />
                 <ShareButton projectId={projectId} />
                 <Link href={`/projects/${projectId}/dashboard`}>
                   <Button variant="ghost" size="sm" title="Project dashboard" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
@@ -277,6 +279,7 @@ function ViewerContent({
               <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2">
+              <DemoProjectLink sourceProjectId={projectId} />
               {/* Share */}
               <ShareButton
                 projectId={projectId}
