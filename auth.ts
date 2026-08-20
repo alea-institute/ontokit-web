@@ -3,6 +3,7 @@ import type { NextAuthConfig, User } from "next-auth";
 import "next-auth/jwt";
 import { randomBytes } from "crypto";
 import { isAuthActive, isZitadelConfigured } from "@/lib/auth-mode";
+import { validateServerEnv } from "@/lib/env";
 
 // NextAuth needs a signing secret to boot. Only auto-supply one when Zitadel is
 // NOT configured — in that case no real OIDC sessions exist, so there is nothing
@@ -16,11 +17,12 @@ if (!isZitadelConfigured() && !process.env.NEXTAUTH_SECRET) {
 }
 
 // Zitadel provider configuration
+const serverEnvironment = validateServerEnv();
 const zitadelProvider = {
   id: "zitadel",
   name: "Zitadel",
   type: "oidc" as const,
-  issuer: process.env.ZITADEL_ISSUER || "http://localhost:8080",
+  issuer: serverEnvironment.ZITADEL_ISSUER,
   clientId: process.env.ZITADEL_CLIENT_ID || "",
   clientSecret: process.env.ZITADEL_CLIENT_SECRET || "",
   authorization: {

@@ -78,6 +78,17 @@ describe("validateServerEnv", () => {
     const validateServerEnv = await loadValidateServerEnv();
     expect(() => validateServerEnv()).not.toThrow();
   });
+
+  it("ignores stale Zitadel variables when auth is disabled", async () => {
+    process.env.AUTH_MODE = "disabled";
+    process.env.ZITADEL_ISSUER = "https://auth.example.com";
+    process.env.ZITADEL_CLIENT_ID = "stale-client-id";
+    delete process.env.ZITADEL_CLIENT_SECRET;
+    delete process.env.NEXTAUTH_SECRET;
+
+    const validateServerEnv = await loadValidateServerEnv();
+    expect(() => validateServerEnv()).not.toThrow();
+  });
 });
 
 describe("validateClientEnv", () => {
