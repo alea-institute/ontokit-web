@@ -31,6 +31,32 @@ interface ExistingClassBlock {
   predicateObjects: Array<{ predicate: string; text: string }>;
 }
 
+function preserveExistingUntaggedLabels(
+  labels: LocalizedString[],
+  existing: ExistingClassBlock,
+  declarations: ReturnType<typeof parseDeclarations>,
+): LocalizedString[] {
+  const labelForms = new Set(
+    iriTurtleForms(RDFS_LABEL_IRI, declarations.prefixes, declarations.base),
+  );
+  const existingLabelObjects = existing.predicateObjects
+    .filter(({ predicate }) => labelForms.has(predicate))
+    .map(({ predicate, text }) => text.slice(predicate.length).trim());
+
+  return labels.map((label) => {
+    if (!label.lang || !label.value.trim()) return label;
+
+    const untaggedLiteral = literal(label.value, "");
+    const untaggedPattern = new RegExp(
+      `(?:^|,\\s*)${escapeRegex(untaggedLiteral)}(?=\\s*(?:,|$))`,
+      "u",
+    );
+    return existingLabelObjects.some((objects) => untaggedPattern.test(objects))
+      ? { ...label, lang: "" }
+      : label;
+  });
+}
+
 function parseExistingClassBlock(block: string): ExistingClassBlock {
   const subjectMatch = block.match(/^\s*(<[^>]+>|(?:[A-Za-z_][\w-]*)?:[\w-]+)/u);
   if (!subjectMatch) {
@@ -316,14 +342,24 @@ export function updateClassInTurtle(
   const carriedPredicateObjects = existing.predicateObjects
     .filter(({ predicate }) => !described.has(predicate))
     .map(({ text }) => text);
-  const newBlock = genBlock(classIri, data, rev, existing.subject, carriedPredicateObjects);
+  const normalizedData = {
+    ...data,
+    labels: preserveExistingUntaggedLabels(data.labels, existing, declarations),
+  };
+  const newBlock = genBlock(
+    classIri,
+    normalizedData,
+    rev,
+    existing.subject,
+    carriedPredicateObjects,
+  );
   const before = lines.slice(0, block.startLine);
   const after = lines.slice(block.endLine + 1);
 
   return pruneDeletedLiteralAxioms(
     [...before, newBlock, ...after],
     classIri,
-    data,
+    normalizedData,
     declarations,
   );
 }

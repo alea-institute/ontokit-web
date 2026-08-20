@@ -127,6 +127,24 @@ ex:Dog a owl:Class ;
       expect(result).toBe(expected);
     });
 
+    it("preserves an untagged label and full-IRI subject when another field changes", () => {
+      const source = `@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://example.org/ont#Actor> a owl:Class ;
+    rdfs:label "Actor" ;
+    rdfs:comment "Old comment"@en .`;
+
+      const result = updateClassInTurtle(source, "http://example.org/ont#Actor", {
+        labels: [{ value: "Actor", lang: "en" }],
+        comments: [{ value: "New comment", lang: "en" }],
+        parent_iris: [],
+      });
+
+      expect(result).toBe(source.replace("Old comment", "New comment"));
+      expect(result).not.toContain('rdfs:label "Actor"@en');
+    });
+
     it("regenerates the target block in the existing canonical order and indentation", () => {
       const source = `@prefix ex: <http://example.org/ont#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
