@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isAuthRequired, isZitadelConfigured } from "./auth-mode";
+import { isAuthActive, isAuthRequired } from "./auth-mode";
 
 // Base schema: all auth vars optional so the inferred ServerEnv type honestly
 // reflects that they can be absent (disabled/optional mode without Zitadel).
@@ -25,12 +25,12 @@ export type ClientEnv = z.infer<typeof clientSchema>;
 
 function validateServerEnv(): ServerEnv {
   // Zitadel vars + a real NEXTAUTH_SECRET are mandatory whenever auth is required
-  // OR Zitadel is configured. The Zitadel-configured case matters even in
-  // "optional" mode: it still mints real authenticated sessions, so a missing
+  // OR Zitadel is active. The active-provider case matters even in "optional"
+  // mode: it still mints real authenticated sessions, so a missing
   // secret (which auth.ts would otherwise fill with a random per-process value)
   // must instead be a hard error — a real, stable secret is required so sessions
   // survive restarts and can't be forged. Only the no-Zitadel case relaxes.
-  const strict = isAuthRequired() || isZitadelConfigured();
+  const strict = isAuthRequired() || isAuthActive();
   const schema = strict
     ? serverSchema.required({
         ZITADEL_ISSUER: true,
