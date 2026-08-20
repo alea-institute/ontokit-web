@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-24T11:47:13Z",
+  "trigger": "precompact-auto",
+  "phase": "16-reviewer-enhancements",
+  "phase_dir": ".planning/phases/16-reviewer-enhancements",
+  "git": {
+    "branch": "upstream-queue/t8-residual-synthesis-web",
+    "head": "f5c1b9b2",
+    "modified_files": 8
+  },
+  "note": "Auto-saved by PreCompact hook. Run /gsd-resume-work in a fresh session."
+}

@@ -84,6 +84,7 @@ import { LLMUsageSection } from "@/components/projects/LLMUsageSection";
 import { LintConfigSection } from "@/components/projects/LintConfigSection";
 import { DistinctEntityDecisionsSection } from "@/components/projects/DistinctEntityDecisionsSection";
 import { TranslationSettingsSection } from "@/components/projects/TranslationSettingsSection";
+import { LintConfigSection } from "@/components/projects/LintConfigSection";
 
 // Dynamically import the diff viewer to avoid SSR issues with Monaco
 const NormalizationDiffViewer = dynamic(

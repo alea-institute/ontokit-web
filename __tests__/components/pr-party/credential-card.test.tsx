@@ -66,10 +66,8 @@ import { usePRPartyCapabilities } from "@/lib/hooks/usePRPartyCapabilities";
 import { usePRPartySettings } from "@/lib/hooks/usePRPartyQueue";
 import { prPartyApi } from "@/lib/api/prParty";
 import { CredentialCard, PAT_FIELD_NAME } from "@/components/pr-party/CredentialCard";
-import PRPartySettingsPage, {
-  NTFY_TOPIC_PATTERN,
-  hasLapsed,
-} from "@/app/pr-party/settings/page";
+import PRPartySettingsPage from "@/app/pr-party/settings/page";
+import { NTFY_TOPIC_PATTERN, hasLapsed } from "@/lib/prPartyCredentials";
 
 const mockedCapabilities = usePRPartyCapabilities as unknown as ReturnType<typeof vi.fn>;
 const mockedSettings = usePRPartySettings as unknown as ReturnType<typeof vi.fn>;
