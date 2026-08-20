@@ -35,6 +35,10 @@ vi.mock("@/components/projects/project-card", () => ({
   ),
 }));
 
+vi.mock("@/components/projects/demo-project-entry", () => ({
+  DemoProjectEntry: () => <section>Demo entry</section>,
+}));
+
 import HomePage from "@/app/page";
 
 const seededResponse: ProjectListResponse = {
