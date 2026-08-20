@@ -161,6 +161,14 @@ describe("ProjectCard", () => {
     expect(screen.queryByText("Exemplar")).toBeNull();
   });
 
+  it("shows Demo lab only from the server demo flag", () => {
+    const { rerender } = render(<ProjectCard project={makeProject({ is_demo: true })} />);
+    expect(screen.getByText("Demo lab")).toBeDefined();
+
+    rerender(<ProjectCard project={makeProject({ is_demo: false })} />);
+    expect(screen.queryByText("Demo lab")).toBeNull();
+  });
+
   // ── Updated date ────────────────────────────────────────────────
   it("shows the updated_at date when present", () => {
     render(<ProjectCard project={makeProject({

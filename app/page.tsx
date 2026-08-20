@@ -8,6 +8,7 @@ import { Plus, Search, Globe, Lock, FolderOpen, LogIn, User } from "lucide-react
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
+import { DemoProjectEntry } from "@/components/projects/demo-project-entry";
 import { projectApi } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
 
@@ -110,6 +111,8 @@ export default function HomePage() {
               </Link>
             )}
           </div>
+
+          <DemoProjectEntry />
 
           {/* Filters and Search */}
           <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
