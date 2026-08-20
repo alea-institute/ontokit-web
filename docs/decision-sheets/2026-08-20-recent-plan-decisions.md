@@ -33,7 +33,7 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 2. Create and seed the repos now with the current operator credential; replace it before automation. Faster, but weakens the plan’s proof and creates temporary broad authority.
 3. Defer demo mode until PROD is settled.
 
-**Your answer:** `D3 = 1, 2, or 3`
+**Decision:** `D3 = 1` — prepare the secure path now. Repository creation, seeding, and live refresh wait for two separately scoped credentials; the current broad operator credential will not be substituted.
 
 ## D4. What should happen with CatholicOS upstream delivery?
 
@@ -81,6 +81,6 @@ Prepare the implementation and outreach package locally. Begin outreach only whe
 
 ## Defaults that do not need a decision
 
-- `folio-python` 0.4.0 is published and the approved pin/remove-`owlready2` task is now in the autonomous API queue.
-- Web #348/#359/#360, cosmetic Turtle churn, and the production-build blocker are implemented on a tested local branch; publication/integration remains. API #208/#209/#212 and the auto-accept live UAT stay in the autonomous queue.
+- `folio-python` 0.4.0 is published; the tested local API branch now pins it exactly and removes `owlready2`.
+- Web #348/#359/#360, cosmetic Turtle churn, the production-build blocker, and API #208/#209/#211/#212 are implemented on tested local branches. Publication/integration and the authenticated auto-accept live UAT remain.
 - CatholicOS issue/PR mutation is authorized only as the final linked batch after the current local implementation and validation work. No self-merge is authorized.

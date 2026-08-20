@@ -2,7 +2,7 @@
 
 ## Outcome
 
-The 21-day plan audit is complete. Seven formal plan artifacts were found for 2026-07-30 through 2026-08-20. Their 52 formal units are accounted for: 37 are complete on shared integration history, two more are implemented and tested on a local residual branch, and 13 remain queued or intentionally gated. Five later review/execution follow-ups are also accounted for.
+The 21-day plan audit is complete. Seven formal plan artifacts were found for 2026-07-30 through 2026-08-20. Their 52 formal units are accounted for: 37 are complete on shared integration history, two more are implemented and tested on a local web residual branch, and 13 remain queued or intentionally gated. All five later review/execution follow-ups are now implemented and tested on isolated local branches; publication and upstream synthesis remain.
 
 Use these artifacts as the continuation source:
 
@@ -25,17 +25,23 @@ The preliminary audit and Decision Sheet committed at `e219328b` are explicitly 
 
 Because `feat/roundup-brainstorm` is a documentation branch 442 commits behind `origin/feat/pr-party`, implementation used an isolated clone based on integration head `83b62b0b`. The reviewed commits were imported into durable local branch `fix/plan-audit-web-residuals` without switching this dirty documentation checkout.
 
-Web U1–U4 are implemented in commits `6f5ee59f`, `fea85b6b`, `5ef55edc`, and `1697e5e7`. The final tree passes 208 test files/3,298 tests, type-check, lint with zero errors, and diff checks. The branch is local only. A production-build attempt compiled successfully before exposing pre-existing invalid extra exports from three Next.js `page.tsx` modules; that build blocker is now cataloged for the next autonomous pass.
+Web U1–U4 plus the production-build repair are implemented in commits `6f5ee59f`, `fea85b6b`, `5ef55edc`, `1697e5e7`, and `4a4dc5bf`. The final tree passes 208 test files/3,298 tests, type-check, lint with zero errors, the optional-auth production build with 24 static pages, and diff checks. The branch is local only.
+
+The sibling API's durable local branch `fix/recent-plan-api-residuals` ends at `0a54857a`. It contains six commits for project-bound audit cursors, declaration-aware annotation parity, `folio-python==0.4.0` with `owlready2` removed, truthful preflight/runtime deploy status, a dormant fail-closed PROD promotion scaffold, and its immutable release pair. The complete API suite passes 2,738 tests against real PostgreSQL and Redis; Ruff, mypy across 182 source files, both deploy harnesses, lock validation, and diff checks pass. No push or merge occurred.
+
+The initial upstream map and T1 drafts now exist under `docs/roundup-2026-08/`. They account for all 277 cutoff commits. Web PR #57's nine feature commits replay cleanly onto current CatholicOS `dev` and all 2,749 scratch tests pass, but the current issuer hardening conflicts and must be synthesized. The unchanged upstream `TurtleEditor.tsx` also prevents a clean type-check signal with the installed toolchain. API replay and final T1 synthesis remain.
+
+Live public browser evidence covers the FOLIO landing/project viewer and both Standard and Developer layouts with no errors or warnings. Authenticated auto-save, translation/audit views, personas, and the auto-accept clock remain credential-gated acceptance work.
 
 ## Next execution order
 
-1. Publish/integrate the reviewed local web U1–U4 branch when authorized, and fix the cataloged App Router page-export build blocker.
-2. Execute API U5–U6 and now-unblocked U15 from the sibling API integration baseline.
-3. Run U7 live auto-accept UAT as soon as the deployed trust/audit stack is healthy; it no longer waits on unrelated residuals.
-4. Begin the current-cutoff U11 upstream map without sending anything to CatholicOS.
-5. Advance U8/U9, U10 activation, U12 live E2E, U13, and U14 only when their named gates clear. U10 rollout-neutral prework and U12 draft preparation may proceed earlier as the plan specifies.
-6. Verify `folio-python` 0.4.0 compatibility, then pin it and remove `owlready2` for U15.
-7. Finish U16 only when every item is complete or has a current, explicit activation condition.
+1. Prepare U8's credential-separated refresh assets locally; repository creation and seeding wait for the two scoped credentials selected in D3.
+2. Build U9's server-enforced demo isolation and web entry/banner on isolated branches, then perform live acceptance only after U8 exists.
+3. Synthesize and scratch-validate T1 against refreshed CatholicOS `dev`; do not send until the final local-work batch is ready.
+4. Run authenticated DEV acceptance for auto-save, translations/audit, personas, and the auto-accept clock when a suitable UAT session/credential is available.
+5. Keep PROD Stage B dormant until branch/environment/CODEOWNERS, smoke credential, AWS access, forced-command, data-path, parallel-host, and UAT gates clear. DNS cutover remains separately approved.
+6. Resolve D5 (`rotate_reviewer_token`), then finish PR Party local preparation. Outreach waits for the demo.
+7. Finish closeout only when every remaining item is complete or has a current, explicit activation condition.
 
 ## Protected local state
 
@@ -49,8 +55,8 @@ The following pre-existing files were intentionally excluded from all validation
 - `WORKER-REPORT-u7-flip-docs.md`
 - `docs/residual-review-findings/2026-08-08-llm-subsystem-review.md`
 
-No secrets, credentials, personal roster data, AWS mutation, DNS mutation, CatholicOS issue/PR mutation, or PROD mutation occurred during this validation pass.
+No secrets, credentials, personal roster data, AWS mutation, DNS mutation, CatholicOS issue/PR mutation, DEV write, or PROD mutation occurred during this validation pass.
 
 ## Commit and publication state
 
-Documentation commits through `56c6b51c` are pushed on `feat/roundup-brainstorm`. Commits `b4429cbd` and `29c4f099` are local only and are not pushed or merged. The web residual branch `fix/plan-audit-web-residuals` is also local only and is not pushed or merged.
+Documentation commits through `59111470` were already pushed on `feat/roundup-brainstorm`; this audit/map/handoff update is also committed and pushed on that branch as a focused documentation change. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf` and API residual branch `fix/recent-plan-api-residuals` at `0a54857a` are durable local branches only; neither is pushed or merged.
