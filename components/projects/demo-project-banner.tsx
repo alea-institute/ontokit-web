@@ -14,6 +14,10 @@ export function DemoProjectBanner() {
 
   if (!project?.is_demo) return null;
 
+  const sourceHref = project.demo_source_project_id
+    ? `/projects/${project.demo_source_project_id}`
+    : "/";
+
   return (
     <aside
       aria-label="Demo workspace notice"
@@ -22,15 +26,17 @@ export function DemoProjectBanner() {
       <div className="flex items-start gap-3 sm:items-center">
         <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-cyan-300 sm:mt-0" />
         <p>
-          <span className="font-semibold text-white">Demo workspace.</span>{" "}
+          <span className="font-semibold text-white">
+            Demo workspace: {project.demo_repository_full_name ?? project.name}.
+          </span>{" "}
           Changes may disappear when this project resets.
         </p>
       </div>
       <Link
-        href="/"
+        href={sourceHref}
         className="inline-flex shrink-0 items-center gap-1.5 self-end font-medium text-cyan-200 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300 sm:self-auto"
       >
-        Exit demo <LogOut className="h-4 w-4" />
+        Return to source <LogOut className="h-4 w-4" />
       </Link>
     </aside>
   );

@@ -18,13 +18,22 @@ vi.mock("@/lib/api/projects", async (importOriginal) => {
   };
 });
 
-import { DemoProjectEntry } from "@/components/projects/demo-project-entry";
+import { DemoProjectEntry, DemoProjectLink } from "@/components/projects/demo-project-entry";
 
 function renderEntry(loader?: () => Promise<{ projects: []; unavailable: boolean }>) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
       <DemoProjectEntry loader={loader} />
+    </QueryClientProvider>,
+  );
+}
+
+function renderSourceLink(sourceProjectId: string) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={client}>
+      <DemoProjectLink sourceProjectId={sourceProjectId} />
     </QueryClientProvider>,
   );
 }
@@ -87,5 +96,32 @@ describe("DemoProjectEntry", () => {
     renderEntry();
 
     expect(await screen.findByText("Demo workspaces are being prepared.")).toBeDefined();
+  });
+
+  it("links a live source project to only its server-linked demo", async () => {
+    listProjects.mockResolvedValue({
+      items: [
+        {
+          id: "demo-folio",
+          name: "FOLIO Demo",
+          is_public: true,
+          is_demo: true,
+          demo_source_project_id: "folio-live",
+          owner_id: "owner",
+          created_at: "2026-08-20T00:00:00Z",
+          member_count: 1,
+        },
+      ],
+      total: 1,
+      unfiltered_total: 1,
+      skip: 0,
+      limit: 100,
+    });
+
+    renderSourceLink("folio-live");
+
+    expect(
+      (await screen.findByRole("link", { name: /Try demo/ })).getAttribute("href"),
+    ).toBe("/projects/demo-folio");
   });
 });

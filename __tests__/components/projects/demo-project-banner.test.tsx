@@ -2,7 +2,12 @@ import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { projectState } = vi.hoisted(() => ({
-  projectState: { is_demo: false },
+  projectState: {
+    is_demo: false,
+    name: "FOLIO Demo",
+    demo_source_project_id: "folio-live",
+    demo_repository_full_name: "alea-institute/ontokit-demo-folio",
+  },
 }));
 
 vi.mock("next/navigation", () => ({ useParams: () => ({ id: "project-1" }) }));
@@ -30,6 +35,8 @@ describe("DemoProjectBanner", () => {
     projectState.is_demo = true;
     rerender(<DemoProjectBanner />);
     expect(screen.getByLabelText("Demo workspace notice")).toBeDefined();
-    expect(screen.getByRole("link", { name: /Exit demo/ }).getAttribute("href")).toBe("/");
+    expect(screen.getByText(/alea-institute\/ontokit-demo-folio/)).toBeDefined();
+    expect(screen.getByRole("link", { name: /Return to source/ }).getAttribute("href"))
+      .toBe("/projects/folio-live");
   });
 });
