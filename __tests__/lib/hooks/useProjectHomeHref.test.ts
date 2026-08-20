@@ -10,23 +10,6 @@ vi.hoisted(() => {
     removeEventListener: vi.fn(),
   });
 
-  // Zustand persist middleware needs a working localStorage at module-load.
-  if (
-    !globalThis.localStorage ||
-    typeof globalThis.localStorage.setItem !== "function"
-  ) {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() {
-        return store.size;
-      },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
 });
 
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";

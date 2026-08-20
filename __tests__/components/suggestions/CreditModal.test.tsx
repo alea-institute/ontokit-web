@@ -2,23 +2,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// Provide localStorage before the anonymousCreditStore module loads (Zustand
-// persist captures it at import time) — CreditModal reads/writes credit info
-// through useAnonymousCreditStore.
-vi.hoisted(() => {
-  if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() { return store.size; },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
-});
-
 import { CreditModal } from "@/components/suggestions/CreditModal";
 import { useAnonymousCreditStore } from "@/lib/stores/anonymousCreditStore";
 

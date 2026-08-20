@@ -1,21 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
-
-// The store uses sessionStorage (NOT localStorage) so BYO keys are cleared when
-// the tab closes. Provide a sessionStorage mock before the store module loads,
-// because Zustand's persist middleware captures the storage at import time.
-vi.hoisted(() => {
-  const store = new Map<string, string>();
-  (globalThis as Record<string, unknown>).sessionStorage = {
-    getItem: (key: string) => store.get(key) ?? null,
-    setItem: (key: string, value: string) => store.set(key, value),
-    removeItem: (key: string) => store.delete(key),
-    clear: () => store.clear(),
-    get length() {
-      return store.size;
-    },
-    key: (index: number) => [...store.keys()][index] ?? null,
-  };
-});
+import { describe, expect, it, beforeEach } from "vitest";
 
 import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
 

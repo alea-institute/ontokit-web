@@ -15,25 +15,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PRPartyCommentResponse, PRPartyQAEntry } from "@/lib/api/prParty";
 
-// This jsdom environment ships an incomplete localStorage; the composer's draft
-// persistence needs a real one. Same shim as CreditModal's tests.
-vi.hoisted(() => {
-  const store = new Map<string, string>();
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, String(value)),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() {
-        return store.size;
-      },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    },
-  });
-});
-
 import { QAThread, qaDraftKey } from "@/components/pr-party/QAThread";
 
 function makeEntry(overrides: Partial<PRPartyQAEntry> = {}): PRPartyQAEntry {

@@ -14,31 +14,13 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// editorModeStore touches matchMedia and localStorage at module load, and the
-// settings page imports it transitively. Stub both before any import runs.
+// editorModeStore touches matchMedia at module load.
 vi.hoisted(() => {
   (globalThis as Record<string, unknown>).matchMedia = vi.fn().mockReturnValue({
     matches: false,
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
   });
-
-  if (
-    !globalThis.localStorage ||
-    typeof globalThis.localStorage.setItem !== "function"
-  ) {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() {
-        return store.size;
-      },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
 });
 
 import { nextLinkMock, nextAuthMock } from "@/__tests__/helpers/mockNextNavigation";

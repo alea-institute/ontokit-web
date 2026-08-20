@@ -4,21 +4,6 @@ import React from "react";
 
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 
-// Provide localStorage polyfill
-vi.hoisted(() => {
-  if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => { store.set(key, value); },
-      removeItem: (key: string) => { store.delete(key); },
-      clear: () => store.clear(),
-      get length() { return store.size; },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
-});
-
 // --- Mocks ---
 
 // PR-5 mounts useLLMGate (session + react-query backed) in the layouts; the

@@ -1,8 +1,6 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 
-// vi.hoisted runs before any imports — needed because the store's module-level
-// code calls window.matchMedia(...).addEventListener(...) and Zustand's persist
-// middleware captures localStorage at module load time.
+// The store subscribes to matchMedia at module load time.
 vi.hoisted(() => {
   const mockMatchMedia = vi.fn().mockReturnValue({
     matches: false,
@@ -11,18 +9,6 @@ vi.hoisted(() => {
   });
   (globalThis as Record<string, unknown>).matchMedia = mockMatchMedia;
 
-  // Provide a minimal localStorage if jsdom hasn't set one up yet
-  if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() { return store.size; },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
 });
 
 import { useEditorModeStore, applyThemeToDOM } from "@/lib/stores/editorModeStore";
