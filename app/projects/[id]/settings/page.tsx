@@ -70,7 +70,7 @@ import type {
   SyncUpdateMode,
 } from "@/lib/api/remoteSync";
 import { NOTIFICATIONS_CHANGED_EVENT } from "@/components/layout/notification-bell";
-import { cn } from "@/lib/utils";
+import { cn, formatTimeAgo } from "@/lib/utils";
 import dynamic from "next/dynamic";
 import {
   embeddingsApi,
@@ -2549,21 +2549,6 @@ const UPDATE_MODE_OPTIONS: { value: SyncUpdateMode; label: string; description: 
   { value: "auto_apply", label: "Auto-apply if clean", description: "Automatically apply updates when there are no conflicts" },
   { value: "review_required", label: "Always create PR", description: "Create a pull request for every remote change" },
 ];
-
-function formatTimeAgo(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHrs = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
-}
 
 function formatTimeUntil(dateStr: string): string {
   const date = new Date(dateStr);

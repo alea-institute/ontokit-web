@@ -5,6 +5,7 @@ import {
   getPreferredLabel,
   formatDate,
   formatDateTime,
+  formatTimeAgo,
   debounce,
   generateId,
 } from "@/lib/utils";
@@ -91,6 +92,24 @@ describe("formatDateTime", () => {
   it("formats a date string with time", () => {
     const result = formatDateTime("2024-01-15T10:30:00Z");
     expect(result).toContain("2024");
+  });
+});
+
+describe("formatTimeAgo", () => {
+  const now = new Date("2026-08-20T12:00:00Z");
+
+  it.each([
+    ["2026-08-20T11:59:30Z", "just now"],
+    ["2026-08-20T11:55:00Z", "5m ago"],
+    ["2026-08-20T09:00:00Z", "3h ago"],
+    ["2026-08-18T12:00:00Z", "2d ago"],
+  ])("formats %s as %s", (date, expected) => {
+    expect(formatTimeAgo(date, now)).toBe(expected);
+  });
+
+  it("accepts Date inputs and falls back to a locale date after seven days", () => {
+    const oldDate = new Date("2026-08-01T12:00:00Z");
+    expect(formatTimeAgo(oldDate, now)).toBe(oldDate.toLocaleDateString());
   });
 });
 

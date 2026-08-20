@@ -53,7 +53,7 @@ export type ProjectTrustSettingsUpdate = Partial<ProjectTrustSettings>;
 
 /** One immutable submitter snapshot paired with its suggestion outcome. */
 export interface SuggestionOutcomeItem {
-  user_id: string | null;
+  user_id: string;
   is_anonymous: boolean;
   submitter_name: string | null;
   submitter_email: string | null;

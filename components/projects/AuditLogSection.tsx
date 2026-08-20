@@ -5,26 +5,13 @@ import { Button } from "@/components/ui/button";
 import { TierBadge } from "@/components/suggestions/TierBadge";
 import { useSuggestionOutcomes } from "@/lib/hooks/useSuggestionOutcomes";
 import type { SuggestionOutcomeItem } from "@/lib/api/trust";
+import { formatTimeAgo } from "@/lib/utils";
 
 interface AuditLogSectionProps {
   projectId: string;
   accessToken?: string;
   /** Owner/admin only — the endpoint refuses anyone else. */
   canManage: boolean;
-}
-
-function formatTimeAgo(date: Date): string {
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-  const diffHrs = Math.floor(diffMs / 3_600_000);
-  const diffDays = Math.floor(diffMs / 86_400_000);
-
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
 }
 
 function TierSnapshot({ item }: { item: SuggestionOutcomeItem }) {
@@ -95,7 +82,7 @@ function AuditRow({ item }: { item: SuggestionOutcomeItem }) {
             <span className="sr-only">Decided by: </span>
             {decider}
           </span>
-          <time dateTime={item.created_at}>{formatTimeAgo(new Date(item.created_at))}</time>
+          <time dateTime={item.created_at}>{formatTimeAgo(item.created_at)}</time>
         </div>
       </div>
     </li>
@@ -157,7 +144,7 @@ export function AuditLogSection({ projectId, accessToken, canManage }: AuditLogS
       <ul className="space-y-3">
         {outcomes.items.map((item, index) => (
           <AuditRow
-            key={`${item.created_at}-${item.user_id ?? "anonymous"}-${index}`}
+            key={`${item.created_at}-${item.user_id}-${index}`}
             item={item}
           />
         ))}
