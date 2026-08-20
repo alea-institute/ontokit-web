@@ -63,4 +63,4 @@ No secrets, credentials, personal roster data, AWS mutation, DNS mutation, Catho
 
 ## Commit and publication state
 
-Documentation commits through `140d7360` are pushed on `feat/roundup-brainstorm`; this U9 correction is the next focused documentation publication. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf`, API residual branch `fix/recent-plan-api-residuals` at `0a54857a`, API demo-refresh branch `feat/demo-refresh-scaffold` at `e894f20f`, API demo-isolation branch `feat/demo-project-isolation` at `b5b13d8f`, and web demo-UI branch `feat/demo-project-ui` at `d7e490ec` are durable local branches only; none is pushed or merged.
+Documentation commits through `4f441bbf` are pushed on `feat/roundup-brainstorm`. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf`, API residual branch `fix/recent-plan-api-residuals` at `0a54857a`, API demo-refresh branch `feat/demo-refresh-scaffold` at `e894f20f`, API demo-isolation branch `feat/demo-project-isolation` at `b5b13d8f`, and web demo-UI branch `feat/demo-project-ui` at `d7e490ec` are durable local branches only; none is pushed or merged.
