@@ -1,7 +1,7 @@
 # Decision Sheet — Recent OntoKit Plan Residuals
 
 Created: 2026-08-20
-Updated: 2026-08-20 after autonomous residual execution
+Updated: 2026-08-20 after the user settled rollout, upstream batching, domain, and external-coordination choices
 
 The recommended choices are first. Reply with short answers such as `D1 = 1; D2 = 1; D3 = 1; D4 = 1; D5 = 1; D6 = 2`.
 
@@ -13,7 +13,7 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 2. In-place promotion with a tested rollback plan. Fewer hostnames, but the current public service carries the migration risk.
 3. Keep the public FOLIO browser and the auth product on permanent separate URLs. No cutover; two intentionally distinct products.
 
-**Your answer:** `D1 = 1, 2, or 3`
+**Decision:** `D1 = 1` — parallel stand-up, UAT, then DNS cutover.
 
 ## D2. What is the status of Mike’s AWS access request?
 
@@ -43,7 +43,7 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 2. Start smallest-first now with #344, #345, and #361 as separate issue-linked PRs.
 3. Keep shipping only on ALEA until PROD and demo mode are settled.
 
-**Your answer:** `D4 = 1, 2, or 3`
+**Decision:** Prepare as much implementation and mapping work as possible first, then create the CatholicOS issues and their linked PRs together as one final batch. This is explicit authorization for that final batch after local work and validation are complete; it is not authorization to self-merge.
 
 ## D5. What should happen with PR Party’s dead token-rotation capability?
 
@@ -63,7 +63,7 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 2. **Defer registration and keep U17 parked — recommended unless the picker is a current priority.**
 3. Choose a different domain; provide the name.
 
-**Your answer:** `D6 = 1, 2, or 3`
+**Decision:** `D6 = 1` — Damien is registering `ontokit.org` now and will decide separately whether to transfer it later. Picker activation waits only for confirmed registration and DNS control.
 
 ## Resolved autonomously: optional auth without Zitadel
 
@@ -71,9 +71,16 @@ Current `AUTH_MODE=optional` deliberately supports anonymous browsing when Zitad
 
 No user decision is required unless you want to change that contract.
 
+## Resolved: Google federation activation
+
+Google federation remains parked until the CatholicOS-side and ALEA-side domain-name questions are resolved. Domain resolution replaces the earlier login-friction-only activation condition for the current queue.
+
+## Resolved: PR Party external coordination
+
+Prepare the implementation and outreach package locally. Begin outreach only when the demo is ready; do not contact the CatholicOS organization earlier.
+
 ## Defaults that do not need a decision
 
-- Google federation remains parked until a real login-friction complaint fires its documented trigger.
 - `folio-python` 0.4.0 is published and the approved pin/remove-`owlready2` task is now in the autonomous API queue.
-- Web #348/#359/#360 and cosmetic Turtle churn are implemented on a tested local branch; publication/integration remains. API #208/#209/#212, the auto-accept live UAT, and the production-build blocker stay in the autonomous queue.
-- No push, issue, PR, or other mutation is sent to CatholicOS without an explicit authorization that names the tranche.
+- Web #348/#359/#360, cosmetic Turtle churn, and the production-build blocker are implemented on a tested local branch; publication/integration remains. API #208/#209/#212 and the auto-accept live UAT stay in the autonomous queue.
+- CatholicOS issue/PR mutation is authorized only as the final linked batch after the current local implementation and validation work. No self-merge is authorized.
