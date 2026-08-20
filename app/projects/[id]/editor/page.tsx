@@ -35,14 +35,12 @@ import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ont
 import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import { detectPatternFromIriIndex, type IriSuffixPattern } from "@/lib/ontology/iriGeneration";
 import { commonPrefixes } from "@/lib/editor/languages/turtle";
+import { persistSuggestionUpdate } from "@/lib/editor/persistSuggestionUpdate";
 
 import { useKeyboardShortcuts, type ShortcutDefinition } from "@/lib/hooks/useKeyboardShortcuts";
 import { KeyboardShortcutDialog } from "@/components/editor/KeyboardShortcutDialog";
 import { SuggestionSubmitDialog } from "@/components/editor/SuggestionSubmitDialog";
-import {
-  useSuggestionSession,
-  type UseSuggestionSessionReturn,
-} from "@/lib/hooks/useSuggestionSession";
+import { useSuggestionSession } from "@/lib/hooks/useSuggestionSession";
 import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
 import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
 import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
@@ -64,33 +62,6 @@ import { shouldRedirectFromEditor } from "@/lib/hooks/useProject";
 function suggestionCardHasFocus(): boolean {
   return !!document.activeElement?.closest('[role="listitem"]');
 }
-
-type SuggestionPersistence = Pick<
-  UseSuggestionSessionReturn,
-  "sessionId" | "startSession" | "saveToSession"
->;
-
-export async function persistSuggestionUpdate(
-  suggestionSession: SuggestionPersistence,
-  content: string,
-  entityIri: string,
-  entityLabel: string,
-  onSuccess: () => void,
-): Promise<void> {
-  const sessionId =
-    suggestionSession.sessionId ?? await suggestionSession.startSession();
-  await suggestionSession.saveToSession(
-    content,
-    entityIri,
-    entityLabel,
-    sessionId,
-  );
-  onSuccess();
-}
-
-export const persistClassSuggestionUpdate = persistSuggestionUpdate;
-export const persistPropertySuggestionUpdate = persistSuggestionUpdate;
-export const persistIndividualSuggestionUpdate = persistSuggestionUpdate;
 
 export default function EditorPage() {
   const { data: session, status } = useSession();
@@ -782,7 +753,7 @@ export default function EditorPage() {
     const modifiedSource = updateClassInTurtle(source, classIri, data);
     const label = data.labels[0]?.value || getLocalName(classIri);
 
-    await persistClassSuggestionUpdate(
+    await persistSuggestionUpdate(
       suggestionSession,
       modifiedSource,
       classIri,
@@ -814,7 +785,7 @@ export default function EditorPage() {
     const modifiedSource = updatePropertyInTurtle(source, propertyIri, data);
     const label = data.labels[0]?.value || getLocalName(propertyIri);
 
-    await persistPropertySuggestionUpdate(
+    await persistSuggestionUpdate(
       suggestionSession,
       modifiedSource,
       propertyIri,
@@ -845,7 +816,7 @@ export default function EditorPage() {
     const modifiedSource = updateIndividualInTurtle(source, individualIri, data);
     const label = data.labels[0]?.value || getLocalName(individualIri);
 
-    await persistIndividualSuggestionUpdate(
+    await persistSuggestionUpdate(
       suggestionSession,
       modifiedSource,
       individualIri,

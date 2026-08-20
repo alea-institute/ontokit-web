@@ -105,7 +105,7 @@ vi.mock("@/lib/utils", () => ({
 import {
   LintConfigSection,
   getSeverityColor,
-} from "@/app/projects/[id]/settings/page";
+} from "@/components/projects/LintConfigSection";
 import { lintApi } from "@/lib/api/lint";
 import type { LintLevelsResponse, LintRuleInfo } from "@/lib/api/lint";
 
