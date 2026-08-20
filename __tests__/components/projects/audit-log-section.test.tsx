@@ -71,7 +71,7 @@ describe("AuditLogSection", () => {
   it("renders three distinct null-tier states", () => {
     mockQuery([
       outcome({
-        user_id: null,
+        user_id: "anonymous-user",
         is_anonymous: true,
         submitter_name: "Anonymous Author",
         snapshot_tier: null,
@@ -89,7 +89,7 @@ describe("AuditLogSection", () => {
         snapshot_tier: null,
       }),
       outcome({
-        user_id: null,
+        user_id: "historical-anonymous-user",
         is_anonymous: true,
         submitter_name: "Historical Anonymous",
         snapshot_tier: null,
@@ -143,7 +143,7 @@ describe("AuditLogSection", () => {
   it("shows anonymous attribution and the Anonymous chip without a tier badge", () => {
     mockQuery([
       outcome({
-        user_id: null,
+        user_id: "anonymous-user",
         is_anonymous: true,
         submitter_name: "Self Reported Name",
         submitter_email: "reported@example.com",
@@ -184,6 +184,24 @@ describe("AuditLogSection", () => {
 
     expect(screen.getByText("Auto-accepted")).toBeDefined();
     expect(screen.queryByText("system:auto-accept")).toBeNull();
+  });
+
+  it("uses erasure-safe fallbacks when display identities are gone", () => {
+    mockQuery([
+      outcome({
+        user_id: "erased-user",
+        submitter_name: null,
+        submitter_email: null,
+        decided_by: "erased-decider",
+        decided_by_name: null,
+      }),
+    ]);
+    renderWithQueryClient(<AuditLogSection projectId="p1" accessToken="tok" canManage />);
+
+    expect(screen.getByText("Unknown submitter")).toBeDefined();
+    expect(screen.getByText("Unknown decider")).toBeDefined();
+    expect(screen.queryByText("erased-user")).toBeNull();
+    expect(screen.queryByText("erased-decider")).toBeNull();
   });
 
   it("shows load more from hasNextPage even when items length equals total", () => {

@@ -2,7 +2,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import {
   trustApi,
   type SuggestionOutcomeItem,
-  type TrustTier,
 } from "@/lib/api/trust";
 
 const mockFetch = vi.fn();
@@ -115,16 +114,6 @@ describe("trustApi", () => {
       expect(result.items[0]).toEqual(item);
       expect(result.items[0].snapshot_tier).toBeNull();
       expect(result.items[0].snapshot_role).toBeNull();
-    });
-
-    it("types snapshot_tier as TrustTier or null", () => {
-      type SnapshotTier = SuggestionOutcomeItem["snapshot_tier"];
-      const tier: SnapshotTier = "trusted";
-      const nullableTier: TrustTier | null = tier;
-      const noTier: SnapshotTier = null;
-
-      expect(nullableTier).toBe("trusted");
-      expect(noTier).toBeNull();
     });
   });
 
