@@ -440,3 +440,19 @@ Zitadel console. Final deployed SHAs are api `20cb6aa7`
 (`feat/u7-zitadel-standup`) and web `cfa91623`
 (`feat/u7-web-auth-buildargs`). U7 is DoD complete, and U12 IaC capture plus U14
 upstream mapping are unblocked.
+
+### 2026-08-15 closure update — F-c/F-d and the discovered data-loss blocker
+
+The two U7 findings above are closed on the ALEA integration branch and deployed to
+DEV. Web PR #18 fixed federated logout (#344) and the stale-session-id save defect
+(#345) across class, property, and individual handlers. Live verification observed
+the real Zitadel end-session URL and a suggestion session POST followed by its save
+PUT and commit.
+
+That verification exposed #361: the indexed API response omitted four label/title
+predicates and the web Turtle writer destroyed predicates absent from the payload.
+API PR #22 and web PR #19 shipped together and were verified on the real Actor / Player
+class: editing one comment preserved all 13 `skos:altLabel` values byte-identical.
+Final verified integration SHAs for that pass were api `435dc393` and web `83b62b0b`.
+Cosmetic Turtle serialization churn and the broader indexed/RDFLib predicate-parity
+gap remain tracked residuals, not data-loss blockers.

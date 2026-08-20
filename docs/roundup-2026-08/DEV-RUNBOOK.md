@@ -45,8 +45,9 @@ names below when operating the stack.
   request headers.
 - The web image now requires build args for `AUTH_MODE`, `ZITADEL_ISSUER`, and
   `ZITADEL_CLIENT_ID`; these are baked into the Next.js client flags. Never pass the
-  client secret as a build arg. DEV currently deploys web `cfa91623` and api
-  `20cb6aa7`.
+  client secret as a build arg. This standup record's original SHAs were web
+  `cfa91623` and api `20cb6aa7`; the 2026-08-15 verified deployment superseded them
+  with web `83b62b0b` and api `435dc393`.
 
 ### Secrets & env contract
 
@@ -171,10 +172,11 @@ credentials; do not record them here. Reset them in the Zitadel console at
 
 ### Known residuals
 
-- Both Zitadel images use `:latest`; pin them during U12 infrastructure capture.
-- The repo compose still contains the dead `ZITADEL_SERVICE_USER_TOKEN_FILE` contract
-  and the broken fetch/localhost healthcheck. Upstream the live wrapper and
-  `http.request` healthcheck, or pin a compatible image, in U12.
+- **U12 capture is complete.** The repository compose, Traefik template, firewall
+  script/unit, env contract, and runbook live under `ontokit-api/deploy/`. External
+  images, including Zitadel and Login V2, are digest-pinned. The Login V2 wrapper and
+  Host-aware healthcheck are captured there. U12's stricter matched-pair/rollback
+  proof and U8 cron capture remain plan-audit follow-ups rather than missing live IaC.
 - The setup script emits a benign `jq` null-iteration line during existing-app search.
 - The setup script's closing message displays its default admin password when
   `ZITADEL_ADMIN_PASSWORD` is absent from the script process env. This is display-only;
@@ -184,16 +186,12 @@ credentials; do not record them here. Reset them in the Zitadel console at
   ineffective for `localhost:8080` because the port cannot be matched.
 - Generated PATs expire `2026-09-15T00:00:00Z`; re-initialize Zitadel or re-mint them
   before then.
-- U12 must capture compose, Traefik, and firewall configuration as repository IaC,
-  including `deploy/compose.dev.yaml` and the corresponding proxy/systemd assets.
-- **F-c (open, repo bug):** federated logout clears the NextAuth session and then
-  redirects to localhost. `components/auth/user-menu.tsx` reads
-  `NEXT_PUBLIC_ZITADEL_ISSUER`, which is not supplied by `next.config.ts`, Dockerfile,
-  or compose, so it falls back to `http://localhost:8080`. The operational workaround
-  is the real issuer's `/oidc/v1/end_session` URL with the client id and post-logout
-  redirect. Fix by deriving the public issuer from `ZITADEL_ISSUER` through the build
-  contract, or by reading it server-side.
-- **F-d (open, needs repro):** browser suggester auto-save created a session and showed
-  the success toast but did not issue the `…/save` PUT, so no commit landed in two
-  attempts. API-level save works. Investigate `useAutoSave`'s suggestion-mode flush
-  path before relying on browser suggester saves.
+- **F-c closed 2026-08-13:** ALEA web PR #18 derives the public issuer through the
+  build contract, removes the localhost client fallback, and was verified against the
+  live bundle and Zitadel end-session URL. CatholicOS web #344 stays open only until
+  the fix reaches upstream.
+- **F-d closed 2026-08-13:** ALEA web PR #18 fixes the stale-session-id closure in all
+  three suggestion handlers. Live verification observed session POST followed by save
+  PUT and a real commit. CatholicOS web #345 stays open only until upstream delivery.
+- The analogous server-side fallback in `auth.ts` remains CatholicOS web #360; it is
+  latent on correctly configured DEV and belongs to the residual engineering queue.

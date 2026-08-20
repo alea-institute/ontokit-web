@@ -25,6 +25,12 @@ Meanwhile the codebase had quietly made a partial choice on its own: folio-pytho
 
 A ce-pov approach-set evaluation (2026-08-10, reversibility Tier 2) closed the open question with a graded verdict on all four candidates. This doc records that verdict and the evidence behind it, so future FOLIO work does not re-open the question from scratch.
 
+**Status update (2026-08-20):** the release gate has cleared. `folio-python` 0.4.0
+published on 2026-08-18, superseding the anticipated 0.3.7 release. The approved
+OntoKit dependency change is now executable: verify 0.4 compatibility, pin the secure
+release, remove `owlready2`, update the lockfile, and run the API gates. CatholicOS
+ontokit-api #209 remains open for that work.
+
 ## Guidance
 
 The verdict, per candidate:
