@@ -55,7 +55,9 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 2. Delete the function and tests; document that key retirement requires reviewers to re-enter valid PATs.
 3. Leave it and accept the tracked debt.
 
-**Your answer:** `D5 = 1, 2, or 3`
+**Decision:** `D5 = 1` — implement the operator-triggered bulk rewrap with best-practice safety controls.
+
+**Execution status (2026-08-21):** Implemented, reviewed, and committed locally in the API repository as `f3c4251d` on `fix/pr-party-credential-rewrap`. The task is dry-run by default, requires exact confirmation plus the expected stable job ID at the worker boundary, rotates all reviewer-credential ciphertext atomically, redacts SQL parameters, and returns only counts and credential-row UUIDs. Unit, real-Postgres, Ruff, mypy, and Pyright checks pass. The branch is not pushed, merged, deployed, or executed against stored credentials; it belongs in the authorized final CatholicOS issue/PR batch after the remaining local work.
 
 ## D6. Do you want to register `ontokit.org` now?
 

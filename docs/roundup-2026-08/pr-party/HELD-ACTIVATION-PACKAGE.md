@@ -36,7 +36,7 @@ No document in this package grants permission to mutate CatholicOS, AWS, DNS, DE
 
 `rotate_reviewer_token(ciphertext)` does not create, replace, revoke, or extend a GitHub PAT. It decrypts the already-stored reviewer PAT using OntoKit’s accepted encryption-key ring and re-encrypts the same plaintext under the current `SECRET_KEY`. The purpose is to retire `SECRET_KEY_PREVIOUS` without requiring reviewers to re-enter otherwise-valid PATs.
 
-The recommended implementation is an explicit operator-triggered bulk rewrap task with an audit receipt. It must:
+The approved implementation is an explicit operator-triggered bulk rewrap task with an audit receipt. It must:
 
 - operate only on encrypted reviewer-credential rows;
 - rewrap each value through `MultiFernet.rotate` without logging plaintext or ciphertext;
@@ -44,7 +44,7 @@ The recommended implementation is an explicit operator-triggered bulk rewrap tas
 - report counts and row identifiers only, never token material; and
 - remain separate from reviewer-controlled GitHub PAT replacement and revocation.
 
-Until that choice is approved and implemented, the existing helper remains local technical debt and does not block degraded-mode preparation.
+This control is implemented and reviewed locally at API commit `f3c4251d` on `fix/pr-party-credential-rewrap`. It is not pushed, merged, deployed, or executed. Activation still requires the ordinary final issue/PR batch, deployment review, one consistent worker generation, the previous application key retained throughout verification, and a counts/UUID-only dry-run receipt before apply. The receipt proves only the PR Party reviewer-credential domain; it does not authorize global removal of `SECRET_KEY_PREVIOUS` while other encrypted domains remain.
 
 ## Held CatholicOS issue draft: organization answerer workflow
 
