@@ -27,6 +27,7 @@ Supersedes or refreshes CatholicOS/ontokit-web#57.
 ## Source and scope
 
 - ALEA source head: `[final web SHA]`
+- Current local synthesis candidate: `4986135c` (`upstream-queue/t1-web-synthesis`), based directly on CatholicOS web `dev` at `c714c74b`
 - CatholicOS base: `[refreshed catholicos/dev SHA]`
 - This is a current-upstream synthesis of the old #57 prefix plus later authorization and issuer-validation hardening. Mixed LLM, trust, PR Party, translation, and editor-preference commits are excluded and remain mapped in later tranches.
 
@@ -38,6 +39,8 @@ Supersedes or refreshes CatholicOS/ontokit-web#57.
 - `[exact production build result]`
 - `[Standard/Developer public browser receipt]`
 - `[final scratch replay receipt]`
+
+Current scratch receipt: 163 files/2,798 tests, type-check, lint with zero errors/15 baseline warnings, and optional/no-Zitadel production build with 22 static pages pass. The candidate includes current issuer fail-fast and anonymous-route hardening while preserving optional mode without Zitadel. Refresh and rerun immediately before the authorized batch.
 
 No self-merge is requested.
 
