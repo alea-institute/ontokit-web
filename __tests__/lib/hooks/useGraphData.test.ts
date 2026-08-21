@@ -69,7 +69,20 @@ describe("useGraphData", () => {
     expect(result.current.isLoading).toBe(false);
   });
 
-  it("returns null graphData when accessToken is missing", () => {
+  it("builds the public viewer graph without an access token", async () => {
+    const detailA = makeDetail("http://example.org/A", ["http://example.org/B"]);
+    const detailB = makeDetail("http://example.org/B");
+    mockedGetClassDetail
+      .mockResolvedValueOnce(detailA)
+      .mockResolvedValueOnce(detailB);
+    mockedBuildGraph.mockReturnValue({
+      nodes: [
+        { id: detailA.iri, label: "A", nodeType: "focus" },
+        { id: detailB.iri, label: "B", nodeType: "class" },
+      ],
+      edges: [{ id: "A-B", source: detailA.iri, target: detailB.iri, edgeType: "subClassOf" }],
+    });
+
     const { result } = renderHook(() =>
       useGraphData({
         focusIri: "http://example.org/A",
@@ -77,7 +90,16 @@ describe("useGraphData", () => {
       }),
     );
 
-    expect(result.current.graphData).toBeNull();
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    expect(mockedGetClassDetail).toHaveBeenCalledWith(
+      "proj-1",
+      "http://example.org/A",
+      undefined,
+      undefined,
+    );
+    expect(result.current.graphData?.nodes).toHaveLength(2);
+    expect(result.current.graphData?.edges).toHaveLength(1);
   });
 
   it("fetches focus node and builds graph", async () => {
