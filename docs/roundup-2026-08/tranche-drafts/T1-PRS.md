@@ -64,6 +64,7 @@ Supersedes or refreshes CatholicOS/ontokit-api#27.
 ## Source and scope
 
 - ALEA source head: `[final API SHA]`
+- Current local synthesis candidate: `d2c31aea` (`upstream-queue/t1-api-synthesis`), based on CatholicOS API `dev` at `a21b7d5c`
 - CatholicOS base: `[refreshed catholicos/dev SHA]`
 - This is a current-upstream synthesis of the old #27 prefix. LLM, trust, PR Party, translation, deploy, and later residual seams are excluded and remain mapped separately.
 
@@ -74,5 +75,7 @@ Supersedes or refreshes CatholicOS/ontokit-api#27.
 - `[exact mypy result]`
 - `[exact authorization/security result]`
 - `[final scratch replay receipt]`
+
+Current scratch receipt: 1,580 tests, Ruff, and strict mypy pass. The candidate excludes PR #27's unrelated seed-script and annotation-index changes and includes the later HTTP/WebSocket auth parity and anonymous-route hardening. Refresh and rerun immediately before the authorized batch.
 
 No self-merge is requested.

@@ -56,13 +56,22 @@ These commits are not part of the 277-commit cutoff. They must be frozen at thei
 | web | `fix/plan-audit-web-residuals` at `4a4dc5bf`; child `feat/demo-project-ui` at `d7e490ec` | 5 residual commits plus 2 U9 UI commits after `83b62b0b` | Fold residuals into T1/T7/T8 and append the home/source-project entry, badge, exact-target notice, and source-return UI to T10; local-only, tested, not pushed or merged |
 | API | `fix/recent-plan-api-residuals` at `0a54857a`; child `feat/demo-project-isolation` at `b5b13d8f` (including refresh ancestor `e894f20f`) | 6 residual/promotion commits plus 4 U8/U9 commits after `435dc393` | Fold audit cursor, annotation parity, FOLIO dependency, deploy-truth, and dormant promotion work into T2/T7/T8; append refresh, demo identity/provisioning, target authorization, resync, and exact repository identity to T10; local-only, tested, not pushed or merged |
 
+### Current upstream synthesis heads
+
+These branches are rebuilt on the CatholicOS cutoff rather than appended to ALEA integration history. They remain local only.
+
+| Repo | Local branch/head | Base | Scope and receipt |
+|---|---|---|---|
+| web | `upstream-queue/t1-web-auth-synthesis` at `f44592a8` | `c714c74b` | Current optional-auth slice plus issuer fail-fast: 161 files/2,772 tests, type-check, lint with zero errors/15 existing warnings, and optional/no-Zitadel production build with 22 static pages green. The anonymous-contribution/public-viewer half of web T1 remains to be synthesized. |
+| API | `upstream-queue/t1-api-synthesis` at `d2c31aea` | `a21b7d5c` | Feature-seam replacement for PR #27: excludes its unrelated seed/index changes and includes HTTP/WebSocket auth parity plus anonymous-route hardening. Full suite 1,580 tests, Ruff, and strict mypy green. |
+
 ## Delivery tranches
 
 Existing CatholicOS web PR #57 and API PR #27 are old AUTH_MODE prefixes. Do not duplicate them blindly: refresh them if their branch ownership and review state permit, otherwise replace them with clearly linked superseding PRs and close the stale prefixes only after reviewer confirmation.
 
 | Order | Tranche | Feature seam and source inventory | Target | Dependencies | Review size | Validation state |
 |---:|---|---|---|---|---|---|
-| T1 | Optional auth, anonymous contribution, and public viewing | AUTH_MODE/anonymous/public-viewer portions of W1/W4/W5 and A1/A6; existing PR #57/#27 prefixes | web + API | none | large, split by repo | Web prefix replays cleanly; tests pass; current hardening requires synthesis; API replay pending |
+| T1 | Optional auth, anonymous contribution, and public viewing | AUTH_MODE/anonymous/public-viewer portions of W1/W4/W5 and A1/A6; existing PR #57/#27 prefixes | web + API | none | large, split by repo | API synthesis is green; web auth synthesis is green; remaining web anonymous-contribution/public-viewer synthesis and final pair replay remain |
 | T2 | DEV deploy and CI | W6, A5, A7, A9, local deploy-truth and dormant-promotion work | API primarily; web CI companion | T1 | medium | provisional; dormant PROD scaffold is not activation authority |
 | T3 | LLM configuration and controlled generation | Remaining W1/W4 and A1/A4 | web + API | T1 | large, split into config, generation, and hardening PRs if reviewer requests | provisional |
 | T4 | Trust ladder and auto-accept | W2 and A2 | web + API | T1, T3 | medium | provisional; authenticated clock UAT still open |
@@ -98,7 +107,10 @@ Before the authorized final batch:
 - The scratch tree's full Vitest run passed: 159 files, 2,749 tests.
 - Type-check stopped on `components/editor/TurtleEditor.tsx:628`, a file unchanged by the T1 replay. The current installed toolchain therefore cannot provide a clean baseline type signal for this old prefix.
 - Applying the current issuer-validation hardening commit directly produced conflicts in `auth.ts`, `lib/env.ts`, and its environment test. T1 must be synthesized against current upstream rather than sent as either stale prefix or a blind cherry-pick.
-- API PR #27 and the final synthesized T1 pair remain to be replayed before send.
+- API PR #27's ten commits replayed without conflict onto refreshed CatholicOS API `dev` at `a21b7d5c`; 1,546 tests, Ruff, and strict mypy passed. The replay still carries unrelated seed-script and annotation-index changes, so it is evidence, not the delivery branch.
+- API branch `upstream-queue/t1-api-synthesis` at `d2c31aea` replaces that mixed prefix with the exact auth/anonymous feature seam. An upstream SECRET_KEY hardening change first exposed 18 stale test-harness failures; explicit non-production test keys made the focused 129 tests and full 1,580-test suite green. Ruff and strict mypy pass.
+- Web branch `upstream-queue/t1-web-auth-synthesis` at `f44592a8` applies current issuer fail-fast behavior to the refreshed optional-auth slice while preserving optional mode without Zitadel. Its 2,772 tests, type-check, lint with zero errors/15 existing warnings, and optional/no-Zitadel production build pass.
+- The remaining web anonymous-contribution/public-viewer seam and a final clean replay of the complete web/API pair remain before send.
 
 ## Gates outside the map
 

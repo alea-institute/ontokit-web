@@ -41,7 +41,7 @@ Live public browser evidence covers the FOLIO landing/project viewer and both St
 
 1. Activate U8/U9 only after the two private repositories and separately scoped source/destination credentials exist; then install refresh/resync, seed, run the manual scope receipt, and complete live keyboard/responsive/write-isolation acceptance.
 2. Include U9 heads `b5b13d8f` and `d7e490ec`, now recorded in the upstream map, in the final refreshed scratch replay.
-3. Synthesize and scratch-validate T1 against refreshed CatholicOS `dev`; do not send until the final local-work batch is ready.
+3. Finish the web anonymous-contribution/public-viewer half of T1, then refresh and replay the complete pair. API synthesis `d2c31aea` and web auth synthesis `f44592a8` are already green local-only heads; do not send until the final local-work batch is ready.
 4. Run authenticated DEV acceptance for auto-save, translations/audit, personas, and the auto-accept clock when a suitable UAT session/credential is available.
 5. Keep PROD Stage B dormant until branch/environment/CODEOWNERS, smoke credential, AWS access, forced-command, data-path, parallel-host, and UAT gates clear. DNS cutover remains separately approved.
 6. Resolve D5 (rewrap stored reviewer-PAT ciphertext under the current OntoKit key; this is not GitHub PAT replacement), then activate the already-prepared held PR Party package after demo readiness. Outreach waits for the demo.
@@ -63,4 +63,4 @@ No secrets, credentials, personal roster data, AWS mutation, DNS mutation, Catho
 
 ## Commit and publication state
 
-The documentation branch, including this handoff and the U9 upstream-map update, is committed and pushed on `feat/roundup-brainstorm`. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf`, API residual branch `fix/recent-plan-api-residuals` at `0a54857a`, API demo-refresh branch `feat/demo-refresh-scaffold` at `e894f20f`, API demo-isolation branch `feat/demo-project-isolation` at `b5b13d8f`, and web demo-UI branch `feat/demo-project-ui` at `d7e490ec` are durable local branches only; none is pushed or merged.
+The documentation branch, including this handoff and the U9 upstream-map update, is committed and pushed on `feat/roundup-brainstorm`. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf`, API residual branch `fix/recent-plan-api-residuals` at `0a54857a`, API demo-refresh branch `feat/demo-refresh-scaffold` at `e894f20f`, API demo-isolation branch `feat/demo-project-isolation` at `b5b13d8f`, web demo-UI branch `feat/demo-project-ui` at `d7e490ec`, API T1 synthesis branch `upstream-queue/t1-api-synthesis` at `d2c31aea`, and web auth synthesis branch `upstream-queue/t1-web-auth-synthesis` at `f44592a8` are durable local branches only; none is pushed or merged.
