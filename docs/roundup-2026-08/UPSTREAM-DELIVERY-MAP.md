@@ -55,6 +55,7 @@ These commits are not part of the 277-commit cutoff. They must be frozen at thei
 |---|---|---:|---|
 | web | `fix/plan-audit-web-residuals` at `4a4dc5bf`; child `feat/demo-project-ui` at `d7e490ec` | 5 residual commits plus 2 U9 UI commits after `83b62b0b` | Fold residuals into T1/T7/T8 and append the home/source-project entry, badge, exact-target notice, and source-return UI to T10; local-only, tested, not pushed or merged |
 | API | `fix/recent-plan-api-residuals` at `0a54857a`; child `feat/demo-project-isolation` at `b5b13d8f` (including refresh ancestor `e894f20f`) | 6 residual/promotion commits plus 4 U8/U9 commits after `435dc393` | Fold audit cursor, annotation parity, FOLIO dependency, deploy-truth, and dormant promotion work into T2/T7/T8; append refresh, demo identity/provisioning, target authorization, resync, and exact repository identity to T10; local-only, tested, not pushed or merged |
+| API | `fix/pr-party-credential-rewrap` at `f3c4251d` | 1 D5 operator-control commit after `435dc393` | Fold the reviewer-credential rewrap task, worker/CLI guard, safe receipt, SQL-parameter redaction, image packaging, runbook, and tests into T5; local-only, reviewed, tested, not pushed or merged |
 
 ### Current upstream synthesis heads
 
@@ -75,7 +76,7 @@ Existing CatholicOS web PR #57 and API PR #27 are old AUTH_MODE prefixes. Do not
 | T2 | DEV deploy and CI | W6, A5, A7, A9, local deploy-truth and dormant-promotion work | API primarily; web CI companion | T1 | medium | provisional; dormant PROD scaffold is not activation authority |
 | T3 | LLM configuration and controlled generation | Remaining W1/W4 and A1/A4 | web + API | T1 | large, split into config, generation, and hardening PRs if reviewer requests | provisional |
 | T4 | Trust ladder and auto-accept | W2 and A2 | web + API | T1, T3 | medium | provisional; authenticated clock UAT still open |
-| T5 | PR Party | W3 and A3 | web + API, then `catholicos/.github` answerer asset | T1, T3, T4, demo readiness, token-rotation decision, org gates | large | provisional; live E2E and outreach gated |
+| T5 | PR Party | W3, A3, and D5 API `f3c4251d` | web + API, then `catholicos/.github` answerer asset | T1, T3, T4, demo readiness, org gates | large | D5 implementation reviewed and green locally; deployment, live E2E, and outreach remain gated |
 | T6 | Translation provenance | W7 and A8 | web + API | T1 | large | provisional; authenticated visual/live acceptance remains |
 | T7 | Editor preference and annotation round-trip | W9, W11, A10, annotation portions of local web/API delta | web + API | T1 | small-to-medium | provisional; public two-mode UI check passed, authenticated preference UAT remains |
 | T8 | Cross-feature correctness and dependency residuals | W10 plus remaining local web/API audit-cursor, FOLIO-dependency, build, and hardening commits not already synthesized into their owning tranche | web + API | T1–T7 as applicable | medium, split by repo and owner feature | provisional; direct replay was correctly refused because prerequisite feature files are absent upstream |
@@ -119,4 +120,4 @@ Before the authorized final batch:
 - Demo repositories: source-read and destination-write credentials must remain separate and narrowly scoped.
 - Google federation: parked until ALEA-side and CatholicOS-side domain-name resolution.
 - `ontokit.org`: registration is a user action in progress; picker activation waits for confirmed registration and DNS control.
-- PR Party: the held issue/PR, org-owner, outreach, and live-E2E package is prepared locally; outreach waits for a ready demo and the selected reviewer-PAT encryption-rewrap disposition.
+- PR Party: the held issue/PR, org-owner, outreach, and live-E2E package is prepared locally; D5 reviewer-credential rewrap is implemented at `f3c4251d`; outreach waits for a ready demo, and rewrap execution waits for a controlled application-key rotation.
