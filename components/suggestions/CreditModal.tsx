@@ -47,6 +47,10 @@ export function CreditModal({ open, onSubmitCredit }: CreditModalProps) {
   // Pre-fill from cached credit on open
   useEffect(() => {
     if (open) {
+      // This is a deliberate form-reset boundary: the modal stays mounted while
+      // closed, and every open must discard stale credit and honeypot drafts.
+      // The reopen/reset contract is covered by CreditModal.test.tsx.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setName(creditStore.name ?? "");
       setEmail(creditStore.email ?? "");
       setHoneypot(""); // Always reset honeypot
