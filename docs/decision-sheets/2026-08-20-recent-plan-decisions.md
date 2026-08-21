@@ -45,12 +45,14 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 
 **Decision:** Prepare as much implementation and mapping work as possible first, then create the CatholicOS issues and their linked PRs together as one final batch. This is explicit authorization for that final batch after local work and validation are complete; it is not authorization to self-merge.
 
-## D5. What should happen with PR Party’s dead token-rotation capability?
+## D5. What should happen with PR Party’s unwired reviewer-PAT encryption rewrap?
 
-**Why this matters:** `rotate_reviewer_token` is exported and tested but unwired. Leaving it that way makes dead code look like a shipped security control.
+**What is being rotated:** not the GitHub token. `rotate_reviewer_token` keeps the same reviewer PAT and re-encrypts its stored ciphertext under OntoKit’s current `SECRET_KEY`, allowing `SECRET_KEY_PREVIOUS` to be retired. GitHub PAT replacement or revocation is a separate reviewer-controlled action.
 
-1. **Wire an operator-triggered rotation task — recommended.** Delivers the intended credential-hygiene capability.
-2. Delete the function and tests; document manual rotation.
+**Why this matters:** the helper is exported and tested but unwired. Leaving it that way makes dead code look like a shipped encryption-key migration control.
+
+1. **Wire an operator-triggered bulk rewrap task — recommended.** Re-encrypts stored reviewer PATs under the current OntoKit key with an audit receipt and no token exposure.
+2. Delete the function and tests; document that key retirement requires reviewers to re-enter valid PATs.
 3. Leave it and accept the tracked debt.
 
 **Your answer:** `D5 = 1, 2, or 3`

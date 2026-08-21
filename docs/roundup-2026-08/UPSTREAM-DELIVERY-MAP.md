@@ -75,6 +75,8 @@ Existing CatholicOS web PR #57 and API PR #27 are old AUTH_MODE prefixes. Do not
 
 No commit should be delivered twice. Where a source commit spans multiple seams, the upstream PR must replay its relevant file-level change rather than cherry-pick the mixed commit wholesale; the PR body must name the source commit and the excluded seam.
 
+The held PR Party activation material is in [`pr-party/HELD-ACTIVATION-PACKAGE.md`](pr-party/HELD-ACTIVATION-PACKAGE.md). It contains the unsent CatholicOS issue/PR drafts, org-owner checklist, reviewer outreach draft, live-E2E receipt, and the exact D5 distinction between rewrapping stored ciphertext and replacing a GitHub PAT.
+
 ## Tranche 1 package
 
 The held drafts are:
@@ -104,4 +106,4 @@ Before the authorized final batch:
 - Demo repositories: source-read and destination-write credentials must remain separate and narrowly scoped.
 - Google federation: parked until ALEA-side and CatholicOS-side domain-name resolution.
 - `ontokit.org`: registration is a user action in progress; picker activation waits for confirmed registration and DNS control.
-- PR Party: prepare locally; outreach waits for a ready demo and the selected token-rotation disposition.
+- PR Party: the held issue/PR, org-owner, outreach, and live-E2E package is prepared locally; outreach waits for a ready demo and the selected reviewer-PAT encryption-rewrap disposition.

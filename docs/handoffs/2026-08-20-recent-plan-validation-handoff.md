@@ -44,7 +44,7 @@ Live public browser evidence covers the FOLIO landing/project viewer and both St
 3. Synthesize and scratch-validate T1 against refreshed CatholicOS `dev`; do not send until the final local-work batch is ready.
 4. Run authenticated DEV acceptance for auto-save, translations/audit, personas, and the auto-accept clock when a suitable UAT session/credential is available.
 5. Keep PROD Stage B dormant until branch/environment/CODEOWNERS, smoke credential, AWS access, forced-command, data-path, parallel-host, and UAT gates clear. DNS cutover remains separately approved.
-6. Resolve D5 (`rotate_reviewer_token`), then finish PR Party local preparation. Outreach waits for the demo.
+6. Resolve D5 (rewrap stored reviewer-PAT ciphertext under the current OntoKit key; this is not GitHub PAT replacement), then activate the already-prepared held PR Party package after demo readiness. Outreach waits for the demo.
 7. Finish closeout only when every remaining item is complete or has a current, explicit activation condition.
 
 ## Protected local state
