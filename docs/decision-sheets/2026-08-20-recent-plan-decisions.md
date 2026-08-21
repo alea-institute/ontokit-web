@@ -1,7 +1,7 @@
 # Decision Sheet — Recent OntoKit Plan Residuals
 
 Created: 2026-08-20
-Updated: 2026-08-20 after the user settled rollout, upstream batching, domain, and external-coordination choices
+Updated: 2026-08-21 after D5 implementation and the latest public domain-status check
 
 The recommended choices are first. Reply with short answers such as `D1 = 1; D2 = 1; D3 = 1; D4 = 1; D5 = 1; D6 = 2`.
 
@@ -61,13 +61,13 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 
 ## D6. Do you want to register `ontokit.org` now?
 
-**Current evidence:** The domain returns NXDOMAIN. Registration is the only blocker before picker implementation can be scheduled.
+**Current evidence:** Registration was selected, but public RDAP still returns not found and authoritative NS/A lookups return no records as of 2026-08-21. Confirmed registration and DNS control are the remaining prerequisites before picker implementation can start.
 
 1. Register it now; then the agent builds the static picker.
 2. **Defer registration and keep U17 parked — recommended unless the picker is a current priority.**
 3. Choose a different domain; provide the name.
 
-**Decision:** `D6 = 1` — Damien is registering `ontokit.org` now and will decide separately whether to transfer it later. Picker activation waits only for confirmed registration and DNS control.
+**Decision:** `D6 = 1` — Damien selected registration and will decide separately whether to transfer it later. The agent will recheck rather than re-ask; picker activation waits for registration and DNS control to become externally observable.
 
 ## Resolved autonomously: optional auth without Zitadel
 

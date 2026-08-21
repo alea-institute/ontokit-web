@@ -1,7 +1,7 @@
 # OntoKit upstream delivery map
 
-**Snapshot date:** 2026-08-20  
-**Status:** Working map; no CatholicOS mutation has occurred  
+**Snapshot date:** 2026-08-20; gate evidence refreshed 2026-08-21
+**Status:** Working map; no CatholicOS mutation has occurred
 **Delivery policy:** Finish and validate the local work, then create the linked CatholicOS issues and PRs together as one batch. Do not self-merge.
 
 ## Cutoff and accounting
@@ -93,6 +93,7 @@ The held drafts are:
 
 - [`tranche-drafts/T1-ISSUES.md`](tranche-drafts/T1-ISSUES.md) — issue/update bodies and link matrix.
 - [`tranche-drafts/T1-PRS.md`](tranche-drafts/T1-PRS.md) — web and API PR descriptions.
+- [`tranche-drafts/FINAL-BATCH-MANIFEST.md`](tranche-drafts/FINAL-BATCH-MANIFEST.md) — issue-first linkage, held titles/scopes, and send conditions for T2–T10.
 
 Before the authorized final batch:
 
@@ -119,5 +120,5 @@ Before the authorized final batch:
 - AWS/PROD: parallel stand-up is selected, but no host action occurs until the exact access and environment gates clear.
 - Demo repositories: source-read and destination-write credentials must remain separate and narrowly scoped.
 - Google federation: parked until ALEA-side and CatholicOS-side domain-name resolution.
-- `ontokit.org`: registration is a user action in progress; picker activation waits for confirmed registration and DNS control.
+- `ontokit.org`: the user selected registration, but public RDAP still returns not found and authoritative NS/A lookups return no records as of 2026-08-21; picker activation waits for confirmed registration and DNS control.
 - PR Party: the held issue/PR, org-owner, outreach, and live-E2E package is prepared locally; D5 reviewer-credential rewrap is implemented at `f3c4251d`; outreach waits for a ready demo, and rewrap execution waits for a controlled application-key rotation.

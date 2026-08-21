@@ -12,7 +12,7 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 
 - **37 of 52 formal plan units are complete on shared integration history.** Two more formal units—the U7 audit tail and annotation serialization tail—are implemented and fully tested on the local `fix/plan-audit-web-residuals` branch, pending publication/integration. Roundup U13 Stage A and U14's initial map/drafts are also implemented locally but are not yet complete units.
 - **13 formal units remain queued or gated.** Ten belong to the roundup plan, including strict U11/U12 acceptance gaps, and three belong to the trigger-gated Google federation plan.
-- All five additional review/execution follow-ups are now implemented and tested on local isolated branches: web #359/#360 and API #208/#209/#212. Publication, upstream synthesis, and live acceptance remain separate gates.
+- All enumerated review/execution residuals are now implemented and tested on local isolated branches, including web #348/#359/#360 and API #208/#209/#211/#212. Publication, upstream synthesis, and live acceptance remain separate gates.
 - The current upstream delta is **277 commits**, not the stale “~690” estimate: 113 web commits and 164 API commits ahead of `catholicos/dev`.
 
 ## Formal plan ledger
@@ -36,11 +36,11 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 | U11 fork CI | **Partially complete** | Both integration branches run their real suites and recorded green real-seam CI, but the source plan also requires an intentionally red draft proof and required status checks on the deploy branch. Both `feat/pr-party` branches are currently unprotected, so the workflows are not merge gates. |
 | U12 DEV deploy and IaC | **Partially complete** | ALEA API PRs #17–#21 merged; forced-command deploy is installed and DEV deploys are approval-gated. Local commit `abff6256` fixes #211 by validating before mutation and reporting immutable running revisions. Strict completion still depends on U8/U11, deployment of the fix, U8 cron IaC, and live matched-revision/rollback/security proof. |
 | U13 PROD promotion workflow | **Stage A implemented locally; Stage B gated** | API commits `2bc46f03` and `0a54857a` add an immutable matched-release manifest, successful-DEV-deploy proof, isolated write smoke, protected-environment contracts, and dormant automatic promotion. No AWS, GitHub configuration, secret, DEV write, PROD, or DNS mutation occurred. Parallel stand-up/UAT/cutover remains gated. |
-| U14 upstream delivery map | **Local deliverable complete; send gated** | `docs/roundup-2026-08/UPSTREAM-DELIVERY-MAP.md` accounts for all 277 cutoff commits and the post-cutoff deltas. Complete T1 candidates are green: API `d2c31aea` passes 1,580 tests/Ruff/mypy; web `4986135c` passes 2,798 tests/type/lint/build while preserving optional no-Zitadel mode. A final base refresh/replay is intentionally deferred to the authorized issue-first batch; nothing has been sent. |
+| U14 upstream delivery map | **Local deliverable complete; send gated** | `docs/roundup-2026-08/UPSTREAM-DELIVERY-MAP.md` accounts for all 277 cutoff commits and the post-cutoff deltas. Complete T1 candidates are green: API `d2c31aea` passes 1,580 tests/Ruff/mypy; web `4986135c` passes 2,798 tests/type/lint/build while preserving optional no-Zitadel mode. `tranche-drafts/FINAL-BATCH-MANIFEST.md` now supplies the held issue-first linkage and scope briefs for T2–T10. A final base refresh/replay is intentionally deferred to the authorized batch; nothing has been sent. |
 | U15 AWS PROD rebuild | **Blocked** | SSH to 54.224.195.12:22 remains closed/filtered on 2026-08-20. PROD itself returns HTTP 200. Requires Mike/AWS access and the rollout-mechanism decision. |
-| U16 PR Party live E2E | **Local activation package complete; live gate blocked** | `docs/roundup-2026-08/pr-party/HELD-ACTIVATION-PACKAGE.md` now holds the unsent answerer issue/PR, org-owner checklist, reviewer outreach, integrity receipt, and both-flow-plus-Q&A runbook. Live execution still requires demo readiness, the reviewer-PAT encryption-rewrap disposition, PAT intake, org webhook, answerer workflow, shared generation token, and an authorized E2E window. |
-| U17 ontokit.org picker | **Blocked** | DNS returns NXDOMAIN on 2026-08-20. The permitted availability preflight is complete; registration remains a human purchase. |
-| U18 closeout | **Partially complete** | The real-seam learning and decision-sheet infrastructure exist. Final closeout still depends on U13/U14 and refreshed external-gate tracking. |
+| U16 PR Party live E2E | **Local activation package complete; live gate blocked** | `docs/roundup-2026-08/pr-party/HELD-ACTIVATION-PACKAGE.md` holds the unsent answerer issue/PR, org-owner checklist, reviewer outreach, integrity receipt, and both-flow-plus-Q&A runbook. D5 is no longer an undecided disposition: the operator-safe ciphertext rewrap is reviewed and green locally at API `f3c4251d`. Live execution still requires demo readiness, controlled deployment/key-rotation handling, reviewer PAT intake, org webhook, answerer workflow, shared generation token, and an authorized E2E window. |
+| U17 ontokit.org picker | **Blocked** | Registration was selected, but public RDAP returns not found and authoritative NS/A lookups return no records as of 2026-08-21. Picker work remains held until registration and DNS control are externally observable. |
+| U18 closeout | **Partially complete** | The real-seam learning, decision sheet, durable handoff, and held final-batch manifest exist. Final closeout still depends on gated activation/live acceptance and the authorized upstream batch. |
 
 ### 2. Multilingual Translation Annotations
 
@@ -66,7 +66,7 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 
 **Plan:** `docs/plans/2026-08-10-001-feat-google-federation-zitadel-plan.md`
 
-**Result: all U1–U3 remain intentionally trigger-gated.** No evidence shows the activation condition—live user login friction—has fired. CatholicOS API #206 remains open as the backlog record. Execution also requires a Google OAuth client and its secret. This is queued conditional work, not a missed current commitment.
+**Result: all U1–U3 remain intentionally trigger-gated.** The user replaced the earlier login-friction-only trigger with resolution of the CatholicOS-side and ALEA-side domain-name questions. That condition has not cleared. CatholicOS API #206 remains the backlog record, and execution also requires a Google OAuth client and its secret. This is queued conditional work, not a missed current commitment.
 
 ### 6. U7 Sweep Bugs
 
@@ -112,7 +112,7 @@ CatholicOS issue #361 remains open pending upstream delivery.
 - `https://ontokit.openlegalstandard.org/` returns HTTP 200.
 - `https://ontokit.dev.openlegalstandard.org/health` returns `{"status":"healthy"}`.
 - TCP 22 to 54.224.195.12 is closed or filtered from the home box.
-- `ontokit.org` returns DNS NXDOMAIN.
+- Public RDAP returns not found for `ontokit.org`, and authoritative NS/A lookups return no records as of 2026-08-21.
 - PyPI lists `folio-python` 0.4.0, released 2026-08-18; the tested local API branch pins it exactly and removes `owlready2`.
 
 ## 2026-08-20 autonomous execution receipt
@@ -124,3 +124,7 @@ The durable local API branch `fix/recent-plan-api-residuals` ends at `0a54857a` 
 The child API branch `feat/demo-refresh-scaffold` adds commit `e894f20f`. Its six focused tests pass, including a real local Git refresh that updates only `main` and preserves an existing `demo-work` branch. Ruff, formatting, mypy, diff checks, and the no-token fail-closed invocation pass. Ambient Git credential helpers are disabled so the eventual destination push cannot silently use a broader stored credential. No demo repository, token, cron, host, or project was created.
 
 The child API branch `feat/demo-project-isolation` ends at `b5b13d8f`. Its earlier final tree passed all 2,760 API tests against disposable PostgreSQL, plus Ruff and strict mypy; after the response-contract follow-up, all 86 project-service unit tests pass and the exact demo-repository response test is green. A repeat of the real provisioning test was environment-blocked because PostgreSQL was no longer listening, not by an assertion failure. The web branch `feat/demo-project-ui` ends at `d7e490ec`; all 210 test files and 3,298 tests pass, type-check passes, and lint reports zero errors with 19 existing warnings. A local browser pass verified the entry panel in light and dark themes; populated, unavailable, source-link, banner, and return states are covered deterministically. Both branches are local only. No repository, token, host, DEV write, or external state changed.
+
+The API branch `fix/pr-party-credential-rewrap` adds local commit `f3c4251d`. It implements the selected D5 operator control with dry-run default, exact apply confirmation at CLI and worker boundaries, stable mode-specific job IDs, all-row transactional `MultiFernet` rotation, SQL-parameter redaction, and counts/UUID-only receipts. Seventy-eight focused unit tests and two disposable real-Postgres integration tests pass; Ruff, authoritative mypy, advisory Pyright, and diff checks are green. The branch is local only. No stored credential was read, changed, pushed, deployed, or rotated.
+
+The held publication choreography now includes `docs/roundup-2026-08/tranche-drafts/FINAL-BATCH-MANIFEST.md`. It defines issue-first ordering, one-owner link semantics, dependent-PR stacking/retarget rules, proposed titles/scopes for T2–T10, security and UX closure gates, a crash-safe correlation journal, exact stop conditions, and the final no-self-merge checklist. A seven-persona local document review corrected duplicate tranche ownership, accidental picker/demo coupling, unsafe publication-resume behavior, incomplete credential/deploy gates, and acceptance-contract drift. The independent cross-model pass was not retried because its earlier external-export authorization was denied. The manifest grants no CatholicOS, GitHub-configuration, credential, AWS, DNS, DEV, or PROD mutation authority.

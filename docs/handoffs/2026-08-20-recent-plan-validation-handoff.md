@@ -9,6 +9,7 @@ Use these artifacts as the continuation source:
 - Audit ledger: `docs/audits/2026-08-20-recent-plan-completion-audit.md`
 - Implementation-ready ce-work plan: `docs/plans/2026-08-20-0836-chore-recent-plan-completion-plan.md`
 - Human Decision Sheet: `docs/decision-sheets/2026-08-20-recent-plan-decisions.md`
+- Held final-batch manifest: `docs/roundup-2026-08/tranche-drafts/FINAL-BATCH-MANIFEST.md`
 
 The preliminary audit and Decision Sheet committed at `e219328b` are explicitly marked superseded. That commit also retired two completed handoffs and refreshed the DEV runbook/UAT record; its history was preserved.
 
@@ -16,7 +17,7 @@ The preliminary audit and Decision Sheet committed at `e219328b` are explicitly 
 
 - Searched every reachable web-repo ref and the sibling API history for in-window plans, including two August 13 plans absent from this checkout.
 - Reconciled every formal unit against commits, merged ALEA PRs, tests, UAT logs, deployment receipts, current GitHub state, DNS, DEV/PROD HTTP health, AWS SSH reachability, and the official PyPI release page.
-- Replaced stale external facts: the refreshed CatholicOS gap is 277 commits (113 web, 164 API), `ontokit.org` is NXDOMAIN, PROD is HTTP 200, DEV health is green, AWS SSH is still closed/filtered, and PyPI lists `folio-python` 0.4.0.
+- Replaced stale external facts: the refreshed CatholicOS gap is 277 commits (113 web, 164 API), PROD is HTTP 200, DEV health is green, AWS SSH is still closed/filtered, and PyPI lists `folio-python` 0.4.0. A 2026-08-21 refresh additionally found no public `ontokit.org` RDAP registration or NS/A delegation yet.
 - Produced one ordered queue with activation conditions and a six-question Decision Sheet; the former optional-auth question was resolved by preserving existing behavior.
 - Ran the required non-interactive document review with coherence, feasibility, scope, security, design, product, and adversarial lenses. The independent cross-model Claude jobs reached their bounded deadline without usable output and are not counted as corroboration.
 - Folded review corrections into the plan: writable-branch preflight, corrected decision references, early auto-accept UAT, two-stage upstream mapping, rollout-neutral PROD prework plus access-gated activation, deployment authority controls, PR Party draft prework and workflow-integrity proof, explicit demo-data cleanup tracking, annotation-property classification, UI/accessibility acceptance, and a version-agnostic secure FOLIO release gate.
@@ -35,15 +36,17 @@ U9 is now locally implemented on API branch `feat/demo-project-isolation` at `b5
 
 D5 is locally complete in the API repository at `f3c4251d` on `fix/pr-party-credential-rewrap`. It adds the explicit operator-only reviewer-credential rewrap chosen by the user: dry-run default, exact apply confirmation at both CLI and worker boundaries, stable mode-specific job IDs, all-row transactional rotation, counts/UUID-only receipts, SQL parameter redaction, and a runbook that separates ciphertext rewrap from GitHub PAT replacement and global key retirement. Seventy-eight focused unit tests and two disposable real-Postgres integration tests pass; Ruff, authoritative mypy, and advisory Pyright are clean. The branch is local only and no stored credential was read or changed.
 
-The initial upstream map and T1 drafts now exist under `docs/roundup-2026-08/`. They account for all 277 cutoff commits. Web PR #57's nine feature commits replay cleanly onto current CatholicOS `dev` and all 2,749 scratch tests pass, but the current issuer hardening conflicts and must be synthesized. The unchanged upstream `TurtleEditor.tsx` also prevents a clean type-check signal with the installed toolchain. API replay and final T1 synthesis remain.
+The upstream map, T1 drafts, and held T2–T10 final-batch manifest now exist under `docs/roundup-2026-08/`. They account for all 277 cutoff commits, the post-cutoff local branches, issue-first ordering, exact owner-link semantics, dependent-PR branch rules, a crash-safe correlation journal, and no-self-merge rules. A seven-persona local document review was applied; its external cross-model pass was not retried after the earlier export-authorization denial. Complete green T1 synthesis heads are API `d2c31aea` and web `4986135c`; only the deliberately last-minute base refresh and clean replay remain before the authorized batch.
 
 Live public browser evidence covers the FOLIO landing/project viewer and both Standard and Developer layouts with no errors or warnings. Authenticated auto-save, translation/audit views, personas, and the auto-accept clock remain credential-gated acceptance work.
+
+Public RDAP and authoritative DNS checks on 2026-08-21 still show no registered/delegated `ontokit.org`. Registration remains selected; do not re-ask the choice. Recheck the public state before beginning picker work.
 
 ## Next execution order
 
 1. Activate U8/U9 only after the two private repositories and separately scoped source/destination credentials exist; then install refresh/resync, seed, run the manual scope receipt, and complete live keyboard/responsive/write-isolation acceptance.
 2. Include U9 heads `b5b13d8f` and `d7e490ec`, now recorded in the upstream map, in the final refreshed scratch replay.
-3. Immediately before the authorized final batch, refresh CatholicOS `dev` and replay the already-green T1 pair: API `d2c31aea` and web `4986135c`. Create/update issues first, link the PRs, and do not self-merge.
+3. Use `tranche-drafts/FINAL-BATCH-MANIFEST.md` as the held T2–T10 publication queue. Immediately before the authorized final batch, refresh CatholicOS `dev` and replay the already-green T1 pair: API `d2c31aea` and web `4986135c`. Create/update issues first, link the PRs, and do not self-merge.
 4. Run authenticated DEV acceptance for auto-save, translations/audit, personas, and the auto-accept clock when a suitable UAT session/credential is available.
 5. Keep PROD Stage B dormant until branch/environment/CODEOWNERS, smoke credential, AWS access, forced-command, data-path, parallel-host, and UAT gates clear. DNS cutover remains separately approved.
 6. Include D5 branch `fix/pr-party-credential-rewrap` at `f3c4251d` in the final issue/PR batch. Deploy or execute it only during a controlled application-key rotation with the previous key retained and every worker on one deployment generation. Activate the already-prepared held PR Party package after demo readiness; outreach waits for the demo.
