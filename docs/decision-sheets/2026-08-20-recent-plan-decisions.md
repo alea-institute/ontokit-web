@@ -87,5 +87,5 @@ Prepare the implementation and outreach package locally. Begin outreach only whe
 
 - `folio-python` 0.4.0 is published; the tested local API branch now pins it exactly and removes `owlready2`.
 - Web #348/#359/#360, cosmetic Turtle churn, the production-build blocker, and API #208/#209/#211/#212 are implemented on tested local branches. Publication/integration and the authenticated auto-accept live UAT remain.
-- The T3 security closure ledger is implemented locally through API `738f20a6` and web `a272c8dc`, including ordinary-generation spend reservation and atomic dimension-safe vector snapshots. API current-upstream synthesis is green at `1b8bde28`; web synthesis remains and needs no new decision.
+- The T3 security closure ledger is implemented locally through API `738f20a6` and web `a272c8dc`, including ordinary-generation spend reservation and atomic dimension-safe vector snapshots. The paired current-upstream candidates are green at API `1b8bde28` and web `2c6a7813`; no new decision is needed.
 - CatholicOS issue/PR mutation is authorized only as the final linked batch after the current local implementation and validation work. No self-merge is authorized.
