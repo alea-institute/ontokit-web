@@ -5,17 +5,53 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export class ApiError extends Error {
+  public readonly detail: unknown;
+  public readonly userMessage: string;
+
   constructor(
     public status: number,
     public statusText: string,
-    message: string
+    rawBody: string
   ) {
-    super(message);
+    super(rawBody);
     this.name = "ApiError";
+    this.detail = apiErrorDetail(rawBody);
+    this.userMessage = apiErrorDisplayMessage(this.detail, rawBody, statusText);
   }
 }
 
-interface RequestOptions extends RequestInit {
+function apiErrorDetail(body: string): unknown {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed && typeof parsed === "object" && "detail" in parsed) {
+      return (parsed as { detail?: unknown }).detail;
+    }
+  } catch {
+    // Non-JSON responses have no structured detail.
+  }
+  return undefined;
+}
+
+function apiErrorDisplayMessage(
+  detail: unknown,
+  rawBody: string,
+  statusText: string
+): string {
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "message" in detail) {
+    const message = (detail as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return rawBody || statusText || "Request failed";
+}
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) return error.userMessage;
+  if (error instanceof Error) return error.message || fallback;
+  return fallback;
+}
+
+export interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
 }
 
@@ -65,8 +101,11 @@ async function request<T>(
       });
 
       if (!response.ok) {
-        const message = await response.text();
-        throw new ApiError(response.status, response.statusText, message);
+        throw new ApiError(
+          response.status,
+          response.statusText,
+          await response.text()
+        );
       }
 
       // Handle empty responses
@@ -125,8 +164,7 @@ async function uploadFile<T>(
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new ApiError(response.status, response.statusText, message);
+    throw new ApiError(response.status, response.statusText, await response.text());
   }
 
   const text = await response.text();
@@ -197,7 +235,13 @@ function uploadFileWithProgress<T>(
           resolve(undefined as T);
         }
       } else {
-        reject(new ApiError(xhr.status, xhr.statusText, xhr.responseText));
+        reject(
+          new ApiError(
+            xhr.status,
+            xhr.statusText,
+            xhr.responseText
+          )
+        );
       }
     });
 
