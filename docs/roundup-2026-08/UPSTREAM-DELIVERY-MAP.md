@@ -54,7 +54,9 @@ These commits are not part of the 277-commit cutoff. They must be frozen at thei
 | Repo | Local branch/head | Delta | Disposition |
 |---|---|---:|---|
 | web | `fix/plan-audit-web-residuals` at `4a4dc5bf`; child `feat/demo-project-ui` at `d7e490ec` | 5 residual commits plus 2 U9 UI commits after `83b62b0b` | Fold residuals into T1/T7/T8 and append the home/source-project entry, badge, exact-target notice, and source-return UI to T10; local-only, tested, not pushed or merged |
+| web | `fix/t3-security-web` at `a272c8dc` | 1 T3 web contract commit after `4a4dc5bf` | Fold structured API-error preservation plus user-safe project-analysis conflict handling into T3; local-only, reviewed, full-suite tested, not pushed or merged |
 | API | `fix/recent-plan-api-residuals` at `0a54857a`; child `feat/demo-project-isolation` at `b5b13d8f` (including refresh ancestor `e894f20f`) | 6 residual/promotion commits plus 4 U8/U9 commits after `435dc393` | Fold audit cursor, annotation parity, FOLIO dependency, deploy-truth, and dormant promotion work into T2/T7/T8; append refresh, demo identity/provisioning, target authorization, resync, and exact repository identity to T10; local-only, tested, not pushed or merged |
+| API | `fix/t3-security-api` at `5a67885f` | 2 T3 security/quality commits after `0a54857a` | Fold exact-origin private-provider authorization, DNS-answer-pinned dialing, redacted connection failures, and project-serialized quality jobs into T3; local-only, reviewed, focused-tested, not pushed or merged |
 | API | `fix/pr-party-credential-rewrap` at `f3c4251d` | 1 D5 operator-control commit after `435dc393` | Fold the reviewer-credential rewrap task, worker/CLI guard, safe receipt, SQL-parameter redaction, image packaging, runbook, and tests into T5; local-only, reviewed, tested, not pushed or merged |
 
 ### Current upstream synthesis heads
@@ -74,7 +76,7 @@ Existing CatholicOS web PR #57 and API PR #27 are old AUTH_MODE prefixes. Do not
 |---:|---|---|---|---|---|---|
 | T1 | Optional auth, anonymous contribution, and public viewing | AUTH_MODE/anonymous/public-viewer portions of W1/W4/W5 and A1/A6; existing PR #57/#27 prefixes | web + API | none | large, split by repo | Complete local pair green at web `4986135c` and API `d2c31aea`; final refreshed replay immediately before the authorized batch remains |
 | T2 | DEV deploy and CI | W6, A5, A7, A9, local deploy-truth and dormant-promotion work | API primarily; web CI companion | T1 | medium | provisional; dormant PROD scaffold is not activation authority |
-| T3 | LLM configuration and controlled generation | Remaining W1/W4 and A1/A4 | web + API | T1 | large, split into config, generation, and hardening PRs if reviewer requests | provisional |
+| T3 | LLM configuration and controlled generation | Remaining W1/W4 and A1/A4 plus API `a4be506b`/`5a67885f` and web `a272c8dc` | web + API | T1 | large, split into config, generation, and hardening PRs if reviewer requests | SSRF/DNS-pinning, safe error, and project-job serialization residuals are reviewed and green locally; remaining closure-ledger rows and upstream synthesis remain |
 | T4 | Trust ladder and auto-accept | W2 and A2 | web + API | T1, T3 | medium | provisional; authenticated clock UAT still open |
 | T5 | PR Party | W3, A3, and D5 API `f3c4251d` | web + API, then `catholicos/.github` answerer asset | T1, T3, T4, demo readiness, org gates | large | D5 implementation reviewed and green locally; deployment, live E2E, and outreach remain gated |
 | T6 | Translation provenance | W7 and A8 | web + API | T1 | large | provisional; authenticated visual/live acceptance remains |

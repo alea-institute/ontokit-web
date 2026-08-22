@@ -41,7 +41,7 @@ Use these placeholders consistently until the pre-send refresh resolves them:
 |---:|---|---|---|---|---|
 | T1 | Optional auth, anonymous contribution, public viewing | web issue or refreshed equivalent; API #83 update | web replacement/refresh for #57; API replacement/refresh for #27 | Complete local synthesis pair is green | Final base refresh and clean replay |
 | T2 | DEV deploy and CI | API #211 update plus one deploy/CI owner if #211 is too narrow; web CI owner only if no current issue exists | API deploy/CI PR; web CI companion only if it carries code not already in T1 | Local deploy-truth and dormant promotion Stage A are green | Required-check design is documented; PROD activation remains visibly dormant |
-| T3 | LLM configuration and controlled generation | one web owner; one API umbrella plus one child owner for each independently mergeable API PR | web configuration/UI PR; API configuration/generation/hardening PRs sized for review | Source seam mapped; synthesis not frozen | Current-upstream synthesis, closure ledger, and complete security/test replay |
+| T3 | LLM configuration and controlled generation | one web owner; one API umbrella plus one child owner for each independently mergeable API PR | web configuration/UI PR; API configuration/generation/hardening PRs sized for review | SSRF/DNS-pinning, safe-error, and project-job serialization residuals are reviewed and green on held local branches | Finish the remaining closure-ledger rows, then current-upstream synthesis and complete security/test replay |
 | T4 | Trust ladder and auto-accept | one web trust/UI owner and one API trust/lifecycle owner | linked web/API PR pair | Product code exists on ALEA integration | Authenticated quiet-period, halt/resume, and TRUSTED-gate UAT receipt |
 | T5 | PR Party | web and API feature owners; D5 API control owner; `.github` answerer issue | web/API PRs, D5 API PR, and held organization answerer PR | D5 is reviewed and green; held org package exists | Demo ready, org approval, credential intake, webhook/token gates, live-E2E window |
 | T6 | Translation provenance | one web owner and one API owner | linked web/API PR pair | ALEA implementation and real-seam API proof exist | Current-upstream replay plus authenticated visual/live acceptance |
@@ -129,12 +129,14 @@ Each independently mergeable API PR closes its own child issue; the API umbrella
 
 Before either API branch freezes, complete this security closure ledger. Each row must name current code evidence, disposition (`fixed here`, `linked issue`, or `not reproducible`), exact verification, and whether it blocks real-key deployment:
 
-- custom-provider SSRF bypass, DNS rebinding, and outbound error-body exposure;
+- custom-provider SSRF bypass, DNS rebinding, and outbound error-body exposure — **fixed locally:** API `a4be506b` requires an exact approved private origin, resolves once, pins the validated numeric address through the connection, blocks metadata, disables redirects, and returns/logs only safe failure detail; web `a272c8dc` preserves structured machine-readable errors while presenting a user-safe message;
 - prompt/output/RDF injection and server-side IRI/Turtle validation;
 - atomic budget reservation, missing-usage estimation, `test_connection` metering, and failure audit;
-- embedding/dedup integrity, project-level job throttling, and merge-triggered reindexing;
+- embedding/dedup integrity, project-level job throttling, and merge-triggered reindexing — **throttling fixed locally:** API `5a67885f` adds a per-project Redis claim, deterministic queue identity, atomic renewal/reclaim/release, retry-safe cancellation behavior, and ambiguous-enqueue reconciliation; embedding integrity and merge-triggered reindexing remain to disposition;
 - server-side minting authorization, submit idempotency, trust/rate-limit expiry, and actuator retry behavior;
 - provider-key encryption/KDF, log redaction, and fail-soft alerting.
+
+Held source heads are API `fix/t3-security-api` at `5a67885f` and web `fix/t3-security-web` at `a272c8dc`. The API focused receipt is 55 passing tests plus Ruff, strict mypy for the changed source, and diff checks. The web receipt is the full 208-file/3,295-test suite, type-check, changed-file ESLint, and diff checks. A diff-scoped adversarial code review found no remaining actionable findings after the fixes. The API's broader synchronous `TestClient` route harness stalls before producing results in this environment, so direct async route/submission/worker coverage is the current receipt; a real-Redis concurrency rehearsal remains part of final synthesis validation. Neither branch is pushed or merged.
 
 The web acceptance matrix must cover the generation entry point, missing/invalid provider configuration, in-progress state, zero-result state, partial/provider failure, successful suggestions, and explicit human accept/reject, with authenticated browser receipts for every reachable state.
 
