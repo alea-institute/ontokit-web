@@ -53,6 +53,59 @@ describe("api.get", () => {
     await expect(api.get("/api/v1/missing")).rejects.toThrow(ApiError);
   });
 
+  it("extracts a FastAPI string detail", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      statusText: "Conflict",
+      text: () => Promise.resolve(JSON.stringify({ detail: "Job already active" })),
+    });
+
+    await expect(api.get("/api/v1/conflict")).rejects.toMatchObject({
+      message: JSON.stringify({ detail: "Job already active" }),
+      detail: "Job already active",
+      userMessage: "Job already active",
+    });
+  });
+
+  it("extracts a structured FastAPI detail message", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 409,
+      statusText: "Conflict",
+      text: () =>
+        Promise.resolve(
+          JSON.stringify({
+            detail: {
+              code: "quality_job_active",
+              message: "A quality job is already active for this project",
+            },
+          })
+        ),
+    });
+
+    await expect(api.get("/api/v1/conflict")).rejects.toMatchObject({
+      detail: {
+        code: "quality_job_active",
+        message: "A quality job is already active for this project",
+      },
+      userMessage: "A quality job is already active for this project",
+    });
+  });
+
+  it("preserves a non-JSON error body", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      text: () => Promise.resolve("upstream unavailable"),
+    });
+
+    await expect(
+      api.get("/api/v1/failure", { retryOn5xx: false })
+    ).rejects.toMatchObject({ message: "upstream unavailable" });
+  });
+
   it("handles empty response", async () => {
     mockFetch.mockResolvedValue({
       ok: true,

@@ -15,6 +15,7 @@ import {
   Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { getApiErrorMessage } from "@/lib/api/client";
 import {
   lintApi,
   createLintWebSocket,
@@ -138,7 +139,7 @@ export function HealthCheckPanel({
         setIsRunning(false);
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load lint data";
+      const message = getApiErrorMessage(err, "Failed to load lint data");
       setError(message);
     } finally {
       setIsLoading(false);
@@ -253,7 +254,7 @@ export function HealthCheckPanel({
       } : null);
       setIssues([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to clear results");
+      setError(getApiErrorMessage(err, "Failed to clear results"));
     } finally {
       setIsClearing(false);
     }
@@ -273,7 +274,7 @@ export function HealthCheckPanel({
       await lintApi.triggerLint(projectId, accessToken);
       // The WebSocket will notify us when it's complete
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to start lint";
+      const message = getApiErrorMessage(err, "Failed to start lint");
       setError(message);
       setIsRunning(false);
     }
@@ -295,9 +296,7 @@ export function HealthCheckPanel({
         branch
       ));
     } catch (err) {
-      setConsistencyError(
-        err instanceof Error ? err.message : "Consistency check failed"
-      );
+      setConsistencyError(getApiErrorMessage(err, "Consistency check failed"));
       setIsCheckingConsistency(false);
       return;
     }
@@ -340,9 +339,7 @@ export function HealthCheckPanel({
       setConsistencyError("Consistency check timed out — try again later");
     } catch (err) {
       if (!pollCancelled.current) {
-        setConsistencyError(
-          err instanceof Error ? err.message : "Consistency check failed"
-        );
+        setConsistencyError(getApiErrorMessage(err, "Consistency check failed"));
       }
     } finally {
       if (!pollCancelled.current) {
@@ -369,9 +366,7 @@ export function HealthCheckPanel({
         branch
       ));
     } catch (err) {
-      setDuplicatesError(
-        err instanceof Error ? err.message : "Duplicate detection failed"
-      );
+      setDuplicatesError(getApiErrorMessage(err, "Duplicate detection failed"));
       setIsDetectingDuplicates(false);
       return;
     }
@@ -418,9 +413,7 @@ export function HealthCheckPanel({
       setDuplicatesError("Duplicate detection timed out — try again later");
     } catch (err) {
       if (!pollCancelled.current) {
-        setDuplicatesError(
-          err instanceof Error ? err.message : "Duplicate detection failed"
-        );
+        setDuplicatesError(getApiErrorMessage(err, "Duplicate detection failed"));
       }
     } finally {
       if (!pollCancelled.current) {
@@ -489,7 +482,7 @@ export function HealthCheckPanel({
         qualityApi.getConsistencyIssues(projectId, accessToken, branch)
           .then((r) => { if (isActive) setConsistencyIssues(r.issues); })
           .catch((err) => {
-            if (isActive) setConsistencyError(err instanceof Error ? err.message : "Failed to load consistency results");
+            if (isActive) setConsistencyError(getApiErrorMessage(err, "Failed to load consistency results"));
           })
           .finally(() => { if (isActive) setIsCheckingConsistency(false); });
       } else if (message.type === "consistency_failed") {
@@ -509,7 +502,7 @@ export function HealthCheckPanel({
         qualityApi.getLatestDuplicates(projectId, accessToken, branch)
           .then((r) => { if (isActive) setDuplicateClusters(r.clusters); })
           .catch((err) => {
-            if (isActive) setDuplicatesError(err instanceof Error ? err.message : "Failed to load duplicate results");
+            if (isActive) setDuplicatesError(getApiErrorMessage(err, "Failed to load duplicate results"));
           })
           .finally(() => { if (isActive) setIsDetectingDuplicates(false); });
       } else if (message.type === "duplicates_failed") {
