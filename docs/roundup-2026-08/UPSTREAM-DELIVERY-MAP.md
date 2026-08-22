@@ -67,6 +67,7 @@ These branches are rebuilt on the CatholicOS cutoff rather than appended to ALEA
 |---|---|---|---|
 | web | `upstream-queue/t1-web-synthesis` at `4986135c` | `c714c74b` | Complete optional-auth, anonymous-contribution, sign-in affordance, route-hardening, and tokenless-public-graph seam. 163 files/2,798 tests, type-check, lint with zero errors/15 baseline warnings, and optional/no-Zitadel production build with 22 static pages green. |
 | API | `upstream-queue/t1-api-synthesis` at `d2c31aea` | `a21b7d5c` | Feature-seam replacement for PR #27: excludes its unrelated seed/index changes and includes HTTP/WebSocket auth parity plus anonymous-route hardening. Full suite 1,580 tests, Ruff, and strict mypy green. |
+| API | `upstream-queue/t3-api-synthesis` at `1b8bde28` | T1 synthesis `d2c31aea` | Complete T3 feature foundation plus reviewed security, metering, concurrency, KDF, alerting, and vector-integrity seam. Empty-to-head migration, 154 focused non-`TestClient` unit tests, four direct route tests, two real-PostgreSQL integrity tests, Ruff, formatting, and diff checks are green. Targeted mypy has only the pre-existing FOLIO annotation mismatch outside T3. |
 
 ## Delivery tranches
 
@@ -76,7 +77,7 @@ Existing CatholicOS web PR #57 and API PR #27 are old AUTH_MODE prefixes. Do not
 |---:|---|---|---|---|---|---|
 | T1 | Optional auth, anonymous contribution, and public viewing | AUTH_MODE/anonymous/public-viewer portions of W1/W4/W5 and A1/A6; existing PR #57/#27 prefixes | web + API | none | large, split by repo | Complete local pair green at web `4986135c` and API `d2c31aea`; final refreshed replay immediately before the authorized batch remains |
 | T2 | DEV deploy and CI | W6, A5, A7, A9, local deploy-truth and dormant-promotion work | API primarily; web CI companion | T1 | medium | provisional; dormant PROD scaffold is not activation authority |
-| T3 | LLM configuration and controlled generation | Remaining W1/W4 and A1/A4 plus API `a4be506b`..`738f20a6` and web `a272c8dc` | web + API | T1 | large, split into config, generation, and hardening PRs if reviewer requests | Nine held API hardening commits and the web conflict UX are green locally; closure-ledger implementation is complete and current-upstream synthesis remains |
+| T3 | LLM configuration and controlled generation | Remaining W1/W4 and A1/A4 plus API synthesis `1b8bde28` and web `a272c8dc` | web + API | T1 | large, split into config, generation, and hardening PRs if reviewer requests | API synthesis is complete and green locally; web synthesis and final paired replay remain |
 | T4 | Trust ladder and auto-accept | W2 and A2 | web + API | T1, T3 | medium | provisional; authenticated clock UAT still open |
 | T5 | PR Party | W3, A3, and D5 API `f3c4251d` | web + API, then `catholicos/.github` answerer asset | T1, T3, T4, demo readiness, org gates | large | D5 implementation reviewed and green locally; deployment, live E2E, and outreach remain gated |
 | T6 | Translation provenance | W7 and A8 | web + API | T1 | large | provisional; authenticated visual/live acceptance remains |
