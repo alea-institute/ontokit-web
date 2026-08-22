@@ -354,3 +354,7 @@ flowchart TB
 - No secret or broad demo credential enters Git history.
 - Abandoned implementation attempts and temporary UAT state are removed.
 - One durable handoff under `docs/handoffs/` records the remaining queue plus commit, push, and merge state.
+
+## Execution checkpoint — 2026-08-21
+
+All autonomous correctness residuals named by the audit and the expanded T3 security closure ledger are implemented on isolated local branches. The final T3 heads are API `738f20a6` and web `a272c8dc`; ordinary generation now reserves spend before actuation, and full vector refreshes activate a dimension-validated private snapshot atomically after a source-revision check. The remaining engineering queue is local current-upstream synthesis plus activation work whose existing gates are demo credentials/repositories, authenticated DEV UAT, AWS/PROD authority, domain/DNS visibility, and the held final CatholicOS batch. No settled user decision needs to be re-asked.
