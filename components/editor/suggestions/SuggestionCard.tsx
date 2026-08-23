@@ -1,7 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { Sparkles, Check, X, Pencil, AlertTriangle } from "lucide-react";
+import { useState, useCallback, useId, type FormEvent } from "react";
+import { Sparkles, Check, X, Pencil, AlertTriangle, Loader2, Unlink2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { getApiErrorMessage } from "@/lib/api/client";
+import type { DuplicateCandidate } from "@/lib/api/generation";
 import { cn } from "@/lib/utils";
 import type { StoredSuggestion } from "@/lib/stores/suggestionStore";
 
@@ -10,6 +21,8 @@ export interface SuggestionCardProps {
   onAccept: () => void;
   onReject: () => void;
   onEdit: (editedValue: string) => void;
+  onMarkDistinct?: (candidate: DuplicateCandidate, reason: string) => Promise<void>;
+  canMarkDistinct?: boolean;
   disabled?: boolean;
 }
 
@@ -28,10 +41,17 @@ export function SuggestionCard({
   onAccept,
   onReject,
   onEdit,
+  onMarkDistinct,
+  canMarkDistinct,
   disabled,
 }: SuggestionCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
+  const [distinctCandidate, setDistinctCandidate] = useState<DuplicateCandidate | null>(null);
+  const [distinctReason, setDistinctReason] = useState("");
+  const [distinctError, setDistinctError] = useState<string | null>(null);
+  const [isMarkingDistinct, setIsMarkingDistinct] = useState(false);
+  const distinctReasonId = useId();
 
   const suggestion = item.suggestion;
   const isBlocked = suggestion.duplicate_verdict === "block";
@@ -83,8 +103,34 @@ export function SuggestionCard({
     setEditValue("");
   }, []);
 
+  const closeDistinctDialog = useCallback(() => {
+    if (isMarkingDistinct) return;
+    setDistinctCandidate(null);
+    setDistinctReason("");
+    setDistinctError(null);
+  }, [isMarkingDistinct]);
+
+  const handleMarkDistinct = useCallback(async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const reason = distinctReason.trim();
+    if (!distinctCandidate || !onMarkDistinct || !reason) return;
+
+    setIsMarkingDistinct(true);
+    setDistinctError(null);
+    try {
+      await onMarkDistinct(distinctCandidate, reason);
+      setDistinctCandidate(null);
+      setDistinctReason("");
+    } catch (error) {
+      setDistinctError(getApiErrorMessage(error, "Could not mark these entities as distinct."));
+    } finally {
+      setIsMarkingDistinct(false);
+    }
+  }, [distinctCandidate, distinctReason, onMarkDistinct]);
+
   return (
-    <div
+    <>
+      <div
       role="listitem"
       tabIndex={0}
       className={cn(
@@ -126,15 +172,33 @@ export function SuggestionCard({
           </span>
         )}
 
-        {/* Duplicate block warning */}
-        {isBlocked && !isEditing && (
-          <div className="mt-1">
+        {/* Duplicate warning and explicit false-positive action */}
+        {(isBlocked || isWarned) && !isEditing && (
+          <div className="mt-1.5 space-y-1.5">
             <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-              Likely duplicate
+              {isBlocked ? "Likely duplicate" : "Similar entity may already exist"}
             </span>
             {suggestion.duplicate_candidates.slice(0, 3).map((c) => (
-              <div key={c.iri} className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                {c.label} ({Math.round(c.score * 100)}%)
+              <div
+                key={c.iri}
+                className="flex min-w-0 items-center justify-between gap-2 rounded-sm bg-amber-50/70 px-2 py-1 dark:bg-amber-900/10"
+              >
+                <span className="min-w-0 truncate text-xs text-slate-600 dark:text-slate-300" title={c.iri}>
+                  {c.label} ({Math.round(c.score * 100)}%)
+                </span>
+                {canMarkDistinct && onMarkDistinct && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDistinctCandidate(c);
+                      setDistinctError(null);
+                    }}
+                    className="shrink-0 rounded-sm px-1.5 py-0.5 text-xs font-medium text-primary-700 hover:bg-primary-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-300 dark:hover:bg-primary-900/30"
+                    aria-label={`Mark ${c.label} as a distinct entity`}
+                  >
+                    Not the same
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -229,6 +293,95 @@ export function SuggestionCard({
           </>
         )}
       </div>
-    </div>
+      </div>
+
+      <Dialog
+        open={distinctCandidate !== null}
+        onOpenChange={(open) => { if (!open) closeDistinctDialog(); }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <form onSubmit={handleMarkDistinct}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Unlink2 className="h-5 w-5 text-primary-600 dark:text-primary-400" />
+                Mark as distinct entities
+              </DialogTitle>
+              <DialogDescription>
+                This is an explicit review decision. Rejecting a suggestion does not create this decision.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="my-4 space-y-4">
+              <div className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm dark:border-slate-700 dark:bg-slate-900/40">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Proposed entity</p>
+                  <p className="truncate font-medium text-slate-900 dark:text-slate-100" title={suggestion.iri}>
+                    {suggestion.label}
+                  </p>
+                </div>
+                <div className="flex justify-center text-slate-400" aria-hidden="true">
+                  <Unlink2 className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Existing entity</p>
+                  <p className="truncate font-medium text-slate-900 dark:text-slate-100" title={distinctCandidate?.iri}>
+                    {distinctCandidate?.label}
+                  </p>
+                </div>
+              </div>
+
+              <div>
+                <label
+                  htmlFor={distinctReasonId}
+                  className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-200"
+                >
+                  Why are these different?
+                </label>
+                <textarea
+                  id={distinctReasonId}
+                  value={distinctReason}
+                  onChange={(event) => setDistinctReason(event.target.value)}
+                  rows={4}
+                  maxLength={4000}
+                  required
+                  autoFocus
+                  disabled={isMarkingDistinct}
+                  placeholder="Describe the conceptual difference so future reviewers can understand this decision."
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
+                />
+                <p className="mt-1 text-xs text-slate-500">{distinctReason.length}/4000 characters</p>
+              </div>
+
+              {distinctError && (
+                <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+                  {distinctError}
+                </p>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeDistinctDialog}
+                disabled={isMarkingDistinct}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!distinctReason.trim() || isMarkingDistinct}>
+                {isMarkingDistinct ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving decision…
+                  </>
+                ) : (
+                  "Mark as distinct"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -34,16 +34,18 @@ function renderCard(item: StoredSuggestion, props: Partial<Parameters<typeof Sug
   const onAccept = vi.fn();
   const onReject = vi.fn();
   const onEdit = vi.fn();
+  const onMarkDistinct = vi.fn().mockResolvedValue(undefined);
   render(
     <SuggestionCard
       item={item}
       onAccept={onAccept}
       onReject={onReject}
       onEdit={onEdit}
+      onMarkDistinct={onMarkDistinct}
       {...props}
     />,
   );
-  return { onAccept, onReject, onEdit };
+  return { onAccept, onReject, onEdit, onMarkDistinct };
 }
 
 describe("SuggestionCard", () => {
@@ -122,5 +124,55 @@ describe("SuggestionCard", () => {
     await user.click(screen.getByRole("button", { name: "Accept" }));
 
     expect(onEdit).toHaveBeenCalledWith("Child One Renamed");
+  });
+
+  it("records a distinct decision only through the explicit Not the same action", async () => {
+    const user = userEvent.setup();
+    const candidate = {
+      iri: "http://example.org/ExistingChild",
+      label: "Existing Child",
+      score: 0.98,
+    };
+    const { onMarkDistinct, onReject } = renderCard(
+      makeItem({
+        suggestion: makeSuggestion({
+          duplicate_verdict: "block",
+          duplicate_candidates: [candidate],
+        }),
+      }),
+      { canMarkDistinct: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Mark Existing Child as a distinct entity" }));
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect(screen.getByText(/Rejecting a suggestion does not create this decision/)).toBeDefined();
+
+    const reason = screen.getByRole("textbox", { name: "Why are these different?" });
+    await user.type(reason, "The proposed class describes a narrower legal concept.");
+    await user.click(screen.getByRole("button", { name: "Mark as distinct" }));
+
+    expect(onMarkDistinct).toHaveBeenCalledWith(
+      candidate,
+      "The proposed class describes a narrower legal concept.",
+    );
+    expect(onReject).not.toHaveBeenCalled();
+  });
+
+  it("does not expose the distinct action without permission", () => {
+    renderCard(
+      makeItem({
+        suggestion: makeSuggestion({
+          duplicate_verdict: "warn",
+          duplicate_candidates: [{
+            iri: "http://example.org/ExistingChild",
+            label: "Existing Child",
+            score: 0.9,
+          }],
+        }),
+      }),
+      { canMarkDistinct: false },
+    );
+
+    expect(screen.queryByRole("button", { name: /distinct entity/i })).toBeNull();
   });
 });

@@ -24,6 +24,7 @@ export interface UseSuggestionsReturn {
   accept: (index: number) => void;
   reject: (index: number) => void;
   edit: (index: number, value: string) => void;
+  markDistinct: (index: number, candidateIri: string) => void;
 }
 
 // Stable fallback so the store selector returns a referentially-equal
@@ -130,5 +131,16 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     store.getState().editSuggestion(scope, entityIri, suggestionType, index, value);
   }, [entityIri, suggestionType, store, scope]);
 
-  return { items, isLoading, error, request, accept, reject, edit };
+  const markDistinct = useCallback((index: number, candidateIri: string) => {
+    if (!entityIri) return;
+    store.getState().removeDuplicateCandidate(
+      scope,
+      entityIri,
+      suggestionType,
+      index,
+      candidateIri,
+    );
+  }, [entityIri, suggestionType, store, scope]);
+
+  return { items, isLoading, error, request, accept, reject, edit, markDistinct };
 }

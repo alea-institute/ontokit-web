@@ -49,6 +49,7 @@ import { useToast } from "@/lib/context/ToastContext";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
 import type { GeneratedSuggestion } from "@/lib/api/generation";
+import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
 import type { ProjectRole } from "@/lib/api/projects";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
@@ -667,6 +668,27 @@ export function ClassDetailPanel({
                 onAccept={() => suggestions.accept(i)}
                 onReject={() => suggestions.reject(i)}
                 onEdit={(val) => { suggestions.edit(i, val); suggestions.accept(i); }}
+                canMarkDistinct={!!canEdit && !!accessToken}
+                onMarkDistinct={async (candidate, reason) => {
+                  if (!accessToken) return;
+                  const parentIri = item.suggestion.suggestion_type === "children"
+                    ? classIri
+                    : item.suggestion.suggestion_type === "siblings"
+                      ? (classDetail?.parent_iris[0] ?? classIri)
+                      : null;
+                  await distinctDecisionsApi.mark(projectId, {
+                    proposed_iri: item.suggestion.iri,
+                    label: item.suggestion.label,
+                    candidate_iri: candidate.iri,
+                    parent_iri: parentIri,
+                    reason,
+                  }, accessToken);
+                  suggestions.markDistinct(i, candidate.iri);
+                  toast.success(
+                    "Distinct entities recorded",
+                    `${item.suggestion.label} will no longer be blocked by ${candidate.label} while their relevant content remains unchanged.`,
+                  );
+                }}
                 disabled={item.suggestion.duplicate_verdict === "block"}
               />
             ) : null,
@@ -674,7 +696,7 @@ export function ClassDetailPanel({
         </div>
       )}
     </>
-  ), []);
+  ), [accessToken, canEdit, classDetail?.parent_iris, classIri, projectId, toast]);
 
   // ── Render: empty state ──
   if (!classIri) {
