@@ -12,6 +12,7 @@ import {
 import { PRActions } from "./PRActions";
 import { PRCommentThread } from "./PRCommentThread";
 import { Button } from "@/components/ui/button";
+import { getApiErrorMessage } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import {
   GitPullRequest,
@@ -29,6 +30,10 @@ import {
   ExternalLink,
   ChevronDown,
   ChevronRight,
+  AlertTriangle,
+  CircleCheck,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 
 type TabType = "conversation" | "commits" | "files";
@@ -64,6 +69,8 @@ export function PRDetail({
   const [isLoadingCommits, setIsLoadingCommits] = useState(false);
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
+  const [isRetryingGitHub, setIsRetryingGitHub] = useState(false);
+  const [githubRetryError, setGitHubRetryError] = useState<string | null>(null);
 
   const loadPR = useCallback(async () => {
     if (!projectId || !prNumber) return;
@@ -94,6 +101,27 @@ export function PRDetail({
   useEffect(() => {
     loadPR();
   }, [loadPR]);
+
+  useEffect(() => {
+    if (pr?.github_sync_status !== "pending") return;
+
+    let cancelled = false;
+    const pollId = window.setInterval(() => {
+      pullRequestsApi
+        .get(projectId, prNumber, accessToken)
+        .then((updated) => {
+          if (!cancelled) setPR(updated);
+        })
+        .catch(() => {
+          // The receipt remains visible; the next poll can recover from a transient read failure.
+        });
+    }, 5000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(pollId);
+    };
+  }, [pr?.github_sync_status, projectId, prNumber, accessToken]);
 
   // Load commits when switching to commits tab
   const loadCommits = useCallback(async () => {
@@ -176,6 +204,26 @@ export function PRDetail({
     setComments(commentsData.items);
   };
 
+  const handleGitHubRetry = async () => {
+    if (!accessToken || !pr) return;
+    setIsRetryingGitHub(true);
+    setGitHubRetryError(null);
+    try {
+      const updated = await pullRequestsApi.retryGitHubSync(
+        projectId,
+        pr.pr_number,
+        accessToken,
+      );
+      setPR(updated);
+    } catch (retryError) {
+      setGitHubRetryError(
+        getApiErrorMessage(retryError, "Could not retry the GitHub mirror."),
+      );
+    } finally {
+      setIsRetryingGitHub(false);
+    }
+  };
+
   const formatDate = (timestamp: string) => {
     return new Date(timestamp).toLocaleDateString(undefined, {
       month: "short",
@@ -238,6 +286,15 @@ export function PRDetail({
     );
   }
 
+  const githubSyncStatus = pr.github_sync_status
+    ?? (pr.github_pr_url ? "synced" : "not_configured");
+  const canRetryGitHub = pr.status !== "merged" && !!accessToken && (
+    currentUserId === pr.author_id
+    || userRole === "owner"
+    || userRole === "admin"
+    || userRole === "superadmin"
+  );
+
   return (
     <div className={cn("space-y-6", className)}>
       {/* Header */}
@@ -270,20 +327,86 @@ export function PRDetail({
                 ? `merged ${formatDate(pr.merged_at)}`
                 : `opened ${formatDate(pr.created_at)}`}
             </span>
-            {pr.github_pr_url && (
+            {githubSyncStatus === "synced" && pr.github_pr_url && (
               <a
                 href={pr.github_pr_url}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 hover:text-primary-600"
               >
-                <ExternalLink className="h-4 w-4" />
-                GitHub
+                <CircleCheck className="h-4 w-4 text-green-600" />
+                GitHub mirror
+                <ExternalLink className="h-3.5 w-3.5" />
               </a>
+            )}
+            {githubSyncStatus === "synced" && !pr.github_pr_url && (
+              <span className="flex items-center gap-1 text-green-700 dark:text-green-400">
+                <CircleCheck className="h-4 w-4" />
+                Synced with GitHub
+              </span>
+            )}
+            {githubSyncStatus === "pending" && (
+              <span className="flex items-center gap-1 text-primary-700 dark:text-primary-400">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Syncing with GitHub…
+              </span>
+            )}
+            {githubSyncStatus === "failed" && (
+              <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
+                <AlertTriangle className="h-4 w-4" />
+                GitHub mirror needs attention
+              </span>
+            )}
+            {githubSyncStatus === "not_configured" && (
+              <span className="text-slate-500 dark:text-slate-400">
+                GitHub mirror not configured
+              </span>
             )}
           </div>
         </div>
       </div>
+
+      {(githubSyncStatus === "failed" || githubRetryError) && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900/50 dark:bg-amber-900/20"
+        >
+          <div className="flex min-w-0 items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <div>
+              <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
+                The OntoKit pull request is safe, but its GitHub mirror did not synchronize.
+              </p>
+              <p className="mt-0.5 text-sm text-amber-800 dark:text-amber-200">
+                {githubRetryError || pr.github_sync_message || "Retry when the GitHub integration is available."}
+              </p>
+              {pr.github_sync_last_attempted_at && (
+                <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                  Last attempted {formatDate(pr.github_sync_last_attempted_at)}
+                </p>
+              )}
+            </div>
+          </div>
+          {canRetryGitHub && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleGitHubRetry}
+              disabled={isRetryingGitHub}
+              className="shrink-0 gap-1.5 border-amber-300 bg-white hover:bg-amber-100 dark:border-amber-700 dark:bg-slate-800 dark:hover:bg-amber-900/30"
+            >
+              {isRetryingGitHub ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+              {isRetryingGitHub ? "Retrying…" : "Retry GitHub sync"}
+            </Button>
+          )}
+        </div>
+      )}
 
       {/* Description */}
       {pr.description && (
