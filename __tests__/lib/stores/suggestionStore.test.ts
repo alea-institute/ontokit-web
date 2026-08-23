@@ -69,6 +69,45 @@ describe("suggestionStore", () => {
     expect(stored[0].status).toBe("rejected");
   });
 
+  it("removes a marked-distinct candidate and recalculates the duplicate verdict", () => {
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [
+      makeSuggestion({
+        duplicate_verdict: "block",
+        duplicate_candidates: [
+          { iri: "http://ex.org/Blocker", label: "Blocker", score: 0.98 },
+          { iri: "http://ex.org/Warning", label: "Warning", score: 0.9 },
+        ],
+      }),
+    ]);
+
+    useSuggestionStore.getState().removeDuplicateCandidate(
+      SCOPE,
+      "http://ex.org/Foo",
+      "children",
+      0,
+      "http://ex.org/Blocker",
+    );
+
+    let suggestion = useSuggestionStore.getState()
+      .suggestions["p1::main::http://ex.org/Foo::children"][0].suggestion;
+    expect(suggestion.duplicate_candidates.map((candidate) => candidate.iri)).toEqual([
+      "http://ex.org/Warning",
+    ]);
+    expect(suggestion.duplicate_verdict).toBe("warn");
+
+    useSuggestionStore.getState().removeDuplicateCandidate(
+      SCOPE,
+      "http://ex.org/Foo",
+      "children",
+      0,
+      "http://ex.org/Warning",
+    );
+    suggestion = useSuggestionStore.getState()
+      .suggestions["p1::main::http://ex.org/Foo::children"][0].suggestion;
+    expect(suggestion.duplicate_candidates).toEqual([]);
+    expect(suggestion.duplicate_verdict).toBe("pass");
+  });
+
   it("editSuggestion sets editedValue on the stored suggestion", () => {
     const items = [makeSuggestion()];
     useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "annotations", items);

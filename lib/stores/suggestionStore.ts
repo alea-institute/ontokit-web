@@ -25,6 +25,7 @@ interface SuggestionStoreState {
   acceptSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
   rejectSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
   editSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number, value: string) => void;
+  removeDuplicateCandidate: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number, candidateIri: string) => void;
   clearAllSuggestions: () => void;
   getPendingCount: (scope: SuggestionScope) => number;
   getPendingSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string) => StoredSuggestion[];
@@ -85,6 +86,38 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
         }
       }
       return { suggestions: { ...state.suggestions, [key]: arr } };
+    });
+  },
+  removeDuplicateCandidate: (scope, entityIri, suggestionType, index, candidateIri) => {
+    const key = storeKey(scope, entityIri, suggestionType);
+    set((state) => {
+      const current = state.suggestions[key];
+      const item = current?.[index];
+      if (!item) return state;
+
+      const duplicateCandidates = item.suggestion.duplicate_candidates.filter(
+        (candidate) => candidate.iri !== candidateIri,
+      );
+      if (duplicateCandidates.length === item.suggestion.duplicate_candidates.length) {
+        return state;
+      }
+
+      const highestScore = Math.max(0, ...duplicateCandidates.map((candidate) => candidate.score));
+      const duplicateVerdict = highestScore > 0.95
+        ? "block"
+        : highestScore > 0.8
+          ? "warn"
+          : "pass";
+      const items = [...current];
+      items[index] = {
+        ...item,
+        suggestion: {
+          ...item.suggestion,
+          duplicate_candidates: duplicateCandidates,
+          duplicate_verdict: duplicateVerdict,
+        },
+      };
+      return { suggestions: { ...state.suggestions, [key]: items } };
     });
   },
   clearAllSuggestions: () => set({ suggestions: {} }),

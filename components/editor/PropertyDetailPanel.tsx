@@ -40,6 +40,7 @@ import { useIriLabels } from "@/lib/hooks/useIriLabels";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
 import type { GeneratedSuggestion } from "@/lib/api/generation";
+import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
 function ensureTrailingEmpty(arr: LocalizedString[]): LocalizedString[] {
@@ -535,6 +536,24 @@ export function PropertyDetailPanel({
                 onAccept={() => suggestions.accept(i)}
                 onReject={() => suggestions.reject(i)}
                 onEdit={(val) => { suggestions.edit(i, val); suggestions.accept(i); }}
+                canMarkDistinct={canEdit && !!accessToken}
+                onMarkDistinct={async (candidate, reason) => {
+                  if (!accessToken) return;
+                  await distinctDecisionsApi.mark(projectId, {
+                    proposed_iri: item.suggestion.iri,
+                    label: item.suggestion.label,
+                    candidate_iri: candidate.iri,
+                    parent_iri: item.suggestion.suggestion_type === "children"
+                      ? propertyIri
+                      : null,
+                    reason,
+                  }, accessToken);
+                  suggestions.markDistinct(i, candidate.iri);
+                  toast.success(
+                    "Distinct entities recorded",
+                    `${item.suggestion.label} will no longer be blocked by ${candidate.label} while their relevant content remains unchanged.`,
+                  );
+                }}
                 disabled={item.suggestion.duplicate_verdict === "block"}
               />
             ) : null,
@@ -542,7 +561,7 @@ export function PropertyDetailPanel({
         </div>
       )}
     </>
-  ), []);
+  ), [accessToken, canEdit, projectId, propertyIri, toast]);
 
   // ── Render ──
   if (!propertyIri) {
