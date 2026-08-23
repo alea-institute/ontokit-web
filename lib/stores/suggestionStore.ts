@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { GeneratedSuggestion } from "@/lib/api/generation";
+import type { DuplicateCandidate, GeneratedSuggestion } from "@/lib/api/generation";
 
 export type SuggestionReviewStatus = "pending" | "accepted" | "rejected";
 
@@ -25,7 +25,13 @@ interface SuggestionStoreState {
   acceptSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
   rejectSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
   editSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number, value: string) => void;
-  removeDuplicateCandidate: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number, candidateIri: string) => void;
+  removeDuplicateCandidate: (
+    scope: SuggestionScope,
+    entityIri: string,
+    suggestionType: string,
+    index: number,
+    candidate: Pick<DuplicateCandidate, "iri" | "branch">,
+  ) => void;
   clearAllSuggestions: () => void;
   getPendingCount: (scope: SuggestionScope) => number;
   getPendingSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string) => StoredSuggestion[];
@@ -88,7 +94,7 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
       return { suggestions: { ...state.suggestions, [key]: arr } };
     });
   },
-  removeDuplicateCandidate: (scope, entityIri, suggestionType, index, candidateIri) => {
+  removeDuplicateCandidate: (scope, entityIri, suggestionType, index, reviewedCandidate) => {
     const key = storeKey(scope, entityIri, suggestionType);
     set((state) => {
       const current = state.suggestions[key];
@@ -96,7 +102,10 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
       if (!item) return state;
 
       const duplicateCandidates = item.suggestion.duplicate_candidates.filter(
-        (candidate) => candidate.iri !== candidateIri,
+        (candidate) => !(
+          candidate.iri === reviewedCandidate.iri
+          && (candidate.branch ?? null) === (reviewedCandidate.branch ?? null)
+        ),
       );
       if (duplicateCandidates.length === item.suggestion.duplicate_candidates.length) {
         return state;

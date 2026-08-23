@@ -118,12 +118,7 @@ export function PRDetail({
 
     const schedulePoll = () => {
       const remaining = staleAt - Date.now();
-      if (remaining <= 0) {
-        pollId = window.setTimeout(() => {
-          if (!cancelled) setTimedOutGitHubAttempt(attemptKey);
-        }, 0);
-        return;
-      }
+      if (remaining <= 0) return;
       pollId = window.setTimeout(poll, Math.min(5000, remaining));
     };
 
@@ -156,11 +151,18 @@ export function PRDetail({
       }
     };
 
+    const staleDeadlineId = window.setTimeout(() => {
+      if (!cancelled) {
+        controller?.abort();
+        setTimedOutGitHubAttempt(attemptKey);
+      }
+    }, Math.max(0, staleAt - Date.now()));
     schedulePoll();
 
     return () => {
       cancelled = true;
       if (pollId !== undefined) window.clearTimeout(pollId);
+      window.clearTimeout(staleDeadlineId);
       controller?.abort();
     };
   }, [pr?.github_sync_status, pr?.github_sync_last_attempted_at, projectId, prNumber, accessToken]);
@@ -335,7 +337,7 @@ export function PRDetail({
     || !pr.github_sync_last_attempted_at
     || Date.now() >= Date.parse(pr.github_sync_last_attempted_at) + GITHUB_SYNC_STALE_MS
   );
-  const canRetryGitHub = pr.status !== "merged" && !!accessToken && (
+  const canRetryGitHub = !!accessToken && (
     currentUserId === pr.author_id
     || userRole === "owner"
     || userRole === "admin"

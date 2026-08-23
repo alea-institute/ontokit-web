@@ -678,10 +678,12 @@ export function ClassDetailPanel({
                     proposed_iri: item.suggestion.iri,
                     label: item.suggestion.label,
                     candidate_iri: candidate.iri,
+                    candidate_branch: candidate.branch,
+                    entity_type: "class",
                     parent_iri: parentIri,
                     reason,
                   }, accessToken);
-                  suggestions.markDistinct(i, candidate.iri);
+                  suggestions.markDistinct(i, candidate);
                   toast.success(
                     "Distinct entities recorded",
                     `${item.suggestion.label} will no longer be blocked by ${candidate.label} while their relevant content remains unchanged.`,

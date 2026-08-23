@@ -178,7 +178,7 @@ export function SuggestionCard({
             </span>
             {suggestion.duplicate_candidates.slice(0, 3).map((c) => (
               <div
-                key={c.iri}
+                key={`${c.iri}::${c.branch ?? ""}`}
                 className="flex min-w-0 items-center justify-between gap-2 rounded-sm bg-amber-50/70 px-2 py-1 dark:bg-amber-900/10"
               >
                 <span className="min-w-0 truncate text-xs text-slate-600 dark:text-slate-300" title={c.iri}>
