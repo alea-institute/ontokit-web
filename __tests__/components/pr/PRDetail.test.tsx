@@ -614,6 +614,80 @@ describe("PRDetail", () => {
     expect(await screen.findByText("GitHub mirror")).toBeDefined();
   });
 
+  it("lets an authorized user retry a failed mirror after the local PR was merged", async () => {
+    setupSuccessfulLoad(makePR({
+      status: "merged",
+      merged_at: "2025-06-05T10:00:00Z",
+      github_sync_status: "failed",
+    }));
+    mockApi.retryGitHubSync.mockResolvedValue(makePR({
+      status: "merged",
+      github_sync_status: "synced",
+      github_pr_url: "https://github.com/org/repo/pull/7",
+    }));
+    render(
+      <PRDetail
+        projectId="proj-1"
+        prNumber={7}
+        accessToken="tok"
+        currentUserId="user-1"
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: "Retry GitHub sync" }));
+    await waitFor(() => {
+      expect(mockApi.retryGitHubSync).toHaveBeenCalledWith("proj-1", 7, "tok");
+    });
+  });
+
+  it("marks a pending mirror stale even while the final poll request remains pending", async () => {
+    vi.useFakeTimers();
+    const now = new Date("2026-08-23T12:00:00Z");
+    vi.setSystemTime(now);
+    const pending = makePR({
+      github_sync_status: "pending",
+      github_sync_last_attempted_at: now.toISOString(),
+    });
+    mockApi.get
+      .mockResolvedValueOnce(pending)
+      .mockReturnValueOnce(new Promise(() => {}));
+    mockApi.listReviews.mockResolvedValue({ items: [], total: 0 });
+    mockApi.listComments.mockResolvedValue({ items: [], total: 0 });
+
+    let unmount: (() => void) | undefined;
+    try {
+      ({ unmount } = render(
+        <PRDetail
+          projectId="proj-1"
+          prNumber={7}
+          accessToken="tok"
+          currentUserId="user-1"
+        />,
+      ));
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(mockApi.get).toHaveBeenCalledTimes(2);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5 * 60 * 1000 - 5_000);
+      });
+
+      expect(screen.getByText(/last sync attempt did not finish/i)).toBeDefined();
+      expect(screen.getByRole("button", { name: "Retry GitHub sync" })).toBeDefined();
+      expect((mockApi.get.mock.calls[1][3] as AbortSignal).aborted).toBe(true);
+    } finally {
+      unmount?.();
+      vi.useRealTimers();
+    }
+  });
+
   it("shows failure context but hides retry from a non-author editor", async () => {
     setupSuccessfulLoad(makePR({ github_sync_status: "failed" }));
     render(

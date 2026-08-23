@@ -28,6 +28,10 @@ vi.mock("@/lib/api/lint", () => ({
   lintApi: { getIssues: vi.fn() },
 }));
 
+vi.mock("@/lib/api/duplicateCheck", () => ({
+  distinctDecisionsApi: { mark: vi.fn() },
+}));
+
 vi.mock("@/lib/context/ToastContext", () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
@@ -124,12 +128,15 @@ vi.mock("@/components/editor/EntityHistoryTab", () => ({
 import { ClassDetailPanel, ensureTrailingEmpty } from "@/components/editor/ClassDetailPanel";
 import { projectOntologyApi } from "@/lib/api/client";
 import { lintApi } from "@/lib/api/lint";
+import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
+import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 
 // ── Helpers ──
 
 const mockGetClassDetail = projectOntologyApi.getClassDetail as Mock;
 const mockGetIssues = lintApi.getIssues as Mock;
 const mockSearchEntities = projectOntologyApi.searchEntities as Mock;
+const mockMarkDistinctDecision = distinctDecisionsApi.mark as Mock;
 
 function makeClassDetail(overrides: Record<string, unknown> = {}) {
   return {
@@ -187,6 +194,8 @@ describe("ClassDetailPanel", () => {
     capturedAnnotationRowProps = [];
     capturedInlineAnnotationAdderProps = null;
     capturedRelationshipSectionProps = null;
+    useSuggestionStore.getState().clearAllSuggestions();
+    mockMarkDistinctDecision.mockResolvedValue({ id: "decision-1" });
   });
 
   // ── Empty / placeholder state ──
@@ -215,6 +224,57 @@ describe("ClassDetailPanel", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Network failure")).toBeDefined();
+    });
+  });
+
+  it("preserves the candidate branch and class entity type in a distinct decision", async () => {
+    useSuggestionStore.getState().setSuggestions(
+      { projectId: "proj-1", branch: "review" },
+      DEFAULT_PROPS.classIri,
+      "children",
+      [{
+        iri: "http://example.org/ontology#SuggestedClass",
+        suggestion_type: "children",
+        label: "Suggested class",
+        provenance: "llm-proposed",
+        validation_errors: [],
+        duplicate_verdict: "block",
+        duplicate_candidates: [{
+          iri: "http://example.org/ontology#Existing",
+          label: "Existing",
+          entity_type: "class",
+          score: 0.99,
+          branch: "feature/existing",
+        }],
+      }],
+    );
+    const user = userEvent.setup();
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        branch="review"
+        canEdit
+        canUseLLM
+      />,
+    );
+
+    await screen.findByRole("button", { name: "Mark Existing as a distinct entity" });
+    await user.click(screen.getByRole("button", { name: "Mark Existing as a distinct entity" }));
+    await user.type(screen.getByLabelText("Why are these different?"), "Same name, different concepts");
+    await user.click(screen.getByRole("button", { name: "Mark as distinct" }));
+
+    await waitFor(() => {
+      expect(mockMarkDistinctDecision).toHaveBeenCalledWith(
+        "proj-1",
+        expect.objectContaining({
+          proposed_iri: "http://example.org/ontology#SuggestedClass",
+          candidate_iri: "http://example.org/ontology#Existing",
+          candidate_branch: "feature/existing",
+          entity_type: "class",
+          reason: "Same name, different concepts",
+        }),
+        "test-token",
+      );
     });
   });
 

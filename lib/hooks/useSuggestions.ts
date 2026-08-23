@@ -1,5 +1,10 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { generationApi, type GeneratedSuggestion, type SuggestionType } from "@/lib/api/generation";
+import {
+  generationApi,
+  type DuplicateCandidate,
+  type GeneratedSuggestion,
+  type SuggestionType,
+} from "@/lib/api/generation";
 import { ApiError } from "@/lib/api/client";
 import { LLM_STATUS_INVALIDATION_EVENT } from "@/lib/api/llm";
 import { storeKey, useSuggestionStore, type StoredSuggestion } from "@/lib/stores/suggestionStore";
@@ -24,7 +29,7 @@ export interface UseSuggestionsReturn {
   accept: (index: number) => void;
   reject: (index: number) => void;
   edit: (index: number, value: string) => void;
-  markDistinct: (index: number, candidateIri: string) => void;
+  markDistinct: (index: number, candidate: DuplicateCandidate) => void;
 }
 
 // Stable fallback so the store selector returns a referentially-equal
@@ -131,14 +136,14 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     store.getState().editSuggestion(scope, entityIri, suggestionType, index, value);
   }, [entityIri, suggestionType, store, scope]);
 
-  const markDistinct = useCallback((index: number, candidateIri: string) => {
+  const markDistinct = useCallback((index: number, candidate: DuplicateCandidate) => {
     if (!entityIri) return;
     store.getState().removeDuplicateCandidate(
       scope,
       entityIri,
       suggestionType,
       index,
-      candidateIri,
+      candidate,
     );
   }, [entityIri, suggestionType, store, scope]);
 

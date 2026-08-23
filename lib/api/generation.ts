@@ -4,6 +4,7 @@ import { api } from "./client";
 export type SuggestionType = "children" | "siblings" | "annotations" | "parents" | "edges";
 export type Provenance = "llm-proposed" | "user-written" | "user-edited-from-llm";
 export type DuplicateVerdict = "pass" | "warn" | "block";
+export type DuplicateEntityType = "class" | "property" | "individual";
 
 // ---- Validation error (matches backend ValidationError) ----
 export interface ValidationError {
@@ -16,7 +17,9 @@ export interface ValidationError {
 export interface DuplicateCandidate {
   iri: string;
   label: string;
+  entity_type?: DuplicateEntityType;
   score: number;
+  branch?: string | null;
 }
 
 // ---- Generated suggestion (union of class/annotation/edge subtypes) ----

@@ -85,7 +85,7 @@ describe("suggestionStore", () => {
       "http://ex.org/Foo",
       "children",
       0,
-      "http://ex.org/Blocker",
+      { iri: "http://ex.org/Blocker", branch: undefined },
     );
 
     let suggestion = useSuggestionStore.getState()
@@ -100,12 +100,53 @@ describe("suggestionStore", () => {
       "http://ex.org/Foo",
       "children",
       0,
-      "http://ex.org/Warning",
+      { iri: "http://ex.org/Warning", branch: undefined },
     );
     suggestion = useSuggestionStore.getState()
       .suggestions["p1::main::http://ex.org/Foo::children"][0].suggestion;
     expect(suggestion.duplicate_candidates).toEqual([]);
     expect(suggestion.duplicate_verdict).toBe("pass");
+  });
+
+  it("removes only the reviewed branch occurrence when the same IRI appears on two branches", () => {
+    useSuggestionStore.getState().setSuggestions(SCOPE, "http://ex.org/Foo", "children", [
+      makeSuggestion({
+        duplicate_verdict: "block",
+        duplicate_candidates: [
+          {
+            iri: "http://ex.org/Shared",
+            label: "Shared on main",
+            score: 0.98,
+            branch: "main",
+          },
+          {
+            iri: "http://ex.org/Shared",
+            label: "Shared on review",
+            score: 0.9,
+            branch: "review",
+          },
+        ],
+      }),
+    ]);
+
+    useSuggestionStore.getState().removeDuplicateCandidate(
+      SCOPE,
+      "http://ex.org/Foo",
+      "children",
+      0,
+      { iri: "http://ex.org/Shared", branch: "main" },
+    );
+
+    const suggestion = useSuggestionStore.getState()
+      .suggestions["p1::main::http://ex.org/Foo::children"][0].suggestion;
+    expect(suggestion.duplicate_candidates).toEqual([
+      expect.objectContaining({
+        iri: "http://ex.org/Shared",
+        branch: "review",
+        score: 0.9,
+      }),
+    ]);
+    expect(suggestion.duplicate_verdict).toBe("warn");
   });
 
   it("editSuggestion sets editedValue on the stored suggestion", () => {

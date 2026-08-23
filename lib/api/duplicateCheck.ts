@@ -1,10 +1,12 @@
 import { api } from "./client";
+import type { DuplicateEntityType } from "./generation";
 
 export interface DistinctDecisionMark {
   proposed_iri: string;
   label: string;
   candidate_iri: string;
-  entity_type?: string;
+  candidate_branch?: string | null;
+  entity_type: DuplicateEntityType;
   parent_iri?: string | null;
   suggestion_session_id?: string;
   reason: string;

@@ -12,6 +12,8 @@ describe("distinctDecisionsApi", () => {
       proposed_iri: "http://example.org/Proposed",
       label: "Proposed",
       candidate_iri: "http://example.org/Existing",
+      candidate_branch: "feature/existing",
+      entity_type: "class",
       reason: "Different scope",
     }, "token-1");
 
@@ -19,7 +21,11 @@ describe("distinctDecisionsApi", () => {
     expect(url).toContain("/projects/project-1/duplicate-check/distinct-decisions");
     expect(options.method).toBe("POST");
     expect(options.headers.get("Authorization")).toBe("Bearer token-1");
-    expect(JSON.parse(options.body)).toMatchObject({ reason: "Different scope" });
+    expect(JSON.parse(options.body)).toMatchObject({
+      candidate_branch: "feature/existing",
+      entity_type: "class",
+      reason: "Different scope",
+    });
     expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 
