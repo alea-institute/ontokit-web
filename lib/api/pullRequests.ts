@@ -7,6 +7,7 @@ import { api } from "./client";
 // Types
 
 export type PRStatus = "open" | "merged" | "closed";
+export type GitHubSyncStatus = "not_configured" | "pending" | "synced" | "failed";
 export type ReviewStatus = "approved" | "changes_requested" | "commented";
 
 export interface PRUser {
@@ -28,6 +29,9 @@ export interface PullRequest {
   author?: PRUser;
   github_pr_number?: number;
   github_pr_url?: string;
+  github_sync_status?: GitHubSyncStatus;
+  github_sync_last_attempted_at?: string;
+  github_sync_message?: string;
   merged_by?: string;
   merged_by_user?: PRUser;
   merged_at?: string;
@@ -312,6 +316,19 @@ export const pullRequestsApi = {
       {
         headers: { Authorization: `Bearer ${token}` },
       }
+    ),
+
+  /**
+   * Safely reconcile the local PR with its configured GitHub mirror.
+   */
+  retryGitHubSync: (projectId: string, prNumber: number, token: string) =>
+    api.post<PullRequest>(
+      `/api/v1/projects/${projectId}/pull-requests/${prNumber}/github-sync/retry`,
+      undefined,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        retryOn5xx: false,
+      },
     ),
 
   /**

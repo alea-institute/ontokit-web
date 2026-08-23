@@ -108,6 +108,20 @@ describe("pullRequestsApi", () => {
     });
   });
 
+  describe("retryGitHubSync", () => {
+    it("calls the explicit retry endpoint once with authentication", async () => {
+      mockOk({ id: "pr1", pr_number: 5, github_sync_status: "synced" });
+
+      await pullRequestsApi.retryGitHubSync("p1", 5, "tok");
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/pull-requests/5/github-sync/retry");
+      expect(options.method).toBe("POST");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // --- get ---
 
   describe("get", () => {
