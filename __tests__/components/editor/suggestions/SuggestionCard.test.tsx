@@ -140,7 +140,6 @@ describe("SuggestionCard", () => {
           duplicate_candidates: [candidate],
         }),
       }),
-      { canMarkDistinct: true },
     );
 
     await user.click(screen.getByRole("button", { name: "Mark Existing Child as a distinct entity" }));
@@ -170,7 +169,7 @@ describe("SuggestionCard", () => {
           }],
         }),
       }),
-      { canMarkDistinct: false },
+      { onMarkDistinct: undefined },
     );
 
     expect(screen.queryByRole("button", { name: /distinct entity/i })).toBeNull();

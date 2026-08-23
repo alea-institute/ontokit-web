@@ -1,18 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+import { mockFetch, mockOk, resetFetch } from "@/__tests__/helpers/mockFetch";
 import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
 
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
-function mockOk(data: unknown) {
-  mockFetch.mockResolvedValueOnce({
-    ok: true,
-    text: () => Promise.resolve(JSON.stringify(data)),
-  });
-}
-
 describe("distinctDecisionsApi", () => {
-  beforeEach(() => mockFetch.mockReset());
+  beforeEach(resetFetch);
 
   it("marks a pair with an explicit reason and no automatic 5xx retry", async () => {
     mockOk({ id: "decision-1" });
@@ -34,7 +25,11 @@ describe("distinctDecisionsApi", () => {
 
   it("lists bounded history and revokes by decision id", async () => {
     mockOk([]);
-    await distinctDecisionsApi.list("project-1", "token-1", true, 10, 25);
+    await distinctDecisionsApi.list("project-1", "token-1", {
+      includeInactive: true,
+      skip: 10,
+      limit: 25,
+    });
 
     let [url, options] = mockFetch.mock.calls[0];
     expect(url).toContain("include_inactive=true");

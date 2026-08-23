@@ -668,9 +668,7 @@ export function ClassDetailPanel({
                 onAccept={() => suggestions.accept(i)}
                 onReject={() => suggestions.reject(i)}
                 onEdit={(val) => { suggestions.edit(i, val); suggestions.accept(i); }}
-                canMarkDistinct={!!canEdit && !!accessToken}
-                onMarkDistinct={async (candidate, reason) => {
-                  if (!accessToken) return;
+                onMarkDistinct={canEdit && accessToken ? async (candidate, reason) => {
                   const parentIri = item.suggestion.suggestion_type === "children"
                     ? classIri
                     : item.suggestion.suggestion_type === "siblings"
@@ -688,7 +686,7 @@ export function ClassDetailPanel({
                     "Distinct entities recorded",
                     `${item.suggestion.label} will no longer be blocked by ${candidate.label} while their relevant content remains unchanged.`,
                   );
-                }}
+                } : undefined}
                 disabled={item.suggestion.duplicate_verdict === "block"}
               />
             ) : null,

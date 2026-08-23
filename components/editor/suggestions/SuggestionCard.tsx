@@ -22,7 +22,6 @@ export interface SuggestionCardProps {
   onReject: () => void;
   onEdit: (editedValue: string) => void;
   onMarkDistinct?: (candidate: DuplicateCandidate, reason: string) => Promise<void>;
-  canMarkDistinct?: boolean;
   disabled?: boolean;
 }
 
@@ -42,7 +41,6 @@ export function SuggestionCard({
   onReject,
   onEdit,
   onMarkDistinct,
-  canMarkDistinct,
   disabled,
 }: SuggestionCardProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -186,7 +184,7 @@ export function SuggestionCard({
                 <span className="min-w-0 truncate text-xs text-slate-600 dark:text-slate-300" title={c.iri}>
                   {c.label} ({Math.round(c.score * 100)}%)
                 </span>
-                {canMarkDistinct && onMarkDistinct && (
+                {onMarkDistinct && (
                   <button
                     type="button"
                     onClick={() => {

@@ -536,9 +536,7 @@ export function PropertyDetailPanel({
                 onAccept={() => suggestions.accept(i)}
                 onReject={() => suggestions.reject(i)}
                 onEdit={(val) => { suggestions.edit(i, val); suggestions.accept(i); }}
-                canMarkDistinct={canEdit && !!accessToken}
-                onMarkDistinct={async (candidate, reason) => {
-                  if (!accessToken) return;
+                onMarkDistinct={canEdit && accessToken ? async (candidate, reason) => {
                   await distinctDecisionsApi.mark(projectId, {
                     proposed_iri: item.suggestion.iri,
                     label: item.suggestion.label,
@@ -553,7 +551,7 @@ export function PropertyDetailPanel({
                     "Distinct entities recorded",
                     `${item.suggestion.label} will no longer be blocked by ${candidate.label} while their relevant content remains unchanged.`,
                   );
-                }}
+                } : undefined}
                 disabled={item.suggestion.duplicate_verdict === "block"}
               />
             ) : null,

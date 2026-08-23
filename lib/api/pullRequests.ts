@@ -29,7 +29,7 @@ export interface PullRequest {
   author?: PRUser;
   github_pr_number?: number;
   github_pr_url?: string;
-  github_sync_status?: GitHubSyncStatus;
+  github_sync_status: GitHubSyncStatus;
   github_sync_last_attempted_at?: string;
   github_sync_message?: string;
   merged_by?: string;
@@ -254,14 +254,14 @@ export const pullRequestsApi = {
   /**
    * Get a pull request by number
    */
-  get: (projectId: string, prNumber: number, token?: string) => {
+  get: (projectId: string, prNumber: number, token?: string, signal?: AbortSignal) => {
     const headers: HeadersInit = {};
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
     return api.get<PullRequest>(
       `/api/v1/projects/${projectId}/pull-requests/${prNumber}`,
-      { headers }
+      { headers, signal }
     );
   },
 
