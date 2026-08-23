@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { DistinctEntityDecisionsSection } from "@/components/projects/DistinctEntityDecisionsSection";
 import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
+import { renderWithQueryClient } from "@/__tests__/helpers/renderWithProviders";
 
 const success = vi.fn();
 const error = vi.fn();
@@ -23,10 +23,7 @@ vi.mock("@/lib/api/duplicateCheck", async (importOriginal) => {
   };
 });
 
-const api = distinctDecisionsApi as unknown as {
-  list: ReturnType<typeof vi.fn>;
-  revoke: ReturnType<typeof vi.fn>;
-};
+const api = vi.mocked(distinctDecisionsApi);
 
 const activeDecision = {
   id: "decision-1",
@@ -45,13 +42,8 @@ const activeDecision = {
 };
 
 function renderSection() {
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
-  return render(
-    <QueryClientProvider client={queryClient}>
-      <DistinctEntityDecisionsSection projectId="project-1" accessToken="token-1" />
-    </QueryClientProvider>,
+  return renderWithQueryClient(
+    <DistinctEntityDecisionsSection projectId="project-1" accessToken="token-1" />,
   );
 }
 
@@ -92,11 +84,11 @@ describe("DistinctEntityDecisionsSection", () => {
     renderSection();
     await screen.findByText("EmploymentContract");
 
-    expect(api.list).toHaveBeenCalledWith("project-1", "token-1", false);
+    expect(api.list).toHaveBeenCalledWith("project-1", "token-1", { includeInactive: false });
     await user.click(screen.getByRole("button", { name: "Show history" }));
 
     await waitFor(() => {
-      expect(api.list).toHaveBeenCalledWith("project-1", "token-1", true);
+      expect(api.list).toHaveBeenCalledWith("project-1", "token-1", { includeInactive: true });
     });
   });
 });

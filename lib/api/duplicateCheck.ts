@@ -26,6 +26,12 @@ export interface DistinctDecision {
   superseded_by_id?: string | null;
 }
 
+export interface DistinctDecisionListOptions {
+  includeInactive?: boolean;
+  skip?: number;
+  limit?: number;
+}
+
 const endpoint = (projectId: string) =>
   `/api/v1/projects/${projectId}/duplicate-check/distinct-decisions`;
 
@@ -39,14 +45,14 @@ export const distinctDecisionsApi = {
   list: (
     projectId: string,
     token: string,
-    includeInactive = false,
-    skip = 0,
-    limit = 50,
-  ) =>
-    api.get<DistinctDecision[]>(endpoint(projectId), {
+    options: DistinctDecisionListOptions = {},
+  ) => {
+    const { includeInactive = false, skip = 0, limit = 50 } = options;
+    return api.get<DistinctDecision[]>(endpoint(projectId), {
       params: { include_inactive: includeInactive, skip, limit },
       headers: { Authorization: `Bearer ${token}` },
-    }),
+    });
+  },
 
   revoke: (projectId: string, decisionId: string, token: string) =>
     api.delete<DistinctDecision>(`${endpoint(projectId)}/${decisionId}`, {

@@ -96,6 +96,7 @@ function makePR(overrides: Partial<PullRequest> = {}): PullRequest {
     target_branch: "main",
     status: "open",
     author_id: "user-1",
+    github_sync_status: "not_configured",
     author: { id: "user-1", name: "Alice" },
     created_at: "2025-06-01T10:00:00Z",
     review_count: 0,

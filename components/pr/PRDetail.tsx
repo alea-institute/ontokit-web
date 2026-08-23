@@ -13,6 +13,7 @@ import { PRActions } from "./PRActions";
 import { PRCommentThread } from "./PRCommentThread";
 import { Button } from "@/components/ui/button";
 import { getApiErrorMessage } from "@/lib/api/client";
+import type { ProjectRole } from "@/lib/api/projects";
 import { cn } from "@/lib/utils";
 import {
   GitPullRequest,
@@ -37,12 +38,13 @@ import {
 } from "lucide-react";
 
 type TabType = "conversation" | "commits" | "files";
+const GITHUB_SYNC_STALE_MS = 5 * 60 * 1000;
 
 interface PRDetailProps {
   projectId: string;
   prNumber: number;
   accessToken?: string;
-  userRole?: string;
+  userRole?: ProjectRole;
   currentUserId?: string;
   className?: string;
 }
@@ -71,6 +73,7 @@ export function PRDetail({
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   const [isRetryingGitHub, setIsRetryingGitHub] = useState(false);
   const [githubRetryError, setGitHubRetryError] = useState<string | null>(null);
+  const [timedOutGitHubAttempt, setTimedOutGitHubAttempt] = useState<string | null>(null);
 
   const loadPR = useCallback(async () => {
     if (!projectId || !prNumber) return;
@@ -106,22 +109,61 @@ export function PRDetail({
     if (pr?.github_sync_status !== "pending") return;
 
     let cancelled = false;
-    const pollId = window.setInterval(() => {
-      pullRequestsApi
-        .get(projectId, prNumber, accessToken)
-        .then((updated) => {
-          if (!cancelled) setPR(updated);
-        })
-        .catch(() => {
-          // The receipt remains visible; the next poll can recover from a transient read failure.
+    let pollId: number | undefined;
+    let controller: AbortController | undefined;
+    const attemptKey = pr.github_sync_last_attempted_at ?? "pending-without-timestamp";
+    const staleAt = pr.github_sync_last_attempted_at
+      ? Date.parse(pr.github_sync_last_attempted_at) + GITHUB_SYNC_STALE_MS
+      : Date.now();
+
+    const schedulePoll = () => {
+      const remaining = staleAt - Date.now();
+      if (remaining <= 0) {
+        pollId = window.setTimeout(() => {
+          if (!cancelled) setTimedOutGitHubAttempt(attemptKey);
+        }, 0);
+        return;
+      }
+      pollId = window.setTimeout(poll, Math.min(5000, remaining));
+    };
+
+    const poll = async () => {
+      controller = new AbortController();
+      try {
+        const updated = await pullRequestsApi.get(
+          projectId,
+          prNumber,
+          accessToken,
+          controller.signal,
+        );
+        if (cancelled) return;
+        setPR((current) => {
+          if (
+            current
+            && current.github_sync_status === updated.github_sync_status
+            && current.github_sync_last_attempted_at === updated.github_sync_last_attempted_at
+            && current.github_sync_message === updated.github_sync_message
+            && current.github_pr_number === updated.github_pr_number
+            && current.github_pr_url === updated.github_pr_url
+          ) {
+            return current;
+          }
+          return updated;
         });
-    }, 5000);
+        if (updated.github_sync_status === "pending") schedulePoll();
+      } catch {
+        if (!cancelled) schedulePoll();
+      }
+    };
+
+    schedulePoll();
 
     return () => {
       cancelled = true;
-      window.clearInterval(pollId);
+      if (pollId !== undefined) window.clearTimeout(pollId);
+      controller?.abort();
     };
-  }, [pr?.github_sync_status, projectId, prNumber, accessToken]);
+  }, [pr?.github_sync_status, pr?.github_sync_last_attempted_at, projectId, prNumber, accessToken]);
 
   // Load commits when switching to commits tab
   const loadCommits = useCallback(async () => {
@@ -286,13 +328,17 @@ export function PRDetail({
     );
   }
 
-  const githubSyncStatus = pr.github_sync_status
-    ?? (pr.github_pr_url ? "synced" : "not_configured");
+  const githubSyncStatus = pr.github_sync_status;
+  const githubAttemptKey = pr.github_sync_last_attempted_at ?? "pending-without-timestamp";
+  const isPendingStale = githubSyncStatus === "pending" && (
+    timedOutGitHubAttempt === githubAttemptKey
+    || !pr.github_sync_last_attempted_at
+    || Date.now() >= Date.parse(pr.github_sync_last_attempted_at) + GITHUB_SYNC_STALE_MS
+  );
   const canRetryGitHub = pr.status !== "merged" && !!accessToken && (
     currentUserId === pr.author_id
     || userRole === "owner"
     || userRole === "admin"
-    || userRole === "superadmin"
   );
 
   return (
@@ -345,13 +391,13 @@ export function PRDetail({
                 Synced with GitHub
               </span>
             )}
-            {githubSyncStatus === "pending" && (
+            {githubSyncStatus === "pending" && !isPendingStale && (
               <span className="flex items-center gap-1 text-primary-700 dark:text-primary-400">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Syncing with GitHub…
               </span>
             )}
-            {githubSyncStatus === "failed" && (
+            {(githubSyncStatus === "failed" || isPendingStale) && (
               <span className="flex items-center gap-1 text-amber-700 dark:text-amber-400">
                 <AlertTriangle className="h-4 w-4" />
                 GitHub mirror needs attention
@@ -366,7 +412,7 @@ export function PRDetail({
         </div>
       </div>
 
-      {(githubSyncStatus === "failed" || githubRetryError) && (
+      {(githubSyncStatus === "failed" || isPendingStale || githubRetryError) && (
         <div
           role="status"
           aria-live="polite"
@@ -379,7 +425,11 @@ export function PRDetail({
                 The OntoKit pull request is safe, but its GitHub mirror did not synchronize.
               </p>
               <p className="mt-0.5 text-sm text-amber-800 dark:text-amber-200">
-                {githubRetryError || pr.github_sync_message || "Retry when the GitHub integration is available."}
+                {githubRetryError
+                  || (isPendingStale
+                    ? "The last sync attempt did not finish. It is safe to retry."
+                    : pr.github_sync_message)
+                  || "Retry when the GitHub integration is available."}
               </p>
               {pr.github_sync_last_attempted_at && (
                 <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
