@@ -90,7 +90,7 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
   }, [entityIri]);
 
   const request = useCallback(async () => {
-    if (!entityIri || !canUseLLM || !accessToken) return;
+    if (!entityIri || !canUseLLM || !accessToken || acceptingRef.current.size > 0) return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -141,6 +141,13 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     setAcceptingIndices(new Set(acceptingRef.current));
     try {
       await onAccepted?.(stored.suggestion, stored.editedValue);
+      const current = store.getState().suggestions[
+        storeKey(scope, entityIri, suggestionType)
+      ]?.[index];
+      if (current !== stored) {
+        setError("The suggestion list changed before acceptance completed. Review the new suggestions and retry.");
+        return;
+      }
       store.getState().acceptSuggestion(scope, entityIri, suggestionType, index);
     } catch (err) {
       const reason = err instanceof Error && err.message

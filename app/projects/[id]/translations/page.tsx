@@ -21,7 +21,6 @@ import { useTranslationCoverage } from "@/lib/hooks/useTranslationCoverage";
 interface TranslationPreviewState {
   preview: TranslationBackfillPreview;
   filters: Readonly<TranslationBackfillFilters>;
-  generation: number;
 }
 
 function TranslationCoverageContent({ projectId, token }: { projectId: string; token?: string }) {
@@ -75,7 +74,7 @@ function TranslationCoverageContent({ projectId, token }: { projectId: string; t
     try {
       const preview = await coverageState.previewBackfill(requestFilters);
       if (previewGenerationRef.current === generation) {
-        setPreviewState({ preview, filters: requestFilters, generation });
+        setPreviewState({ preview, filters: requestFilters });
       }
     } catch {
       // The mutation exposes the error used by the rendered message.

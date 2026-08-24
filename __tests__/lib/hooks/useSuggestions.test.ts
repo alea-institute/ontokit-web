@@ -168,6 +168,44 @@ describe("useSuggestions", () => {
     expect(onAccepted).toHaveBeenCalledTimes(1);
   });
 
+  it("does not accept a replacement suggestion while persistence is in flight", async () => {
+    const entityIri = "http://ex.org/Foo";
+    const suggestionType = "children" as const;
+    useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, suggestionType, [makeSuggestion()]);
+    let resolvePersistence!: () => void;
+    const onAccepted = vi.fn(() => new Promise<void>((resolve) => {
+      resolvePersistence = resolve;
+    }));
+    const { result } = renderHook(() => useSuggestions({
+      projectId: SCOPE.projectId,
+      branch: SCOPE.branch,
+      entityIri,
+      suggestionType,
+      canUseLLM: true,
+      accessToken: "token",
+      onAccepted,
+    }));
+
+    let acceptance!: Promise<void>;
+    act(() => {
+      acceptance = result.current.accept(0);
+    });
+    await act(async () => { await result.current.request(); });
+    expect(mockGenerate).not.toHaveBeenCalled();
+
+    act(() => {
+      useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, suggestionType, [
+        makeSuggestion({ iri: "http://example.org/Replacement", label: "Replacement" }),
+      ]);
+    });
+    resolvePersistence();
+    await act(async () => { await acceptance; });
+
+    expect(result.current.items[0].suggestion.label).toBe("Replacement");
+    expect(result.current.items[0].status).toBe("pending");
+    expect(result.current.error).toMatch(/list changed/i);
+  });
+
   it("surfaces persistence failure and leaves the suggestion pending for retry", async () => {
     const entityIri = "http://ex.org/Foo";
     const suggestionType = "children" as const;
