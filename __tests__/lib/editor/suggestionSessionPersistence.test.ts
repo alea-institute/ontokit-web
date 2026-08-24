@@ -57,4 +57,19 @@ describe("saveSuggestionUpdate", () => {
     );
     expect(options.onSaved).toHaveBeenCalledTimes(1);
   });
+
+  it("saves directly when the suggestion session is already active", async () => {
+    const session = makeSession();
+    const options = { ...makeOptions(session), isSessionActive: true };
+
+    await saveSuggestionUpdate(options);
+
+    expect(session.startSession).not.toHaveBeenCalled();
+    expect(session.saveToSession).toHaveBeenCalledWith(
+      "updated ontology",
+      "http://example.org/ont#Entity",
+      "Entity",
+    );
+    expect(options.onSaved).toHaveBeenCalledTimes(1);
+  });
 });

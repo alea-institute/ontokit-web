@@ -75,6 +75,39 @@ describe("persistGeneratedEntity", () => {
     expect(events).toEqual(["first:start", "first:end", "second:start"]);
   });
 
+  it("continues a scope after a rejected operation", async () => {
+    const queue = createGeneratedEntityPersistenceQueue();
+    const failed = queue.run("project-1:main", async () => {
+      throw new Error("save failed");
+    });
+    const recovered = queue.run("project-1:main", async () => "recovered");
+
+    await expect(failed).rejects.toThrow("save failed");
+    await expect(recovered).resolves.toBe("recovered");
+  });
+
+  it("allows unrelated branch scopes to persist concurrently", async () => {
+    const queue = createGeneratedEntityPersistenceQueue();
+    const started: string[] = [];
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const main = queue.run("project-1:main", async () => {
+      started.push("main");
+      await gate;
+    });
+    const feature = queue.run("project-1:feature", async () => {
+      started.push("feature");
+      await gate;
+    });
+
+    await vi.waitFor(() => expect(started).toEqual(["main", "feature"]));
+    release();
+    await Promise.all([main, feature]);
+  });
+
   it("loads the authoritative branch and saves a generated child directly", async () => {
     const content = await persistGeneratedEntity({
       mode: "direct",

@@ -44,4 +44,23 @@ describe("ByoKeySessionGuard", () => {
     expect(useByoKeyStore.getState().ownerId).toBe("user-b");
     expect(useByoKeyStore.getState().entries).toEqual({});
   });
+
+  it("clears user-owned keys when the session expires in optional-auth mode", () => {
+    sessionState.data = { user: { id: "user-a", email: "a@example.org" } };
+    sessionState.status = "authenticated";
+    useByoKeyStore.setState({
+      ownerId: "user-a",
+      entries: {
+        "project-1": { provider: "openai", key: "secret-a", validatedAt: null },
+      },
+    });
+
+    const { rerender } = render(<ByoKeySessionGuard />);
+    sessionState.data = null;
+    sessionState.status = "unauthenticated";
+    rerender(<ByoKeySessionGuard />);
+
+    expect(useByoKeyStore.getState().ownerId).toBeNull();
+    expect(useByoKeyStore.getState().entries).toEqual({});
+  });
 });
