@@ -50,14 +50,15 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) return error.message || fallback;
   return fallback;
 }
-
 export interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
   /**
    * Retry 5xx responses (default true).
    *
-   * Non-idempotent actuations must pass `false`; these retries occur inside
-   * one mutation call and therefore cannot be disabled by React Query.
+   * Actuations — anything that submits a review, merges, or posts a comment —
+   * must pass `false`. React Query's `retry: false` cannot reach this loop:
+   * the retries happen *inside* a single mutationFn call, so a flaky 500 would
+   * silently submit the same action up to three times.
    */
   retryOn5xx?: boolean;
 }
