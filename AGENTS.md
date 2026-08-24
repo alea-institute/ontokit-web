@@ -40,7 +40,7 @@ Use the `ontokit-web.sh` script to manage the development server:
 
 ## Architecture Overview
 
-OntoKit Web is a Next.js 15 frontend for collaborative OWL ontology editing. It connects to a FastAPI backend (ontokit-api) for ontology operations.
+OntoKit Web is a Next.js 16 frontend for collaborative OWL ontology editing. It connects to a FastAPI backend (ontokit-api) for ontology operations.
 
 ### Key Architectural Patterns
 
@@ -52,7 +52,9 @@ OntoKit Web is a Next.js 15 frontend for collaborative OWL ontology editing. It 
 - Automatic query parameter handling and error wrapping via `ApiError`
 
 **Ontology Editor Architecture** (`app/projects/[id]/editor/page.tsx`):
-- Three-panel layout: Class tree (left), Detail panel (right), Source/Health tabs (bottom)
+- Selects `StandardEditorLayout` or `DeveloperEditorLayout` from the saved editor mode
+- Standard mode provides entity navigation and detail editing, including the ontology graph
+- Developer mode switches among Tree, Source, and Graph views and can open Health as a side panel
 - Tree state managed by `useOntologyTree` hook with lazy loading
 - Source view uses Monaco editor with custom Turtle language support
 - Web Worker (`lib/editor/indexWorker.ts`) handles IRI indexing for linting without blocking UI
