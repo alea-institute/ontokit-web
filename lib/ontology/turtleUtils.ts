@@ -300,6 +300,11 @@ export function esc(s: string): string {
 }
 
 export function literal(value: string, lang: string): string {
+  // Deliberately conservative BCP 47 subset, matching the project settings
+  // validator: primary language plus optional 1-8 character subtags.
+  if (lang && !/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(lang)) {
+    throw new TypeError("Invalid BCP 47 language tag");
+  }
   const escaped = esc(value);
   return lang ? `"${escaped}"@${lang}` : `"${escaped}"`;
 }

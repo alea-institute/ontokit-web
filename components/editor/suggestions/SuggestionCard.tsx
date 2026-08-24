@@ -71,6 +71,7 @@ export function SuggestionCard({
     : `AI-suggested${modelLabel}`;
 
   const validationErrors = suggestion.validation_errors ?? [];
+  const isInvalid = validationErrors.length > 0;
 
   // Display the annotation value when property_iri exists, otherwise the label
   const displayText = suggestion.property_iri
@@ -83,6 +84,10 @@ export function SuggestionCard({
   }, [item.editedValue, displayText]);
 
   const handleAcceptEdit = useCallback(() => {
+    if (isInvalid) {
+      setIsEditing(false);
+      return;
+    }
     // M-5: the edit flow (onEdit) bypasses the plain Accept button's
     // `disabled || isBlocked` guard. If this suggestion is a blocked duplicate
     // and the text was NOT changed, committing would silently accept the
@@ -94,7 +99,7 @@ export function SuggestionCard({
     }
     onEdit(editValue);
     setIsEditing(false);
-  }, [editValue, onEdit, isBlocked, displayText]);
+  }, [editValue, onEdit, isBlocked, isInvalid, displayText]);
 
   const handleDiscardEdit = useCallback(() => {
     setIsEditing(false);
@@ -266,7 +271,7 @@ export function SuggestionCard({
             <button
               type="button"
               onClick={onAccept}
-              disabled={disabled || isBlocked}
+              disabled={disabled || isBlocked || isInvalid}
               aria-label="Accept suggestion"
               className="rounded-sm p-1 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -283,8 +288,9 @@ export function SuggestionCard({
             <button
               type="button"
               onClick={handleEditClick}
+              disabled={isInvalid}
               aria-label="Edit suggestion before accepting"
-              className="rounded-sm p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700"
+              className="rounded-sm p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-700"
             >
               <Pencil className="h-3.5 w-3.5" />
             </button>

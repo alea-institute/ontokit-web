@@ -1,9 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { act, renderHook } from "@testing-library/react";
 import { storeKey, useSuggestionStore } from "@/lib/stores/suggestionStore";
 import { generationApi } from "@/lib/api/generation";
 import type { GeneratedSuggestion, GenerateSuggestionsResponse } from "@/lib/api/generation";
 import { ApiError } from "@/lib/api/client";
-import { generationErrorMessage } from "@/lib/hooks/useSuggestions";
+import { generationErrorMessage, useSuggestions } from "@/lib/hooks/useSuggestions";
 
 const SCOPE = { projectId: "p1", branch: "main" };
 
@@ -132,6 +133,36 @@ describe("useSuggestions", () => {
       "edited label",
     );
     expect(useSuggestionStore.getState().suggestions[storeKey(SCOPE, entityIri, suggestionType)][0].status).toBe("accepted");
+  });
+
+  it("keeps malformed suggestions pending across plain and edited accept attempts", () => {
+    const entityIri = "http://ex.org/Foo";
+    const suggestionType = "children" as const;
+    useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, suggestionType, [
+      makeSuggestion({
+        validation_errors: [
+          { field: "iri", code: "invalid", message: "IRI is not valid" },
+        ],
+      }),
+    ]);
+    const onAccepted = vi.fn();
+    const { result } = renderHook(() => useSuggestions({
+      projectId: SCOPE.projectId,
+      branch: SCOPE.branch,
+      entityIri,
+      suggestionType,
+      canUseLLM: true,
+      accessToken: "token",
+      onAccepted,
+    }));
+
+    act(() => result.current.accept(0));
+    act(() => result.current.edit(0, "Edited label"));
+    act(() => result.current.accept(0));
+
+    expect(onAccepted).not.toHaveBeenCalled();
+    expect(result.current.items[0].status).toBe("pending");
+    expect(result.current.error).toMatch(/validation errors/i);
   });
 
   it("reject() sets suggestion status to rejected in store", () => {

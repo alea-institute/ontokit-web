@@ -609,6 +609,26 @@ export function ClassDetailPanel({
     [onAddSuggestedChild, classIri],
   );
 
+  const getSiblingAcceptanceError = useCallback(() => {
+    const parentCount = classDetail?.parent_iris.length ?? 0;
+    if (parentCount === 0) {
+      return "Cannot accept this sibling suggestion because the selected class has no parent. Add or choose a parent first.";
+    }
+    if (parentCount > 1) {
+      return "Cannot accept this sibling suggestion because the selected class has multiple parents. Choose which parent should receive the sibling first.";
+    }
+    return null;
+  }, [classDetail?.parent_iris]);
+
+  const handleAcceptSiblingSuggestion = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      const parentIri = classDetail?.parent_iris[0];
+      if (!parentIri) return;
+      onAddSuggestedChild?.(suggestion.iri, editedValue ?? suggestion.label, parentIri);
+    },
+    [classDetail?.parent_iris, onAddSuggestedChild],
+  );
+
   const handleAcceptAnnotationSuggestion = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
       if (!suggestion.property_iri) return;
@@ -677,7 +697,8 @@ export function ClassDetailPanel({
   const siblingsSuggestions = useSuggestions({
     ...suggestionOpts,
     suggestionType: "siblings",
-    onAccepted: handleAcceptChildSuggestion,
+    onAccepted: handleAcceptSiblingSuggestion,
+    getAcceptanceError: getSiblingAcceptanceError,
   });
 
   const annotationsSuggestions = useSuggestions({

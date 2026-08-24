@@ -411,6 +411,13 @@ describe("literal", () => {
     expect(literal("hello", "en")).toBe('"hello"@en');
   });
 
+  it.each(["en-US", "zh-Hant-TW", "grc", "de-1996"])(
+    "accepts common BCP 47 language tag %s",
+    (lang) => {
+      expect(literal("hello", lang)).toBe(`"hello"@${lang}`);
+    },
+  );
+
   it("creates a plain literal without language tag", () => {
     expect(literal("hello", "")).toBe('"hello"');
   });
@@ -421,6 +428,20 @@ describe("literal", () => {
 
   it("escapes backslashes and newlines", () => {
     expect(literal("line1\nline2\\end", "")).toBe('"line1\\nline2\\\\end"');
+  });
+
+  it.each([
+    "en--US",
+    "en_US",
+    "en;ex:injected",
+    "en@x",
+    "en US",
+    "en\nex:injected",
+    "a",
+    "toolongprimary",
+    "en-123456789",
+  ])("rejects malformed or unsafe language tag %j", (lang) => {
+    expect(() => literal("hello", lang)).toThrow(/invalid BCP 47 language tag/i);
   });
 });
 

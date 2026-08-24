@@ -701,7 +701,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   projectId={projectId}
                   propertyIri={selectedPropertyIri}
                   sourceContent={sourceContent || ""}
-                  canEdit={canEdit}
+                  canEdit={canEdit || isSuggestionMode}
                   onUpdateProperty={onUpdateProperty}
                   branch={activeBranch}
                   refreshKey={detailRefreshKey}

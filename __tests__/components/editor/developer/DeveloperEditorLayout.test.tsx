@@ -142,8 +142,11 @@ vi.mock("@/components/editor/standard/IndividualList", () => ({
   IndividualList: () => <div data-testid="individual-list" />,
 }));
 
+let _propertyDetailProps: Record<string, unknown> = {};
 vi.mock("@/components/editor/PropertyDetailPanel", () => ({
-  PropertyDetailPanel: (props: Record<string, unknown>) => (
+  PropertyDetailPanel: (props: Record<string, unknown>) => {
+    _propertyDetailProps = props;
+    return (
     <div data-testid="property-detail-panel">
       {typeof props.onNavigateToEntity === "function" && (
         <button
@@ -154,7 +157,8 @@ vi.mock("@/components/editor/PropertyDetailPanel", () => ({
         </button>
       )}
     </div>
-  ),
+    );
+  },
 }));
 
 vi.mock("@/components/editor/IndividualDetailPanel", () => ({
@@ -470,6 +474,17 @@ describe("DeveloperEditorLayout", () => {
     );
     fireEvent.click(screen.getByText("Properties"));
     expect(screen.getByTestId("property-detail-panel")).toBeDefined();
+  });
+
+  it("passes canEdit=true to PropertyDetailPanel in suggestion mode", () => {
+    render(
+      <DeveloperEditorLayout
+        {...defaultProps({ nodes: [makeNode()], canEdit: false, isSuggestionMode: true })}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Properties"));
+    expect(_propertyDetailProps.canEdit).toBe(true);
   });
 
   it("shows IndividualDetailPanel when individuals tab is selected", () => {

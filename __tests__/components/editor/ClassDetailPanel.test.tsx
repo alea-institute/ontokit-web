@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // ── Configurable mock state (tests can override before render) ──
@@ -384,6 +384,82 @@ describe("ClassDetailPanel", () => {
         "test-token",
       );
     });
+  });
+
+  it("accepts a sibling suggestion under the selected class's sole parent", async () => {
+    const onAddSuggestedChild = vi.fn();
+    useSuggestionStore.getState().setSuggestions(
+      { projectId: "proj-1", branch: "main" },
+      DEFAULT_PROPS.classIri,
+      "siblings",
+      [{
+        iri: "http://example.org/ontology#Sibling",
+        suggestion_type: "siblings",
+        label: "Suggested sibling",
+        provenance: "llm-proposed",
+        validation_errors: [],
+        duplicate_verdict: "pass",
+        duplicate_candidates: [],
+      }],
+    );
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit
+        canUseLLM
+        onAddSuggestedChild={onAddSuggestedChild}
+      />,
+    );
+
+    const card = (await screen.findByText("Suggested sibling")).closest<HTMLElement>('[role="listitem"]');
+    expect(card).not.toBeNull();
+    await userEvent.click(within(card!).getByRole("button", { name: "Accept suggestion" }));
+
+    expect(onAddSuggestedChild).toHaveBeenCalledWith(
+      "http://example.org/ontology#Sibling",
+      "Suggested sibling",
+      "http://example.org/ontology#Agent",
+    );
+  });
+
+  it.each([
+    [[], /has no parent/i],
+    [["http://example.org/ontology#Agent", "http://example.org/ontology#LegalEntity"], /multiple parents/i],
+  ])("keeps a sibling suggestion pending when its parent is not deterministic", async (parentIris, expectedError) => {
+    const onAddSuggestedChild = vi.fn();
+    mockGetClassDetail.mockResolvedValue(makeClassDetail({ parent_iris: parentIris }));
+    useSuggestionStore.getState().setSuggestions(
+      { projectId: "proj-1", branch: "main" },
+      DEFAULT_PROPS.classIri,
+      "siblings",
+      [{
+        iri: "http://example.org/ontology#Sibling",
+        suggestion_type: "siblings",
+        label: "Ambiguous sibling",
+        provenance: "llm-proposed",
+        validation_errors: [],
+        duplicate_verdict: "pass",
+        duplicate_candidates: [],
+      }],
+    );
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit
+        canUseLLM
+        onAddSuggestedChild={onAddSuggestedChild}
+      />,
+    );
+
+    const card = (await screen.findByText("Ambiguous sibling")).closest<HTMLElement>('[role="listitem"]');
+    expect(card).not.toBeNull();
+    await userEvent.click(within(card!).getByRole("button", { name: "Accept suggestion" }));
+
+    expect(onAddSuggestedChild).not.toHaveBeenCalled();
+    expect(await screen.findByText(expectedError)).toBeDefined();
+    expect(useSuggestionStore.getState().suggestions[
+      "proj-1::main::http://example.org/ontology#Person::siblings"
+    ][0].status).toBe("pending");
   });
 
   it("shows entity-type hint for 404 errors", async () => {

@@ -612,7 +612,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             projectId={projectId}
             propertyIri={selectedPropertyIri}
             sourceContent={sourceContent || ""}
-            canEdit={canEdit}
+            canEdit={canEdit || isSuggestionMode}
             onUpdateProperty={onUpdateProperty}
             branch={activeBranch}
             refreshKey={detailRefreshKey}

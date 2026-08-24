@@ -19,6 +19,7 @@ export interface UseSuggestionsOptions {
   accessToken?: string;
   byoKey?: string;
   onAccepted?: (suggestion: GeneratedSuggestion, editedValue?: string) => void;
+  getAcceptanceError?: (suggestion: GeneratedSuggestion) => string | null;
 }
 
 export interface UseSuggestionsReturn {
@@ -65,7 +66,7 @@ export function generationErrorMessage(error: unknown): string {
 export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsReturn {
   const {
     projectId, entityIri, branch, suggestionType,
-    batchSize = 5, canUseLLM, accessToken, byoKey, onAccepted,
+    batchSize = 5, canUseLLM, accessToken, byoKey, onAccepted, getAcceptanceError,
   } = opts;
 
   const [isLoading, setIsLoading] = useState(false);
@@ -122,9 +123,19 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     if (!entityIri) return;
     const stored = store.getState().suggestions[storeKey(scope, entityIri, suggestionType)]?.[index];
     if (!stored) return;
+    if ((stored.suggestion.validation_errors?.length ?? 0) > 0) {
+      setError("This suggestion cannot be accepted until its validation errors are resolved.");
+      return;
+    }
+    const acceptanceError = getAcceptanceError?.(stored.suggestion);
+    if (acceptanceError) {
+      setError(acceptanceError);
+      return;
+    }
+    setError(null);
     store.getState().acceptSuggestion(scope, entityIri, suggestionType, index);
     onAccepted?.(stored.suggestion, stored.editedValue);
-  }, [entityIri, suggestionType, store, onAccepted, scope]);
+  }, [entityIri, suggestionType, store, onAccepted, getAcceptanceError, scope]);
 
   const reject = useCallback((index: number) => {
     if (!entityIri) return;

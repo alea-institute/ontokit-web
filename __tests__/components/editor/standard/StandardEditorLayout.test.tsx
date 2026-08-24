@@ -534,6 +534,17 @@ describe("StandardEditorLayout", () => {
     expect(_propertyDetailProps.refreshKey).toBe(7);
   });
 
+  it("passes canEdit=true to PropertyDetailPanel in suggestion mode", () => {
+    render(
+      <StandardEditorLayout
+        {...defaultProps({ nodes: sampleNodes, canEdit: false, isSuggestionMode: true })}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Properties"));
+    expect(_propertyDetailProps.canEdit).toBe(true);
+  });
+
   // --- IndividualDetailPanel prop forwarding ---
   it("forwards sourceContent and callbacks to IndividualDetailPanel", () => {
     const onUpdateIndividual = vi.fn();

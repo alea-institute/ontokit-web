@@ -89,6 +89,22 @@ describe("SuggestionCard", () => {
     expect(screen.getByText(/Label exceeds 60 characters/)).toBeDefined();
   });
 
+  it("disables both plain and edit acceptance when validation_errors are present", () => {
+    renderCard(
+      makeItem({
+        suggestion: makeSuggestion({
+          validation_errors: [
+            { field: "iri", code: "invalid", message: "IRI is not valid" },
+          ],
+        }),
+      }),
+    );
+
+    expect((screen.getByRole("button", { name: "Accept suggestion" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Edit suggestion before accepting" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Reject suggestion" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   // ── L-3: confidence badge has an accessible name ──
   it("gives the confidence badge an accessible name (L-3)", () => {
     renderCard(makeItem({ suggestion: makeSuggestion({ confidence: 0.82 }) }));
