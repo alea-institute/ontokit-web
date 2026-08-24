@@ -51,3 +51,9 @@ public/sitemap.xml
 
 .ontokit-web.log
 .ontokit-web.pid
+
+# Local agent/session artifacts
+.claude/RESUME.md
+.codex/hooks.json
+.worker-reports/
+WORKER-REPORT-*.md
