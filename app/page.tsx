@@ -23,6 +23,7 @@ export default function HomePage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const isAuthenticated = status === "authenticated";
+  const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
 
   // Default authenticated users to "mine" tab
   const authDefaultApplied = useRef(false);
@@ -62,7 +63,9 @@ export default function HomePage() {
       const nextSkip = lastPage.skip + lastPage.limit;
       return nextSkip < lastPage.total ? nextSkip : undefined;
     },
-    enabled: status !== "loading" && !((filter === "mine" || filter === "private") && !isAuthenticated),
+    enabled:
+      (status !== "loading" || (filter === "public" && authMode !== "required")) &&
+      !((filter === "mine" || filter === "private") && !isAuthenticated),
   });
 
   const projects = data?.pages.flatMap((page) => page.items) ?? [];
