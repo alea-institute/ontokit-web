@@ -123,13 +123,14 @@ export function PRDetail({
     };
 
     const poll = async () => {
+      if (cancelled || Date.now() >= staleAt) return;
       controller = new AbortController();
       try {
         const updated = await pullRequestsApi.get(
           projectId,
           prNumber,
           accessToken,
-          controller.signal,
+          { signal: controller.signal, retryOn5xx: false },
         );
         if (cancelled) return;
         setPR((current) => {

@@ -215,6 +215,11 @@ export interface OpenPRsSummary {
 }
 
 // API functions
+export interface PullRequestGetOptions {
+  signal?: AbortSignal;
+  retryOn5xx?: boolean;
+}
+
 export const pullRequestsApi = {
   /**
    * Get summary of open PRs across projects the user manages
@@ -254,14 +259,19 @@ export const pullRequestsApi = {
   /**
    * Get a pull request by number
    */
-  get: (projectId: string, prNumber: number, token?: string, signal?: AbortSignal) => {
+  get: (
+    projectId: string,
+    prNumber: number,
+    token?: string,
+    options: PullRequestGetOptions = {},
+  ) => {
     const headers: HeadersInit = {};
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
     return api.get<PullRequest>(
       `/api/v1/projects/${projectId}/pull-requests/${prNumber}`,
-      { headers, signal }
+      { headers, signal: options.signal, retryOn5xx: options.retryOn5xx },
     );
   },
 

@@ -144,6 +144,21 @@ describe("pullRequestsApi", () => {
       const [, options] = mockFetch.mock.calls[0];
       expect(options.headers.has("Authorization")).toBe(false);
     });
+
+    it("can disable automatic 5xx retries for an outer polling loop", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 503,
+        statusText: "Unavailable",
+        text: () => Promise.resolve("temporarily unavailable"),
+      });
+
+      await expect(
+        pullRequestsApi.get("p1", 1, "tok", { retryOn5xx: false }),
+      ).rejects.toThrow(ApiError);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   // --- create ---

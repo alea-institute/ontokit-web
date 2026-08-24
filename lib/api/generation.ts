@@ -6,6 +6,15 @@ export type Provenance = "llm-proposed" | "user-written" | "user-edited-from-llm
 export type DuplicateVerdict = "pass" | "warn" | "block";
 export type DuplicateEntityType = "class" | "property" | "individual";
 
+export const DUPLICATE_BLOCK_THRESHOLD = 0.95;
+export const DUPLICATE_WARN_THRESHOLD = 0.8;
+
+export function duplicateVerdictForScore(score: number): DuplicateVerdict {
+  if (score > DUPLICATE_BLOCK_THRESHOLD) return "block";
+  if (score > DUPLICATE_WARN_THRESHOLD) return "warn";
+  return "pass";
+}
+
 // ---- Validation error (matches backend ValidationError) ----
 export interface ValidationError {
   field: string;

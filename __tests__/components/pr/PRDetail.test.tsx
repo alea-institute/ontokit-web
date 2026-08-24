@@ -681,7 +681,54 @@ describe("PRDetail", () => {
 
       expect(screen.getByText(/last sync attempt did not finish/i)).toBeDefined();
       expect(screen.getByRole("button", { name: "Retry GitHub sync" })).toBeDefined();
-      expect((mockApi.get.mock.calls[1][3] as AbortSignal).aborted).toBe(true);
+      expect((mockApi.get.mock.calls[1][3] as { signal: AbortSignal }).signal.aborted).toBe(true);
+    } finally {
+      unmount?.();
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not start another poll at the stale deadline", async () => {
+    vi.useFakeTimers();
+    const now = new Date("2026-08-23T12:00:00Z");
+    vi.setSystemTime(now);
+    const pending = makePR({
+      github_sync_status: "pending",
+      github_sync_last_attempted_at: new Date(now.getTime() - (5 * 60 * 1000 - 10_000)).toISOString(),
+    });
+    mockApi.get.mockResolvedValue(pending);
+    mockApi.listReviews.mockResolvedValue({ items: [], total: 0 });
+    mockApi.listComments.mockResolvedValue({ items: [], total: 0 });
+
+    let unmount: (() => void) | undefined;
+    try {
+      ({ unmount } = render(
+        <PRDetail
+          projectId="proj-1"
+          prNumber={7}
+          accessToken="tok"
+          currentUserId="user-1"
+        />,
+      ));
+
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(mockApi.get).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+      expect(mockApi.get).toHaveBeenCalledTimes(2);
+      expect(mockApi.get.mock.calls[1][3]).toMatchObject({ retryOn5xx: false });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_000);
+      });
+
+      expect(screen.getByText(/last sync attempt did not finish/i)).toBeDefined();
+      expect(mockApi.get).toHaveBeenCalledTimes(2);
     } finally {
       unmount?.();
       vi.useRealTimers();

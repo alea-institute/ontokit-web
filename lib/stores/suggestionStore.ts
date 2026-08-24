@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import type { DuplicateCandidate, GeneratedSuggestion } from "@/lib/api/generation";
+import {
+  duplicateVerdictForScore,
+  type DuplicateCandidate,
+  type GeneratedSuggestion,
+} from "@/lib/api/generation";
 
 export type SuggestionReviewStatus = "pending" | "accepted" | "rejected";
 
@@ -112,11 +116,7 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
       }
 
       const highestScore = Math.max(0, ...duplicateCandidates.map((candidate) => candidate.score));
-      const duplicateVerdict = highestScore > 0.95
-        ? "block"
-        : highestScore > 0.8
-          ? "warn"
-          : "pass";
+      const duplicateVerdict = duplicateVerdictForScore(highestScore);
       const items = [...current];
       items[index] = {
         ...item,

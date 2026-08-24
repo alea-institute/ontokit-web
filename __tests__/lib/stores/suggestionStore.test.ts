@@ -1,6 +1,9 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { useSuggestionStore } from "@/lib/stores/suggestionStore";
-import type { GeneratedSuggestion } from "@/lib/api/generation";
+import {
+  duplicateVerdictForScore,
+  type GeneratedSuggestion,
+} from "@/lib/api/generation";
 
 const SCOPE = { projectId: "p1", branch: "main" };
 
@@ -23,6 +26,13 @@ describe("suggestionStore", () => {
   beforeEach(() => {
     // Reset store between tests
     useSuggestionStore.getState().clearAllSuggestions();
+  });
+
+  it("keeps duplicate verdict thresholds aligned with the API contract", () => {
+    expect(duplicateVerdictForScore(0.950001)).toBe("block");
+    expect(duplicateVerdictForScore(0.95)).toBe("warn");
+    expect(duplicateVerdictForScore(0.800001)).toBe("warn");
+    expect(duplicateVerdictForScore(0.8)).toBe("pass");
   });
 
   it("setSuggestions stores suggestions keyed by entityIri::suggestionType", () => {
