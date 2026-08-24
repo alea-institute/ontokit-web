@@ -57,4 +57,32 @@ describe("useTranslationState on-demand polling", () => {
     expect(result.current.isTranslationPending).toBe(false);
     expect(result.current.pendingNotice).toMatch(/you can retry/i);
   });
+
+  it("bounds polling for pending state observed before a local request", async () => {
+    vi.useFakeTimers();
+    vi.mocked(translationsApi.getEntityState).mockResolvedValue({
+      entity_iri: "ex:Person",
+      branch: "main",
+      items: [{
+        predicate: "skos:definition",
+        language: "fr",
+        state: "pending",
+        value: null,
+        record_id: null,
+      }],
+    });
+
+    const { result } = setup();
+    await act(async () => { await vi.runOnlyPendingTimersAsync(); });
+    expect(result.current.state?.items[0]?.state).toBe("pending");
+
+    const callsBeforeTimeout = vi.mocked(translationsApi.getEntityState).mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000); });
+    const callsAtTimeout = vi.mocked(translationsApi.getEntityState).mock.calls.length;
+    expect(callsAtTimeout).toBeGreaterThan(callsBeforeTimeout);
+    expect(result.current.pendingNotice).toMatch(/you can retry/i);
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
+    expect(vi.mocked(translationsApi.getEntityState)).toHaveBeenCalledTimes(callsAtTimeout);
+  });
 });
