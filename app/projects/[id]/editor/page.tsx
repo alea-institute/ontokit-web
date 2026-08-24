@@ -34,7 +34,6 @@ import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ont
 import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import { detectPatternFromIriIndex, type IriSuffixPattern } from "@/lib/ontology/iriGeneration";
 import { commonPrefixes } from "@/lib/editor/languages/turtle";
-import { persistSuggestionUpdate } from "@/lib/editor/persistSuggestionUpdate";
 
 import { useKeyboardShortcuts, type ShortcutDefinition } from "@/lib/hooks/useKeyboardShortcuts";
 import { KeyboardShortcutDialog } from "@/components/editor/KeyboardShortcutDialog";
@@ -731,7 +730,6 @@ export default function EditorPage() {
     const modifiedSource = updateClassInTurtle(source, classIri, data);
     const label = data.labels[0]?.value || getLocalName(classIri);
 
-<<<<<<< HEAD
     await suggestionSession.saveToSession(modifiedSource, classIri, label);
 
     setSourceContent(modifiedSource);
@@ -740,22 +738,6 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-=======
-    await persistSuggestionUpdate(
-      suggestionSession,
-      modifiedSource,
-      classIri,
-      label,
-      () => {
-        setSourceContent(modifiedSource);
-        toast.success(`Suggested update to "${label}"`);
-        updateNodeLabel(classIri, label);
-        setDetailRefreshKey((k) => k + 1);
-        setSourceIriIndex(new Map());
-        iriPatternDetectedRef.current = false;
-      },
-    );
->>>>>>> 4a4dc5bf (fix(build): restore valid Next.js page modules)
   }, [session, projectId, activeBranch, project, sourceContent, toast, updateNodeLabel, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode property update
@@ -778,7 +760,6 @@ export default function EditorPage() {
     const modifiedSource = updatePropertyInTurtle(source, propertyIri, data);
     const label = data.labels[0]?.value || getLocalName(propertyIri);
 
-<<<<<<< HEAD
     await suggestionSession.saveToSession(modifiedSource, propertyIri, label);
 
     setSourceContent(modifiedSource);
@@ -786,21 +767,6 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-=======
-    await persistSuggestionUpdate(
-      suggestionSession,
-      modifiedSource,
-      propertyIri,
-      label,
-      () => {
-        setSourceContent(modifiedSource);
-        toast.success(`Suggested update to "${label}"`);
-        setDetailRefreshKey((k) => k + 1);
-        setSourceIriIndex(new Map());
-        iriPatternDetectedRef.current = false;
-      },
-    );
->>>>>>> 4a4dc5bf (fix(build): restore valid Next.js page modules)
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode individual update
@@ -823,7 +789,6 @@ export default function EditorPage() {
     const modifiedSource = updateIndividualInTurtle(source, individualIri, data);
     const label = data.labels[0]?.value || getLocalName(individualIri);
 
-<<<<<<< HEAD
     await suggestionSession.saveToSession(modifiedSource, individualIri, label);
 
     setSourceContent(modifiedSource);
@@ -831,21 +796,6 @@ export default function EditorPage() {
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-=======
-    await persistSuggestionUpdate(
-      suggestionSession,
-      modifiedSource,
-      individualIri,
-      label,
-      () => {
-        setSourceContent(modifiedSource);
-        toast.success(`Suggested update to "${label}"`);
-        setDetailRefreshKey((k) => k + 1);
-        setSourceIriIndex(new Map());
-        iriPatternDetectedRef.current = false;
-      },
-    );
->>>>>>> 4a4dc5bf (fix(build): restore valid Next.js page modules)
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle anonymous proposal mode class update
