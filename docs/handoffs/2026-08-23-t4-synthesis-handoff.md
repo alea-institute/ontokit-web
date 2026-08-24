@@ -1,58 +1,68 @@
-# T4 Trust-Ladder Synthesis Handoff — 2026-08-23
+# T4/T5 Synthesis Continuation Handoff - 2026-08-23
 
 ## Outcome
 
-T4 trust ladder and auto-accept are synthesized, deeply reviewed, remediated, and committed on isolated local API and web branches. No implementation branch, issue, pull request, CatholicOS record, DEV/PROD system, AWS resource, DNS record, or external organization asset was published or changed.
+The T4 trust ladder, explicit distinct-entity decisions, pull-request lifecycle concurrency, and retryable GitHub mirror-status foundation are synthesized, reviewed, remediated, and committed on isolated local API and web branches. No implementation branch, issue, pull request, CatholicOS record, DEV/PROD system, AWS resource, DNS record, or external organization asset was published or changed.
 
-The durable local heads are:
+The durable local implementation heads are:
 
-- API `upstream-queue/t4-api-synthesis` at `8d6fc226` (`feat(trust): add contribution ladder and guarded auto-accept`), based on T3 API `1b8bde28`.
-- Web `upstream-queue/t4-web-synthesis` at `d4ed4581` (`feat(trust): add contribution controls and triage`), based on T3 web `2c6a7813`.
+- API `upstream-queue/t4-distinct-t5-sync-api` at `1029cd26` (`fix(review): close API lifecycle race gaps`), based on T4 API `8d6fc226`.
+- Web `upstream-queue/t4-distinct-t5-sync-web` at `6890216b` (`fix(review): bound sync polling and duplicate verdicts`), based on T4 web `d4ed4581`.
 
-Both implementation worktrees are clean. Both commits are local only, unpushed, and unmerged.
+Both implementation worktrees are clean. Every commit is local only, unpushed, and unmerged.
 
-## What T4 now covers
+## Implemented stack
 
-The paired candidate implements per-project trust tiers and overrides, append-only suggestion outcomes and promotion, authenticated and anonymous minting enforcement derived from RDF changes, first-suggestion verification and shared rate limiting, triage and bounded bulk review, quiet-period auto-accept with objection halting and recoverable leases, server-owned LLM provenance exclusion, contributor-safe commit identity, and outbound-only system-credential GitHub mirroring.
+The API stack now contains:
 
-The web exposes the trust explainer, tier-aware editor affordances, proposal completion nudge, member and policy administration, triage filters and bulk actions, and commit-identity preferences. Review follow-up removed stale queue races, stale selections, unsafe mutation retries, concurrent-policy overwrite behavior, persistent optimistic trust state, and the 100-item select-all dead end.
+- auditable fingerprint-bound distinct-entity decisions, revocation, suppression, role gates, authenticated billing attribution, and submission-time content revalidation;
+- one-open-PR-per-source-branch and project-scoped PR-number invariants across interactive, suggestion, webhook, and retroactive-history paths;
+- deadlock-safe project/branch lock ordering with real-PostgreSQL concurrency proofs;
+- durable GitHub mirror receipts, repository identity, monotonic intent generations, replayable open/closed/merged state, bounded stale-side-effect repair, and safe manual retry;
+- immutable pre-commit mirror intent snapshots, verified head/base/repository targeting, legacy receipt-identity migration, explicit remote-body clearing, and fixed-error logging that excludes token or request detail;
+- optional mode without Zitadel retained for browse-only operation while distinct-decision and mirror-retry mutations reject the explicit anonymous identity.
 
-Optional mode without Zitadel remains supported for browse-only operation. Semantic embedding computation remains authenticated; reviewers proposed anonymous access, but that conflicted with the settled compute boundary and was rejected.
+The web stack now contains explicit distinct-entity review UX, preserved decision context, retryable mirror-state presentation, bounded status polling, safe duplicate verdict precedence, and the prior T4 trust-policy and triage surfaces.
 
 ## Verification receipts
 
-API:
+API final head:
 
-- Full suite: 2,095 passed, two expected integration skips, 13 known warnings.
-- Ruff: clean.
-- Targeted mypy: clean across all 23 changed source files using the worktree's Python 3.13 environment.
-- Full-project mypy: only three pre-existing errors in `ontokit/models/embedding.py`; no T4 error remains.
-- Alembic: one head `w0x1y2z3a4b5`.
-- Disposable PostgreSQL/pgvector: empty-to-head upgrade, expected T4 lease/index/unique constraint inspection, T4-only downgrade, and re-upgrade all passed.
-- Code review: ten local lenses plus three validator batches; every validated finding applied. External adversarial code egress was denied, so the required adversarial coverage ran locally.
+- Full suite: 2,150 passed, 11 expected integration skips, 13 known warnings.
+- Disposable PostgreSQL/pgvector: nine distinct/concurrency/configured-sync integration proofs passed.
+- Migration: one head `g6h7i8j9k0l1`; clean downgrade to `e4f5g6h7i8j9`, re-upgrade, and legacy mirror receipt identity/status backfill passed.
+- Ruff: clean across every Python file changed since T4.
+- Mypy: clean across all 18 changed production source files.
+- Full-project mypy still reports only the three pre-existing `ontokit/models/embedding.py` shim errors.
+- `ce-code-review`: three actionable correctness/security findings were applied and verified: retroactive allocator serialization, immutable pre-commit sync snapshots, and legacy repository-identity backfill. No actionable finding remains.
 
-Web:
+Web final head:
 
-- Full suite: 184 files, 2,983 tests passed.
+- Full suite: 186 files, 3,003 tests passed.
 - TypeScript: clean.
 - ESLint: zero errors, 18 pre-existing warnings.
-- `AUTH_MODE=optional` production build: passed, 22 static pages; only the known Turbopack tracing warning remains.
-- Code review: nine local lenses plus validator pass; all 11 validated findings applied. External adversarial code egress was denied, so the adversarial coverage ran locally.
+- `AUTH_MODE=optional` with all Zitadel variables absent: production build passed with 22 static pages and only the known Turbopack worktree tracing warning.
+- `ce-code-review`: ready to merge with zero remaining findings. The external peer route was denied before code egress; no repository content left the machine.
 
-## Operational note
+## Remaining autonomous queue
 
-During migration verification, one Alembic invocation did not receive the intended tool-call environment override and therefore applied the additive T4 migration to the repository's configured local API database. No downgrade was attempted against that unknown local dataset. The authoritative destructive downgrade/re-upgrade test was then rerun against an explicitly addressed disposable PostgreSQL container, which was stopped and auto-removed afterward. No remote or production database was targeted.
+1. Synthesize the remaining main T5 PR Party API and web seams on top of these combined heads, including the already-green D5 credential-rewrap control without executing a real key rotation.
+2. Synthesize T6 translation provenance.
+3. Synthesize T7 editor preference and annotation round-trip.
+4. Synthesize T8 cross-feature correctness/dependency residuals.
+5. Classify and place or explicitly omit T9 documentation learnings.
+6. Synthesize T10 demo mode while keeping domain, DNS, repository-credential, and live deployment activation gated.
+7. Run final cross-tranche review and repository gates, freeze exact heads, refresh CatholicOS bases, then execute the authorized issue-first issue/PR batch with explicit links. Never self-merge.
 
-## Next autonomous engineering order
+No new user judgment or taste decision is required for the next local synthesis step.
 
-1. Replay the already-green distinct-entities net changes onto the final T4 API and web heads, preserving the paired order and excluding the earlier web handoff-only commit from implementation history.
-2. Replay GitHub synchronization after distinct entities, so its migration and contracts descend from the distinct pair.
-3. Run simplify, full local code review, and the complete source-repo gates for each new paired head.
-4. Continue the remaining T5–T10 local syntheses before the authorized issue-first final batch.
-5. At the final batch only: refresh CatholicOS bases, create/update issues first, link PRs to their owning issues, push/open the prepared branches, and do not self-merge.
+## Gates that remain open
 
-Authenticated DEV acceptance for the elapsed quiet period, objection halt/resume, and automatic `system:auto-accept` outcome remains a named activation gate. It is not a code blocker and must not be represented as complete until a suitable credentialed UAT window exists.
+- Authenticated DEV acceptance for elapsed quiet-period auto-accept, objection halt/resume, TRUSTED gating, and the `system:auto-accept` outcome is not yet a live UAT receipt.
+- D5 is code-complete but no application-key rotation or stored-ciphertext rewrap has been executed.
+- CatholicOS/ALEA domain-name resolution, `ontokit.org` registration/delegation confirmation, DNS, AWS, PROD, demo credentials/repositories, organization answerer publication, and reviewer outreach retain their explicit approval gates.
+- Issues, PRs, pushes, and links remain held until the final authorized batch after the remaining local synthesis work.
 
 ## Protected state
 
-The authoritative `feat/roundup-brainstorm` checkout remains at `16fe6411` with exactly its seven preserved untracked paths. This docs checkpoint was created in a separate worktree and contains no secrets, credentials, personal roster data, or unrelated private information.
+The authoritative `feat/roundup-brainstorm` checkout remains at `16fe6411` with exactly its seven preserved untracked paths. This documentation checkpoint is isolated, contains no secrets, credentials, personal roster data, or unrelated private information, and must remain local until publication is separately authorized.
