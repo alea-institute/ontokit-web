@@ -52,6 +52,8 @@ jobs:
       - uses: ./.github/actions/setup-node
       - run: npm run build
         env:
+          # Exercise the supported credential-free deployment mode in CI.
+          AUTH_MODE: optional
           NEXT_PUBLIC_API_URL: http://localhost:8000
           NEXT_PUBLIC_WS_URL: ws://localhost:8000
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
