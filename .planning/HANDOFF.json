@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-24T10:58:57Z",
+  "trigger": "precompact-auto",
+  "phase": "16-reviewer-enhancements",
+  "phase_dir": ".planning/phases/16-reviewer-enhancements",
+  "git": {
+    "branch": "upstream-queue/t5-pr-party-synthesis-web",
+    "head": "73f9db01",
+    "modified_files": 1
+  },
+  "note": "Auto-saved by PreCompact hook. Run /gsd-resume-work in a fresh session."
+}
