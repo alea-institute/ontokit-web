@@ -7,9 +7,8 @@ problem_type: process_pattern
 tags: [code-review, cross-model, adversarial-review, codex, invariants, prompt-injection, idempotency, concurrency, verification]
 status: solved
 related:
-  - docs/plans/2026-07-26-011-feat-pr-party-ontokit-native-plan.md
-  - docs/residual-review-findings/2026-07-28-pr-party-code-review.md
-  - docs/solutions/2026-07-28-pr-party-fifteen-unit-build.md
+  - docs/audits/2026-08-20-recent-plan-completion-audit.md
+  - docs/roundup-2026-08/UPSTREAM-DELIVERY-MAP.md
 ---
 
 # What the second model saw
