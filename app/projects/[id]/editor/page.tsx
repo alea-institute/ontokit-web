@@ -30,9 +30,11 @@ import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
 import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
 import {
+  createGeneratedEntityPersistenceQueue,
   persistGeneratedEntity,
   type GeneratedEntityPersistenceMode,
 } from "@/lib/editor/generatedEntityPersistence";
+import { saveSuggestionUpdate } from "@/lib/editor/suggestionSessionPersistence";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
 import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
@@ -106,6 +108,7 @@ export default function EditorPage() {
   // Branch state
   const queryClient = useQueryClient();
   const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
+  const generatedEntityPersistenceQueue = useRef(createGeneratedEntityPersistenceQueue());
 
   // Shared project/tree/source state from hook
   const viewer = useProjectViewer({
@@ -478,24 +481,28 @@ export default function EditorPage() {
       : isSuggestionMode
         ? "authenticated-suggestion"
         : "direct";
-    const content = await persistGeneratedEntity({
-      mode,
-      projectId,
-      branch: activeBranch,
-      accessToken: generatedEntityAccessToken,
-      ontologyPath: project?.git_ontology_path,
-      entity,
-      ontologyPrefix,
-      ontologyNamespace,
-      suggestionSession: {
-        startSession: suggestionSession.startSession,
-        saveToSession: suggestionSession.saveToSession,
-      },
-      anonymousSession: {
-        startSession: anonymousSuggestion.startSession,
-        saveToSession: anonymousSuggestion.saveToSession,
-      },
-    });
+    const persistenceScope = `${projectId}:${mode}:${activeBranch ?? "pending"}`;
+    const content = await generatedEntityPersistenceQueue.current.run(
+      persistenceScope,
+      () => persistGeneratedEntity({
+        mode,
+        projectId,
+        branch: activeBranch,
+        accessToken: generatedEntityAccessToken,
+        ontologyPath: project?.git_ontology_path,
+        entity,
+        ontologyPrefix,
+        ontologyNamespace,
+        suggestionSession: {
+          startSession: suggestionSession.startSession,
+          saveToSession: suggestionSession.saveToSession,
+        },
+        anonymousSession: {
+          startSession: anonymousSuggestion.startSession,
+          saveToSession: anonymousSuggestion.saveToSession,
+        },
+      }),
+    );
 
     // Only update client state after the authoritative branch confirms the
     // entity. A rejected save leaves the card pending and these values intact.
@@ -746,11 +753,6 @@ export default function EditorPage() {
     if (!session?.accessToken) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
 
-    // Ensure session exists
-    if (!suggestionSession.sessionId) {
-      await suggestionSession.startSession();
-    }
-
     let source = sourceContent;
     if (!source) {
       const response = await revisionsApi.getFileAtVersion(
@@ -765,24 +767,27 @@ export default function EditorPage() {
     const modifiedSource = updateClassInTurtle(source, classIri, data);
     const label = data.labels[0]?.value || getLocalName(classIri);
 
-    await suggestionSession.saveToSession(modifiedSource, classIri, label);
-
-    setSourceContent(modifiedSource);
-    toast.success(`Suggested update to "${label}"`);
-    updateNodeLabel(classIri, label);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
+    await saveSuggestionUpdate({
+      isSessionActive: Boolean(suggestionSession.sessionId),
+      session: suggestionSession,
+      content: modifiedSource,
+      entityIri: classIri,
+      entityLabel: label,
+      onSaved: () => {
+        setSourceContent(modifiedSource);
+        toast.success(`Suggested update to "${label}"`);
+        updateNodeLabel(classIri, label);
+        setDetailRefreshKey((k) => k + 1);
+        setSourceIriIndex(new Map());
+        iriPatternDetectedRef.current = false;
+      },
+    });
   }, [session, projectId, activeBranch, project, sourceContent, toast, updateNodeLabel, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode property update
   const handleSuggestPropertyUpdate = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
     if (!session?.accessToken) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
-
-    if (!suggestionSession.sessionId) {
-      await suggestionSession.startSession();
-    }
 
     let source = sourceContent;
     if (!source) {
@@ -795,23 +800,26 @@ export default function EditorPage() {
     const modifiedSource = updatePropertyInTurtle(source, propertyIri, data);
     const label = data.labels[0]?.value || getLocalName(propertyIri);
 
-    await suggestionSession.saveToSession(modifiedSource, propertyIri, label);
-
-    setSourceContent(modifiedSource);
-    toast.success(`Suggested update to "${label}"`);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
+    await saveSuggestionUpdate({
+      isSessionActive: Boolean(suggestionSession.sessionId),
+      session: suggestionSession,
+      content: modifiedSource,
+      entityIri: propertyIri,
+      entityLabel: label,
+      onSaved: () => {
+        setSourceContent(modifiedSource);
+        toast.success(`Suggested update to "${label}"`);
+        setDetailRefreshKey((k) => k + 1);
+        setSourceIriIndex(new Map());
+        iriPatternDetectedRef.current = false;
+      },
+    });
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode individual update
   const handleSuggestIndividualUpdate = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
     if (!session?.accessToken) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
-
-    if (!suggestionSession.sessionId) {
-      await suggestionSession.startSession();
-    }
 
     let source = sourceContent;
     if (!source) {
@@ -824,13 +832,20 @@ export default function EditorPage() {
     const modifiedSource = updateIndividualInTurtle(source, individualIri, data);
     const label = data.labels[0]?.value || getLocalName(individualIri);
 
-    await suggestionSession.saveToSession(modifiedSource, individualIri, label);
-
-    setSourceContent(modifiedSource);
-    toast.success(`Suggested update to "${label}"`);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
+    await saveSuggestionUpdate({
+      isSessionActive: Boolean(suggestionSession.sessionId),
+      session: suggestionSession,
+      content: modifiedSource,
+      entityIri: individualIri,
+      entityLabel: label,
+      onSaved: () => {
+        setSourceContent(modifiedSource);
+        toast.success(`Suggested update to "${label}"`);
+        setDetailRefreshKey((k) => k + 1);
+        setSourceIriIndex(new Map());
+        iriPatternDetectedRef.current = false;
+      },
+    });
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle anonymous proposal mode class update

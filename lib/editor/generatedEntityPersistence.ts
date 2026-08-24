@@ -34,6 +34,34 @@ interface PersistGeneratedEntityOptions {
   anonymousSession?: GeneratedEntitySessionWriter;
 }
 
+export interface GeneratedEntityPersistenceQueue {
+  run: <T>(scope: string, operation: () => Promise<T>) => Promise<T>;
+}
+
+/**
+ * Serialize authoritative read/append/save transactions that target the same
+ * editor branch. A rejected operation does not poison the queue, and unrelated
+ * branches remain independent.
+ */
+export function createGeneratedEntityPersistenceQueue(): GeneratedEntityPersistenceQueue {
+  const tails = new Map<string, Promise<unknown>>();
+
+  return {
+    run<T>(scope: string, operation: () => Promise<T>): Promise<T> {
+      const previous = tails.get(scope) ?? Promise.resolve();
+      const result = previous.catch(() => undefined).then(operation);
+      tails.set(scope, result);
+
+      const cleanup = () => {
+        if (tails.get(scope) === result) tails.delete(scope);
+      };
+      void result.then(cleanup, cleanup);
+
+      return result;
+    },
+  };
+}
+
 function entityAlreadyExists(source: string, iri: string): boolean {
   const { prefixes, base } = parseDeclarations(source);
   return findBlock(source.split("\n"), iri, prefixes, base) !== null;

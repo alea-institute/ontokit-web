@@ -3,7 +3,7 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { shouldShowAuthUI } from "@/lib/auth-mode";
 import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
 
@@ -17,15 +17,6 @@ export function UserMenu() {
   const showAuthUI = shouldShowAuthUI();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const accountId = session?.user?.id ?? session?.user?.email ?? null;
-
-  // Bind tab-scoped secrets to the settled account before browser paint. A
-  // direct same-tab account replacement (not only this menu's logout path)
-  // clears keys when the stable session identity changes.
-  useLayoutEffect(() => {
-    if (status !== "loading") useByoKeyStore.getState().setOwner(accountId);
-  }, [accountId, status]);
-
   // Handle federated logout (sign out from both NextAuth and Zitadel)
   const handleSignOut = async () => {
     setIsOpen(false);

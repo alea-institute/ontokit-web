@@ -12,7 +12,10 @@ vi.mock("@/lib/api/revisions", () => ({
 
 import { projectOntologyApi } from "@/lib/api/client";
 import { revisionsApi } from "@/lib/api/revisions";
-import { persistGeneratedEntity } from "@/lib/editor/generatedEntityPersistence";
+import {
+  createGeneratedEntityPersistenceQueue,
+  persistGeneratedEntity,
+} from "@/lib/editor/generatedEntityPersistence";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 
@@ -46,6 +49,32 @@ beforeEach(() => {
 });
 
 describe("persistGeneratedEntity", () => {
+  it("serializes deferred persistence operations within one editor branch", async () => {
+    const queue = createGeneratedEntityPersistenceQueue();
+    const events: string[] = [];
+    let releaseFirst!: () => void;
+    const firstGate = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    const first = queue.run("project-1:main", async () => {
+      events.push("first:start");
+      await firstGate;
+      events.push("first:end");
+      return "first";
+    });
+    const second = queue.run("project-1:main", async () => {
+      events.push("second:start");
+      return "second";
+    });
+
+    await vi.waitFor(() => expect(events).toEqual(["first:start"]));
+
+    releaseFirst();
+    await expect(Promise.all([first, second])).resolves.toEqual(["first", "second"]);
+    expect(events).toEqual(["first:start", "first:end", "second:start"]);
+  });
+
   it("loads the authoritative branch and saves a generated child directly", async () => {
     const content = await persistGeneratedEntity({
       mode: "direct",

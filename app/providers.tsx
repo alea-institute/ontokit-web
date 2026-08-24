@@ -8,6 +8,7 @@ import { ToastContainer } from "@/components/ui/toast-container";
 import { ScreenReaderAnnouncerProvider } from "@/components/ui/ScreenReaderAnnouncer";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { SessionGuard } from "@/components/auth/SessionGuard";
+import { ByoKeySessionGuard } from "@/components/auth/ByoKeySessionGuard";
 
 // Import the store module to ensure module-level theme sync runs
 import "@/lib/stores/editorModeStore";
@@ -32,6 +33,7 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
       <SessionGuard />
+      <ByoKeySessionGuard />
       <QueryClientProvider client={queryClient}>
         <ScreenReaderAnnouncerProvider>
           <ToastProvider>

@@ -6,7 +6,6 @@ const mockSignIn = vi.fn();
 const mockSignOut = vi.fn().mockResolvedValue(undefined);
 const mockUseSession = vi.fn();
 const mockClearAll = vi.fn();
-const mockSetOwner = vi.fn();
 
 vi.mock("next-auth/react", () => ({
   useSession: (...args: unknown[]) => mockUseSession(...args),
@@ -16,7 +15,7 @@ vi.mock("next-auth/react", () => ({
 
 vi.mock("@/lib/stores/byoKeyStore", () => ({
   useByoKeyStore: {
-    getState: () => ({ clearAll: mockClearAll, setOwner: mockSetOwner }),
+    getState: () => ({ clearAll: mockClearAll }),
   },
 }));
 
@@ -89,7 +88,6 @@ describe("UserMenu", () => {
     });
     render(<UserMenu />);
     expect(screen.getByText("A")).toBeDefined();
-    expect(mockSetOwner).toHaveBeenCalledWith("user-a");
   });
 
   it("shows user image when available", () => {

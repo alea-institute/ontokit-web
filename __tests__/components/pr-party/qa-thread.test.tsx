@@ -321,4 +321,34 @@ describe("QAThread", () => {
       "Reviewer's private draft",
     );
   });
+
+  it("never paints the previous reviewer's draft when the draft key changes in place", () => {
+    window.localStorage.setItem(qaDraftKey("card-1", "reviewer-a"), "Reviewer A secret");
+    const paintedDrafts: string[] = [];
+
+    function ThreadWithPaintProbe({ reviewerId }: { reviewerId: string }) {
+      React.useLayoutEffect(() => {
+        const box = screen.getByLabelText(/ask the author/i) as HTMLTextAreaElement;
+        paintedDrafts.push(box.value);
+      }, [reviewerId]);
+
+      return (
+        <QAThread
+          cardId="card-1"
+          reviewerId={reviewerId}
+          entries={[]}
+          prUrl="https://github.com/catholicos/ontokit-api/pull/42"
+          onAsk={vi.fn().mockResolvedValue(makeCommentResponse())}
+        />
+      );
+    }
+
+    const { rerender } = render(<ThreadWithPaintProbe reviewerId="reviewer-a" />);
+    expect(paintedDrafts).toEqual(["Reviewer A secret"]);
+
+    rerender(<ThreadWithPaintProbe reviewerId="reviewer-b" />);
+
+    expect(paintedDrafts).toEqual(["Reviewer A secret", ""]);
+    expect((screen.getByLabelText(/ask the author/i) as HTMLTextAreaElement).value).toBe("");
+  });
 });

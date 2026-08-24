@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ExternalLink, Loader2, MessageCircleQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
@@ -60,11 +60,6 @@ function readDraft(key: string): string {
 function useLocalDraft(key: string): [string, (next: string) => void] {
   const [value, setValue] = useState(() => readDraft(key));
 
-  // The panel is remounted per card in some layouts and reused in others.
-  useEffect(() => {
-    setValue(readDraft(key));
-  }, [key]);
-
   const update = useCallback(
     (next: string) => {
       setValue(next);
@@ -102,9 +97,20 @@ interface DegradedCompose {
   deepLink: string;
 }
 
-export function QAThread({ cardId, reviewerId, entries, prUrl, onAsk }: QAThreadProps) {
+export function QAThread(props: QAThreadProps) {
+  const draftKey = qaDraftKey(props.cardId, props.reviewerId);
+  return <QAThreadForDraft key={draftKey} {...props} draftKey={draftKey} />;
+}
+
+function QAThreadForDraft({
+  cardId,
+  entries,
+  prUrl,
+  onAsk,
+  draftKey,
+}: QAThreadProps & { draftKey: string }) {
   const { announce } = useAnnounce();
-  const [draft, setDraft] = useLocalDraft(qaDraftKey(cardId, reviewerId));
+  const [draft, setDraft] = useLocalDraft(draftKey);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compose, setCompose] = useState<DegradedCompose | null>(null);
