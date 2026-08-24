@@ -47,6 +47,7 @@ function preserveExistingUntaggedLabels(
     if (!label.lang || !label.value.trim()) return label;
 
     const untaggedLiteral = literal(label.value, "");
+    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- the only dynamic segment is quoted by escapeRegex
     const untaggedPattern = new RegExp(
       `(?:^|,\\s*)${escapeRegex(untaggedLiteral)}(?=\\s*(?:,|$))`,
       "u",
@@ -194,6 +195,7 @@ function pruneDeletedLiteralAxioms(
     }
 
     const annotatesClass = sourceForms.some((form) =>
+      // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- form is quoted by escapeRegex before interpolation
       new RegExp(`owl:annotatedSource\\s+${escapeRegex(form)}(?=\\s*[;.])`).test(block),
     );
     if (!annotatesClass) {
@@ -203,10 +205,12 @@ function pruneDeletedLiteralAxioms(
 
     const stillExists = retained.some(({ propertyForms, target }) => {
       const hasProperty = propertyForms.some((form) =>
+        // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- form is quoted by escapeRegex before interpolation
         new RegExp(`owl:annotatedProperty\\s+${escapeRegex(form)}(?=\\s*[;.])`).test(block),
       );
       return (
         hasProperty &&
+        // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- target is quoted by escapeRegex before interpolation
         new RegExp(`owl:annotatedTarget\\s+${escapeRegex(target)}(?=\\s*[;.])`).test(block)
       );
     });
