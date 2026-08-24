@@ -75,8 +75,13 @@ export function ProjectCard({ project, className }: ProjectCardProps) {
         <span>Updated {formatDate(project.updated_at || project.created_at)}</span>
       </div>
 
-      {(project.user_role || project.is_exemplar) && (
+      {(project.user_role || project.is_exemplar || project.is_demo) && (
         <div className="mt-3 flex items-center gap-2">
+          {project.is_demo && (
+            <span className="inline-flex items-center rounded-full bg-cyan-100 px-2.5 py-0.5 text-xs font-medium text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300">
+              Demo lab
+            </span>
+          )}
           {project.is_exemplar && (
             <span className="inline-flex items-center rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
               Exemplar

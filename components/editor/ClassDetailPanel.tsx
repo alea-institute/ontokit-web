@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
 import {
   ExternalLink,
   AlertTriangle,
@@ -26,6 +26,8 @@ import {
   StickyNote,
   Hash,
   Link2,
+  LogIn,
+  Pencil,
 } from "lucide-react";
 import { projectOntologyApi, type OWLClassDetail, type ClassUpdatePayload, type AnnotationUpdate } from "@/lib/api/client";
 import type { LocalizedString } from "@/lib/api/client";
@@ -44,6 +46,16 @@ import { SimilarConceptsPanel } from "@/components/editor/SimilarConceptsPanel";
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { useToast } from "@/lib/context/ToastContext";
+import { AUTO_SAVE_TEACHING_TOAST } from "@/lib/editor/autoSave";
+import { useSuggestions } from "@/lib/hooks/useSuggestions";
+import { useTranslationConfig } from "@/lib/hooks/useTranslationConfig";
+import { useTranslationState } from "@/lib/hooks/useTranslationState";
+import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
+import { getTranslationErrorMessage, type OnDemandTranslationPredicate, type TranslationEntityStateItem } from "@/lib/api/translations";
+import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
+import type { GeneratedSuggestion } from "@/lib/api/generation";
+import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
+import type { ProjectRole } from "@/lib/api/projects";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
 export function ensureTrailingEmpty(arr: LocalizedString[]): LocalizedString[] {
@@ -75,6 +87,26 @@ interface ClassDetailPanelProps {
   refreshKey?: number;
   /** Extra actions rendered in the header row (e.g. Graph button) */
   headerActions?: ReactNode;
+  /** Show "Sign in to edit" button for anonymous users when Zitadel is configured */
+  showSignInToEdit?: boolean;
+  /** Called when anonymous user clicks "Sign in to edit" */
+  onSignInToEdit?: () => void;
+  /** Show "Propose Edit" button for anonymous users (AUTH_MODE != required) */
+  canPropose?: boolean;
+  /** Called when anonymous user clicks "Propose Edit" */
+  onProposeEdit?: () => void;
+  /** True while an anonymous proposal session is being created. */
+  isProposeEditStarting?: boolean;
+  /** True when anonymous proposal mode is active (editing is allowed) */
+  isAnonymousProposalMode?: boolean;
+
+  // LLM suggestion support
+  canUseLLM?: boolean;
+  byoKey?: string;
+  userRole?: ProjectRole;
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => Promise<void>;
+  /** When true, auto-fire annotation suggestions when classIri changes (D-09) */
+  autoSuggestAnnotationsOnMount?: boolean;
 }
 
 export function ClassDetailPanel({
@@ -90,12 +122,83 @@ export function ClassDetailPanel({
   onUpdateClass,
   refreshKey,
   headerActions,
+  showSignInToEdit,
+  onSignInToEdit,
+  canPropose,
+  onProposeEdit,
+  isProposeEditStarting,
+  isAnonymousProposalMode: _isAnonymousProposalMode,
+  canUseLLM,
+  byoKey,
+  userRole: _userRole,
+  onAddSuggestedChild,
+  autoSuggestAnnotationsOnMount,
 }: ClassDetailPanelProps) {
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
   const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resolvedTargetLabels, setResolvedTargetLabels] = useState<Record<string, string>>({});
+  const [requestedTranslation, setRequestedTranslation] = useState<OnDemandTranslationPredicate | null>(null);
+  const [failedTranslation, setFailedTranslation] = useState<OnDemandTranslationPredicate | null>(null);
+  const { announce } = useAnnounce();
+  const translationConfig = useTranslationConfig(projectId, accessToken);
+  const translationState = useTranslationState(
+    projectId,
+    classIri,
+    branch || "main",
+    accessToken,
+  );
+  const translationItems = useMemo(
+    () => translationState.state?.items ?? [],
+    [translationState.state?.items],
+  );
+  const languagesConfigured = (translationConfig.config?.language_tags.length ?? 0) > 0;
+  const announcedProvisionalRef = useRef("");
+
+  const requestFieldTranslation = useCallback(async (
+    predicate: OnDemandTranslationPredicate,
+    fieldLabel: string,
+  ) => {
+    translationState.resetTranslation();
+    setFailedTranslation(null);
+    if (!window.confirm(`Translate this ${fieldLabel} into the configured languages?`)) return;
+    setRequestedTranslation(predicate);
+    announce(`${fieldLabel} translation requested and pending.`);
+    try {
+      await translationState.translateField(predicate);
+    } catch {
+      setRequestedTranslation(null);
+      setFailedTranslation(predicate);
+      announce(`${fieldLabel} translation failed. You can retry.`, "assertive");
+    }
+  }, [announce, translationState]);
+
+  useEffect(() => {
+    if (!requestedTranslation) return;
+    const arrived = translationItems.some(
+      (item) => item.predicate === requestedTranslation &&
+        item.value !== null &&
+        (item.state === "provisional" || item.state === "verified"),
+    );
+    if (arrived) {
+      const label = requestedTranslation === "skos:definition" ? "Definition" : "Example";
+      setRequestedTranslation(null);
+      announce(`${label} translations arrived.`);
+    }
+  }, [announce, requestedTranslation, translationItems]);
+
+  useEffect(() => {
+    const provisionalSignature = translationItems
+      .filter((item) => item.state === "provisional" && item.value !== null)
+      .map((item) => `${item.predicate}:${item.language}:${item.value}`)
+      .sort()
+      .join("|");
+    if (provisionalSignature && provisionalSignature !== announcedProvisionalRef.current) {
+      announce("Provisional machine translations are available.");
+    }
+    announcedProvisionalRef.current = provisionalSignature;
+  }, [announce, translationItems]);
 
   // Edit mode: explicit state (default read-only)
   const [isEditing, setIsEditing] = useState(false);
@@ -133,6 +236,10 @@ export function ClassDetailPanel({
     canEdit: !!canEdit && !!onUpdateClass,
     onUpdateClass,
     onError: (msg) => toast.error(msg),
+    onFirstAutoSave: () => toast.info(
+      AUTO_SAVE_TEACHING_TOAST.title,
+      AUTO_SAVE_TEACHING_TOAST.description,
+    ),
   });
 
   // Keep editStateRef in sync with current edit state (only when editing)
@@ -242,7 +349,7 @@ export function ClassDetailPanel({
   // Manual save: flush the current draft to git. Stays in edit mode.
   const flushDraftToGit = useCallback(async () => {
     triggerSave();
-    await flushToGit();
+    await flushToGit("manual");
   }, [triggerSave, flushToGit]);
 
   // Auto-enter edit mode based on continuous editing or restored draft
@@ -482,6 +589,249 @@ export function ClassDetailPanel({
     ]);
   }, []);
 
+  // ── Suggestion hooks — one per section type ──
+  const suggestionOpts = {
+    projectId,
+    entityIri: classIri,
+    branch: branch ?? "main",
+    canUseLLM: canUseLLM ?? false,
+    accessToken,
+    byoKey,
+  };
+
+  // Accept handlers
+  const handleAcceptChildSuggestion = useCallback(
+    async (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      // D-07: Create entity directly in tree WITHOUT opening AddEntityDialog
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — currently dropped on accept. See QA queue.
+      if (!onAddSuggestedChild) throw new Error("Generated entity persistence is unavailable.");
+      await onAddSuggestedChild(suggestion.iri, editedValue ?? suggestion.label, classIri!);
+    },
+    [onAddSuggestedChild, classIri],
+  );
+
+  const getSiblingAcceptanceError = useCallback(() => {
+    const parentCount = classDetail?.parent_iris.length ?? 0;
+    if (parentCount === 0) {
+      return "Cannot accept this sibling suggestion because the selected class has no parent. Add or choose a parent first.";
+    }
+    if (parentCount > 1) {
+      return "Cannot accept this sibling suggestion because the selected class has multiple parents. Choose which parent should receive the sibling first.";
+    }
+    return null;
+  }, [classDetail?.parent_iris]);
+
+  const handleAcceptSiblingSuggestion = useCallback(
+    async (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      const parentIri = classDetail?.parent_iris[0];
+      if (!parentIri) throw new Error("Choose a parent before accepting this sibling suggestion.");
+      if (!onAddSuggestedChild) throw new Error("Generated entity persistence is unavailable.");
+      await onAddSuggestedChild(suggestion.iri, editedValue ?? suggestion.label, parentIri);
+    },
+    [classDetail?.parent_iris, onAddSuggestedChild],
+  );
+
+  const handleAcceptAnnotationSuggestion = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      if (!suggestion.property_iri) return;
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — only the value survives into the edit draft. See QA queue.
+      // Merge into edit annotations state
+      setEditAnnotations((prev) => {
+        const existing = prev.find((a) => a.property_iri === suggestion.property_iri);
+        const newValue = { value: editedValue ?? suggestion.value ?? suggestion.label, lang: suggestion.lang ?? "en" };
+        if (existing) {
+          return prev.map((a) =>
+            a.property_iri === suggestion.property_iri
+              ? { ...a, values: ensureTrailingEmpty([...a.values.filter((v) => v.value.trim()), newValue]) }
+              : a,
+          );
+        }
+        return [...prev, { property_iri: suggestion.property_iri!, values: ensureTrailingEmpty([newValue]) }];
+      });
+      requestAnimationFrame(() => triggerSave());
+    },
+    [triggerSave],
+  );
+
+  const handleAcceptParentSuggestion = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped when the parent is added. See QA queue.
+      addParent(suggestion.iri, editedValue ?? suggestion.label);
+    },
+    [addParent],
+  );
+
+  const handleAcceptEdgeSuggestion = useCallback(
+    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+      if (!suggestion.relationship_type || !suggestion.target_iri) return;
+      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped when the edge is added. See QA queue.
+      setEditRelationships((prev) => {
+        const existing = prev.find((g) => g.property_iri === suggestion.relationship_type);
+        const newTarget: RelationshipTarget = {
+          iri: suggestion.target_iri!,
+          label: editedValue ?? suggestion.label,
+        };
+        if (existing) {
+          return prev.map((g) =>
+            g.property_iri === suggestion.relationship_type
+              ? { ...g, targets: [...g.targets, newTarget] }
+              : g,
+          );
+        }
+        const propInfo = getAnnotationPropertyInfo(suggestion.relationship_type!);
+        return [...prev, {
+          property_iri: suggestion.relationship_type!,
+          property_label: propInfo.displayLabel,
+          targets: [newTarget],
+        }];
+      });
+      requestAnimationFrame(() => triggerSave());
+    },
+    [triggerSave],
+  );
+
+  const childrenSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "children",
+    onAccepted: handleAcceptChildSuggestion,
+  });
+
+  const siblingsSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "siblings",
+    onAccepted: handleAcceptSiblingSuggestion,
+    getAcceptanceError: getSiblingAcceptanceError,
+  });
+
+  const annotationsSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "annotations",
+    onAccepted: handleAcceptAnnotationSuggestion,
+  });
+
+  const parentsSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "parents",
+    onAccepted: handleAcceptParentSuggestion,
+  });
+
+  const edgesSuggestions = useSuggestions({
+    ...suggestionOpts,
+    suggestionType: "edges",
+    onAccepted: handleAcceptEdgeSuggestion,
+  });
+
+  // D-09 / M-1: Auto-fire annotation suggestions when navigating via
+  // BranchNavigator. The panel is REMOUNTED per selection (key={selectedIri}
+  // in both layouts), so an intra-instance "IRI changed" guard could never
+  // fire. Instead we fire once on mount when the layout has flagged this
+  // navigation as auto-suggest. A per-instance ref guarantees exactly one
+  // request even if the flag prop toggles during the instance's lifetime.
+  const didAutoSuggestRef = useRef(false);
+  useEffect(() => {
+    if (didAutoSuggestRef.current) return;
+    if (autoSuggestAnnotationsOnMount && classIri && canUseLLM) {
+      didAutoSuggestRef.current = true;
+      annotationsSuggestions.request();
+    }
+  }, [classIri, autoSuggestAnnotationsOnMount, canUseLLM]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Helper: Render suggestion slot for a section ──
+  const renderSuggestionSlot = useCallback((
+    suggestions: ReturnType<typeof useSuggestions>,
+  ) => (
+    <>
+      {suggestions.isLoading && (
+        <div role="list" className="space-y-2 mt-2">
+          <SuggestionSkeleton />
+          <SuggestionSkeleton />
+          <SuggestionSkeleton />
+        </div>
+      )}
+      {suggestions.error && (
+        <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+          {suggestions.error} <button onClick={suggestions.request} className="underline">Retry</button>
+        </div>
+      )}
+      {suggestions.items.filter((s) => s.status !== "rejected").length > 0 && (
+        <div role="list" className="space-y-2 mt-2">
+          {suggestions.items.map((item, i) =>
+            item.status !== "rejected" ? (
+              <SuggestionCard
+                key={item.suggestion.iri ?? i}
+                item={item}
+                onAccept={() => { void suggestions.accept(i); }}
+                onReject={() => suggestions.reject(i)}
+                onEdit={(val) => { suggestions.edit(i, val); void suggestions.accept(i); }}
+                busy={suggestions.acceptingIndices.has(i)}
+                onMarkDistinct={canEdit && accessToken ? async (candidate, reason) => {
+                  const parentIri = item.suggestion.suggestion_type === "children"
+                    ? classIri
+                    : item.suggestion.suggestion_type === "siblings"
+                      ? (classDetail?.parent_iris[0] ?? classIri)
+                      : null;
+                  await distinctDecisionsApi.mark(projectId, {
+                    proposed_iri: item.suggestion.iri,
+                    label: item.suggestion.label,
+                    candidate_iri: candidate.iri,
+                    candidate_branch: candidate.branch,
+                    entity_type: "class",
+                    parent_iri: parentIri,
+                    reason,
+                  }, accessToken);
+                  suggestions.markDistinct(i, candidate);
+                  toast.success(
+                    "Distinct entities recorded",
+                    `${item.suggestion.label} will no longer be blocked by ${candidate.label} while their relevant content remains unchanged.`,
+                  );
+                } : undefined}
+                disabled={item.suggestion.duplicate_verdict === "block"}
+              />
+            ) : null,
+          )}
+        </div>
+      )}
+    </>
+  ), [accessToken, canEdit, classDetail?.parent_iris, classIri, projectId, toast]);
+
+  const translationValues = (predicate: string) =>
+    translationItems.filter((item) => item.predicate === predicate);
+
+  const translationItemFor = (predicate: string, value: LocalizedString) =>
+    translationValues(predicate).find(
+      (item) => item.language === value.lang && item.value === value.value,
+    );
+
+  const provisionalOnly = (predicate: string, committed: LocalizedString[]) =>
+    translationValues(predicate).filter(
+      (item) => item.state === "provisional" && item.value !== null &&
+        !committed.some((value) => value.lang === item.language && value.value === item.value),
+    );
+
+  const fieldTranslationAction = (
+    predicate: OnDemandTranslationPredicate,
+    label: string,
+    hasSourceValue: boolean,
+  ) => {
+    if (!hasSourceValue || !languagesConfigured || !canUseLLM) return undefined;
+    const isPending = !translationState.pendingNotice && (
+      requestedTranslation === predicate ||
+      translationState.isTranslationPending ||
+      translationValues(predicate).some((item) => item.state === "pending")
+    );
+    return (
+      <button
+        type="button"
+        onClick={() => void requestFieldTranslation(predicate, label.toLowerCase())}
+        disabled={isPending || translationState.isTranslating}
+        className="rounded px-1.5 py-0.5 text-[11px] text-primary-700 hover:bg-primary-50 disabled:text-slate-400 dark:text-primary-300 dark:hover:bg-primary-900/20"
+        aria-label={isPending ? `${label} translation pending` : `Translate ${label}`}
+      >
+        {isPending ? "Pending…" : "Translate"}
+      </button>
+    );
+  };
+
   // ── Render: empty state ──
   if (!classIri) {
     return (
@@ -590,6 +940,40 @@ export function ClassDetailPanel({
               </h2>
               <div className="flex shrink-0 items-center gap-1">
                 {headerActions}
+                {!canEdit && canPropose && !isEditing && onProposeEdit && (
+                  <>
+                    <button
+                      onClick={onProposeEdit}
+                      disabled={isProposeEditStarting}
+                      aria-busy={isProposeEditStarting}
+                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                      title="Propose an edit to this class"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                      {isProposeEditStarting ? "Starting…" : "Propose Edit"}
+                    </button>
+                    {showSignInToEdit && onSignInToEdit && (
+                      <button
+                        onClick={onSignInToEdit}
+                        className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800"
+                        title="Sign in for full editing"
+                      >
+                        <LogIn className="h-3 w-3" />
+                        Sign in for full editing
+                      </button>
+                    )}
+                  </>
+                )}
+                {!canEdit && !canPropose && !isEditing && showSignInToEdit && onSignInToEdit && (
+                  <button
+                    onClick={onSignInToEdit}
+                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                    title="Sign in to edit this class"
+                  >
+                    <LogIn className="h-3.5 w-3.5" />
+                    Sign in to edit
+                  </button>
+                )}
               </div>
             </div>
             <div className="mt-1 flex items-center gap-2">
@@ -626,7 +1010,7 @@ export function ClassDetailPanel({
           status={saveStatus}
           error={saveError}
           validationError={validationError}
-          onRetry={() => flushToGit()}
+          onRetry={() => flushToGit("manual")}
           onManualSave={flushDraftToGit}
           onCancel={cancelEditMode}
         />
@@ -636,6 +1020,22 @@ export function ClassDetailPanel({
 
         {/* Content */}
         <div className="p-4 space-y-3">
+          {translationItems.some((item) => item.state === "pending") && (
+            <div role="status" className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <Clock className="h-3.5 w-3.5" />
+              Translations pending for this entity
+            </div>
+          )}
+          {translationState.translateError && failedTranslation && (
+            <p role="alert" className="text-xs text-red-600">
+              {getTranslationErrorMessage(translationState.translateError, "Translation failed.")} <button className="underline" onClick={() => void requestFieldTranslation(failedTranslation, failedTranslation === "skos:definition" ? "definition" : "example")}>Retry</button>
+            </p>
+          )}
+          {translationState.pendingNotice && (
+            <p role="alert" className="text-xs text-amber-700">
+              {translationState.pendingNotice}{requestedTranslation && <> <button className="underline" onClick={() => void requestFieldTranslation(requestedTranslation, requestedTranslation === "skos:definition" ? "definition" : "example")}>Retry</button></>}
+            </p>
+          )}
           {/* Lint Issues (always read-only) */}
           {classIssues.length > 0 && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-900/50 dark:bg-amber-900/10">
@@ -694,8 +1094,13 @@ export function ClassDetailPanel({
               <div className="space-y-1">
                 {classDetail.labels.map((label, index) => (
                   <div key={index} className="flex items-center gap-2">
+                    {label.lang && <LanguageFlag lang={label.lang} />}
                     <span className="text-sm text-slate-700 dark:text-slate-300">{label.value}</span>
+                    <TranslationStateBadge item={translationItemFor("rdfs:label", label)} />
                   </div>
+                ))}
+                {provisionalOnly("rdfs:label", classDetail.labels).map((item) => (
+                  <ProvisionalTranslationValue key={`${item.language}:${item.value}`} item={item} />
                 ))}
               </div>
             </Section>
@@ -710,7 +1115,17 @@ export function ClassDetailPanel({
             if (isEditing) {
               const defValues = defAnnotation?.values || [];
               return (
-                <Section title="Definition" tooltip="skos:definition" icon={<BookOpen className="h-4 w-4" />}>
+                <Section
+                  title="Definition"
+                  tooltip="skos:definition"
+                  icon={<BookOpen className="h-4 w-4" />}
+                  headerActions={canUseLLM ? (
+                    <span className="flex items-center gap-1">
+                      {fieldTranslationAction("skos:definition", "Definition", defAnnotation?.values.some((value) => value.value.trim()) ?? false)}
+                      <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
+                    </span>
+                  ) : undefined}
+                >
                   <div className="space-y-2">
                     {defValues.map((val, vIdx) => {
                       const isGhost = vIdx === defValues.length - 1 && val.value.trim() === "";
@@ -730,21 +1145,37 @@ export function ClassDetailPanel({
                       );
                     })}
                   </div>
+                  {renderSuggestionSlot(annotationsSuggestions)}
                 </Section>
               );
             }
 
             if (defAnnotation && defAnnotation.values.length > 0) {
               return (
-                <Section title="Definition" tooltip="skos:definition" icon={<BookOpen className="h-4 w-4" />}>
+                <Section
+                  title="Definition"
+                  tooltip="skos:definition"
+                  icon={<BookOpen className="h-4 w-4" />}
+                  headerActions={canUseLLM ? (
+                    <span className="flex items-center gap-1">
+                      {fieldTranslationAction("skos:definition", "Definition", defAnnotation.values.some((value) => value.value.trim()))}
+                      <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
+                    </span>
+                  ) : undefined}
+                >
                   <div className="space-y-1">
                     {defAnnotation.values.map((val, vIndex) => (
                       <div key={vIndex} className="flex items-start gap-2">
                         {val.lang && <LanguageFlag lang={val.lang} />}
                         <span className="text-sm text-slate-700 dark:text-slate-300">{val.value}</span>
+                        <TranslationStateBadge item={translationItemFor("skos:definition", val)} />
                       </div>
                     ))}
+                    {provisionalOnly("skos:definition", defAnnotation.values).map((item) => (
+                      <ProvisionalTranslationValue key={`${item.language}:${item.value}`} item={item} />
+                    ))}
                   </div>
+                  {renderSuggestionSlot(annotationsSuggestions)}
                 </Section>
               );
             }
@@ -846,13 +1277,25 @@ export function ClassDetailPanel({
                   }
 
                   return (
-                    <Section key={annotation.property_iri} title={propInfo.displayLabel} tooltip={propInfo.curie} icon={icon}>
+                    <Section
+                      key={annotation.property_iri}
+                      title={propInfo.displayLabel}
+                      tooltip={propInfo.curie}
+                      icon={icon}
+                      headerActions={annotation.property_iri === "http://www.w3.org/2004/02/skos/core#example"
+                        ? fieldTranslationAction("skos:example", "Example", annotation.values.some((value) => value.value.trim()))
+                        : undefined}
+                    >
                       <div className="space-y-1">
                         {annotation.values.map((val, vIdx) => (
                           <div key={vIdx} className="flex items-center gap-2">
                             {val.lang && <LanguageFlag lang={val.lang} />}
                             <span className="text-sm text-slate-700 dark:text-slate-300">{val.value}</span>
+                            <TranslationStateBadge item={translationItemFor(propInfo.curie, val)} />
                           </div>
+                        ))}
+                        {provisionalOnly(propInfo.curie, annotation.values).map((item) => (
+                          <ProvisionalTranslationValue key={`${item.language}:${item.value}`} item={item} />
                         ))}
                       </div>
                     </Section>
@@ -885,13 +1328,36 @@ export function ClassDetailPanel({
                     }}
                   />
                 )}
+
+                {/* Annotation Suggestion Slot (M-2: the scope toggle was a
+                    no-op — GenerateSuggestionsRequest has no scope field, so
+                    it has been removed to avoid misleading users.
+                    TODO: restore a scope toggle here once the backend accepts a
+                    scope parameter on generate-suggestions.) */}
+                {canUseLLM && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <SuggestImprovementsButton
+                      onRequest={annotationsSuggestions.request}
+                      isLoading={annotationsSuggestions.isLoading}
+                      disabled={!classIri}
+                    />
+                  </div>
+                )}
+                {renderSuggestionSlot(annotationsSuggestions)}
               </>
             );
           })()}
 
           {/* ═══ PARENT CLASSES ═══ */}
           {isEditing ? (
-            <Section title="Parent(s)" tooltip="rdfs:subClassOf" icon={<ArrowUp className="h-4 w-4" />}>
+            <Section
+              title="Parent(s)"
+              tooltip="rdfs:subClassOf"
+              icon={<ArrowUp className="h-4 w-4" />}
+              headerActions={canUseLLM ? (
+                <SuggestImprovementsButton onRequest={parentsSuggestions.request} isLoading={parentsSuggestions.isLoading} disabled={!classIri} />
+              ) : undefined}
+            >
               <div className="space-y-2">
                 {editParentIris.map((parentIri) => (
                   <div key={parentIri} className="flex items-center gap-2">
@@ -932,9 +1398,17 @@ export function ClassDetailPanel({
                   </button>
                 )}
               </div>
+              {renderSuggestionSlot(parentsSuggestions)}
             </Section>
           ) : classDetail.parent_iris.length > 0 ? (
-            <Section title="Parent(s)" tooltip="rdfs:subClassOf" icon={<ArrowUp className="h-4 w-4" />}>
+            <Section
+              title="Parent(s)"
+              tooltip="rdfs:subClassOf"
+              icon={<ArrowUp className="h-4 w-4" />}
+              headerActions={canUseLLM ? (
+                <SuggestImprovementsButton onRequest={parentsSuggestions.request} isLoading={parentsSuggestions.isLoading} disabled={!classIri} />
+              ) : undefined}
+            >
               <div className="space-y-1">
                 {classDetail.parent_iris.map((parentIri) => (
                   <IriLink
@@ -945,6 +1419,7 @@ export function ClassDetailPanel({
                   />
                 ))}
               </div>
+              {renderSuggestionSlot(parentsSuggestions)}
             </Section>
           ) : null}
 
@@ -969,7 +1444,13 @@ export function ClassDetailPanel({
             if (!isEditing && !hasRelationships) return null;
 
             return (
-              <Section title="Relationship(s)" icon={<Link2 className="h-4 w-4" />}>
+              <Section
+                title="Relationship(s)"
+                icon={<Link2 className="h-4 w-4" />}
+                headerActions={canUseLLM ? (
+                  <SuggestImprovementsButton onRequest={edgesSuggestions.request} isLoading={edgesSuggestions.isLoading} disabled={!classIri} />
+                ) : undefined}
+              >
                 <RelationshipSection
                   groups={readRelationships}
                   isEditing={isEditing}
@@ -983,9 +1464,28 @@ export function ClassDetailPanel({
                   onNavigateToClass={onNavigateToClass}
                   onSaveNeeded={() => triggerSave()}
                 />
+                {renderSuggestionSlot(edgesSuggestions)}
               </Section>
             );
           })()}
+
+          {/* ═══ CHILDREN (LLM suggestions) ═══ */}
+          {canUseLLM && (
+            <Section
+              title="Subclasses"
+              tooltip="Suggest child classes"
+              icon={<Plus className="h-4 w-4" />}
+              headerActions={
+                <SuggestImprovementsButton onRequest={childrenSuggestions.request} isLoading={childrenSuggestions.isLoading} disabled={!classIri} />
+              }
+            >
+              <div className="text-xs text-slate-400 dark:text-slate-500">
+                {classDetail.child_count} existing subclass{classDetail.child_count !== 1 ? "es" : ""}
+              </div>
+              {renderSuggestionSlot(childrenSuggestions)}
+              {renderSuggestionSlot(siblingsSuggestions)}
+            </Section>
+          )}
 
           {/* Statistics (always read-only) */}
           <Section title="Statistics" icon={<BarChart3 className="h-4 w-4" />}>
@@ -1070,6 +1570,34 @@ function getAnnotationIcon(propertyIri: string): React.ReactNode {
   return ANNOTATION_ICON_MAP[propertyIri] || <FileText className="h-4 w-4" />;
 }
 
+function TranslationStateBadge({ item }: { item?: TranslationEntityStateItem }) {
+  if (!item || item.state === "missing") return null;
+  const styles = {
+    verified: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300",
+    provisional: "bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-300",
+    pending: "bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300",
+  }[item.state];
+  return (
+    <span
+      className={cn("inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-medium", styles)}
+      aria-label={`${item.language || "untagged"} translation ${item.state}`}
+    >
+      {item.state}
+    </span>
+  );
+}
+
+function ProvisionalTranslationValue({ item }: { item: TranslationEntityStateItem }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md bg-sky-50/60 px-1.5 py-1 dark:bg-sky-900/10">
+      {item.language && <LanguageFlag lang={item.language} />}
+      <span className="text-sm text-slate-700 dark:text-slate-300">{item.value}</span>
+      <TranslationStateBadge item={item} />
+      <span className="sr-only">Provisional machine translation</span>
+    </div>
+  );
+}
+
 // ── Sub-components ──────────────────────────────────────────────────
 
 interface SectionProps {
@@ -1077,9 +1605,11 @@ interface SectionProps {
   tooltip?: string;
   icon?: React.ReactNode;
   children: React.ReactNode;
+  /** Optional actions rendered after the section title (e.g. SuggestImprovementsButton) */
+  headerActions?: React.ReactNode;
 }
 
-function Section({ title, tooltip, icon, children }: SectionProps) {
+function Section({ title, tooltip, icon, children, headerActions }: SectionProps) {
   return (
     <div className="flex gap-4">
       <div
@@ -1088,6 +1618,7 @@ function Section({ title, tooltip, icon, children }: SectionProps) {
       >
         {icon && <span className="text-slate-400 dark:text-slate-500">{icon}</span>}
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{title}</span>
+        {headerActions && <span className="ml-auto">{headerActions}</span>}
       </div>
       <div className="min-w-0 flex-1">
         {children}

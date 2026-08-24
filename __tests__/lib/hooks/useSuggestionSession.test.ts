@@ -143,6 +143,28 @@ describe("useSuggestionSession", () => {
     expect(result.current.status).toBe("active");
   });
 
+  it("can save immediately after starting with callbacks from the same render", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-immediate",
+      branch: "suggest/sess-immediate",
+      created_at: "2024-01-01T00:00:00Z",
+    });
+    mockedSave.mockResolvedValue({
+      commit_hash: "abc123",
+      branch: "suggest/sess-immediate",
+      changes_count: 1,
+    });
+    const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
+    const { startSession, saveToSession } = result.current;
+
+    await act(async () => {
+      expect(await startSession()).toBe("suggest/sess-immediate");
+      expect(await saveToSession("content", "http://ex.org/A", "A")).toBe(true);
+    });
+
+    expect(mockedSave).toHaveBeenCalledTimes(1);
+  });
+
   it("saveToSession deduplicates entity labels", async () => {
     mockedCreateSession.mockResolvedValue({
       session_id: "sess-1",

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { NotificationBell } from "@/components/layout/notification-bell";
+import { NotificationBell, isSafeInternalUrl } from "@/components/layout/notification-bell";
 import type { Notification } from "@/lib/api/notifications";
 
 // Mock next/navigation
@@ -269,5 +269,122 @@ describe("NotificationBell", () => {
     await user.click(screen.getByText("Join request"));
 
     expect(mockPush).toHaveBeenCalledWith("/projects/proj-1/settings#join-requests");
+  });
+});
+
+/**
+ * U12 — PR Party notifications ride the same bell, but they carry no project.
+ * The row must render without project fields, route through the server-supplied
+ * `target_url`, and refuse to push a `target_url` that is not same-origin
+ * relative (R21) — a notification body is not a safe navigation source.
+ */
+describe("NotificationBell — PR Party rows", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function prPartyNotification(overrides: Partial<Notification> = {}): Notification {
+    return makeNotification({
+      id: "n-pr",
+      type: "pr_party_ready",
+      title: "A review is ready for you",
+      body: undefined,
+      project_id: undefined,
+      project_name: undefined,
+      target_url: "/pr-party?card=11111111-2222-3333-4444-555555555555",
+      ...overrides,
+    });
+  }
+
+  it("gives pr_party_ready its own icon and colour", async () => {
+    const user = userEvent.setup();
+    setupHook({ notifications: [prPartyNotification()], unreadCount: 1 });
+    const { container } = render(<NotificationBell />);
+
+    await user.click(screen.getByRole("button", { name: "Notifications" }));
+
+    const row = screen.getByText("A review is ready for you").closest("button");
+    expect(row).toBeTruthy();
+    const icon = row!.querySelector("svg");
+    expect(icon).toBeTruthy();
+    // Not the generic fallback colour.
+    expect(icon!.getAttribute("class")).not.toContain("text-slate-400");
+    expect(container).toBeTruthy();
+  });
+
+  it("navigates to the card deep link", async () => {
+    const user = userEvent.setup();
+    setupHook({ notifications: [prPartyNotification()], unreadCount: 1 });
+    render(<NotificationBell />);
+
+    await user.click(screen.getByRole("button", { name: "Notifications" }));
+    await user.click(screen.getByText("A review is ready for you"));
+
+    expect(mockPush).toHaveBeenCalledWith(
+      "/pr-party?card=11111111-2222-3333-4444-555555555555",
+    );
+  });
+
+  it.each([
+    ["https://evil.com/steal", "an absolute url"],
+    ["//evil.com/steal", "a protocol-relative url"],
+    // The URL parser normalises a backslash in the authority position to a
+    // slash, so these resolve to https://evil.test/ exactly as `//evil.test`
+    // does — a `//` check alone waves them straight through.
+    ["/\\evil.test/steal", "a backslash protocol-relative url"],
+    ["/\\\\evil.test/steal", "a double-backslash protocol-relative url"],
+    ["javascript:alert(1)", "a javascript url"],
+  ])("refuses to navigate to %s (%s)", async (targetUrl) => {
+    const user = userEvent.setup();
+    setupHook({
+      notifications: [prPartyNotification({ target_url: targetUrl })],
+      unreadCount: 1,
+    });
+    render(<NotificationBell />);
+
+    await user.click(screen.getByRole("button", { name: "Notifications" }));
+    await user.click(screen.getByText("A review is ready for you"));
+
+    expect(mockPush).toHaveBeenCalledTimes(1);
+    expect(mockPush).not.toHaveBeenCalledWith(targetUrl);
+    expect(mockPush.mock.calls[0][0].startsWith("/")).toBe(true);
+    expect(mockPush.mock.calls[0][0].startsWith("//")).toBe(false);
+  });
+
+  it("admits normal internal paths with query/hash and rejects URL parser escape forms", () => {
+    expect(isSafeInternalUrl("/pr-party?card=1")).toBe(true);
+    expect(isSafeInternalUrl("/projects/p/settings#join-requests")).toBe(true);
+
+    expect(isSafeInternalUrl("//evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/\\evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/\\\\evil.test")).toBe(false);
+    expect(isSafeInternalUrl("\\\\evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/projects\\evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/safe\n//evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/safe\r//evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/safe\t//evil.test")).toBe(false);
+    expect(isSafeInternalUrl(`/safe${String.fromCharCode(0x7f)}suffix`)).toBe(false);
+    expect(isSafeInternalUrl("https://evil.test")).toBe(false);
+    expect(isSafeInternalUrl(undefined)).toBe(false);
+    expect(isSafeInternalUrl(null)).toBe(false);
+  });
+
+  it("renders a mixed list where one notification has no project", async () => {
+    const user = userEvent.setup();
+    setupHook({
+      notifications: [
+        prPartyNotification(),
+        makeNotification({ id: "n-2", title: "New suggestion", project_name: "Canon" }),
+      ],
+      unreadCount: 2,
+    });
+    render(<NotificationBell />);
+
+    await user.click(screen.getByRole("button", { name: "Notifications" }));
+
+    expect(screen.getByText("A review is ready for you")).toBeTruthy();
+    expect(screen.getByText(/Canon/)).toBeTruthy();
+    // No "undefined ·" leaking into the meta line of the project-less row.
+    expect(screen.queryByText(/undefined/)).toBeNull();
   });
 });

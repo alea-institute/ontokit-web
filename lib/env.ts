@@ -1,11 +1,16 @@
 import { z } from "zod";
+import { isAuthActive, isAuthRequired } from "./auth-mode";
 
+// Base schema: all auth vars optional so the inferred ServerEnv type honestly
+// reflects that they can be absent (disabled/optional mode without Zitadel).
+// validateServerEnv() promotes the relevant keys to required at runtime when
+// Zitadel is actually in use — see the `strict` gate below.
 const serverSchema = z.object({
-  ZITADEL_ISSUER: z.url("ZITADEL_ISSUER must be a valid URL"),
-  ZITADEL_CLIENT_ID: z.string().min(1, "ZITADEL_CLIENT_ID is required"),
-  ZITADEL_CLIENT_SECRET: z.string().min(1, "ZITADEL_CLIENT_SECRET is required"),
+  ZITADEL_ISSUER: z.url("ZITADEL_ISSUER must be a valid URL").optional(),
+  ZITADEL_CLIENT_ID: z.string().min(1, "ZITADEL_CLIENT_ID is required").optional(),
+  ZITADEL_CLIENT_SECRET: z.string().min(1, "ZITADEL_CLIENT_SECRET is required").optional(),
   NEXTAUTH_URL: z.url().optional(),
-  NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required"),
+  NEXTAUTH_SECRET: z.string().min(1, "NEXTAUTH_SECRET is required").optional(),
 });
 
 const clientSchema = z.object({
@@ -19,7 +24,23 @@ export type ServerEnv = z.infer<typeof serverSchema>;
 export type ClientEnv = z.infer<typeof clientSchema>;
 
 function validateServerEnv(): ServerEnv {
-  const result = serverSchema.safeParse(process.env);
+  // Zitadel vars + a real NEXTAUTH_SECRET are mandatory whenever auth is required
+  // OR Zitadel is active. The active-provider case matters even in "optional"
+  // mode: it still mints real authenticated sessions, so a missing
+  // secret (which auth.ts would otherwise fill with a random per-process value)
+  // must instead be a hard error — a real, stable secret is required so sessions
+  // survive restarts and can't be forged. Only the no-Zitadel case relaxes.
+  const strict = isAuthRequired() || isAuthActive();
+  const schema = strict
+    ? serverSchema.required({
+        ZITADEL_ISSUER: true,
+        ZITADEL_CLIENT_ID: true,
+        ZITADEL_CLIENT_SECRET: true,
+        NEXTAUTH_SECRET: true,
+      })
+    : serverSchema;
+
+  const result = schema.safeParse(process.env);
   if (!result.success) {
     const tree = z.treeifyError(result.error);
     const messages = Object.entries(tree.properties ?? {})
@@ -33,6 +54,8 @@ function validateServerEnv(): ServerEnv {
         `Set the required variables before starting the server.`
     );
   }
+  // No cast needed: both the strict (required-promoted) and relaxed schemas
+  // produce values structurally assignable to ServerEnv (all-optional).
   return result.data;
 }
 

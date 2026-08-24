@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // ── Configurable mock state (tests can override before render) ──
@@ -13,6 +13,11 @@ const mockEditStateRef = { current: null as Record<string, unknown> | null };
 let autoSaveOverrides: Record<string, unknown> = {};
 
 let editorModeOverrides: Record<string, unknown> = {};
+const mockTranslateField = vi.fn();
+const mockResetTranslation = vi.fn();
+const mockAnnounce = vi.fn();
+let translationItems: Array<Record<string, unknown>> = [];
+let translationError: Error | null = null;
 
 // ── Mocks (must be before component import) ──
 
@@ -26,6 +31,10 @@ vi.mock("@/lib/api/client", () => ({
 
 vi.mock("@/lib/api/lint", () => ({
   lintApi: { getIssues: vi.fn() },
+}));
+
+vi.mock("@/lib/api/duplicateCheck", () => ({
+  distinctDecisionsApi: { mark: vi.fn() },
 }));
 
 vi.mock("@/lib/context/ToastContext", () => ({
@@ -55,7 +64,24 @@ vi.mock("@/lib/stores/editorModeStore", () => ({
 
 // Stub child components
 vi.mock("@/components/editor/LanguageFlag", () => ({
-  LanguageFlag: () => null,
+  LanguageFlag: ({ lang }: { lang: string }) => <span aria-label={`Language: ${lang}`}>flag</span>,
+}));
+vi.mock("@/lib/hooks/useTranslationConfig", () => ({
+  useTranslationConfig: () => ({ config: { language_tags: ["fr"] } }),
+}));
+vi.mock("@/lib/hooks/useTranslationState", () => ({
+  useTranslationState: () => ({
+    state: { entity_iri: "http://example.org/ontology#Person", branch: "main", items: translationItems },
+    translateField: mockTranslateField,
+    isTranslating: false,
+    translateError: translationError,
+    isTranslationPending: false,
+    pendingNotice: null,
+    resetTranslation: mockResetTranslation,
+  }),
+}));
+vi.mock("@/components/ui/ScreenReaderAnnouncer", () => ({
+  useAnnounce: () => ({ announce: mockAnnounce }),
 }));
 vi.mock("@/components/editor/LanguagePicker", () => ({
   LanguagePicker: ({ value, onChange }: { value: string; onChange: (code: string) => void }) => (
@@ -124,12 +150,15 @@ vi.mock("@/components/editor/EntityHistoryTab", () => ({
 import { ClassDetailPanel, ensureTrailingEmpty } from "@/components/editor/ClassDetailPanel";
 import { projectOntologyApi } from "@/lib/api/client";
 import { lintApi } from "@/lib/api/lint";
+import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
+import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 
 // ── Helpers ──
 
 const mockGetClassDetail = projectOntologyApi.getClassDetail as Mock;
 const mockGetIssues = lintApi.getIssues as Mock;
 const mockSearchEntities = projectOntologyApi.searchEntities as Mock;
+const mockMarkDistinctDecision = distinctDecisionsApi.mark as Mock;
 
 function makeClassDetail(overrides: Record<string, unknown> = {}) {
   return {
@@ -182,11 +211,99 @@ describe("ClassDetailPanel", () => {
     mockSearchEntities.mockResolvedValue({ results: [] });
     autoSaveOverrides = {};
     editorModeOverrides = {};
+    translationItems = [];
+    translationError = null;
+    mockTranslateField.mockResolvedValue({ job_id: "job-1" });
     mockEditStateRef.current = null;
     mockFlushToGit.mockResolvedValue(true);
     capturedAnnotationRowProps = [];
     capturedInlineAnnotationAdderProps = null;
     capturedRelationshipSectionProps = null;
+    useSuggestionStore.getState().clearAllSuggestions();
+    mockMarkDistinctDecision.mockResolvedValue({ id: "decision-1" });
+  });
+
+  it("disables the proposal trigger while its session is starting", async () => {
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit={false}
+        canPropose
+        onProposeEdit={vi.fn()}
+        isProposeEditStarting
+      />,
+    );
+
+    const button = await screen.findByRole("button", { name: "Starting…" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("shows language flags and calm provisional values without committing them", async () => {
+    translationItems = [{
+      predicate: "rdfs:label",
+      language: "fr",
+      state: "provisional",
+      value: "Personne",
+      record_id: "record-1",
+    }];
+    const onUpdateClass = vi.fn();
+
+    render(<ClassDetailPanel {...DEFAULT_PROPS} onUpdateClass={onUpdateClass} />);
+
+    expect(await screen.findByText("Personne")).toBeDefined();
+    expect(screen.getAllByLabelText("Language: en").length).toBeGreaterThan(0);
+    expect(screen.getByLabelText("Language: fr")).toBeDefined();
+    expect(screen.getByLabelText("fr translation provisional")).toBeDefined();
+    await waitFor(() => expect(mockAnnounce).toHaveBeenCalledWith("Provisional machine translations are available."));
+    expect(onUpdateClass).not.toHaveBeenCalled();
+  });
+
+  it("runs the confirmed on-demand lifecycle and clears pending when a value arrives", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockGetClassDetail.mockResolvedValue(makeClassDetail({
+      annotations: [{ property_iri: "http://www.w3.org/2004/02/skos/core#definition", values: [{ value: "A person", lang: "en" }] }],
+    }));
+    const view = render(<ClassDetailPanel {...DEFAULT_PROPS} canUseLLM />);
+
+    await user.click(await screen.findByRole("button", { name: "Translate Definition" }));
+    expect(window.confirm).toHaveBeenCalled();
+    expect(mockTranslateField).toHaveBeenCalledWith("skos:definition");
+    expect((screen.getByRole("button", { name: "Definition translation pending" }) as HTMLButtonElement).disabled).toBe(true);
+
+    translationItems = [{ predicate: "skos:definition", language: "fr", state: "provisional", value: "Une personne", record_id: "record-1" }];
+    view.rerender(<ClassDetailPanel {...DEFAULT_PROPS} canUseLLM />);
+    expect(await screen.findByText("Une personne")).toBeDefined();
+    await waitFor(() => expect((screen.getByRole("button", { name: "Translate Definition" }) as HTMLButtonElement).disabled).toBe(false));
+    expect(mockAnnounce).toHaveBeenCalledWith("Definition translations arrived.");
+  });
+
+  it("shows a retryable typed-error path for on-demand translation", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    mockTranslateField.mockRejectedValueOnce(new Error("provider unavailable"));
+    mockGetClassDetail.mockResolvedValue(makeClassDetail({
+      annotations: [{ property_iri: "http://www.w3.org/2004/02/skos/core#definition", values: [{ value: "A person", lang: "en" }] }],
+    }));
+    translationError = new Error("provider unavailable");
+
+    render(<ClassDetailPanel {...DEFAULT_PROPS} canUseLLM />);
+    await user.click(await screen.findByRole("button", { name: "Translate Definition" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain("provider unavailable");
+    expect((screen.getByRole("button", { name: "Retry" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(mockAnnounce).toHaveBeenCalledWith("definition translation failed. You can retry.", "assertive");
+  });
+
+  it("clears the entity pending indicator when translations arrive", async () => {
+    translationItems = [{ predicate: "rdfs:label", language: "fr", state: "pending", value: null, record_id: null }];
+    const view = render(<ClassDetailPanel {...DEFAULT_PROPS} />);
+    expect(await screen.findByText("Translations pending for this entity")).toBeDefined();
+
+    translationItems = [{ predicate: "rdfs:label", language: "fr", state: "provisional", value: "Personne", record_id: "record-1" }];
+    view.rerender(<ClassDetailPanel {...DEFAULT_PROPS} />);
+    await waitFor(() => expect(screen.queryByText("Translations pending for this entity")).toBeNull());
   });
 
   // ── Empty / placeholder state ──
@@ -216,6 +333,133 @@ describe("ClassDetailPanel", () => {
     await waitFor(() => {
       expect(screen.getByText("Network failure")).toBeDefined();
     });
+  });
+
+  it("preserves the candidate branch and class entity type in a distinct decision", async () => {
+    useSuggestionStore.getState().setSuggestions(
+      { projectId: "proj-1", branch: "review" },
+      DEFAULT_PROPS.classIri,
+      "children",
+      [{
+        iri: "http://example.org/ontology#SuggestedClass",
+        suggestion_type: "children",
+        label: "Suggested class",
+        provenance: "llm-proposed",
+        validation_errors: [],
+        duplicate_verdict: "block",
+        duplicate_candidates: [{
+          iri: "http://example.org/ontology#Existing",
+          label: "Existing",
+          entity_type: "class",
+          score: 0.99,
+          branch: "feature/existing",
+        }],
+      }],
+    );
+    const user = userEvent.setup();
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        branch="review"
+        canEdit
+        canUseLLM
+      />,
+    );
+
+    await screen.findByRole("button", { name: "Mark Existing as a distinct entity" });
+    await user.click(screen.getByRole("button", { name: "Mark Existing as a distinct entity" }));
+    await user.type(screen.getByLabelText("Why are these different?"), "Same name, different concepts");
+    await user.click(screen.getByRole("button", { name: "Mark as distinct" }));
+
+    await waitFor(() => {
+      expect(mockMarkDistinctDecision).toHaveBeenCalledWith(
+        "proj-1",
+        expect.objectContaining({
+          proposed_iri: "http://example.org/ontology#SuggestedClass",
+          candidate_iri: "http://example.org/ontology#Existing",
+          candidate_branch: "feature/existing",
+          entity_type: "class",
+          reason: "Same name, different concepts",
+        }),
+        "test-token",
+      );
+    });
+  });
+
+  it("accepts a sibling suggestion under the selected class's sole parent", async () => {
+    const onAddSuggestedChild = vi.fn();
+    useSuggestionStore.getState().setSuggestions(
+      { projectId: "proj-1", branch: "main" },
+      DEFAULT_PROPS.classIri,
+      "siblings",
+      [{
+        iri: "http://example.org/ontology#Sibling",
+        suggestion_type: "siblings",
+        label: "Suggested sibling",
+        provenance: "llm-proposed",
+        validation_errors: [],
+        duplicate_verdict: "pass",
+        duplicate_candidates: [],
+      }],
+    );
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit
+        canUseLLM
+        onAddSuggestedChild={onAddSuggestedChild}
+      />,
+    );
+
+    const card = (await screen.findByText("Suggested sibling")).closest<HTMLElement>('[role="listitem"]');
+    expect(card).not.toBeNull();
+    await userEvent.click(within(card!).getByRole("button", { name: "Accept suggestion" }));
+
+    expect(onAddSuggestedChild).toHaveBeenCalledWith(
+      "http://example.org/ontology#Sibling",
+      "Suggested sibling",
+      "http://example.org/ontology#Agent",
+    );
+  });
+
+  it.each([
+    [[], /has no parent/i],
+    [["http://example.org/ontology#Agent", "http://example.org/ontology#LegalEntity"], /multiple parents/i],
+  ])("keeps a sibling suggestion pending when its parent is not deterministic", async (parentIris, expectedError) => {
+    const onAddSuggestedChild = vi.fn();
+    mockGetClassDetail.mockResolvedValue(makeClassDetail({ parent_iris: parentIris }));
+    useSuggestionStore.getState().setSuggestions(
+      { projectId: "proj-1", branch: "main" },
+      DEFAULT_PROPS.classIri,
+      "siblings",
+      [{
+        iri: "http://example.org/ontology#Sibling",
+        suggestion_type: "siblings",
+        label: "Ambiguous sibling",
+        provenance: "llm-proposed",
+        validation_errors: [],
+        duplicate_verdict: "pass",
+        duplicate_candidates: [],
+      }],
+    );
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit
+        canUseLLM
+        onAddSuggestedChild={onAddSuggestedChild}
+      />,
+    );
+
+    const card = (await screen.findByText("Ambiguous sibling")).closest<HTMLElement>('[role="listitem"]');
+    expect(card).not.toBeNull();
+    await userEvent.click(within(card!).getByRole("button", { name: "Accept suggestion" }));
+
+    expect(onAddSuggestedChild).not.toHaveBeenCalled();
+    expect(await screen.findByText(expectedError)).toBeDefined();
+    expect(useSuggestionStore.getState().suggestions[
+      "proj-1::main::http://example.org/ontology#Person::siblings"
+    ][0].status).toBe("pending");
   });
 
   it("shows entity-type hint for 404 errors", async () => {

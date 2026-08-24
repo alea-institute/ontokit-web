@@ -1,12 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// Mock dependencies
-vi.mock("@/lib/stores/editorModeStore", () => ({
-  useEditorModeStore: (selector: (state: Record<string, unknown>) => unknown) =>
-    selector({ hideSaveButton: false }),
-}));
+vi.hoisted(() => {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  });
+});
 
 vi.mock("next/link", () => ({
   __esModule: true,
@@ -20,8 +25,12 @@ vi.mock("@/components/ui/tooltip", () => ({
 }));
 
 import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 
 describe("AutoSaveAffordanceBar", () => {
+  beforeEach(() => {
+    useEditorModeStore.setState({ showManualSaveButton: true });
+  });
   it("renders idle state with 'Auto-save on' text", () => {
     render(<AutoSaveAffordanceBar status="idle" />);
     expect(screen.getByText("Auto-save on")).toBeDefined();
@@ -112,5 +121,22 @@ describe("AutoSaveAffordanceBar", () => {
       <AutoSaveAffordanceBar status="draft" onManualSave={() => {}} />
     );
     expect(screen.getByText("Save")).toBeDefined();
+  });
+
+  it("surfaces a Save button when the manual-save preference is on and saves immediately", async () => {
+    const onManualSave = vi.fn();
+    useEditorModeStore.getState().setShowManualSaveButton(true);
+    render(<AutoSaveAffordanceBar status="draft" onManualSave={onManualSave} />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(onManualSave).toHaveBeenCalledOnce();
+  });
+
+  it("omits the optional Save button when the preference is off", () => {
+    useEditorModeStore.getState().setShowManualSaveButton(false);
+    render(<AutoSaveAffordanceBar status="draft" onManualSave={() => {}} />);
+
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 });

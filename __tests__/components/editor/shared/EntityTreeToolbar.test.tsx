@@ -2,21 +2,6 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// Provide localStorage before component imports (jsdom may not have it ready)
-vi.hoisted(() => {
-  if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() { return store.size; },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
-});
-
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
 
 describe("EntityTreeToolbar", () => {
@@ -53,6 +38,25 @@ describe("EntityTreeToolbar", () => {
     render(<EntityTreeToolbar {...baseProps} canAdd onAdd={onAdd} />);
     await userEvent.click(screen.getByLabelText("Add entity"));
     expect(onAdd).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the add callback inert while entity minting is locked", async () => {
+    const onAdd = vi.fn();
+    render(
+      <EntityTreeToolbar
+        {...baseProps}
+        canAdd
+        onAdd={onAdd}
+        addLocked
+        addLockedReason="Creating new entries requires trusted status."
+      />,
+    );
+
+    const add = screen.getByLabelText("Add entity") as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    expect(add.title).toBe("Creating new entries requires trusted status.");
+    await userEvent.click(add);
+    expect(onAdd).not.toHaveBeenCalled();
   });
 
   it("calls onToggleSearch when search button is clicked", async () => {

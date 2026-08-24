@@ -4,22 +4,31 @@ import React from "react";
 
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 
-// Provide localStorage polyfill
-vi.hoisted(() => {
-  if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => { store.set(key, value); },
-      removeItem: (key: string) => { store.delete(key); },
-      clear: () => store.clear(),
-      get length() { return store.size; },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
-});
-
 // --- Mocks ---
+
+// PR-5 mounts useLLMGate (session + react-query backed) in the layouts; the
+// gate has its own dedicated tests — here we stub an anonymous/no-access
+// state so the layout renders without Session/QueryClient providers.
+vi.mock("@/lib/hooks/useLLMGate", () => ({
+  useLLMGate: () => ({
+    canUseLLM: false,
+    budgetExhausted: false,
+    dailyExhausted: false,
+    notConfigured: false,
+    dailyRemaining: null,
+    isBudgetUnlimited: true,
+    isAnonymous: true,
+    hasRoleAccess: false,
+    monthlySpentUsd: 0,
+    monthlyBudgetUsd: null,
+    burnRateDailyUsd: 0,
+    roleLimitLabel: null,
+    invalidateStatus: () => {},
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+}));
 
 vi.mock("next/dynamic", () => ({
   __esModule: true,
@@ -436,6 +445,52 @@ describe("StandardEditorLayout", () => {
     expect(_toolbarProps.canAdd).toBe(false);
   });
 
+  it("exposes minting affordances to a trusted contributor in suggestion mode", () => {
+    render(
+      <StandardEditorLayout
+        {...defaultProps({
+          nodes: sampleNodes,
+          canEdit: false,
+          isSuggestionMode: true,
+          trustGate: {
+            tier: "trusted",
+            locked: false,
+            isLoading: false,
+            isError: false,
+            progress: null,
+          },
+        })}
+      />,
+    );
+
+    expect(_toolbarProps.canAdd).toBe(true);
+    expect(_classTreeProps.onAddChild).toBeDefined();
+  });
+
+  it("keeps minting visible but locked for an untrusted contributor in suggestion mode", () => {
+    render(
+      <StandardEditorLayout
+        {...defaultProps({
+          nodes: sampleNodes,
+          canEdit: false,
+          isSuggestionMode: true,
+          trustGate: {
+            tier: "untrusted",
+            locked: true,
+            isLoading: false,
+            isError: false,
+            progress: { accepted: 1, threshold: 5, remaining: 4 },
+          },
+        })}
+      />,
+    );
+
+    expect(_toolbarProps.canAdd).toBe(true);
+    expect(_toolbarProps.addLocked).toBe(true);
+    expect(_classTreeProps.onAddChild).toBeDefined();
+    expect(_classTreeProps.addChildLocked).toBe(true);
+  });
+
   // --- ClassDetailPanel prop forwarding ---
   it("passes canEdit=true to ClassDetailPanel when isSuggestionMode is true", () => {
     render(
@@ -477,6 +532,17 @@ describe("StandardEditorLayout", () => {
     expect(_propertyDetailProps.onCopyIri).toBe(onCopyIri);
     expect(_propertyDetailProps.canEdit).toBe(true);
     expect(_propertyDetailProps.refreshKey).toBe(7);
+  });
+
+  it("passes canEdit=true to PropertyDetailPanel in suggestion mode", () => {
+    render(
+      <StandardEditorLayout
+        {...defaultProps({ nodes: sampleNodes, canEdit: false, isSuggestionMode: true })}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Properties"));
+    expect(_propertyDetailProps.canEdit).toBe(true);
   });
 
   // --- IndividualDetailPanel prop forwarding ---

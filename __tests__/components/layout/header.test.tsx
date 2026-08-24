@@ -1,5 +1,14 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+
+// The Review entry is role-gated, so the Header now reads PR Party capability.
+// Mocked rather than provider-wrapped: the gate is what these tests assert, and
+// a real query would drag a QueryClient and a session into every nav case.
+let mockIsReviewer = false;
+vi.mock("@/lib/hooks/usePRPartyCapabilities", () => ({
+  usePRPartyCapabilities: () => ({ isReviewer: mockIsReviewer, isLoading: false }),
+}));
+
 import { Header } from "@/components/layout/header";
 
 // Mock next/link
@@ -32,6 +41,14 @@ vi.mock("@/components/editor/ThemeToggle", () => ({
 describe("Header", () => {
   beforeEach(() => {
     mockPathname = "/";
+    mockIsReviewer = false;
+    // Configured deployment (Zitadel present) so auth affordances render — the
+    // case these tests assert. Anonymous/hidden case covered separately below.
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("renders the OntoKit brand link", () => {
@@ -62,6 +79,15 @@ describe("Header", () => {
     expect(screen.getByTestId("theme-toggle")).toBeDefined();
   });
 
+  it("hides UserMenu and NotificationBell in anonymous mode (Zitadel unconfigured)", () => {
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "false");
+    render(<Header />);
+    expect(screen.queryByTestId("user-menu")).toBeNull();
+    expect(screen.queryByTestId("notification-bell")).toBeNull();
+    // ThemeToggle is always shown regardless of auth mode.
+    expect(screen.getByTestId("theme-toggle")).toBeDefined();
+  });
+
   it("highlights the Projects link when on /", () => {
     mockPathname = "/";
     render(<Header />);
@@ -74,6 +100,19 @@ describe("Header", () => {
     render(<Header />);
     const infoLink = screen.getByText("Info");
     expect(infoLink.className).toContain("bg-blue-100");
+  });
+
+  it("hides the Review link from non-reviewers", () => {
+    mockIsReviewer = false;
+    render(<Header />);
+    expect(screen.queryByText("Review")).toBeNull();
+  });
+
+  it("shows the Review link to reviewers, pointing at /pr-party", () => {
+    mockIsReviewer = true;
+    render(<Header />);
+    const link = screen.getByText("Review").closest("a");
+    expect(link?.getAttribute("href")).toBe("/pr-party");
   });
 
   it("does not highlight Projects link on non-root paths", () => {

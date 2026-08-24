@@ -5,25 +5,75 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export class ApiError extends Error {
+  public readonly detail: unknown;
+  public readonly userMessage: string;
+
   constructor(
     public status: number,
     public statusText: string,
-    message: string
+    rawBody: string
   ) {
-    super(message);
+    super(rawBody);
     this.name = "ApiError";
+    this.detail = apiErrorDetail(rawBody);
+    this.userMessage = apiErrorDisplayMessage(this.detail, rawBody, statusText);
   }
 }
 
-interface RequestOptions extends RequestInit {
+function apiErrorDetail(body: string): unknown {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed && typeof parsed === "object" && "detail" in parsed) {
+      return (parsed as { detail?: unknown }).detail;
+    }
+  } catch {
+    // Non-JSON responses have no structured detail.
+  }
+  return undefined;
+}
+
+function apiErrorDisplayMessage(
+  detail: unknown,
+  rawBody: string,
+  statusText: string
+): string {
+  if (typeof detail === "string") return detail;
+  if (detail && typeof detail === "object" && "message" in detail) {
+    const message = (detail as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return rawBody || statusText || "Request failed";
+}
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof ApiError) return error.userMessage;
+  if (error instanceof Error) return error.message || fallback;
+  return fallback;
+}
+export interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
+  /**
+   * Retry 5xx responses. Defaults to true for GET/HEAD and false for mutation
+   * methods. Callers may explicitly override either posture.
+   */
+  retryOn5xx?: boolean;
 }
 
 async function request<T>(
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<T> {
-  const { params, ...fetchOptions } = options;
+  // Pull the caller's optional AbortSignal out so we can combine it with the
+  // internal per-attempt timeout controller (we can't pass two signals to
+  // fetch directly).
+  const {
+    params,
+    signal: externalSignal,
+    retryOn5xx: retryOn5xxOption,
+    ...fetchOptions
+  } = options;
+  const method = (fetchOptions.method ?? "GET").toUpperCase();
+  const retryOn5xx = retryOn5xxOption ?? (method === "GET" || method === "HEAD");
 
   // Build URL with query params
   const url = new URL(`${API_BASE}${endpoint}`);
@@ -46,6 +96,14 @@ async function request<T>(
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
+    // Forward the caller's abort (e.g. navigating away cancels an in-flight
+    // suggestion request) onto the per-attempt timeout controller.
+    const onExternalAbort = () => controller.abort();
+    if (externalSignal) {
+      if (externalSignal.aborted) controller.abort();
+      else externalSignal.addEventListener("abort", onExternalAbort, { once: true });
+    }
+
     try {
       const response = await fetch(url.toString(), {
         ...fetchOptions,
@@ -54,8 +112,11 @@ async function request<T>(
       });
 
       if (!response.ok) {
-        const message = await response.text();
-        throw new ApiError(response.status, response.statusText, message);
+        throw new ApiError(
+          response.status,
+          response.statusText,
+          await response.text()
+        );
       }
 
       // Handle empty responses
@@ -66,13 +127,14 @@ async function request<T>(
 
       return JSON.parse(text);
     } catch (error) {
-      if (error instanceof ApiError && error.status >= 500 && attempt < 2) {
+      if (retryOn5xx && error instanceof ApiError && error.status >= 500 && attempt < 2) {
         await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt)));
         continue;
       }
       throw error;
     } finally {
       clearTimeout(timeoutId);
+      externalSignal?.removeEventListener("abort", onExternalAbort);
     }
   }
 
@@ -113,8 +175,7 @@ async function uploadFile<T>(
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new ApiError(response.status, response.statusText, message);
+    throw new ApiError(response.status, response.statusText, await response.text());
   }
 
   const text = await response.text();
@@ -185,7 +246,13 @@ function uploadFileWithProgress<T>(
           resolve(undefined as T);
         }
       } else {
-        reject(new ApiError(xhr.status, xhr.statusText, xhr.responseText));
+        reject(
+          new ApiError(
+            xhr.status,
+            xhr.statusText,
+            xhr.responseText
+          )
+        );
       }
     });
 
@@ -583,6 +650,7 @@ export { embeddingsApi } from "./embeddings";
 export { qualityApi } from "./quality";
 export { analyticsApi } from "./analytics";
 export { remoteSyncApi } from "./remoteSync";
+export { llmApi } from "./llm";
 
 // Annotation update — a single annotation property with its values
 export interface AnnotationUpdate {

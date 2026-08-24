@@ -4,22 +4,31 @@ import React from "react";
 
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 
-// Provide localStorage polyfill
-vi.hoisted(() => {
-  if (!globalThis.localStorage || typeof globalThis.localStorage.setItem !== "function") {
-    const store = new Map<string, string>();
-    (globalThis as Record<string, unknown>).localStorage = {
-      getItem: (key: string) => store.get(key) ?? null,
-      setItem: (key: string, value: string) => store.set(key, value),
-      removeItem: (key: string) => store.delete(key),
-      clear: () => store.clear(),
-      get length() { return store.size; },
-      key: (index: number) => [...store.keys()][index] ?? null,
-    };
-  }
-});
-
 // --- Mocks ---
+
+// PR-5 mounts useLLMGate (session + react-query backed) in the layouts; the
+// gate has its own dedicated tests — here we stub an anonymous/no-access
+// state so the layout renders without Session/QueryClient providers.
+vi.mock("@/lib/hooks/useLLMGate", () => ({
+  useLLMGate: () => ({
+    canUseLLM: false,
+    budgetExhausted: false,
+    dailyExhausted: false,
+    notConfigured: false,
+    dailyRemaining: null,
+    isBudgetUnlimited: true,
+    isAnonymous: true,
+    hasRoleAccess: false,
+    monthlySpentUsd: 0,
+    monthlyBudgetUsd: null,
+    burnRateDailyUsd: 0,
+    roleLimitLabel: null,
+    invalidateStatus: () => {},
+    isLoading: false,
+    isError: false,
+    error: null,
+  }),
+}));
 
 vi.mock("next/dynamic", () => ({
   __esModule: true,
@@ -133,8 +142,11 @@ vi.mock("@/components/editor/standard/IndividualList", () => ({
   IndividualList: () => <div data-testid="individual-list" />,
 }));
 
+let _propertyDetailProps: Record<string, unknown> = {};
 vi.mock("@/components/editor/PropertyDetailPanel", () => ({
-  PropertyDetailPanel: (props: Record<string, unknown>) => (
+  PropertyDetailPanel: (props: Record<string, unknown>) => {
+    _propertyDetailProps = props;
+    return (
     <div data-testid="property-detail-panel">
       {typeof props.onNavigateToEntity === "function" && (
         <button
@@ -145,7 +157,8 @@ vi.mock("@/components/editor/PropertyDetailPanel", () => ({
         </button>
       )}
     </div>
-  ),
+    );
+  },
 }));
 
 vi.mock("@/components/editor/IndividualDetailPanel", () => ({
@@ -163,16 +176,20 @@ vi.mock("@/components/editor/IndividualDetailPanel", () => ({
   ),
 }));
 
+let _toolbarProps: Record<string, unknown> = {};
 vi.mock("@/components/editor/shared/EntityTreeToolbar", () => ({
-  EntityTreeToolbar: (props: Record<string, unknown>) => (
-    <div data-testid="entity-tree-toolbar">
-      {typeof props.onAdd === "function" && (
-        <button data-testid="toolbar-add-btn" onClick={props.onAdd as () => void}>
-          Add entity
-        </button>
-      )}
-    </div>
-  ),
+  EntityTreeToolbar: (props: Record<string, unknown>) => {
+    _toolbarProps = props;
+    return (
+      <div data-testid="entity-tree-toolbar">
+        {typeof props.onAdd === "function" && (
+          <button data-testid="toolbar-add-btn" onClick={props.onAdd as () => void}>
+            Add entity
+          </button>
+        )}
+      </div>
+    );
+  },
 }));
 
 vi.mock("@/components/editor/shared/DraggableTreeWrapper", () => ({
@@ -457,6 +474,17 @@ describe("DeveloperEditorLayout", () => {
     );
     fireEvent.click(screen.getByText("Properties"));
     expect(screen.getByTestId("property-detail-panel")).toBeDefined();
+  });
+
+  it("passes canEdit=true to PropertyDetailPanel in suggestion mode", () => {
+    render(
+      <DeveloperEditorLayout
+        {...defaultProps({ nodes: [makeNode()], canEdit: false, isSuggestionMode: true })}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Properties"));
+    expect(_propertyDetailProps.canEdit).toBe(true);
   });
 
   it("shows IndividualDetailPanel when individuals tab is selected", () => {
@@ -1142,6 +1170,27 @@ describe("DeveloperEditorLayout", () => {
 
     fireEvent.click(screen.getByTestId("toolbar-add-btn"));
     expect(onAddEntity).toHaveBeenCalledWith();
+  });
+
+  it("exposes minting affordances to a trusted contributor in suggestion mode", () => {
+    render(
+      <DeveloperEditorLayout
+        {...defaultProps({
+          nodes: [makeNode()],
+          canEdit: false,
+          isSuggestionMode: true,
+          trustGate: {
+            tier: "trusted",
+            locked: false,
+            isLoading: false,
+            isError: false,
+            progress: null,
+          },
+        })}
+      />,
+    );
+
+    expect(_toolbarProps.canAdd).toBe(true);
   });
 
   it("calls onAddEntity with parentIri via ClassTree onAddChild", () => {

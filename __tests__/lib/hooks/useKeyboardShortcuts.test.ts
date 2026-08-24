@@ -263,6 +263,60 @@ describe("useKeyboardShortcuts", () => {
     document.body.removeChild(input);
   });
 
+  it("does not fire OR preventDefault when shouldFire returns false (H-1)", () => {
+    const action = vi.fn();
+
+    const shortcuts: ShortcutDefinition[] = [
+      {
+        id: "suggestion-accept",
+        key: "Enter",
+        description: "Accept focused suggestion",
+        category: "Suggestions",
+        // Simulates "no suggestion card owns focus"
+        shouldFire: () => false,
+        action,
+      },
+    ];
+
+    renderHook(() => useKeyboardShortcuts(shortcuts));
+
+    // Focus a non-suggestion button, then press Enter
+    const button = document.createElement("button");
+    document.body.appendChild(button);
+    button.focus();
+
+    const event = fireKeydown({ key: "Enter" });
+
+    // The action must NOT run and the event must NOT be consumed — so Enter
+    // reaches the focused button as normal.
+    expect(action).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+
+    document.body.removeChild(button);
+  });
+
+  it("fires and consumes the event when shouldFire returns true", () => {
+    const action = vi.fn();
+
+    const shortcuts: ShortcutDefinition[] = [
+      {
+        id: "suggestion-accept",
+        key: "Enter",
+        description: "Accept focused suggestion",
+        category: "Suggestions",
+        shouldFire: () => true,
+        action,
+      },
+    ];
+
+    renderHook(() => useKeyboardShortcuts(shortcuts));
+
+    const event = fireKeydown({ key: "Enter" });
+
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
   it("suppresses shortcuts when a Radix dialog is open", () => {
     const action = vi.fn();
 

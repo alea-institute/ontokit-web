@@ -18,12 +18,18 @@ interface ClassTreeProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  /** Trust ladder (R8): minting is above this contributor's rung. */
+  addChildLocked?: boolean;
+  /** Plain-language reason shown on the disabled affordance (AE2). */
+  addChildLockedReason?: string;
   searchResults?: EntitySearchResult[] | null;
   isSearching?: boolean;
   onSearchSelect?: (iri: string) => void;
   searchQuery?: string;
   /** IRIs that have uncommitted drafts — shown with amber dot indicator */
   draftIris?: Set<string>;
+  /** IRIs of accepted LLM suggestions — shown with sparkle badge indicator */
+  suggestedIris?: Set<string>;
   /** Pre-built filtered tree from useFilteredTree (ancestor-path search results) */
   filteredTree?: EntityTreeNode[] | null;
   /** Whether the filtered tree is still being built */
@@ -48,11 +54,14 @@ export function ClassTree({
   onCopyIri,
   onDelete,
   onViewInSource,
+  addChildLocked,
+  addChildLockedReason,
   searchResults,
   isSearching,
   onSearchSelect,
   searchQuery,
   draftIris,
+  suggestedIris,
   filteredTree,
   isFilteredTreeBuilding,
   filteredTreeTruncated,
@@ -149,7 +158,10 @@ export function ClassTree({
       onCopyIri={onCopyIri}
       onDelete={onDelete}
       onViewInSource={onViewInSource}
+      addChildLocked={addChildLocked}
+      addChildLockedReason={addChildLockedReason}
       draftIris={draftIris}
+      suggestedIris={suggestedIris}
       enableKeyboardNav
       dragState={dragState}
       onDragEnterNode={onDragEnterNode}

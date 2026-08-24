@@ -2,7 +2,7 @@
 
 import { memo, useCallback } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { ChevronRight, ChevronDown, Circle, Plus } from "lucide-react";
+import { ChevronRight, ChevronDown, Circle, Plus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { TreeNodeContextMenu } from "@/components/editor/TreeNodeContextMenu";
@@ -22,7 +22,13 @@ interface EntityTreeNodeProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  /** Trust ladder (R8): minting is above this contributor's rung. */
+  addChildLocked?: boolean;
+  /** Plain-language reason shown on the disabled affordance (AE2). */
+  addChildLockedReason?: string;
   draftIris?: Set<string>;
+  /** IRIs of accepted LLM suggestions — shown with sparkle badge indicator */
+  suggestedIris?: Set<string>;
   /** Drag state for drag-and-drop reparenting. Undefined = drag disabled. */
   dragState?: DragState;
   /** Called when drag hovers over this node (for auto-expand) */
@@ -57,7 +63,10 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   onCopyIri,
   onDelete,
   onViewInSource,
+  addChildLocked = false,
+  addChildLockedReason,
   draftIris,
+  suggestedIris,
   dragState,
   onDragEnterNode,
   onDragLeaveNode,
@@ -120,9 +129,10 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   const handleAddChild = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
+      if (addChildLocked) return;
       onAddChild?.(node.iri);
     },
-    [node.iri, onAddChild],
+    [node.iri, onAddChild, addChildLocked],
   );
 
   // Group headers: uppercase label + count, click only toggles expand
@@ -164,7 +174,10 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
                 onCopyIri={onCopyIri}
                 onDelete={onDelete}
                 onViewInSource={onViewInSource}
+                addChildLocked={addChildLocked}
+                addChildLockedReason={addChildLockedReason}
                 draftIris={draftIris}
+                suggestedIris={suggestedIris}
               />
             ))}
           </div>
@@ -244,12 +257,28 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
         />
       )}
 
+      {/* Suggested entity sparkle badge (D-07) */}
+      {suggestedIris?.has(node.iri) && (
+        <Sparkles
+          className="h-3 w-3 shrink-0 text-amber-500"
+          aria-label="LLM-suggested entity"
+          role="img"
+        />
+      )}
+
       {/* Add child button — visible on hover */}
       {onAddChild && (
         <button
           onClick={handleAddChild}
-          className="opacity-0 group-hover:opacity-100 p-1 rounded-sm hover:bg-slate-200 dark:hover:bg-slate-700"
+          disabled={addChildLocked}
+          className={cn(
+            "opacity-0 group-hover:opacity-100 p-1 rounded-sm",
+            addChildLocked
+              ? "cursor-not-allowed disabled:opacity-0 group-hover:opacity-40"
+              : "hover:bg-slate-200 dark:hover:bg-slate-700",
+          )}
           aria-label="Add subclass"
+          title={addChildLocked ? addChildLockedReason : undefined}
           tabIndex={-1}
         >
           <Plus className="w-3 h-3" />
@@ -269,6 +298,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
             onCopyIri={onCopyIri}
             onDelete={onDelete}
             onViewInSource={onViewInSource}
+            addChildLocked={addChildLocked}
+            addChildLockedReason={addChildLockedReason}
           />
         </ContextMenu>
       ) : (
@@ -292,7 +323,10 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
             onCopyIri={onCopyIri}
             onDelete={onDelete}
             onViewInSource={onViewInSource}
+            addChildLocked={addChildLocked}
+            addChildLockedReason={addChildLockedReason}
             draftIris={draftIris}
+            suggestedIris={suggestedIris}
             dragState={dragState}
             onDragEnterNode={onDragEnterNode}
             onDragLeaveNode={onDragLeaveNode}

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { ApiError } from "@/lib/api/client";
-import { projectApi } from "@/lib/api/projects";
+import { projectApi, type Project } from "@/lib/api/projects";
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -53,6 +53,19 @@ describe("projectApi", () => {
       expect(url).toContain("limit=10");
       expect(url).toContain("filter=public");
       expect(url).toContain("search=test");
+    });
+
+    it("passes bounded demo discovery filters", async () => {
+      mockOk({ items: [], total: 0, unfiltered_total: 0, skip: 0, limit: 1 });
+
+      await projectApi.list(0, 1, "public", undefined, undefined, {
+        isDemo: true,
+        demoSourceProjectId: "folio-live",
+      });
+
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toContain("is_demo=true");
+      expect(url).toContain("demo_source_project_id=folio-live");
     });
 
     it("passes Authorization header when token provided", async () => {
@@ -118,6 +131,32 @@ describe("projectApi", () => {
 
       const [, options] = mockFetch.mock.calls[0];
       expect(options.headers.has("Authorization")).toBe(false);
+    });
+
+    it("accepts explicit null demo metadata from the API", async () => {
+      const project: Project = {
+        id: "p1",
+        name: "Ordinary project",
+        is_public: true,
+        owner_id: "owner-1",
+        created_at: "2026-08-24T12:00:00Z",
+        member_count: 0,
+        is_demo: false,
+        demo_source_project_id: null,
+        demo_repository_full_name: null,
+      };
+      mockOk(project);
+
+      const result = await projectApi.get(project.id);
+      const sourceHref = result.demo_source_project_id
+        ? `/projects/${result.demo_source_project_id}`
+        : null;
+      const displayName = result.demo_repository_full_name ?? result.name;
+
+      expect(result.demo_source_project_id).toBeNull();
+      expect(result.demo_repository_full_name).toBeNull();
+      expect(sourceHref).toBeNull();
+      expect(displayName).toBe("Ordinary project");
     });
   });
 

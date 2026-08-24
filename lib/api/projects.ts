@@ -39,6 +39,9 @@ export interface Project {
   member_count: number;
   user_role?: ProjectRole;
   is_superadmin?: boolean;  // Whether the current user is a superadmin
+  is_demo?: boolean;
+  demo_source_project_id?: string | null;
+  demo_repository_full_name?: string | null;
   // Import-related fields (optional, only set when project was created via import)
   source_file_path?: string;
   git_ontology_path?: string;
@@ -59,6 +62,11 @@ export interface ProjectListResponse {
   unfiltered_total: number;
   skip: number;
   limit: number;
+}
+
+export interface ProjectListFilters {
+  isDemo?: boolean;
+  demoSourceProjectId?: string;
 }
 
 export interface ProjectCreate {
@@ -85,6 +93,7 @@ export interface ProjectMember {
   project_id: string;
   user_id: string;
   role: ProjectRole;
+  can_self_merge_structural?: boolean;  // Only relevant for editor role
   user?: MemberUser;
   created_at: string;
 }
@@ -101,6 +110,7 @@ export interface MemberCreate {
 
 export interface MemberUpdate {
   role: ProjectRole;
+  can_self_merge_structural?: boolean;  // Only relevant for editor role
 }
 
 export interface TransferOwnership {
@@ -150,14 +160,30 @@ export const projectApi = {
    * @param limit - Maximum results
    * @param filter - Filter type: 'public', 'private', 'mine', or undefined for all accessible
    * @param token - Access token for authentication
+   * @param search - Optional project-name or description search
+   * @param demoFilters - Optional server-side demo identity filters
    */
-  list: (skip = 0, limit = 20, filter?: "public" | "private" | "mine", token?: string, search?: string) => {
+  list: (
+    skip = 0,
+    limit = 20,
+    filter?: "public" | "private" | "mine",
+    token?: string,
+    search?: string,
+    demoFilters: ProjectListFilters = {},
+  ) => {
     const headers: HeadersInit = {};
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
     return api.get<ProjectListResponse>("/api/v1/projects", {
-      params: { skip, limit, filter, search: search || undefined },
+      params: {
+        skip,
+        limit,
+        filter,
+        search: search || undefined,
+        is_demo: demoFilters.isDemo,
+        demo_source_project_id: demoFilters.demoSourceProjectId,
+      },
       headers,
     });
   },

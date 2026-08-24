@@ -12,7 +12,7 @@ export function useSemanticSearch(
   limit = 20
 ) {
   return useQuery({
-    queryKey: ["search", mode, projectId, query, !!accessToken, branch, limit],
+    queryKey: ["search", mode, projectId, query, accessToken ?? null, branch, limit],
     queryFn: async () => {
       if (mode === "text") {
         const response = await projectOntologyApi.searchEntities(
@@ -38,8 +38,12 @@ export function useSemanticSearch(
           branch,
           limit
         );
-      } catch {
-        // Fall back to text search if semantic search unavailable
+      } catch (error) {
+        // Budget exhaustion (402) and unavailable embeddings (503) can still
+        // produce useful text results. Authorization and other failures must
+        // remain visible instead of being silently disguised as text results.
+        const status = (error as { status?: number }).status;
+        if (status !== 402 && status !== 503) throw error;
         const response = await projectOntologyApi.searchEntities(
           projectId,
           query,
@@ -57,5 +61,6 @@ export function useSemanticSearch(
     },
     enabled: enabled && !!query.trim() && !!projectId,
     staleTime: 10_000,
+    retry: false,
   });
 }

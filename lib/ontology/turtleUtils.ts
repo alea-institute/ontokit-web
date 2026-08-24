@@ -51,8 +51,16 @@ export function reverseMap(prefixes: PrefixMap): Map<string, string> {
   return rev;
 }
 
+/** Reject characters that can escape or corrupt a Turtle IRI reference. */
+export function assertSafeTurtleIri(iri: string): void {
+  if (!iri || /[\u0000-\u0020<>"{}|^`\\]/u.test(iri)) {
+    throw new Error("Invalid IRI: unsafe characters are not allowed");
+  }
+}
+
 /** Convert a full IRI to shortest Turtle form using available prefixes */
 export function toTurtle(iri: string, rev: Map<string, string>): string {
+  assertSafeTurtleIri(iri);
   for (const [ns, alias] of rev) {
     if (iri.startsWith(ns)) {
       const local = iri.slice(ns.length);
@@ -292,6 +300,11 @@ export function esc(s: string): string {
 }
 
 export function literal(value: string, lang: string): string {
+  // Deliberately conservative BCP 47 subset, matching the project settings
+  // validator: primary language plus optional 1-8 character subtags.
+  if (lang && !/^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*$/.test(lang)) {
+    throw new TypeError("Invalid BCP 47 language tag");
+  }
   const escaped = esc(value);
   return lang ? `"${escaped}"@${lang}` : `"${escaped}"`;
 }

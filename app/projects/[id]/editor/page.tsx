@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn } from "lucide-react";
+import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn, Pencil } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -21,6 +21,7 @@ import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { useQueryClient } from "@tanstack/react-query";
 import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
+import { useLLMGate } from "@/lib/hooks/useLLMGate";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
@@ -28,6 +29,12 @@ import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
 import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
+import {
+  createGeneratedEntityPersistenceQueue,
+  persistGeneratedEntity,
+  type GeneratedEntityPersistenceMode,
+} from "@/lib/editor/generatedEntityPersistence";
+import { saveSuggestionUpdate } from "@/lib/editor/suggestionSessionPersistence";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
 import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
@@ -42,8 +49,22 @@ import { useSuggestionBeacon } from "@/lib/hooks/useSuggestionBeacon";
 import { DeleteImpactAnalysis } from "@/components/editor/DeleteImpactAnalysis";
 import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
 import { ShareButton } from "@/components/editor/ShareButton";
+import { useAnonymousSuggestion } from "@/lib/hooks/useAnonymousSuggestion";
+import { CreditModal } from "@/components/suggestions/CreditModal";
+import { ProposalSubmittedDialog } from "@/components/editor/ProposalSubmittedDialog";
+import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
+import type { TrustGate } from "@/components/editor/TrustExplainer";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+
+/**
+ * True when a suggestion card (role="listitem") currently owns focus. Used to
+ * gate the bare-key suggestion shortcuts so they only fire — and only consume
+ * the event — when the user is actually reviewing a suggestion (H-1).
+ */
+function suggestionCardHasFocus(): boolean {
+  return !!document.activeElement?.closest('[role="listitem"]');
+}
 
 export default function EditorPage() {
   const { data: session, status } = useSession();
@@ -80,9 +101,14 @@ export default function EditorPage() {
     setProjectViewMode("editor");
   }, [setProjectViewMode]);
 
+  // Auth mode — set at build time by next.config.ts
+  const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
+  const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+
   // Branch state
   const queryClient = useQueryClient();
   const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
+  const generatedEntityPersistenceQueue = useRef(createGeneratedEntityPersistenceQueue());
 
   // Shared project/tree/source state from hook
   const viewer = useProjectViewer({
@@ -110,6 +136,49 @@ export default function EditorPage() {
     connectionStatus, wsEndpoint, wsPurpose,
     resetSourceState,
   } = viewer;
+
+  // LLM access gate — shared (React Query dedupes) with the layouts. Used here
+  // to scope the suggestion keyboard shortcuts so they only register when the
+  // project actually has LLM access (H-1).
+  const llmGate = useLLMGate(projectId, project?.user_role);
+  const canUseLLM = llmGate.canUseLLM;
+
+  // Trust ladder (R8, KTD3) — the single client-side source of tier truth.
+  // Minting stays locked while capabilities are loading and when the fetch
+  // failed: an affordance that appears before its permission is known invites
+  // a contributor into an action the server will refuse.
+  const {
+    tier: trustTier,
+    canMintEntities,
+    isLoading: isTrustLoading,
+    isError: isTrustError,
+    promotionProgress,
+    refetch: refetchTrust,
+  } = useTrustCapabilities(projectId);
+
+  const trustGate: TrustGate = useMemo(
+    () => ({
+      tier: trustTier,
+      locked: !canMintEntities,
+      isLoading: isTrustLoading,
+      isError: isTrustError,
+      onRetry: () => { void refetchTrust(); },
+      progress: promotionProgress,
+      onSignIn:
+        trustTier === "anonymous" && zitadelConfigured
+          ? () => signIn("zitadel", { callbackUrl: window.location.href })
+          : undefined,
+    }),
+    [
+      trustTier,
+      canMintEntities,
+      isTrustLoading,
+      isTrustError,
+      promotionProgress,
+      refetchTrust,
+      zitadelConfigured,
+    ],
+  );
 
   // UI state (editor-only)
   const [showHistory, setShowHistory] = useState(false);
@@ -155,6 +224,9 @@ export default function EditorPage() {
     consumedSelectionRef.current = key;
   }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode, isLoading]);
 
+  // Track accepted suggestion IRIs for sparkle badges (D-07)
+  const [acceptedSuggestionIris, setAcceptedSuggestionIris] = useState<Set<string>>(new Set());
+
   // Commit dialog
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
   const [pendingSaveContent, setPendingSaveContent] = useState<string | null>(null);
@@ -191,6 +263,32 @@ export default function EditorPage() {
 
   // Suggestion session (only active for suggesters who can't directly edit)
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
+
+  // Anonymous proposal mode: available when AUTH_MODE != required, the user is
+  // NOT signed in as editor/suggester, and the project is PUBLIC (the api only
+  // allows anonymous sessions on public projects — hiding the affordance on
+  // private projects avoids a guaranteed 403 loop). Evaluated after the
+  // isLoading early-return, so project is resolved wherever this gates.
+  const canPropose = authMode !== "required" && !canEdit && !canSuggest && !!project?.is_public;
+  const [creditModalOpen, setCreditModalOpen] = useState(false);
+  const [discardProposalConfirmOpen, setDiscardProposalConfirmOpen] = useState(false);
+
+  // Post-submit success state for anonymous proposals (R7, KTD12). A dialog
+  // rather than a toast, because this is the one moment the account nudge has
+  // the contributor's attention — and a toast that vanishes cannot carry a CTA.
+  const [submittedProposal, setSubmittedProposal] = useState<
+    { prNumber: number; prUrl: string | null } | null
+  >(null);
+
+  const anonymousSuggestion = useAnonymousSuggestion({
+    projectId,
+    onSubmitted: (prNumber, prUrl) => {
+      setSubmittedProposal({ prNumber, prUrl });
+    },
+    onError: (msg) => toast.error("Proposal error", msg),
+  });
+
+  const isAnonymousProposalMode = canPropose && anonymousSuggestion.isActive;
 
   const suggestionSession = useSuggestionSession({
     projectId,
@@ -328,6 +426,9 @@ export default function EditorPage() {
   const handleEntityConfirm = useCallback(
     async (entity: NewEntityInfo) => {
       if (!canSuggest) return;
+      // Trust gate (R8): the dialog already disables Create, but the confirm
+      // path is the one the server would refuse, so it carries the guard too.
+      if (trustGate.locked) return;
       const snippet = generateTurtleSnippet({
         iri: entity.iri,
         label: entity.label,
@@ -363,8 +464,110 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [canSuggest, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
+    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
   );
+
+  const generatedEntityAccessToken = session?.accessToken;
+  const persistAcceptedGeneratedEntity = useCallback(async (
+    entity: {
+      iri: string;
+      label: string;
+      parentIri: string;
+      entityType: "class" | "objectProperty" | "dataProperty" | "annotationProperty";
+    },
+  ) => {
+    const mode: GeneratedEntityPersistenceMode = isAnonymousProposalMode
+      ? "anonymous-suggestion"
+      : isSuggestionMode
+        ? "authenticated-suggestion"
+        : "direct";
+    const persistenceScope = `${projectId}:${mode}:${activeBranch ?? "pending"}`;
+    const content = await generatedEntityPersistenceQueue.current.run(
+      persistenceScope,
+      () => persistGeneratedEntity({
+        mode,
+        projectId,
+        branch: activeBranch,
+        accessToken: generatedEntityAccessToken,
+        ontologyPath: project?.git_ontology_path,
+        entity,
+        ontologyPrefix,
+        ontologyNamespace,
+        suggestionSession: {
+          startSession: suggestionSession.startSession,
+          saveToSession: suggestionSession.saveToSession,
+        },
+        anonymousSession: {
+          startSession: anonymousSuggestion.startSession,
+          saveToSession: anonymousSuggestion.saveToSession,
+        },
+      }),
+    );
+
+    // Only update client state after the authoritative branch confirms the
+    // entity. A rejected save leaves the card pending and these values intact.
+    setSourceContent(content);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+    setDetailRefreshKey((key) => key + 1);
+    if (mode === "direct" && generatedEntityAccessToken) {
+      queryClient.invalidateQueries({
+        queryKey: branchQueryKeys.list(projectId, generatedEntityAccessToken),
+      });
+    }
+  }, [
+    isAnonymousProposalMode,
+    isSuggestionMode,
+    projectId,
+    activeBranch,
+    generatedEntityAccessToken,
+    project?.git_ontology_path,
+    ontologyPrefix,
+    ontologyNamespace,
+    suggestionSession.startSession,
+    suggestionSession.saveToSession,
+    anonymousSuggestion.startSession,
+    anonymousSuggestion.saveToSession,
+    setSourceContent,
+    setSourceIriIndex,
+    queryClient,
+  ]);
+
+  // Handle accepted child suggestion — persist first, then update the tree (D-07)
+  const handleAddSuggestedChild = useCallback(async (
+    iri: string,
+    label: string,
+    parentIri: string,
+  ) => {
+    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — the accepted suggestion's metadata is dropped here. See QA queue.
+    await persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType: "class" });
+    addOptimisticNode(iri, label, parentIri);
+    setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
+  }, [persistAcceptedGeneratedEntity, addOptimisticNode]);
+
+  // Handle accepted sub-PROPERTY suggestion (B-1). Distinct from
+  // handleAddSuggestedChild (classes): emits the correct OWL property rdf:type
+  // and does NOT push a node into the class tree — properties live in the
+  // property tree, which re-derives from the ontology source.
+  const handleAddSuggestedProperty = useCallback((
+    iri: string,
+    label: string,
+    parentIri: string,
+    propertyType: "object" | "data" | "annotation" = "object",
+  ) => {
+    const entityType =
+      propertyType === "data"
+        ? "dataProperty"
+        : propertyType === "annotation"
+          ? "annotationProperty"
+          : "objectProperty";
+
+    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped here; only label/type/parent are emitted. See QA queue.
+    return persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType })
+      .then(() => {
+        setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
+      });
+  }, [persistAcceptedGeneratedEntity]);
 
   // Handle copy IRI
   const handleCopyIri = useCallback(async (iri: string) => {
@@ -550,11 +753,6 @@ export default function EditorPage() {
     if (!session?.accessToken) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
 
-    // Ensure session exists
-    if (!suggestionSession.sessionId) {
-      await suggestionSession.startSession();
-    }
-
     let source = sourceContent;
     if (!source) {
       const response = await revisionsApi.getFileAtVersion(
@@ -569,24 +767,27 @@ export default function EditorPage() {
     const modifiedSource = updateClassInTurtle(source, classIri, data);
     const label = data.labels[0]?.value || getLocalName(classIri);
 
-    await suggestionSession.saveToSession(modifiedSource, classIri, label);
-
-    setSourceContent(modifiedSource);
-    toast.success(`Suggested update to "${label}"`);
-    updateNodeLabel(classIri, label);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
+    await saveSuggestionUpdate({
+      isSessionActive: Boolean(suggestionSession.sessionId),
+      session: suggestionSession,
+      content: modifiedSource,
+      entityIri: classIri,
+      entityLabel: label,
+      onSaved: () => {
+        setSourceContent(modifiedSource);
+        toast.success(`Suggested update to "${label}"`);
+        updateNodeLabel(classIri, label);
+        setDetailRefreshKey((k) => k + 1);
+        setSourceIriIndex(new Map());
+        iriPatternDetectedRef.current = false;
+      },
+    });
   }, [session, projectId, activeBranch, project, sourceContent, toast, updateNodeLabel, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode property update
   const handleSuggestPropertyUpdate = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
     if (!session?.accessToken) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
-
-    if (!suggestionSession.sessionId) {
-      await suggestionSession.startSession();
-    }
 
     let source = sourceContent;
     if (!source) {
@@ -599,23 +800,26 @@ export default function EditorPage() {
     const modifiedSource = updatePropertyInTurtle(source, propertyIri, data);
     const label = data.labels[0]?.value || getLocalName(propertyIri);
 
-    await suggestionSession.saveToSession(modifiedSource, propertyIri, label);
-
-    setSourceContent(modifiedSource);
-    toast.success(`Suggested update to "${label}"`);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
+    await saveSuggestionUpdate({
+      isSessionActive: Boolean(suggestionSession.sessionId),
+      session: suggestionSession,
+      content: modifiedSource,
+      entityIri: propertyIri,
+      entityLabel: label,
+      onSaved: () => {
+        setSourceContent(modifiedSource);
+        toast.success(`Suggested update to "${label}"`);
+        setDetailRefreshKey((k) => k + 1);
+        setSourceIriIndex(new Map());
+        iriPatternDetectedRef.current = false;
+      },
+    });
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
   // Handle suggestion-mode individual update
   const handleSuggestIndividualUpdate = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
     if (!session?.accessToken) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
-
-    if (!suggestionSession.sessionId) {
-      await suggestionSession.startSession();
-    }
 
     let source = sourceContent;
     if (!source) {
@@ -628,14 +832,88 @@ export default function EditorPage() {
     const modifiedSource = updateIndividualInTurtle(source, individualIri, data);
     const label = data.labels[0]?.value || getLocalName(individualIri);
 
-    await suggestionSession.saveToSession(modifiedSource, individualIri, label);
+    await saveSuggestionUpdate({
+      isSessionActive: Boolean(suggestionSession.sessionId),
+      session: suggestionSession,
+      content: modifiedSource,
+      entityIri: individualIri,
+      entityLabel: label,
+      onSaved: () => {
+        setSourceContent(modifiedSource);
+        toast.success(`Suggested update to "${label}"`);
+        setDetailRefreshKey((k) => k + 1);
+        setSourceIriIndex(new Map());
+        iriPatternDetectedRef.current = false;
+      },
+    });
+  }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
+
+  // Handle anonymous proposal mode class update
+  // Routes through anonymousSuggestion.saveToSession() instead of the normal commit path
+  const handleAnonymousClassUpdate = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
+    if (!activeBranch && !anonymousSuggestion.branch) {
+      throw new Error("No branch selected");
+    }
+
+    // Ensure session exists before saving
+    if (!anonymousSuggestion.sessionId) {
+      await anonymousSuggestion.startSession();
+    }
+
+    // Load source from the anonymous suggestion branch (or current active branch as fallback)
+    const branchToLoad = anonymousSuggestion.branch || activeBranch;
+    let source = sourceContent;
+    if (!source) {
+      const response = await revisionsApi.getFileAtVersion(
+        projectId,
+        branchToLoad!,
+        undefined, // no Bearer token needed for anonymous
+        project?.git_ontology_path,
+      );
+      source = response.content;
+    }
+
+    const modifiedSource = updateClassInTurtle(source, classIri, data);
+    const label = data.labels[0]?.value || getLocalName(classIri);
+
+    const saved = await anonymousSuggestion.saveToSession(modifiedSource, classIri, label);
+    if (!saved) {
+      // A concurrent save was in flight (or the save failed — errors already
+      // toast via onError). Do NOT report success or update local state for a
+      // change that never reached the session branch.
+      toast.error("Change not saved", "A previous save was still in progress or the save failed — please retry.");
+      return;
+    }
 
     setSourceContent(modifiedSource);
-    toast.success(`Suggested update to "${label}"`);
+    toast.success(`Proposed update to "${label}"`);
+    updateNodeLabel(classIri, label);
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
-  }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
+  }, [activeBranch, anonymousSuggestion, projectId, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, setSourceContent, setSourceIriIndex]);
+
+  // Handle anonymous proposal "Propose Edit" button click
+  const handleProposeEdit = useCallback(async () => {
+    if (!anonymousSuggestion.isActive) {
+      await anonymousSuggestion.startSession();
+    }
+    // After session starts, isAnonymousProposalMode becomes true (canPropose && isActive),
+    // which re-renders ClassDetailPanel with canEdit=true allowing form editing
+  }, [anonymousSuggestion]);
+
+  // Handle "Submit Proposal" — called by CreditModal for EVERY exit path
+  // (save / skip / dismiss). The honeypot value is forwarded verbatim so the
+  // server-side control (filled honeypot -> silent fake success) actually
+  // receives the bot signal (PR-7 /ce:review BLOCKER fix).
+  const handleAnonymousSubmit = useCallback(async (
+    name: string | null,
+    email: string | null,
+    website: string = "",
+  ) => {
+    setCreditModalOpen(false);
+    await anonymousSuggestion.submitSession(undefined, name ?? undefined, email ?? undefined, website);
+  }, [anonymousSuggestion]);
 
   // Handle drag-and-drop reparent class
   // Fetches full class detail, modifies parent_iris, then routes through the appropriate save handler
@@ -690,9 +968,13 @@ export default function EditorPage() {
     };
 
     // Route through the appropriate save handler
-    const saveHandler = isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass;
+    const saveHandler = isAnonymousProposalMode
+      ? handleAnonymousClassUpdate
+      : isSuggestionMode
+      ? handleSuggestClassUpdate
+      : handleUpdateClass;
     await saveHandler(classIri, payload);
-  }, [session, projectId, activeBranch, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate]);
+  }, [session, projectId, activeBranch, isAnonymousProposalMode, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate, handleAnonymousClassUpdate]);
 
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
@@ -759,13 +1041,61 @@ export default function EditorPage() {
       global: true,
       ignoreWhenEditorFocused: false,
     },
-  ], [handleAddEntity, shortcutDialogOpen, showHistory, canSuggest]);
+    // Suggestion curation shortcuts (D-16). Only registered when the project
+    // has LLM access, and each is gated (shouldFire) on a suggestion card
+    // actually owning focus — so a bare Enter/Delete/e never hijacks a focused
+    // button/link elsewhere in the editor (H-1).
+    ...(canUseLLM ? [
+      {
+        id: "suggestion-accept",
+        key: "Enter",
+        description: "Accept focused suggestion",
+        category: "Suggestions",
+        shouldFire: suggestionCardHasFocus,
+        action: () => {
+          const focused = document.activeElement?.closest('[role="listitem"]');
+          if (focused) {
+            const acceptBtn = focused.querySelector('[aria-label="Accept suggestion"]') as HTMLButtonElement | null;
+            acceptBtn?.click();
+          }
+        },
+      },
+      {
+        id: "suggestion-reject",
+        key: "Delete",
+        description: "Reject focused suggestion",
+        category: "Suggestions",
+        shouldFire: suggestionCardHasFocus,
+        action: () => {
+          const focused = document.activeElement?.closest('[role="listitem"]');
+          if (focused) {
+            const rejectBtn = focused.querySelector('[aria-label="Reject suggestion"]') as HTMLButtonElement | null;
+            rejectBtn?.click();
+          }
+        },
+      },
+      {
+        id: "suggestion-edit",
+        key: "e",
+        description: "Edit focused suggestion",
+        category: "Suggestions",
+        shouldFire: suggestionCardHasFocus,
+        action: () => {
+          const focused = document.activeElement?.closest('[role="listitem"]');
+          if (focused) {
+            const editBtn = focused.querySelector('[aria-label="Edit suggestion before accepting"]') as HTMLButtonElement | null;
+            editBtn?.click();
+          }
+        },
+      },
+    ] : []),
+  ], [handleAddEntity, shortcutDialogOpen, showHistory, canSuggest, canUseLLM]);
 
   useKeyboardShortcuts(keyboardShortcuts);
 
   // --- Render ---
 
-  if (isLoading || status === "loading") {
+  if (isLoading || (status === "loading" && authMode === "required")) {
     return (
       <>
         <Header />
@@ -796,8 +1126,8 @@ export default function EditorPage() {
                 {error || "Project not found"}
               </h2>
               <div className="mt-4 flex items-center justify-center gap-3">
-                {errorKind === "private-403" && (
-                  <Button onClick={() => signIn("zitadel")} className="gap-2">
+                {errorKind === "private-403" && zitadelConfigured && (
+                  <Button onClick={() => signIn("zitadel", { callbackUrl: window.location.href })} className="gap-2">
                     <LogIn className="h-4 w-4" />
                     Sign In
                   </Button>
@@ -813,8 +1143,10 @@ export default function EditorPage() {
     );
   }
 
-  // Auth guard: redirect unauthenticated or unauthorized users to the viewer
-  if (status === "unauthenticated" || (project && !canSuggest)) {
+  // Auth guard: redirect unauthenticated or unauthorized users to the viewer —
+  // UNLESS anonymous proposal mode applies (AUTH_MODE != required + public
+  // project): those users are this page's audience in propose mode (PR-7).
+  if ((status === "unauthenticated" || (project && !canSuggest)) && !canPropose) {
     router.replace(`/projects/${projectId}`);
     return (
       <>
@@ -897,16 +1229,24 @@ export default function EditorPage() {
                 </span>
               )}
 
-              {/* Sign-in CTA for unauthenticated users */}
-              {!hasValidAccess && (
+              {/* Anonymous proposal mode indicator */}
+              {isAnonymousProposalMode && (
+                <span className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  <Pencil className="h-3 w-3" />
+                  Proposing
+                </span>
+              )}
+
+              {/* Sign-in CTA for unauthenticated users (only when Zitadel is configured) */}
+              {!hasValidAccess && zitadelConfigured && (
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => signIn("zitadel")}
+                  onClick={() => signIn("zitadel", { callbackUrl: window.location.href })}
                   className="gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 >
                   <LogIn className="h-3 w-3" />
-                  Sign in to suggest edits
+                  Sign in to edit
                 </Button>
               )}
             </div>
@@ -924,6 +1264,34 @@ export default function EditorPage() {
                   <span className="rounded-full bg-amber-500/30 px-1.5 py-0.5 text-xs">
                     {suggestionSession.changesCount}
                   </span>
+                </Button>
+              )}
+
+              {/* Submit Proposal button (anonymous mode) */}
+              {isAnonymousProposalMode && anonymousSuggestion.changesCount > 0 && (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setCreditModalOpen(true)}
+                >
+                  <Pencil className="h-4 w-4" />
+                  Submit Proposal
+                  <span className="rounded-full bg-emerald-500/30 px-1.5 py-0.5 text-xs">
+                    {anonymousSuggestion.changesCount}
+                  </span>
+                </Button>
+              )}
+
+              {/* Discard Proposal button (anonymous mode) */}
+              {isAnonymousProposalMode && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  onClick={() => setDiscardProposalConfirmOpen(true)}
+                >
+                  Discard
                 </Button>
               )}
 
@@ -1063,11 +1431,13 @@ export default function EditorPage() {
                 <DeveloperEditorLayout
                   projectId={projectId}
                   accessToken={session?.accessToken}
-                  activeBranch={activeBranch}
-                  canEdit={!!canEdit}
+                  activeBranch={isAnonymousProposalMode && anonymousSuggestion.branch ? anonymousSuggestion.branch : activeBranch}
+                  canEdit={isAnonymousProposalMode ? true : !!canEdit}
+                  userRole={project?.user_role}
                   entityNavigationRef={entityNavigationRef}
                   canSuggest={!!canSuggest}
-                  isSuggestionMode={isSuggestionMode}
+                  trustGate={trustGate}
+                  isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
                   treeError={treeError}
@@ -1098,24 +1468,41 @@ export default function EditorPage() {
                   onDeleteClass={handleDeleteClass}
                   onCopyIri={handleCopyIri}
                   selectedNodeFallback={selectedNodeFallback}
-                  onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
+                  onUpdateClass={
+                    isAnonymousProposalMode
+                      ? handleAnonymousClassUpdate
+                      : isSuggestionMode
+                      ? handleSuggestClassUpdate
+                      : handleUpdateClass
+                  }
                   detailRefreshKey={detailRefreshKey}
                   onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
                   onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
                   onReparentClass={handleReparentClass}
                   reparentOptimistic={reparentOptimistic}
                   rollbackReparent={rollbackReparent}
+                  showSignInToEdit={!hasValidAccess && zitadelConfigured && !canPropose}
+                  onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
+                  canPropose={canPropose && !isAnonymousProposalMode}
+                  onProposeEdit={handleProposeEdit}
+                  isProposeEditStarting={anonymousSuggestion.isStarting}
+                  isAnonymousProposalMode={isAnonymousProposalMode}
+                  onAddSuggestedChild={handleAddSuggestedChild}
+                  onAddSuggestedProperty={handleAddSuggestedProperty}
+                  acceptedSuggestionIris={acceptedSuggestionIris}
                 />
               </div>
             ) : (
               <StandardEditorLayout
                 projectId={projectId}
                 accessToken={session?.accessToken}
-                activeBranch={activeBranch}
-                canEdit={!!canEdit}
+                activeBranch={isAnonymousProposalMode && anonymousSuggestion.branch ? anonymousSuggestion.branch : activeBranch}
+                canEdit={isAnonymousProposalMode ? true : !!canEdit}
+                userRole={project?.user_role}
                 canSuggest={!!canSuggest}
+                trustGate={trustGate}
                 entityNavigationRef={entityNavigationRef}
-                isSuggestionMode={isSuggestionMode}
+                isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
                 nodes={nodes}
                 isTreeLoading={isTreeLoading}
                 treeError={treeError}
@@ -1135,7 +1522,13 @@ export default function EditorPage() {
                 onDeleteClass={handleDeleteClass}
                 onCopyIri={handleCopyIri}
                 selectedNodeFallback={selectedNodeFallback}
-                onUpdateClass={isSuggestionMode ? handleSuggestClassUpdate : handleUpdateClass}
+                onUpdateClass={
+                  isAnonymousProposalMode
+                    ? handleAnonymousClassUpdate
+                    : isSuggestionMode
+                    ? handleSuggestClassUpdate
+                    : handleUpdateClass
+                }
                 detailRefreshKey={detailRefreshKey}
                 sourceContent={sourceContent}
                 onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
@@ -1143,6 +1536,15 @@ export default function EditorPage() {
                 onReparentClass={handleReparentClass}
                 reparentOptimistic={reparentOptimistic}
                 rollbackReparent={rollbackReparent}
+                showSignInToEdit={!hasValidAccess && zitadelConfigured && !canPropose}
+                onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
+                canPropose={canPropose && !isAnonymousProposalMode}
+                onProposeEdit={handleProposeEdit}
+                isProposeEditStarting={anonymousSuggestion.isStarting}
+                isAnonymousProposalMode={isAnonymousProposalMode}
+                onAddSuggestedChild={handleAddSuggestedChild}
+                onAddSuggestedProperty={handleAddSuggestedProperty}
+                acceptedSuggestionIris={acceptedSuggestionIris}
               />
             )}
           </div>
@@ -1197,6 +1599,7 @@ export default function EditorPage() {
           ontologyNamespace={ontologyNamespace}
           parentIri={addEntityParentIri}
           parentLabel={addEntityParentLabel}
+          trustGate={trustGate}
         />
       )}
 
@@ -1239,6 +1642,38 @@ export default function EditorPage() {
         open={shortcutDialogOpen}
         onOpenChange={setShortcutDialogOpen}
         shortcuts={keyboardShortcuts}
+      />
+
+      {/* Credit Modal for anonymous proposal submissions — opens before submit to collect optional credit info */}
+      <ConfirmDialog
+        open={discardProposalConfirmOpen}
+        onOpenChange={setDiscardProposalConfirmOpen}
+        title="Discard proposal?"
+        description="All changes in this anonymous proposal will be permanently discarded. This cannot be undone."
+        confirmLabel="Discard"
+        variant="danger"
+        onConfirm={() => {
+          setDiscardProposalConfirmOpen(false);
+          anonymousSuggestion.discardSession();
+        }}
+      />
+      <CreditModal
+        open={creditModalOpen}
+        onSubmitCredit={handleAnonymousSubmit}
+      />
+
+      {/* Anonymous submit-success + account nudge (R7) */}
+      <ProposalSubmittedDialog
+        open={!!submittedProposal}
+        onOpenChange={(open) => { if (!open) setSubmittedProposal(null); }}
+        prNumber={submittedProposal?.prNumber ?? null}
+        prUrl={submittedProposal?.prUrl ?? null}
+        isSignedIn={!!session?.accessToken}
+        onSignIn={
+          zitadelConfigured
+            ? () => signIn("zitadel", { callbackUrl: window.location.href })
+            : undefined
+        }
       />
     </BranchProvider>
   );

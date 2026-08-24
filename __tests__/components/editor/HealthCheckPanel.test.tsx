@@ -710,9 +710,9 @@ describe("HealthCheckPanel", () => {
     expect(mockQualityApi.getConsistencyJobResult).not.toHaveBeenCalled();
   });
 
-  it("shows error when consistency check trigger fails", async () => {
+  it("shows the active-job conflict when consistency trigger is rejected", async () => {
     mockQualityApi.triggerConsistencyCheck.mockRejectedValue(
-      new Error("Consistency backend down")
+      new Error("A quality job is already active for this project")
     );
     setup();
     await waitFor(() => {
@@ -724,7 +724,9 @@ describe("HealthCheckPanel", () => {
     });
     await userEvent.click(screen.getByText("Run Check"));
     await waitFor(() => {
-      expect(screen.getByText("Consistency backend down")).toBeDefined();
+      expect(
+        screen.getByText("A quality job is already active for this project")
+      ).toBeDefined();
     });
   });
 
@@ -1100,9 +1102,9 @@ describe("HealthCheckPanel", () => {
     expect(mockLintApi.dismissIssue).toHaveBeenCalledWith("p1", "i1", "tok");
   });
 
-  it("shows error when duplicate detection trigger fails", async () => {
+  it("shows the active-job conflict when duplicate trigger is rejected", async () => {
     mockQualityApi.triggerDuplicateDetection.mockRejectedValue(
-      new Error("Backend unavailable")
+      new Error("A quality job is already active for this project")
     );
     setup();
     await waitFor(() => {
@@ -1114,7 +1116,9 @@ describe("HealthCheckPanel", () => {
     });
     await userEvent.click(screen.getByText("Find Duplicates"));
     await waitFor(() => {
-      expect(screen.getByText("Backend unavailable")).toBeDefined();
+      expect(
+        screen.getByText("A quality job is already active for this project")
+      ).toBeDefined();
     });
   });
 

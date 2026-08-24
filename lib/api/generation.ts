@@ -1,0 +1,96 @@
+import { api } from "./client";
+
+// ---- Type literals ----
+export type SuggestionType = "children" | "siblings" | "annotations" | "parents" | "edges";
+export type Provenance = "llm-proposed" | "user-written" | "user-edited-from-llm";
+export type DuplicateVerdict = "pass" | "warn" | "block";
+export type DuplicateEntityType = "class" | "property" | "individual";
+
+export const DUPLICATE_BLOCK_THRESHOLD = 0.95;
+export const DUPLICATE_WARN_THRESHOLD = 0.8;
+
+export function duplicateVerdictForScore(score: number): DuplicateVerdict {
+  if (score > DUPLICATE_BLOCK_THRESHOLD) return "block";
+  if (score > DUPLICATE_WARN_THRESHOLD) return "warn";
+  return "pass";
+}
+
+// ---- Validation error (matches backend ValidationError) ----
+export interface ValidationError {
+  field: string;
+  code: string;
+  message: string;
+}
+
+// ---- Duplicate candidate ----
+export interface DuplicateCandidate {
+  iri: string;
+  label: string;
+  entity_type?: DuplicateEntityType;
+  score: number;
+  branch?: string | null;
+}
+
+// ---- Generated suggestion (union of class/annotation/edge subtypes) ----
+export interface GeneratedSuggestion {
+  iri: string;
+  suggestion_type: SuggestionType;
+  label: string;
+  definition?: string | null;
+  confidence?: number | null;
+  provenance: Provenance;
+  /** Model id that produced this suggestion (e.g. "gpt-4o-mini") — provenance metadata */
+  model?: string | null;
+  /** Prompt-template key that produced this suggestion (e.g. "children") — provenance metadata */
+  prompt_template?: string | null;
+  validation_errors: ValidationError[];
+  duplicate_verdict: DuplicateVerdict;
+  duplicate_candidates: DuplicateCandidate[];
+  // AnnotationSuggestion extras
+  property_iri?: string;
+  value?: string;
+  lang?: string | null;
+  // EdgeSuggestion extras
+  target_iri?: string;
+  relationship_type?: string;
+}
+
+// ---- Request/Response ----
+export interface GenerateSuggestionsRequest {
+  class_iri: string;
+  branch: string;
+  suggestion_type: SuggestionType;
+  batch_size?: number;
+}
+
+export interface GenerateSuggestionsResponse {
+  suggestions: GeneratedSuggestion[];
+  input_tokens: number;
+  output_tokens: number;
+  context_tokens_estimate?: number | null;
+}
+
+// ---- API client ----
+export const generationApi = {
+  generateSuggestions: (
+    projectId: string,
+    data: GenerateSuggestionsRequest,
+    token: string,
+    byoKey?: string,
+    signal?: AbortSignal,
+  ) =>
+    api.post<GenerateSuggestionsResponse>(
+      `/api/v1/projects/${projectId}/llm/generate-suggestions`,
+      data,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(byoKey ? { "X-BYO-API-Key": byoKey } : {}),
+        },
+        // Forwarded so an aborted controller (e.g. navigating away) actually
+        // cancels the underlying fetch rather than orphaning it.
+        signal,
+        retryOn5xx: false,
+      },
+    ),
+};

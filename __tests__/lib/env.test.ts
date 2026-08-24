@@ -56,6 +56,39 @@ describe("validateServerEnv", () => {
     expect(result.ZITADEL_CLIENT_SECRET).toBe("my-client-secret");
     expect(result.NEXTAUTH_SECRET).toBe("my-secret");
   });
+
+  it("still REQUIRES a real NEXTAUTH_SECRET when Zitadel is configured in optional mode (BLOCKER regression: a known secret would forge sessions)", async () => {
+    process.env.AUTH_MODE = "optional";
+    process.env.ZITADEL_ISSUER = "https://auth.example.com";
+    process.env.ZITADEL_CLIENT_ID = "my-client-id";
+    process.env.ZITADEL_CLIENT_SECRET = "my-client-secret";
+    delete process.env.NEXTAUTH_SECRET;
+
+    const validateServerEnv = await loadValidateServerEnv();
+    expect(() => validateServerEnv()).toThrow("NEXTAUTH_SECRET");
+  });
+
+  it("relaxes all auth vars when Zitadel is NOT configured (disabled/optional anonymous)", async () => {
+    process.env.AUTH_MODE = "disabled";
+    delete process.env.ZITADEL_ISSUER;
+    delete process.env.ZITADEL_CLIENT_ID;
+    delete process.env.ZITADEL_CLIENT_SECRET;
+    delete process.env.NEXTAUTH_SECRET;
+
+    const validateServerEnv = await loadValidateServerEnv();
+    expect(() => validateServerEnv()).not.toThrow();
+  });
+
+  it("ignores stale Zitadel variables when auth is disabled", async () => {
+    process.env.AUTH_MODE = "disabled";
+    process.env.ZITADEL_ISSUER = "https://auth.example.com";
+    process.env.ZITADEL_CLIENT_ID = "stale-client-id";
+    delete process.env.ZITADEL_CLIENT_SECRET;
+    delete process.env.NEXTAUTH_SECRET;
+
+    const validateServerEnv = await loadValidateServerEnv();
+    expect(() => validateServerEnv()).not.toThrow();
+  });
 });
 
 describe("validateClientEnv", () => {

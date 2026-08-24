@@ -2,6 +2,10 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
+import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
+import { useLLMGate } from "@/lib/hooks/useLLMGate";
+import type { ProjectRole } from "@/lib/api/projects";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
@@ -11,6 +15,7 @@ import { PropertyDetailPanel } from "@/components/editor/PropertyDetailPanel";
 import { IndividualDetailPanel } from "@/components/editor/IndividualDetailPanel";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
+import { TrustExplainer, mintingLockReason, type TrustGate } from "@/components/editor/TrustExplainer";
 import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
 import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
 import { Share2, ArrowLeft } from "lucide-react";
@@ -18,6 +23,10 @@ import { DraggableTreeWrapper } from "@/components/editor/shared/DraggableTreeWr
 import { useTreeDragDrop, type DragMode } from "@/lib/hooks/useTreeDragDrop";
 import { useToast } from "@/lib/context/ToastContext";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
+import { PendingSuggestionBadge } from "@/components/editor/PendingSuggestionBadge";
+import { BranchNavigator } from "@/components/editor/BranchNavigator";
+import { useSuggestionStore } from "@/lib/stores/suggestionStore";
+import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
 
 const OntologyGraph = dynamic(
   () => import("@/components/graph/OntologyGraph").then((mod) => mod.OntologyGraph),
@@ -45,7 +54,10 @@ export interface StandardEditorLayoutProps {
   activeBranch?: string;
   canEdit: boolean;
   canSuggest?: boolean;
+  /** Trust-ladder state for entity minting (R8). Absent = ladder not applicable. */
+  trustGate?: TrustGate;
   isSuggestionMode?: boolean;
+  userRole?: ProjectRole | null;
 
   // Tree state (from useOntologyTree)
   nodes: ClassTreeNode[];
@@ -89,6 +101,22 @@ export interface StandardEditorLayoutProps {
 
   /** Ref populated with a function to navigate to any entity type */
   entityNavigationRef?: React.RefObject<((iri: string, type?: string) => void) | null>;
+
+  // Sign-in-to-edit affordance for anonymous users
+  showSignInToEdit?: boolean;
+  onSignInToEdit?: () => void;
+
+  // Anonymous proposal mode
+  canPropose?: boolean;
+  onProposeEdit?: () => void;
+  isProposeEditStarting?: boolean;
+  isAnonymousProposalMode?: boolean;
+
+  // LLM suggestion support
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => Promise<void>;
+  /** Create a new PROPERTY entity from an accepted sub-property suggestion (B-1). */
+  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation") => Promise<void>;
+  acceptedSuggestionIris?: Set<string>;
 }
 
 export function StandardEditorLayout(props: StandardEditorLayoutProps) {
@@ -98,7 +126,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     activeBranch,
     canEdit,
     canSuggest: _canSuggest = false,
+    trustGate,
     isSuggestionMode = false,
+    userRole,
     nodes,
     isTreeLoading,
     treeError,
@@ -126,10 +156,57 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     onReparentClass,
     reparentOptimistic,
     rollbackReparent,
+    showSignInToEdit,
+    onSignInToEdit,
+    canPropose,
+    onProposeEdit,
+    isProposeEditStarting,
+    isAnonymousProposalMode,
+    onAddSuggestedChild,
+    onAddSuggestedProperty,
+    acceptedSuggestionIris,
   } = props;
+
+  // Trust ladder (R8, AE2): one derivation, shared by every minting
+  // affordance in this layout, so the toolbar, the tree and the context menu
+  // can never tell a contributor three different stories.
+  const mintingLocked = trustGate?.locked === true;
+  const mintingLockedReason = mintingLockReason(trustGate);
+  // Trusted suggesters mint through the suggestion branch rather than the
+  // direct-edit path. Keep that affordance visible in suggestion mode; the
+  // capability gate decides whether it is enabled.
+  const canAddEntity = canEdit || isSuggestionMode;
 
   const toast = useToast();
   const { announce } = useAnnounce();
+  const llmGate = useLLMGate(projectId, userRole);
+
+  // Suggestion store for pending count badge
+  const pendingCount = useSuggestionStore((s) =>
+    s.getPendingCount({ projectId, branch: activeBranch ?? "main" })
+  );
+  const byoEntry = useByoKeyStore((s) => s.getEntry(projectId));
+
+  const scrollToFirstPending = useCallback(() => {
+    const firstCard = document.querySelector('[role="listitem"]');
+    firstCard?.scrollIntoView({ behavior: "smooth", block: "center" });
+    (firstCard as HTMLElement)?.focus();
+  }, []);
+
+  // D-09: State to trigger auto-suggest annotations on navigate
+  const [isAutoSuggesting, setIsAutoSuggesting] = useState(false);
+
+  const handleAutoSuggest = useCallback((_iri: string) => {
+    setIsAutoSuggesting(true);
+  }, []);
+
+  // Reset auto-suggest flag after ClassDetailPanel has consumed it
+  useEffect(() => {
+    if (isAutoSuggesting) {
+      const timer = setTimeout(() => setIsAutoSuggesting(false), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isAutoSuggesting]);
 
   // Draft badges
   const getDraftIris = useDraftStore((s) => s.getDraftIris);
@@ -272,6 +349,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     }
   }, [activeTab, selectedIri, selectedPropertyIri, selectedIndividualIri, setSelection]);
 
+  // Property node list for BranchNavigator
+  const [propertyNodes, setPropertyNodes] = useState<{ iri: string; label: string }[]>([]);
+
   // Shared search state
   const {
     showSearch,
@@ -304,7 +384,30 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   };
 
   return (
-    <div className="flex h-full min-w-0 flex-1">
+    <div className="flex h-full min-w-0 flex-1 flex-col">
+      {/* LLM Budget Banner — spans full width, above main content */}
+      {!llmGate.isAnonymous && (
+        <LLMBudgetBanner
+          budgetExhausted={llmGate.budgetExhausted}
+          monthlySpentUsd={llmGate.monthlySpentUsd}
+          monthlyBudgetUsd={llmGate.monthlyBudgetUsd}
+        />
+      )}
+
+      {/* LLM Role Badge + Pending Suggestion Badge — shown in a slim toolbar row when user has LLM access */}
+      {(llmGate.roleLimitLabel || pendingCount > 0) && (
+        <div className="flex items-center justify-end gap-2 border-b border-slate-200 bg-white px-4 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+          {pendingCount > 0 && (
+            <PendingSuggestionBadge count={pendingCount} onClick={scrollToFirstPending} />
+          )}
+          <LLMRoleBadge
+            roleLimitLabel={llmGate.roleLimitLabel}
+            userRole={userRole ?? undefined}
+          />
+        </div>
+      )}
+
+      <div className="flex min-h-0 flex-1">
       {/* Left Panel - Entity Tree/List with tabs */}
       <div className="flex-shrink-0 bg-white dark:bg-slate-800" style={{ width: treePanelWidth }}>
         {/* Entity Type Tabs */}
@@ -312,8 +415,10 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
 
         {/* Toolbar: add + expand/collapse + search */}
         <EntityTreeToolbar
-          canAdd={canEdit && activeTab === "classes"}
+          canAdd={canAddEntity && activeTab === "classes"}
           onAdd={() => onAddEntity()}
+          addLocked={mintingLocked}
+          addLockedReason={mintingLockedReason}
           showSearch={showSearch}
           searchQuery={searchQuery}
           onToggleSearch={toggleSearch}
@@ -328,6 +433,14 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           hasExpandedNodes={activeTab === "classes" ? hasExpandedNodes : false}
           isExpandingAll={activeTab === "classes" ? isExpandingAll : false}
         />
+
+        {/* Trust ladder (R8, AE2): the minting affordance above is disabled;
+            this is where a contributor learns how to un-disable it. */}
+        {trustGate && mintingLocked && canAddEntity && activeTab === "classes" && (
+          <div className="border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
+            <TrustExplainer gate={trustGate} />
+          </div>
+        )}
 
         {/* Tab Content */}
         <div className="h-[calc(100%-5.5rem)] overflow-y-auto">
@@ -365,7 +478,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                     onSelect={selectNode}
                     onExpand={expandNode}
                     onCollapse={collapseNode}
-                    onAddChild={canEdit ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+                    onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+                    addChildLocked={mintingLocked}
+                    addChildLockedReason={mintingLockedReason}
                     onCopyIri={onCopyIri}
                     onDelete={canEdit ? onDeleteClass : undefined}
                     searchResults={showSearch ? searchResults : undefined}
@@ -373,6 +488,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                     onSearchSelect={handleSearchSelect}
                     searchQuery={searchQuery}
                     draftIris={draftIris}
+                    suggestedIris={acceptedSuggestionIris}
                     filteredTree={filteredNodes}
                     isFilteredTreeBuilding={isFilteredTreeBuilding}
                     filteredTreeTruncated={filteredTreeTruncated}
@@ -392,6 +508,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
               branch={activeBranch}
               selectedIri={selectedPropertyIri}
               onSelect={setSelectedPropertyIri}
+              onNodesLoaded={setPropertyNodes}
             />
           )}
 
@@ -459,15 +576,34 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             canEdit={canEdit || isSuggestionMode}
             onUpdateClass={onUpdateClass}
             refreshKey={detailRefreshKey}
+            showSignInToEdit={showSignInToEdit}
+            onSignInToEdit={onSignInToEdit}
+            canPropose={canPropose}
+            onProposeEdit={onProposeEdit}
+            isProposeEditStarting={isProposeEditStarting}
+            isAnonymousProposalMode={isAnonymousProposalMode}
+            canUseLLM={llmGate.canUseLLM}
+            byoKey={byoEntry?.key}
+            onAddSuggestedChild={onAddSuggestedChild}
+            autoSuggestAnnotationsOnMount={isAutoSuggesting}
             headerActions={selectedIri ? (
-              <button
-                onClick={() => setShowGraph(true)}
-                className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
-                aria-label="Show relationship graph"
-              >
-                <Share2 className="h-3.5 w-3.5" />
-                Graph
-              </button>
+              <>
+                <BranchNavigator
+                  nodes={nodes}
+                  selectedIri={selectedIri}
+                  onNavigate={(iri) => selectNode(iri)}
+                  autoSuggestOnNavigate={true}
+                  onAutoSuggest={handleAutoSuggest}
+                />
+                <button
+                  onClick={() => setShowGraph(true)}
+                  className="flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
+                  aria-label="Show relationship graph"
+                >
+                  <Share2 className="h-3.5 w-3.5" />
+                  Graph
+                </button>
+              </>
             ) : undefined}
           />
         ) : activeTab === "properties" ? (
@@ -476,7 +612,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             projectId={projectId}
             propertyIri={selectedPropertyIri}
             sourceContent={sourceContent || ""}
-            canEdit={canEdit}
+            canEdit={canEdit || isSuggestionMode}
             onUpdateProperty={onUpdateProperty}
             branch={activeBranch}
             refreshKey={detailRefreshKey}
@@ -484,6 +620,19 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onCopyIri={onCopyIri}
             accessToken={accessToken}
             labelHints={treeLabelHintsRecord}
+            canUseLLM={llmGate.canUseLLM}
+            byoKey={byoEntry?.key}
+            onAddSuggestedProperty={onAddSuggestedProperty}
+            headerActions={selectedPropertyIri ? (
+              <BranchNavigator
+                nodes={nodes}
+                simpleNodes={propertyNodes}
+                selectedIri={selectedPropertyIri}
+                onNavigate={(iri) => setSelectedPropertyIri(iri)}
+                autoSuggestOnNavigate={true}
+                onAutoSuggest={handleAutoSuggest}
+              />
+            ) : undefined}
           />
         ) : (
           <IndividualDetailPanel
@@ -502,6 +651,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
           />
         )}
       </div>
+
+      </div>{/* end flex min-h-0 flex-1 */}
     </div>
   );
 }

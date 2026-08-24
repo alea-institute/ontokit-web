@@ -64,6 +64,21 @@ export function formatDateTime(dateString: string): string {
   });
 }
 
+/** Format a timestamp as a compact relative age, falling back to a locale date. */
+export function formatTimeAgo(dateInput: Date | string, now = new Date()): string {
+  const date = typeof dateInput === "string" ? new Date(dateInput) : dateInput;
+  const diffMs = now.getTime() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60_000);
+  const diffHrs = Math.floor(diffMs / 3_600_000);
+  const diffDays = Math.floor(diffMs / 86_400_000);
+
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffHrs < 24) return `${diffHrs}h ago`;
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+}
+
 /**
  * Get the preferred label from a list of localized strings
  */

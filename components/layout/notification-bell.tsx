@@ -14,10 +14,11 @@ import {
   AlertCircle,
   RefreshCw,
   Download,
+  ClipboardCheck,
 } from "lucide-react";
 import { useNotifications, NOTIFICATIONS_CHANGED_EVENT } from "@/lib/hooks/useNotifications";
 import type { NotificationType } from "@/lib/api/notifications";
-import { cn } from "@/lib/utils";
+import { cn, formatTimeAgo } from "@/lib/utils";
 
 // Re-export for consumers that import from this file
 export { NOTIFICATIONS_CHANGED_EVENT };
@@ -35,6 +36,7 @@ const iconByType: Record<NotificationType, React.ComponentType<{ className?: str
   remote_update_applied: RefreshCw,
   remote_update_available: Download,
   remote_sync_error: AlertCircle,
+  pr_party_ready: ClipboardCheck,
 };
 
 const colorByType: Record<NotificationType, string> = {
@@ -50,25 +52,41 @@ const colorByType: Record<NotificationType, string> = {
   remote_update_applied: "text-blue-500",
   remote_update_available: "text-indigo-500",
   remote_sync_error: "text-red-500",
+  pr_party_ready: "text-emerald-500",
 };
 
-function formatTimeAgo(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffHrs = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+/**
+ * A `target_url` is server data that ends up in `router.push`. Only a
+ * same-origin *relative* path may be navigated to: an absolute URL, or the
+ * protocol-relative `//evil.test` form that looks relative but is not, would
+ * turn a notification row into an open redirect (R21). Anything else falls
+ * through to the type switch, which only ever builds paths from our own routes.
+ *
+ * Backslashes are rejected everywhere because URL parsers normalise them as
+ * path separators, including into authority forms. C0/DEL controls are also
+ * rejected: trimming or parser normalisation must never be able to turn server
+ * data into a different navigation target than the string we validated.
+ */
+export function isSafeInternalUrl(url: string | undefined | null): url is string {
+  if (typeof url !== "string" || !url.startsWith("/") || url.startsWith("//")) {
+    return false;
+  }
 
-  if (diffMin < 1) return "just now";
-  if (diffMin < 60) return `${diffMin}m ago`;
-  if (diffHrs < 24) return `${diffHrs}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
+  for (const character of url) {
+    const code = character.charCodeAt(0);
+    if (character === "\\" || code <= 0x1f || code === 0x7f) return false;
+  }
+
+  return true;
 }
 
-function getTargetUrl(notification: { type: NotificationType; project_id: string; target_id?: string; target_url?: string }): string {
-  if (notification.target_url) return notification.target_url;
+function getTargetUrl(notification: { type: NotificationType; project_id?: string | null; target_id?: string; target_url?: string }): string {
+  if (isSafeInternalUrl(notification.target_url)) return notification.target_url;
+
+  // Not every notification belongs to a project — PR Party rows do not — so a
+  // project-scoped fallback is not always available.
+  if (notification.type === "pr_party_ready") return "/pr-party";
+  if (!notification.project_id) return "/";
 
   const base = `/projects/${notification.project_id}`;
 
@@ -210,7 +228,9 @@ export function NotificationBell() {
                         </p>
                       )}
                       <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500">
-                        {n.project_name} · {formatTimeAgo(n.created_at)}
+                        {n.project_name
+                          ? `${n.project_name} · ${formatTimeAgo(n.created_at)}`
+                          : formatTimeAgo(n.created_at)}
                       </p>
                     </div>
                   </button>

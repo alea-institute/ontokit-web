@@ -15,7 +15,13 @@ interface EntityTreeProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  /** Trust ladder (R8): minting is above this contributor's rung. */
+  addChildLocked?: boolean;
+  /** Plain-language reason shown on the disabled affordance (AE2). */
+  addChildLockedReason?: string;
   draftIris?: Set<string>;
+  /** IRIs of accepted LLM suggestions — shown with sparkle badge indicator */
+  suggestedIris?: Set<string>;
   searchQuery?: string;
   enableKeyboardNav?: boolean;
   /** Drag state for drag-and-drop reparenting. Undefined = drag disabled. */
@@ -85,7 +91,10 @@ export function EntityTree({
   onCopyIri,
   onDelete,
   onViewInSource,
+  addChildLocked,
+  addChildLockedReason,
   draftIris,
+  suggestedIris,
   searchQuery,
   enableKeyboardNav = false,
   dragState,
@@ -205,7 +214,10 @@ export function EntityTree({
           onCopyIri={onCopyIri}
           onDelete={onDelete}
           onViewInSource={onViewInSource}
+          addChildLocked={addChildLocked}
+          addChildLockedReason={addChildLockedReason}
           draftIris={draftIris}
+          suggestedIris={suggestedIris}
           dragState={dragState}
           onDragEnterNode={onDragEnterNode}
           onDragLeaveNode={onDragLeaveNode}

@@ -625,7 +625,7 @@ export function TurtleEditor({
           suggestOnTriggerCharacters: false,
           acceptSuggestionOnCommitCharacter: false,
           parameterHints: { enabled: false },
-          hover: { enabled: true, delay: 500 },
+          hover: { enabled: "on", delay: 500 },
         }}
         loading={
           <div className="flex h-full items-center justify-center bg-slate-50 dark:bg-slate-900">

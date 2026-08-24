@@ -4,9 +4,13 @@
  * Manages the suggestion workflow for non-technical users (suggesters).
  * Each session maps to a suggestion branch; edits auto-save as commits,
  * and explicit submission creates a PR for review.
+ *
+ * Also provides anonymousSuggestionsApi for unauthenticated users —
+ * uses X-Anonymous-Token header instead of Authorization: Bearer.
  */
 
 import { api } from "./client";
+import type { TrustTier } from "./trust";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -16,6 +20,7 @@ export interface SuggestionSession {
   session_id: string;
   branch: string;
   created_at: string;
+  beacon_token: string;
 }
 
 export interface SuggestionSaveResponse {
@@ -61,6 +66,19 @@ export interface SuggestionSessionSummary {
   reviewed_at?: string;
   revision?: number;
   summary?: string;
+  is_anonymous?: boolean;
+  /**
+   * Rung the submitter sat on when they submitted (R9). Present so a reviewer
+   * sees provenance without a second call — identity, tier and provenance are
+   * meant to be self-evident on the row.
+   */
+  submitter_tier?: TrustTier | null;
+  /** LLM-generated suggestions are never auto-accepted, at any tier (R13). */
+  is_llm_generated?: boolean;
+  /** When the quiet period elapses and this merges itself (R11). */
+  auto_accept_after?: string | null;
+  /** Set when a reviewer objection stopped the clock (R12). */
+  auto_accept_halted_at?: string | null;
 }
 
 export interface SuggestionSessionListResponse {
@@ -89,9 +107,63 @@ export interface SuggestionResubmitPayload {
   summary?: string;
 }
 
+/** Which review queue a listing targets (R9, KTD13). */
+export type SuggestionQueue = "triage" | "review";
+
+/** Bulk triage verbs. Accept merges; dismiss closes without merging. */
+export type BulkReviewAction = "accept" | "dismiss";
+
+export interface BulkReviewPayload {
+  /** Capped server-side at 100 ids per request. */
+  session_ids: string[];
+  action: BulkReviewAction;
+  note?: string;
+}
+
+export interface BulkReviewFailure {
+  session_id: string;
+  reason: string;
+}
+
+/**
+ * Partial-success by design: one stale session must not abort a 40-item
+ * dismissal, so the caller renders per-item failures rather than one toast.
+ */
+export interface BulkReviewResponse {
+  action: BulkReviewAction;
+  succeeded: string[];
+  failed: BulkReviewFailure[];
+}
+
 export interface SuggestionBeaconPayload {
   session_id: string;
   content: string;
+}
+
+// --- Anonymous suggestion types ---
+
+/**
+ * Response from creating an anonymous suggestion session.
+ * The anonymous_token must be stored client-side and passed as
+ * X-Anonymous-Token on all subsequent calls for this session.
+ */
+export interface AnonymousSessionCreateResponse {
+  session_id: string;
+  branch: string;
+  created_at: string;
+  anonymous_token: string;
+}
+
+/**
+ * Payload for submitting an anonymous suggestion session.
+ * submitter_name and submitter_email are optional credit fields.
+ * website is a honeypot — always send as empty string; bots fill it.
+ */
+export interface AnonymousSubmitPayload {
+  summary?: string;
+  submitter_name?: string;
+  submitter_email?: string;
+  website?: string; // honeypot field — always send empty string
 }
 
 // --- API ---
@@ -105,7 +177,7 @@ export const suggestionsApi = {
     api.post<SuggestionSession>(
       `/api/v1/projects/${projectId}/suggestions/sessions`,
       undefined,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -121,7 +193,7 @@ export const suggestionsApi = {
     api.put<SuggestionSaveResponse>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/save`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -136,7 +208,7 @@ export const suggestionsApi = {
     api.post<SuggestionSubmitResponse>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/submit`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -155,7 +227,7 @@ export const suggestionsApi = {
     api.post<void>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/discard`,
       undefined,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -179,11 +251,46 @@ export const suggestionsApi = {
 
   /**
    * List pending suggestion sessions for review (editors/admins only).
+   *
+   * `queue` splits the list by submitter tier (R9): "triage" for anonymous
+   * and untrusted submissions, "review" for trusted ones. Omitting it returns
+   * everything, which is the pre-ladder behaviour.
    */
-  listPending: (projectId: string, token: string) =>
+  listPending: (projectId: string, token: string, queue?: SuggestionQueue) =>
     api.get<SuggestionSessionListResponse>(
       `/api/v1/projects/${projectId}/suggestions/pending`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: queue ? { queue } : undefined,
+      },
+    ),
+
+  /**
+   * Dismiss a triage-queue suggestion without merging it (editors/admins).
+   */
+  dismiss: (projectId: string, sessionId: string, token: string, note?: string) =>
+    api.post<void>(
+      `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/dismiss`,
+      undefined,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: note ? { note } : undefined,
+        retryOn5xx: false,
+      },
+    ),
+
+  /**
+   * Accept or dismiss many suggestions at once (editors/admins only).
+   *
+   * The response reports per-session failures rather than aborting the batch,
+   * so callers must render `failed` — a single error toast would silently
+   * lose which items are still pending.
+   */
+  bulkReview: (projectId: string, data: BulkReviewPayload, token: string) =>
+    api.post<BulkReviewResponse>(
+      `/api/v1/projects/${projectId}/suggestions/bulk-review`,
+      data,
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -193,7 +300,7 @@ export const suggestionsApi = {
     api.post<void>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/approve`,
       undefined,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -208,7 +315,7 @@ export const suggestionsApi = {
     api.post<void>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/reject`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -223,7 +330,7 @@ export const suggestionsApi = {
     api.post<void>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/request-changes`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**
@@ -238,6 +345,77 @@ export const suggestionsApi = {
     api.post<SuggestionSubmitResponse>(
       `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/resubmit`,
       data,
-      { headers: { Authorization: `Bearer ${token}` } },
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
+};
+
+// --- Anonymous suggestion API ---
+
+/**
+ * API client for anonymous (unauthenticated) suggestion sessions.
+ *
+ * All methods use X-Anonymous-Token header rather than Authorization: Bearer.
+ * The anonymous token is returned on session creation and must be stored
+ * in localStorage and passed to all subsequent calls.
+ *
+ * Only available when AUTH_MODE is "optional" or "disabled" on the server.
+ */
+export const anonymousSuggestionsApi = {
+  /**
+   * Create a new anonymous suggestion session.
+   * No token required — returns an anonymous_token to use for subsequent calls.
+   */
+  createSession: (projectId: string) =>
+    api.post<AnonymousSessionCreateResponse>(
+      `/api/v1/projects/${projectId}/suggestions/anonymous/sessions`,
+    ),
+
+  /**
+   * Save content to the anonymous suggestion branch.
+   */
+  save: (
+    projectId: string,
+    sessionId: string,
+    data: SuggestionSavePayload,
+    anonymousToken: string,
+  ) =>
+    api.put<SuggestionSaveResponse>(
+      `/api/v1/projects/${projectId}/suggestions/anonymous/sessions/${sessionId}/save`,
+      data,
+      { headers: { "X-Anonymous-Token": anonymousToken } },
+    ),
+
+  /**
+   * Submit the anonymous suggestion session — creates a PR for review.
+   * Optionally includes submitter_name/email for credit attribution.
+   * Always send website as empty string (honeypot — bots fill this, humans don't).
+   */
+  submit: (
+    projectId: string,
+    sessionId: string,
+    data: AnonymousSubmitPayload,
+    anonymousToken: string,
+  ) =>
+    api.post<SuggestionSubmitResponse>(
+      `/api/v1/projects/${projectId}/suggestions/anonymous/sessions/${sessionId}/submit`,
+      data,
+      { headers: { "X-Anonymous-Token": anonymousToken } },
+    ),
+
+  /**
+   * Discard an anonymous suggestion session (deletes the suggestion branch).
+   */
+  discard: (projectId: string, sessionId: string, anonymousToken: string) =>
+    api.post<void>(
+      `/api/v1/projects/${projectId}/suggestions/anonymous/sessions/${sessionId}/discard`,
+      undefined,
+      { headers: { "X-Anonymous-Token": anonymousToken } },
+    ),
+
+  // NOTE: no beacon() client here on purpose. navigator.sendBeacon cannot set
+  // headers, and putting the full 24h X-Anonymous-Token in a query string
+  // would leak a bearer-equivalent into browser history and access logs (the
+  // authenticated flow uses a separate short-lived beaconToken for exactly
+  // this reason). An anonymous flush-on-close needs a scoped beacon token
+  // from the api first — tracked as a PR-7 follow-up.
 };

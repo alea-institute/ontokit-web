@@ -14,8 +14,12 @@ export function SessionGuard() {
 
   useEffect(() => {
     if (session?.error === "RefreshAccessTokenError") {
-      // Refresh token is dead — force a fresh OIDC sign-in
-      signIn("zitadel");
+      // Refresh token is dead — force a fresh OIDC sign-in. The callbackUrl is
+      // what brings the user back to the page they were on: a forced re-auth
+      // that lands them on the home page loses whatever they had open (an
+      // expanded PR Party card, a half-typed question), and the loss is
+      // invisible to them because they never chose to sign out.
+      signIn("zitadel", { callbackUrl: window.location.href });
     }
   }, [session?.error]);
 

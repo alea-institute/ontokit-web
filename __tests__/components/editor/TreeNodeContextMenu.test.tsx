@@ -18,10 +18,12 @@ vi.mock("@/components/ui/context-menu", () => ({
     children,
     onSelect,
     destructive,
+    disabled,
   }: {
     children: React.ReactNode;
     onSelect?: () => void;
     destructive?: boolean;
+    disabled?: boolean;
   }) => {
     const text =
       typeof children === "string"
@@ -34,6 +36,7 @@ vi.mock("@/components/ui/context-menu", () => ({
       <button
         data-testid={`menu-item-${text.trim()}`}
         data-destructive={destructive ? "true" : undefined}
+        disabled={disabled}
         onClick={onSelect}
       >
         {children}
@@ -44,6 +47,9 @@ vi.mock("@/components/ui/context-menu", () => ({
     _separatorCount++;
     return <hr data-testid="separator" />;
   },
+  ContextMenuLabel: ({ children }: { children: React.ReactNode }) => (
+    <p data-testid="menu-label">{children}</p>
+  ),
 }));
 
 vi.mock("lucide-react", () => ({
@@ -51,6 +57,7 @@ vi.mock("lucide-react", () => ({
   Copy: () => <span data-testid="icon-copy" />,
   Code: () => <span data-testid="icon-code" />,
   Trash2: () => <span data-testid="icon-trash" />,
+  Lock: () => <span data-testid="icon-lock" />,
 }));
 
 import { TreeNodeContextMenu } from "@/components/editor/TreeNodeContextMenu";
@@ -110,8 +117,9 @@ describe("TreeNodeContextMenu", () => {
       expect(screen.getByTestId("icon-copy")).not.toBeNull();
       expect(screen.getByTestId("icon-code")).not.toBeNull();
       expect(screen.getByTestId("icon-trash")).not.toBeNull();
-    });
   });
+});
+
 
   // ── Conditional rendering ────────────────────────────────────────
   describe("conditional rendering", () => {

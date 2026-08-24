@@ -22,6 +22,10 @@ vi.mock("@/lib/context/ToastContext", () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }));
 
+vi.mock("@/lib/api/duplicateCheck", () => ({
+  distinctDecisionsApi: { mark: vi.fn() },
+}));
+
 const mockTriggerSave = vi.fn();
 const mockFlushToGit = vi.fn().mockResolvedValue(true);
 const mockDiscardDraft = vi.fn();
@@ -106,6 +110,8 @@ vi.mock("@/components/editor/AutoSaveAffordanceBar", () => ({
 }));
 
 import { PropertyDetailPanel } from "@/components/editor/PropertyDetailPanel";
+import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
+import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 
 // ── Helpers ──
 
@@ -151,6 +157,8 @@ const DEFAULT_PROPS = {
   branch: "main",
 };
 
+const mockMarkDistinctDecision = vi.mocked(distinctDecisionsApi.mark);
+
 // ── Tests ──
 
 describe("PropertyDetailPanel", () => {
@@ -164,6 +172,8 @@ describe("PropertyDetailPanel", () => {
     capturedAutoSaveBarProps = null;
     capturedInlineAnnotationAdderProps = null;
     mockExtractPropertyDetail.mockReturnValue(makePropertyDetail());
+    useSuggestionStore.getState().clearAllSuggestions();
+    mockMarkDistinctDecision.mockResolvedValue({ id: "decision-1" } as never);
   });
 
   // ── Empty / placeholder state ──
@@ -218,6 +228,59 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(null);
     render(<PropertyDetailPanel {...DEFAULT_PROPS} />);
     expect(screen.getByText("hasParent")).toBeDefined();
+  });
+
+  it("preserves a cross-branch candidate and marks the proposed entity as a property", async () => {
+    useSuggestionStore.getState().setSuggestions(
+      { projectId: "proj-1", branch: "review" },
+      DEFAULT_PROPS.propertyIri,
+      "children",
+      [{
+        iri: "http://example.org/ontology#suggestedProperty",
+        suggestion_type: "children",
+        label: "suggested property",
+        provenance: "llm-proposed",
+        validation_errors: [],
+        duplicate_verdict: "block",
+        duplicate_candidates: [{
+          iri: "http://example.org/ontology#existingProperty",
+          label: "existing property",
+          entity_type: "property",
+          score: 0.99,
+          branch: "feature/existing-property",
+        }],
+      }],
+    );
+    const user = userEvent.setup();
+    render(
+      <PropertyDetailPanel
+        {...DEFAULT_PROPS}
+        branch="review"
+        canEdit
+        canUseLLM
+      />,
+    );
+
+    await user.click(await screen.findByRole(
+      "button",
+      { name: "Mark existing property as a distinct entity" },
+    ));
+    await user.type(screen.getByLabelText("Why are these different?"), "Different relation semantics");
+    await user.click(screen.getByRole("button", { name: "Mark as distinct" }));
+
+    await waitFor(() => {
+      expect(mockMarkDistinctDecision).toHaveBeenCalledWith(
+        "proj-1",
+        expect.objectContaining({
+          proposed_iri: "http://example.org/ontology#suggestedProperty",
+          candidate_iri: "http://example.org/ontology#existingProperty",
+          candidate_branch: "feature/existing-property",
+          entity_type: "property",
+          reason: "Different relation semantics",
+        }),
+        "test-token",
+      );
+    });
   });
 
   // ── Successful render ──

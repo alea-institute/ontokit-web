@@ -1,15 +1,22 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockSignIn = vi.fn();
 const mockSignOut = vi.fn().mockResolvedValue(undefined);
 const mockUseSession = vi.fn();
+const mockClearAll = vi.fn();
 
 vi.mock("next-auth/react", () => ({
   useSession: (...args: unknown[]) => mockUseSession(...args),
   signIn: (...args: unknown[]) => mockSignIn(...args),
   signOut: (...args: unknown[]) => mockSignOut(...args),
+}));
+
+vi.mock("@/lib/stores/byoKeyStore", () => ({
+  useByoKeyStore: {
+    getState: () => ({ clearAll: mockClearAll }),
+  },
 }));
 
 vi.mock("next/image", () => ({
@@ -32,11 +39,18 @@ import { UserMenu } from "@/components/auth/user-menu";
 describe("UserMenu", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default to a configured deployment (Zitadel present) so sign-in UI shows —
+    // the case these tests exercise. Anonymous/hidden case tested separately below.
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
     // Reset location mock
     Object.defineProperty(window, "location", {
       writable: true,
       value: { origin: "http://localhost:3000", href: "" },
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
   });
 
   it("shows loading skeleton when status is loading", () => {
@@ -59,9 +73,17 @@ describe("UserMenu", () => {
     expect(mockSignIn).toHaveBeenCalledWith("zitadel");
   });
 
+  it("renders nothing when unauthenticated and auth UI is hidden (disabled/anonymous mode)", () => {
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "false");
+    mockUseSession.mockReturnValue({ data: null, status: "unauthenticated" });
+    const { container } = render(<UserMenu />);
+    expect(screen.queryByText("Sign in")).toBeNull();
+    expect(container.firstChild).toBeNull();
+  });
+
   it("shows user initial when authenticated without image", () => {
     mockUseSession.mockReturnValue({
-      data: { user: { name: "Alice", email: "alice@test.com", image: null } },
+      data: { user: { id: "user-a", name: "Alice", email: "alice@test.com", image: null } },
       status: "authenticated",
     });
     render(<UserMenu />);
@@ -110,7 +132,7 @@ describe("UserMenu", () => {
     expect(screen.queryByText("Sign out")).toBeNull();
   });
 
-  it("calls signOut with redirect:false on sign out click", async () => {
+  it("clears all BYO secrets before ending the authenticated session", async () => {
     mockUseSession.mockReturnValue({
       data: { user: { name: "Alice", email: "alice@test.com", image: null } },
       status: "authenticated",
@@ -118,7 +140,11 @@ describe("UserMenu", () => {
     render(<UserMenu />);
     await userEvent.click(screen.getByText("A"));
     await userEvent.click(screen.getByText("Sign out"));
+    expect(mockClearAll).toHaveBeenCalledTimes(1);
     expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
+    expect(mockClearAll.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSignOut.mock.invocationCallOrder[0],
+    );
   });
 
   it("shows U as initial when name is undefined", () => {

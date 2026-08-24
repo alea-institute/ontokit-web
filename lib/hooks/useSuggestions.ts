@@ -1,0 +1,195 @@
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import {
+  generationApi,
+  type DuplicateCandidate,
+  type GeneratedSuggestion,
+  type SuggestionType,
+} from "@/lib/api/generation";
+import { ApiError } from "@/lib/api/client";
+import { LLM_STATUS_INVALIDATION_EVENT } from "@/lib/api/llm";
+import { storeKey, useSuggestionStore, type StoredSuggestion } from "@/lib/stores/suggestionStore";
+
+export interface UseSuggestionsOptions {
+  projectId: string;
+  entityIri: string | null;
+  branch: string;
+  suggestionType: SuggestionType;
+  batchSize?: number;
+  canUseLLM: boolean;
+  accessToken?: string;
+  byoKey?: string;
+  onAccepted?: (suggestion: GeneratedSuggestion, editedValue?: string) => void | Promise<void>;
+  getAcceptanceError?: (suggestion: GeneratedSuggestion) => string | null;
+}
+
+export interface UseSuggestionsReturn {
+  items: StoredSuggestion[];
+  isLoading: boolean;
+  error: string | null;
+  request: () => Promise<void>;
+  accept: (index: number) => Promise<void>;
+  acceptingIndices: ReadonlySet<number>;
+  reject: (index: number) => void;
+  edit: (index: number, value: string) => void;
+  markDistinct: (index: number, candidate: DuplicateCandidate) => void;
+}
+
+// Stable fallback so the store selector returns a referentially-equal
+// snapshot when an entity has no suggestions — a fresh [] per call makes
+// useSyncExternalStore's getSnapshot unstable and React 19 aborts the
+// render ("The result of getSnapshot should be cached").
+const NO_SUGGESTIONS: StoredSuggestion[] = [];
+
+export function generationErrorMessage(error: unknown): string {
+  if (!(error instanceof ApiError)) {
+    return error instanceof Error ? error.message : "Could not generate suggestions.";
+  }
+  switch (error.status) {
+    case 400:
+      return "No generation model is configured. Choose a model in project AI settings.";
+    case 402:
+      return "This project's AI budget has been exhausted. Ask a project admin to review the budget.";
+    case 403:
+      return "Your project role does not allow AI suggestions.";
+    case 429:
+      return "The AI request limit has been reached. Wait before trying again.";
+    case 500:
+      return "The AI service encountered an unexpected error. Try again, and contact support if the problem continues.";
+    case 502:
+      return "The configured AI provider is unavailable. Check the provider connection and try again.";
+    case 503:
+      return "Model pricing is unavailable. Choose a registry model or a local provider in project AI settings.";
+    default:
+      return "Could not generate suggestions.";
+  }
+}
+
+export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsReturn {
+  const {
+    projectId, entityIri, branch, suggestionType,
+    batchSize = 5, canUseLLM, accessToken, byoKey, onAccepted, getAcceptanceError,
+  } = opts;
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+  const acceptingRef = useRef(new Set<number>());
+  const [acceptingIndices, setAcceptingIndices] = useState<ReadonlySet<number>>(new Set());
+
+  const store = useSuggestionStore;
+  const scope = useMemo(() => ({ projectId, branch }), [projectId, branch]);
+  const items = useSuggestionStore((s) =>
+    entityIri
+      ? (s.suggestions[storeKey(scope, entityIri, suggestionType)] ?? NO_SUGGESTIONS)
+      : NO_SUGGESTIONS
+  );
+
+  // Abort in-flight request when entityIri changes (Pitfall 6 defense)
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, [entityIri]);
+
+  const request = useCallback(async () => {
+    if (!entityIri || !canUseLLM || !accessToken || acceptingRef.current.size > 0) return;
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await generationApi.generateSuggestions(
+        projectId,
+        { class_iri: entityIri, branch, suggestion_type: suggestionType, batch_size: batchSize },
+        accessToken,
+        byoKey,
+        controller.signal,
+      );
+      if (!controller.signal.aborted) {
+        store.getState().setSuggestions(scope, entityIri, suggestionType, response.suggestions);
+      }
+    } catch (err) {
+      if (!controller.signal.aborted) {
+        setError(generationErrorMessage(err));
+        if (err instanceof ApiError && (err.status === 402 || err.status === 429)) {
+          window.dispatchEvent(
+            new CustomEvent(LLM_STATUS_INVALIDATION_EVENT, { detail: { projectId } }),
+          );
+        }
+      }
+    } finally {
+      if (!controller.signal.aborted) setIsLoading(false);
+    }
+  }, [projectId, entityIri, branch, suggestionType, batchSize, canUseLLM, accessToken, byoKey, store, scope]);
+
+  const accept = useCallback(async (index: number) => {
+    if (!entityIri) return;
+    if (acceptingRef.current.has(index)) return;
+    const stored = store.getState().suggestions[storeKey(scope, entityIri, suggestionType)]?.[index];
+    if (!stored || stored.status !== "pending") return;
+    if ((stored.suggestion.validation_errors?.length ?? 0) > 0) {
+      setError("This suggestion cannot be accepted until its validation errors are resolved.");
+      return;
+    }
+    const acceptanceError = getAcceptanceError?.(stored.suggestion);
+    if (acceptanceError) {
+      setError(acceptanceError);
+      return;
+    }
+    setError(null);
+    acceptingRef.current.add(index);
+    setAcceptingIndices(new Set(acceptingRef.current));
+    try {
+      await onAccepted?.(stored.suggestion, stored.editedValue);
+      const current = store.getState().suggestions[
+        storeKey(scope, entityIri, suggestionType)
+      ]?.[index];
+      if (current !== stored) {
+        setError("The suggestion list changed before acceptance completed. Review the new suggestions and retry.");
+        return;
+      }
+      store.getState().acceptSuggestion(scope, entityIri, suggestionType, index);
+    } catch (err) {
+      const reason = err instanceof Error && err.message
+        ? err.message
+        : "The change could not be persisted.";
+      setError(`Could not accept this suggestion. ${reason}`);
+    } finally {
+      acceptingRef.current.delete(index);
+      setAcceptingIndices(new Set(acceptingRef.current));
+    }
+  }, [entityIri, suggestionType, store, onAccepted, getAcceptanceError, scope]);
+
+  const reject = useCallback((index: number) => {
+    if (!entityIri) return;
+    store.getState().rejectSuggestion(scope, entityIri, suggestionType, index);
+  }, [entityIri, suggestionType, store, scope]);
+
+  const edit = useCallback((index: number, value: string) => {
+    if (!entityIri) return;
+    store.getState().editSuggestion(scope, entityIri, suggestionType, index, value);
+  }, [entityIri, suggestionType, store, scope]);
+
+  const markDistinct = useCallback((index: number, candidate: DuplicateCandidate) => {
+    if (!entityIri) return;
+    store.getState().removeDuplicateCandidate(
+      scope,
+      entityIri,
+      suggestionType,
+      index,
+      candidate,
+    );
+  }, [entityIri, suggestionType, store, scope]);
+
+  return {
+    items,
+    isLoading,
+    error,
+    request,
+    accept,
+    acceptingIndices,
+    reject,
+    edit,
+    markDistinct,
+  };
+}

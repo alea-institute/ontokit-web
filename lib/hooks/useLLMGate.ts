@@ -1,0 +1,101 @@
+import { useCallback, useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
+import { llmApi } from "@/lib/api/llm";
+import type { ProjectRole } from "@/lib/api/projects";
+import { LLM_STATUS_INVALIDATION_EVENT } from "@/lib/api/llm";
+
+const LLM_ACCESS_ROLES: ProjectRole[] = [
+  "owner",
+  "admin",
+  "editor",
+  "suggester",
+];
+
+export function useLLMGate(
+  projectId: string,
+  userRole?: ProjectRole | null
+) {
+  const { data: session } = useSession();
+  const queryClient = useQueryClient();
+  const isAnonymous = !session?.user;
+
+  const statusQuery = useQuery({
+    // User-scoped: daily_remaining is role/user-dependent and the cached
+    // status must not survive a sign-out/user-switch in the same tab.
+    queryKey: ["llm-status", projectId, session?.user?.email ?? null],
+    queryFn: () => llmApi.getStatus(projectId, session!.accessToken!),
+    enabled: !!session?.accessToken && !!projectId && !isAnonymous,
+    staleTime: 60_000, // 1 min — advisory, not authoritative
+    retry: false,
+  });
+
+  const status = statusQuery.data;
+  const hasAccess =
+    !isAnonymous && userRole != null && LLM_ACCESS_ROLES.includes(userRole);
+  // The API currently returns the role's static allowance, not live usage.
+  // Do not disable the affordance from this advisory field; dispatch remains
+  // authoritative and a 429 refreshes this status.
+
+  const invalidateStatus = useCallback(
+    () =>
+      queryClient.invalidateQueries({ queryKey: ["llm-status", projectId] }),
+    [queryClient, projectId]
+  );
+
+  useEffect(() => {
+    const handleInvalidation = (event: Event) => {
+      const detail = (event as CustomEvent<{ projectId?: string }>).detail;
+      if (detail?.projectId === projectId) void invalidateStatus();
+    };
+    window.addEventListener(LLM_STATUS_INVALIDATION_EVENT, handleInvalidation);
+    return () => window.removeEventListener(LLM_STATUS_INVALIDATION_EVENT, handleInvalidation);
+  }, [invalidateStatus, projectId]);
+
+  return {
+    // Core access decision
+    canUseLLM:
+      hasAccess &&
+      (status?.configured ?? false) &&
+      !(status?.budget_exhausted ?? false),
+
+    // Individual states for UI rendering
+    budgetExhausted: status?.budget_exhausted ?? false,
+    // Only claim "not configured" when the server actually said so — while
+    // loading or on a fetch error this must NOT masquerade as unconfigured.
+    notConfigured: status ? !status.configured : false,
+    dailyRemaining: status?.daily_remaining ?? null,
+    isBudgetUnlimited: status?.monthly_budget_usd === null,
+    isAnonymous,
+    hasRoleAccess: hasAccess,
+
+    // Status data for banner/badge
+    monthlySpentUsd: status?.monthly_spent_usd ?? 0,
+    monthlyBudgetUsd: status?.monthly_budget_usd ?? null,
+    burnRateDailyUsd: status?.burn_rate_daily_usd ?? 0,
+
+    // Role-based display
+    roleLimitLabel: getRoleLimitLabel(userRole),
+
+    // Force refresh (e.g., after 402 response)
+    invalidateStatus,
+
+    isLoading: statusQuery.isLoading,
+    isError: statusQuery.isError,
+    error: statusQuery.error,
+  };
+}
+
+function getRoleLimitLabel(role?: ProjectRole | null): string | null {
+  switch (role) {
+    case "owner":
+    case "admin":
+      return "Admin — unlimited";
+    case "editor":
+      return "Editor — 500/day";
+    case "suggester":
+      return "Suggester — 100/day";
+    default:
+      return null;
+  }
+}

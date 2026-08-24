@@ -1,8 +1,21 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+
+vi.hoisted(() => {
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    value: vi.fn().mockReturnValue({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }),
+  });
+});
+
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import type { OWLClassDetail } from "@/lib/api/client";
 import type { AnyDraftEntry } from "@/lib/stores/draftStore";
+import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 
 // Mock the draft store with stable function references
 const mockDrafts: Record<string, AnyDraftEntry> = {};
@@ -29,6 +42,8 @@ beforeEach(() => {
   for (const key of Object.keys(mockDrafts)) {
     delete mockDrafts[key];
   }
+  localStorage.removeItem("ontokit-auto-save-toast-seen");
+  useEditorModeStore.setState({ hasSeenAutoSaveToast: false });
 });
 
 function makeClassDetail(overrides: Partial<OWLClassDetail> = {}): OWLClassDetail {
@@ -149,6 +164,56 @@ describe("useAutoSave", () => {
 
     const key = "proj-1:main:http://example.org/MyClass";
     expect(mockDrafts[key]).toBeUndefined();
+  });
+
+  it("defaults navigate-away flushes to auto-save and teaches only on the first success", async () => {
+    const onUpdateClass = vi.fn().mockResolvedValue(undefined);
+    const onFirstAutoSave = vi.fn();
+    const { result } = renderHook(() =>
+      useAutoSave({ ...BASE_OPTIONS, onUpdateClass, onFirstAutoSave }),
+    );
+
+    act(() => {
+      setEditState(result, [{ value: "First", lang: "en" }]);
+      result.current.triggerSave();
+    });
+    await act(async () => {
+      await result.current.flushToGit();
+    });
+
+    act(() => {
+      setEditState(result, [{ value: "Second", lang: "en" }]);
+      result.current.triggerSave();
+    });
+    await act(async () => {
+      await result.current.flushToGit();
+    });
+
+    expect(onUpdateClass).toHaveBeenCalledTimes(2);
+    expect(onFirstAutoSave).toHaveBeenCalledOnce();
+    expect(useEditorModeStore.getState().hasSeenAutoSaveToast).toBe(true);
+  });
+
+  it("manual saves do not consume the first auto-save teaching toast", async () => {
+    const onFirstAutoSave = vi.fn();
+    const { result } = renderHook(() =>
+      useAutoSave({
+        ...BASE_OPTIONS,
+        onUpdateClass: vi.fn().mockResolvedValue(undefined),
+        onFirstAutoSave,
+      }),
+    );
+
+    act(() => {
+      setEditState(result, [{ value: "Manual", lang: "en" }]);
+      result.current.triggerSave();
+    });
+    await act(async () => {
+      await result.current.flushToGit("manual");
+    });
+
+    expect(onFirstAutoSave).not.toHaveBeenCalled();
+    expect(useEditorModeStore.getState().hasSeenAutoSaveToast).toBe(false);
   });
 
   it("flushToGit handles errors gracefully", async () => {

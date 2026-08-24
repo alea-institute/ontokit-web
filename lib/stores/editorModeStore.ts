@@ -4,15 +4,22 @@ import { persist } from "zustand/middleware";
 export type EditorMode = "standard" | "developer";
 export type ThemePreference = "light" | "dark" | "system";
 
+const AUTO_SAVE_TOAST_STORAGE_KEY = "ontokit-auto-save-toast-seen";
+const AUTO_SAVE_TOAST_LOCK_NAME = "ontokit-auto-save-toast-claim";
+
 interface EditorModeState {
   editorMode: EditorMode;
   theme: ThemePreference;
-  hideSaveButton: boolean;
+  /** Auto-save is always on; this controls only the optional immediate-save affordance. */
+  showManualSaveButton: boolean;
+  /** Persisted so the auto-save teaching toast is shown once per browser profile. */
+  hasSeenAutoSaveToast: boolean;
   /** When true, opening an entity in the editor auto-enters edit mode (no extra "Edit Item" click). */
   preferEditMode: boolean;
   setEditorMode: (mode: EditorMode) => void;
   setTheme: (theme: ThemePreference) => void;
-  setHideSaveButton: (on: boolean) => void;
+  setShowManualSaveButton: (on: boolean) => void;
+  claimAutoSaveTeachingToast: () => Promise<boolean>;
   setPreferEditMode: (on: boolean) => void;
 }
 
@@ -37,10 +44,11 @@ export function applyThemeToDOM(theme: ThemePreference) {
 
 export const useEditorModeStore = create<EditorModeState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       editorMode: "standard",
       theme: "system",
-      hideSaveButton: false,
+      showManualSaveButton: true,
+      hasSeenAutoSaveToast: false,
       preferEditMode: false,
 
       setEditorMode: (mode) => set({ editorMode: mode }),
@@ -50,12 +58,56 @@ export const useEditorModeStore = create<EditorModeState>()(
         set({ theme });
       },
 
-      setHideSaveButton: (on) => set({ hideSaveButton: on }),
+      setShowManualSaveButton: (on) => set({ showManualSaveButton: on }),
+
+      claimAutoSaveTeachingToast: async () => {
+        const claim = () => {
+          let claimedInAnotherTab = false;
+          try {
+            claimedInAnotherTab = localStorage.getItem(AUTO_SAVE_TOAST_STORAGE_KEY) === "true";
+          } catch {
+            // Persisted Zustand state remains the fallback when storage is unavailable.
+          }
+
+          if (claimedInAnotherTab || get().hasSeenAutoSaveToast) return false;
+
+          try {
+            localStorage.setItem(AUTO_SAVE_TOAST_STORAGE_KEY, "true");
+          } catch {
+            // The in-memory flag still guarantees once-only behavior in this tab.
+          }
+          set({ hasSeenAutoSaveToast: true });
+          return true;
+        };
+
+        if (typeof navigator !== "undefined" && navigator.locks) {
+          return navigator.locks.request(AUTO_SAVE_TOAST_LOCK_NAME, claim);
+        }
+        return claim();
+      },
 
       setPreferEditMode: (on) => set({ preferEditMode: on }),
     }),
     {
       name: "ontokit-editor-preferences",
+      version: 1,
+      migrate: (persistedState) => {
+        const legacy = persistedState as Partial<EditorModeState> & {
+          hideSaveButton?: boolean;
+        };
+        const { hideSaveButton, ...current } = legacy;
+
+        return {
+          ...current,
+          // Existing users keep their chosen button visibility. Blobs that
+          // predate the old setting retain its original visible-button default.
+          showManualSaveButton:
+            typeof legacy.showManualSaveButton === "boolean"
+              ? legacy.showManualSaveButton
+              : hideSaveButton !== true,
+          hasSeenAutoSaveToast: legacy.hasSeenAutoSaveToast ?? false,
+        };
+      },
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyThemeToDOM(state.theme);
@@ -83,11 +135,9 @@ if (typeof window !== "undefined") {
   });
 
   // Listen for OS preference changes (relevant when theme is "system")
-  window
-    .matchMedia("(prefers-color-scheme: dark)")
-    .addEventListener("change", () => {
-      if (useEditorModeStore.getState().theme === "system") {
-        applyThemeToDOM("system");
-      }
-    });
+  window.matchMedia?.("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (useEditorModeStore.getState().theme === "system") {
+      applyThemeToDOM("system");
+    }
+  });
 }

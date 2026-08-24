@@ -15,6 +15,12 @@ interface MemberListProps {
   onRemove: (userId: string) => Promise<void>;
   onTransferOwnership?: (userId: string) => Promise<void>;
   isLoading?: boolean;
+  /**
+   * Optional per-member trust control (R6). Supplied by the settings page,
+   * which owns the trust query; return null for members the ladder does not
+   * govern (owners, admins and editors already resolve above trusted).
+   */
+  renderTrustControl?: (member: ProjectMember) => React.ReactNode;
 }
 
 const roleIcons: Record<ProjectRole, React.ComponentType<{ className?: string }>> = {
@@ -50,6 +56,7 @@ export function MemberList({
   onRemove,
   onTransferOwnership,
   isLoading = false,
+  renderTrustControl,
 }: MemberListProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
@@ -154,6 +161,32 @@ export function MemberList({
                 <RoleIcon className="h-4 w-4" />
                 <span className="text-sm font-medium">{roleLabels[member.role]}</span>
               </div>
+
+              {renderTrustControl?.(member)}
+
+              {member.role === "editor" && canManageMembers && (
+                <label
+                  className="flex min-h-[44px] cursor-pointer items-center gap-2"
+                  title="Allow this editor to merge structural PRs directly"
+                >
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Structural self-merge</span>
+                  <div className="relative inline-flex cursor-pointer items-center">
+                    <input
+                      type="checkbox"
+                      className="peer sr-only"
+                      checked={member.can_self_merge_structural ?? false}
+                      disabled={isLoading || isProcessing}
+                      onChange={() =>
+                        onUpdateRole(member.user_id, {
+                          role: member.role,
+                          can_self_merge_structural: !(member.can_self_merge_structural ?? false),
+                        })
+                      }
+                    />
+                    <div className="peer h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-primary-600 peer-checked:after:translate-x-full dark:bg-slate-600 dark:peer-checked:bg-primary-500" />
+                  </div>
+                </label>
+              )}
 
               {(canEditMember(member) || canRemoveMember(member) || canTransferTo(member)) && (
                 <div className="relative">
