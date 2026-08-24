@@ -75,11 +75,12 @@ export function LLMUsageSection({
     (a, b) => b.calls_this_month - a.calls_this_month
   );
   const totalUsers = sortedUsers.length;
-  const pagedUsers = sortedUsers.slice(
-    currentPage * PAGE_SIZE,
-    (currentPage + 1) * PAGE_SIZE
-  );
   const totalPages = Math.ceil(totalUsers / PAGE_SIZE);
+  const visiblePage = Math.min(currentPage, Math.max(totalPages - 1, 0));
+  const pagedUsers = sortedUsers.slice(
+    visiblePage * PAGE_SIZE,
+    (visiblePage + 1) * PAGE_SIZE
+  );
   const showPagination = totalUsers > PAGE_SIZE;
 
   return (
@@ -247,26 +248,24 @@ export function LLMUsageSection({
                 {showPagination && (
                   <div className="mt-3 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
                     <span>
-                      Showing {currentPage * PAGE_SIZE + 1}–
-                      {Math.min((currentPage + 1) * PAGE_SIZE, totalUsers)} of{" "}
+                      Showing {visiblePage * PAGE_SIZE + 1}–
+                      {Math.min((visiblePage + 1) * PAGE_SIZE, totalUsers)} of{" "}
                       {totalUsers} users
                     </span>
                     <div className="flex gap-2">
                       <Button
                         variant="outline"
-                        onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
-                        disabled={currentPage === 0}
+                        onClick={() => setCurrentPage(Math.max(0, visiblePage - 1))}
+                        disabled={visiblePage === 0}
                       >
                         Previous
                       </Button>
                       <Button
                         variant="outline"
                         onClick={() =>
-                          setCurrentPage((p) =>
-                            Math.min(totalPages - 1, p + 1)
-                          )
+                          setCurrentPage(Math.min(totalPages - 1, visiblePage + 1))
                         }
-                        disabled={currentPage >= totalPages - 1}
+                        disabled={visiblePage >= totalPages - 1}
                       >
                         Next
                       </Button>
