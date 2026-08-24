@@ -63,11 +63,12 @@ const EMPTY_COPY: Record<PRPartyTab, { title: string; body: string }> = {
 
 export interface PRPartyQueueViewProps {
   /** U12 mounts the full detail panel for the expanded card through here. */
-  renderCardDetail?: (card: PRPartyQueueCard) => React.ReactNode;
+  renderCardDetail?: (card: PRPartyQueueCard, reviewerId: string) => React.ReactNode;
 }
 
 export function PRPartyQueueView({ renderCardDetail }: PRPartyQueueViewProps = {}) {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
+  const reviewerId = session?.user?.id ?? session?.user?.email ?? null;
   const {
     isReviewer,
     degraded,
@@ -276,7 +277,7 @@ export function PRPartyQueueView({ renderCardDetail }: PRPartyQueueViewProps = {
                     cardId: expandedCardId === cardId ? null : cardId,
                   })
                 }
-                detailSlot={renderCardDetail?.(card)}
+                detailSlot={reviewerId ? renderCardDetail?.(card, reviewerId) : undefined}
                 mergePlacement={settings?.merge_default === "manual" ? "manual" : "dashboard"}
                 onSubmitAction={queue.submitAction}
                 onUnpark={queue.unparkCard}

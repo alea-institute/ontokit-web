@@ -54,9 +54,10 @@ const OUTCOME_STYLES: Record<MergeOutcomeKind, string> = {
 
 export interface CardDetailProps {
   card: PRPartyQueueCard;
+  reviewerId: string;
 }
 
-export function CardDetail({ card }: CardDetailProps) {
+export function CardDetail({ card, reviewerId }: CardDetailProps) {
   const { announce } = useAnnounce();
   const { card: detail, isLoading, isError } = usePRPartyCard(card.card_id);
   const { submitAction, askQuestion } = usePRPartyQueue();
@@ -231,6 +232,7 @@ export function CardDetail({ card }: CardDetailProps) {
 
       <QAThread
         cardId={detail.card_id}
+        reviewerId={reviewerId}
         entries={detail.qa_thread ?? []}
         prUrl={detail.pr_url}
         onAsk={askQuestion}

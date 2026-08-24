@@ -62,16 +62,25 @@ const colorByType: Record<NotificationType, string> = {
  * turn a notification row into an open redirect (R21). Anything else falls
  * through to the type switch, which only ever builds paths from our own routes.
  *
- * The backslash forms are the same hole with a different slash: browsers
- * normalise `\` to `/` in the authority position, so `/\evil.test` and
- * `/\\evil.test` are protocol-relative URLs that a plain `//` check waves
- * through. Only a leading `/` followed by neither slash nor backslash is safe.
+ * Backslashes are rejected everywhere because URL parsers normalise them as
+ * path separators, including into authority forms. C0/DEL controls are also
+ * rejected: trimming or parser normalisation must never be able to turn server
+ * data into a different navigation target than the string we validated.
  */
 export function isSafeInternalUrl(url: string | undefined | null): url is string {
-  return typeof url === "string" && /^\/(?![/\\])/.test(url);
+  if (typeof url !== "string" || !url.startsWith("/") || url.startsWith("//")) {
+    return false;
+  }
+
+  for (const character of url) {
+    const code = character.charCodeAt(0);
+    if (character === "\\" || code <= 0x1f || code === 0x7f) return false;
+  }
+
+  return true;
 }
 
-function getTargetUrl(notification: { type: NotificationType; project_id?: string; target_id?: string; target_url?: string }): string {
+function getTargetUrl(notification: { type: NotificationType; project_id?: string | null; target_id?: string; target_url?: string }): string {
   if (isSafeInternalUrl(notification.target_url)) return notification.target_url;
 
   // Not every notification belongs to a project — PR Party rows do not — so a

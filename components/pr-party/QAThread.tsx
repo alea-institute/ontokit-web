@@ -36,9 +36,9 @@ import { cn } from "@/lib/utils";
 
 const DRAFT_PREFIX = "prparty";
 
-/** localStorage key for one card's in-progress question. */
-export function qaDraftKey(cardId: string): string {
-  return `${DRAFT_PREFIX}:${cardId}`;
+/** localStorage key for one reviewer's in-progress question on one card. */
+export function qaDraftKey(cardId: string, reviewerId: string): string {
+  return `${DRAFT_PREFIX}:${encodeURIComponent(reviewerId)}:${encodeURIComponent(cardId)}`;
 }
 
 function readDraft(key: string): string {
@@ -89,6 +89,8 @@ function formatWhen(iso: string | null): string {
 
 export interface QAThreadProps {
   cardId: string;
+  /** Stable authenticated reviewer identity; preserved across forced re-auth. */
+  reviewerId: string;
   entries: PRPartyQAEntry[];
   /** Where to send someone who has to finish the conversation by hand. */
   prUrl: string;
@@ -100,9 +102,9 @@ interface DegradedCompose {
   deepLink: string;
 }
 
-export function QAThread({ cardId, entries, prUrl, onAsk }: QAThreadProps) {
+export function QAThread({ cardId, reviewerId, entries, prUrl, onAsk }: QAThreadProps) {
   const { announce } = useAnnounce();
-  const [draft, setDraft] = useLocalDraft(qaDraftKey(cardId));
+  const [draft, setDraft] = useLocalDraft(qaDraftKey(cardId, reviewerId));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [compose, setCompose] = useState<DegradedCompose | null>(null);

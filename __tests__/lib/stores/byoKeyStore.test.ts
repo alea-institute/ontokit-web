@@ -7,7 +7,7 @@ const PROJECT = "project-1";
 describe("byoKeyStore", () => {
   beforeEach(() => {
     // Reset store + backing sessionStorage between tests.
-    useByoKeyStore.setState({ entries: {} });
+    useByoKeyStore.setState({ ownerId: null, entries: {} });
     sessionStorage.clear();
   });
 
@@ -65,5 +65,28 @@ describe("byoKeyStore", () => {
     useByoKeyStore.getState().clearKey("proj-a");
     expect(useByoKeyStore.getState().getKey("proj-a")).toBeNull();
     expect(useByoKeyStore.getState().getKey("proj-b")).toBe("key-b");
+  });
+
+  it("clears every project key at the account boundary", () => {
+    const s = useByoKeyStore.getState();
+    s.setKey("proj-a", "openai", "key-a");
+    s.setKey("proj-b", "anthropic", "key-b");
+
+    useByoKeyStore.getState().clearAll();
+
+    expect(useByoKeyStore.getState().entries).toEqual({});
+    expect(sessionStorage.getItem("ontokit-byo-keys")).not.toContain("key-a");
+    expect(sessionStorage.getItem("ontokit-byo-keys")).not.toContain("key-b");
+  });
+
+  it("clears a prior account's keys on a same-tab identity switch", () => {
+    useByoKeyStore.getState().setOwner("user-a");
+    useByoKeyStore.getState().setKey(PROJECT, "openai", "user-a-key");
+
+    useByoKeyStore.getState().setOwner("user-b");
+
+    expect(useByoKeyStore.getState().ownerId).toBe("user-b");
+    expect(useByoKeyStore.getState().getKey(PROJECT)).toBeNull();
+    expect(sessionStorage.getItem("ontokit-byo-keys")).not.toContain("user-a-key");
   });
 });

@@ -40,7 +40,9 @@ export default function PRPartyPage() {
             }
           >
             <PRPartyQueueView
-              renderCardDetail={(card) => <CardDetail card={card} />}
+              renderCardDetail={(card, reviewerId) => (
+                <CardDetail card={card} reviewerId={reviewerId} />
+              )}
             />
           </Suspense>
         </div>

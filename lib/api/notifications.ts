@@ -35,8 +35,8 @@ export interface Notification {
    * first of these — a review card belongs to a GitHub PR, not to an OntoKit
    * project — and the API sends null for both fields.
    */
-  project_id?: string;
-  project_name?: string;
+  project_id?: string | null;
+  project_name?: string | null;
   target_id?: string;
   target_url?: string;
   is_read: boolean;

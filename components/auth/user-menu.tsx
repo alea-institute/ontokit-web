@@ -3,8 +3,9 @@
 import { signIn, signOut, useSession } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { shouldShowAuthUI } from "@/lib/auth-mode";
+import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
 
 // Zitadel configuration
 const ZITADEL_ISSUER = process.env.NEXT_PUBLIC_ZITADEL_ISSUER || "http://localhost:8080";
@@ -16,10 +17,22 @@ export function UserMenu() {
   const showAuthUI = shouldShowAuthUI();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const accountId = session?.user?.id ?? session?.user?.email ?? null;
+
+  // Bind tab-scoped secrets to the settled account before browser paint. A
+  // direct same-tab account replacement (not only this menu's logout path)
+  // clears keys when the stable session identity changes.
+  useLayoutEffect(() => {
+    if (status !== "loading") useByoKeyStore.getState().setOwner(accountId);
+  }, [accountId, status]);
 
   // Handle federated logout (sign out from both NextAuth and Zitadel)
   const handleSignOut = async () => {
     setIsOpen(false);
+    // Secrets belong to the current account boundary. Clear synchronously so
+    // a same-tab sign-out/sign-in cannot expose them to the next account, even
+    // if the federated logout request fails after NextAuth is cleared.
+    useByoKeyStore.getState().clearAll();
     // First clear the NextAuth session
     await signOut({ redirect: false });
     // Then redirect to Zitadel's end_session endpoint with client_id for proper redirect

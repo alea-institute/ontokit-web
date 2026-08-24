@@ -5,11 +5,19 @@ import userEvent from "@testing-library/user-event";
 const mockSignIn = vi.fn();
 const mockSignOut = vi.fn().mockResolvedValue(undefined);
 const mockUseSession = vi.fn();
+const mockClearAll = vi.fn();
+const mockSetOwner = vi.fn();
 
 vi.mock("next-auth/react", () => ({
   useSession: (...args: unknown[]) => mockUseSession(...args),
   signIn: (...args: unknown[]) => mockSignIn(...args),
   signOut: (...args: unknown[]) => mockSignOut(...args),
+}));
+
+vi.mock("@/lib/stores/byoKeyStore", () => ({
+  useByoKeyStore: {
+    getState: () => ({ clearAll: mockClearAll, setOwner: mockSetOwner }),
+  },
 }));
 
 vi.mock("next/image", () => ({
@@ -76,11 +84,12 @@ describe("UserMenu", () => {
 
   it("shows user initial when authenticated without image", () => {
     mockUseSession.mockReturnValue({
-      data: { user: { name: "Alice", email: "alice@test.com", image: null } },
+      data: { user: { id: "user-a", name: "Alice", email: "alice@test.com", image: null } },
       status: "authenticated",
     });
     render(<UserMenu />);
     expect(screen.getByText("A")).toBeDefined();
+    expect(mockSetOwner).toHaveBeenCalledWith("user-a");
   });
 
   it("shows user image when available", () => {
@@ -125,7 +134,7 @@ describe("UserMenu", () => {
     expect(screen.queryByText("Sign out")).toBeNull();
   });
 
-  it("calls signOut with redirect:false on sign out click", async () => {
+  it("clears all BYO secrets before ending the authenticated session", async () => {
     mockUseSession.mockReturnValue({
       data: { user: { name: "Alice", email: "alice@test.com", image: null } },
       status: "authenticated",
@@ -133,7 +142,11 @@ describe("UserMenu", () => {
     render(<UserMenu />);
     await userEvent.click(screen.getByText("A"));
     await userEvent.click(screen.getByText("Sign out"));
+    expect(mockClearAll).toHaveBeenCalledTimes(1);
     expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
+    expect(mockClearAll.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSignOut.mock.invocationCallOrder[0],
+    );
   });
 
   it("shows U as initial when name is undefined", () => {

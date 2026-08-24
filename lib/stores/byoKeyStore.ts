@@ -16,10 +16,14 @@ interface BYOKeyEntry {
 }
 
 interface BYOKeyState {
+  /** Account that owns every entry in this tab; null is the anonymous scope. */
+  ownerId: string | null;
   entries: Record<string, BYOKeyEntry>; // keyed by projectId
+  setOwner: (ownerId: string | null) => void;
   setKey: (projectId: string, provider: string, key: string) => void;
   markValidated: (projectId: string) => void;
   clearKey: (projectId: string) => void;
+  clearAll: () => void;
   getKey: (projectId: string) => string | null;
   getEntry: (projectId: string) => BYOKeyEntry | null;
 }
@@ -27,7 +31,13 @@ interface BYOKeyState {
 export const useByoKeyStore = create<BYOKeyState>()(
   persist(
     (set, get) => ({
+      ownerId: null,
       entries: {},
+
+      setOwner: (ownerId) =>
+        set((state) =>
+          state.ownerId === ownerId ? state : { ownerId, entries: {} },
+        ),
 
       setKey: (projectId, provider, key) =>
         set((s) => ({
@@ -55,6 +65,8 @@ export const useByoKeyStore = create<BYOKeyState>()(
           delete entries[projectId];
           return { entries };
         }),
+
+      clearAll: () => set({ entries: {} }),
 
       getKey: (projectId) => get().entries[projectId]?.key ?? null,
 

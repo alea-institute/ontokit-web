@@ -54,6 +54,7 @@ function renderThread(props: Partial<React.ComponentProps<typeof QAThread>> = {}
   const utils = render(
     <QAThread
       cardId="card-1"
+      reviewerId="reviewer-a"
       entries={[]}
       prUrl="https://github.com/catholicos/ontokit-api/pull/42"
       onAsk={onAsk}
@@ -282,7 +283,7 @@ describe("QAThread", () => {
     const { unmount } = renderThread();
 
     await user.type(screen.getByLabelText(/ask the author/i), "Half a question");
-    expect(window.localStorage.getItem(qaDraftKey("card-1"))).toBe("Half a question");
+    expect(window.localStorage.getItem(qaDraftKey("card-1", "reviewer-a"))).toBe("Half a question");
 
     unmount();
     renderThread();
@@ -301,6 +302,23 @@ describe("QAThread", () => {
     renderThread({ cardId: "card-2" });
     expect((screen.getByLabelText(/ask the author/i) as HTMLTextAreaElement).value).toBe(
       "",
+    );
+  });
+
+  it("keeps two reviewers' drafts separate on the same card and ignores legacy keys", async () => {
+    const user = userEvent.setup();
+    window.localStorage.setItem("prparty:card-1", "legacy shared draft");
+
+    const { unmount } = renderThread({ reviewerId: "reviewer-a" });
+    const box = screen.getByLabelText(/ask the author/i) as HTMLTextAreaElement;
+    expect(box.value).toBe("");
+    await user.type(box, "Reviewer's private draft");
+    unmount();
+
+    renderThread({ reviewerId: "reviewer-b" });
+    expect((screen.getByLabelText(/ask the author/i) as HTMLTextAreaElement).value).toBe("");
+    expect(window.localStorage.getItem(qaDraftKey("card-1", "reviewer-a"))).toBe(
+      "Reviewer's private draft",
     );
   });
 });

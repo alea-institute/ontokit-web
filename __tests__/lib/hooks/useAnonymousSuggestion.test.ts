@@ -28,8 +28,10 @@ const PROJECT_ID = "proj-1";
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useRealTimers();
   useAnonymousTokenStore.setState({ tokens: {} });
   localStorage.clear();
+  sessionStorage.clear();
 });
 
 describe("useAnonymousSuggestion", () => {
@@ -58,11 +60,34 @@ describe("useAnonymousSuggestion", () => {
     expect(mockedCreateSession).not.toHaveBeenCalled();
   });
 
+  it("refuses an expired restored session and clears its persisted entry", async () => {
+    vi.setSystemTime(new Date("2026-08-24T12:00:00Z"));
+    useAnonymousTokenStore.setState({
+      tokens: {
+        [PROJECT_ID]: {
+          token: "tok-expired",
+          sessionId: "sess-expired",
+          branch: "anon/sess-expired",
+          issuedAt: Date.now() - 86_400_001,
+          expiresAt: Date.now() - 1,
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useAnonymousSuggestion({ projectId: PROJECT_ID }));
+
+    await waitFor(() => expect(result.current.status).toBe("idle"));
+    expect(result.current.sessionId).toBeNull();
+    expect(result.current.anonymousToken).toBeNull();
+    expect(useAnonymousTokenStore.getState().getToken(PROJECT_ID)).toBeNull();
+  });
+
   it("startSession creates a session, persists the token, and activates", async () => {
+    vi.setSystemTime(new Date("2026-08-24T12:00:00Z"));
     mockedCreateSession.mockResolvedValue({
       session_id: "sess-1",
       branch: "anon/sess-1",
-      created_at: "2024-01-01T00:00:00Z",
+      created_at: "2026-08-24T11:59:00Z",
       anonymous_token: "tok-1",
     });
 
@@ -84,7 +109,11 @@ describe("useAnonymousSuggestion", () => {
       token: "tok-1",
       sessionId: "sess-1",
       branch: "anon/sess-1",
+      issuedAt: Date.parse("2026-08-24T11:59:00Z"),
+      expiresAt: Date.parse("2026-08-25T11:59:00Z"),
     });
+    expect(sessionStorage.getItem("ontokit-anonymous-token")).toContain("tok-1");
+    expect(localStorage.getItem("ontokit-anonymous-token")).toBeNull();
   });
 
   it("startSession does nothing if a session is already active", async () => {

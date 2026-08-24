@@ -351,7 +351,7 @@ describe("NotificationBell — PR Party rows", () => {
     expect(mockPush.mock.calls[0][0].startsWith("//")).toBe(false);
   });
 
-  it("admits only a leading slash followed by neither slash nor backslash", () => {
+  it("admits normal internal paths with query/hash and rejects URL parser escape forms", () => {
     expect(isSafeInternalUrl("/pr-party?card=1")).toBe(true);
     expect(isSafeInternalUrl("/projects/p/settings#join-requests")).toBe(true);
 
@@ -359,6 +359,11 @@ describe("NotificationBell — PR Party rows", () => {
     expect(isSafeInternalUrl("/\\evil.test")).toBe(false);
     expect(isSafeInternalUrl("/\\\\evil.test")).toBe(false);
     expect(isSafeInternalUrl("\\\\evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/projects\\evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/safe\n//evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/safe\r//evil.test")).toBe(false);
+    expect(isSafeInternalUrl("/safe\t//evil.test")).toBe(false);
+    expect(isSafeInternalUrl(`/safe${String.fromCharCode(0x7f)}suffix`)).toBe(false);
     expect(isSafeInternalUrl("https://evil.test")).toBe(false);
     expect(isSafeInternalUrl(undefined)).toBe(false);
     expect(isSafeInternalUrl(null)).toBe(false);

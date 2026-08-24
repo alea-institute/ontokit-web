@@ -7,7 +7,8 @@
  *    so repeat anonymous contributors don't have to retype their info.
  *
  * 2. useAnonymousTokenStore — persists the anonymous session token, sessionId,
- *    and branch per projectId so the session survives page navigations.
+ *    branch, and 24-hour lifetime per projectId in sessionStorage so the
+ *    session survives page navigations without surviving the browser tab.
  */
 
 import { create } from "zustand";
@@ -52,10 +53,27 @@ export const useAnonymousCreditStore = create<AnonymousCreditState>()(
 
 // --- Anonymous token store ---
 
+export const ANONYMOUS_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const ANONYMOUS_TOKEN_STORAGE_KEY = "ontokit-anonymous-token";
+
+function anonymousTokenStorage(): Storage {
+  if (typeof window === "undefined") throw new Error("Browser storage is unavailable");
+  // This key used to live in durable localStorage. Remove that legacy bearer
+  // token while selecting the tab-scoped replacement.
+  try {
+    window.localStorage.removeItem(ANONYMOUS_TOKEN_STORAGE_KEY);
+  } catch {
+    // Storage may be disabled; createJSONStorage already degrades gracefully.
+  }
+  return window.sessionStorage;
+}
+
 interface AnonymousTokenEntry {
   token: string;
   sessionId: string;
   branch: string;
+  issuedAt: number;
+  expiresAt: number;
 }
 
 interface AnonymousTokenState {
@@ -65,6 +83,7 @@ interface AnonymousTokenState {
     token: string,
     sessionId: string,
     branch: string,
+    issuedAt?: number,
   ) => void;
   getToken: (projectId: string) => AnonymousTokenEntry | null;
   clearToken: (projectId: string) => void;
@@ -73,22 +92,49 @@ interface AnonymousTokenState {
 /**
  * Persisted store for anonymous session tokens, keyed by projectId.
  * Allows resuming an in-progress anonymous session after page reload/navigation.
- * Stored under localStorage key "ontokit-anonymous-token".
+ * Stored under sessionStorage key "ontokit-anonymous-token". Entries without
+ * lifetime metadata (including legacy persisted entries) are not restorable.
  */
 export const useAnonymousTokenStore = create<AnonymousTokenState>()(
   persist(
     (set, get) => ({
       tokens: {},
 
-      setToken: (projectId, token, sessionId, branch) =>
+      setToken: (projectId, token, sessionId, branch, issuedAt = Date.now()) => {
+        const normalizedIssuedAt = Number.isFinite(issuedAt) ? issuedAt : Date.now();
         set((state) => ({
           tokens: {
             ...state.tokens,
-            [projectId]: { token, sessionId, branch },
+            [projectId]: {
+              token,
+              sessionId,
+              branch,
+              issuedAt: normalizedIssuedAt,
+              expiresAt: normalizedIssuedAt + ANONYMOUS_TOKEN_TTL_MS,
+            },
           },
-        })),
+        }));
+      },
 
-      getToken: (projectId) => get().tokens[projectId] ?? null,
+      getToken: (projectId) => {
+        const entry = get().tokens[projectId];
+        if (!entry) return null;
+
+        if (
+          !Number.isFinite(entry.issuedAt) ||
+          !Number.isFinite(entry.expiresAt) ||
+          entry.expiresAt <= entry.issuedAt ||
+          entry.expiresAt <= Date.now()
+        ) {
+          set((state) => {
+            const { [projectId]: _, ...rest } = state.tokens;
+            return { tokens: rest };
+          });
+          return null;
+        }
+
+        return entry;
+      },
 
       clearToken: (projectId) =>
         set((state) => {
@@ -97,8 +143,12 @@ export const useAnonymousTokenStore = create<AnonymousTokenState>()(
         }),
     }),
     {
-      name: "ontokit-anonymous-token",
-      storage: createJSONStorage(() => localStorage),
+      name: ANONYMOUS_TOKEN_STORAGE_KEY,
+      storage: createJSONStorage(anonymousTokenStorage),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        for (const projectId of Object.keys(state.tokens)) state.getToken(projectId);
+      },
     },
   ),
 );

@@ -47,7 +47,7 @@ interface UseAnonymousSuggestionOptions {
  *
  * Mirrors useSuggestionSession but uses anonymous tokens
  * (X-Anonymous-Token header) instead of Bearer tokens.
- * The anonymous token is persisted in localStorage via useAnonymousTokenStore
+ * The anonymous token is persisted in sessionStorage via useAnonymousTokenStore
  * and restored on mount so sessions survive page navigations.
  *
  * Only usable when AUTH_MODE is "optional" or "disabled" on the server.
@@ -71,7 +71,7 @@ export function useAnonymousSuggestion({
   const submittingRef = useRef(false);
   const restoredRef = useRef(false);
 
-  // Restore any active session from localStorage on mount
+  // Restore any unexpired active session from sessionStorage on mount
   useEffect(() => {
     if (restoredRef.current) return;
     restoredRef.current = true;
@@ -94,8 +94,16 @@ export function useAnonymousSuggestion({
     try {
       const session = await anonymousSuggestionsApi.createSession(projectId);
 
-      // Persist token to localStorage before updating state
-      tokenStore.setToken(projectId, session.anonymous_token, session.session_id, session.branch);
+      // Persist the 24-hour token lifetime before updating state. The server's
+      // created_at is authoritative when valid; Date.now is the safe fallback.
+      const serverIssuedAt = Date.parse(session.created_at);
+      tokenStore.setToken(
+        projectId,
+        session.anonymous_token,
+        session.session_id,
+        session.branch,
+        Number.isNaN(serverIssuedAt) ? Date.now() : serverIssuedAt,
+      );
 
       setSessionId(session.session_id);
       setBranch(session.branch);

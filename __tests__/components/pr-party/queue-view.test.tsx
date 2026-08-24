@@ -233,6 +233,16 @@ describe("PR Party access gates", () => {
 // --- Tabs and routine states ---
 
 describe("PR Party tabs", () => {
+  it("passes the authenticated reviewer identity to a card detail renderer", () => {
+    const card = makeCard({ title: "Identity-scoped detail" });
+    const renderCardDetail = vi.fn(() => <div>Detail</div>);
+    mockedQueue.mockReturnValue(queueState({ cards: [card] }));
+
+    render(<PRPartyQueueView renderCardDetail={renderCardDetail} />);
+
+    expect(renderCardDetail).toHaveBeenCalledWith(card, "reviewer@example.com");
+  });
+
   it("splits cards into queue, agenda and done, and keeps a settled card out of the queue", async () => {
     const settled = makeCard({
       card_id: "settled",

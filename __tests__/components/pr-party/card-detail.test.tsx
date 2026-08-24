@@ -134,7 +134,7 @@ function setup({
 }
 
 function renderDetail(card: PRPartyQueueCard = makeCard()) {
-  return render(<CardDetail card={card} />);
+  return render(<CardDetail card={card} reviewerId="reviewer-a" />);
 }
 
 describe("CardDetail", () => {
