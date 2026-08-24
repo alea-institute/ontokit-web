@@ -18,7 +18,7 @@ export interface UseSuggestionsOptions {
   canUseLLM: boolean;
   accessToken?: string;
   byoKey?: string;
-  onAccepted?: (suggestion: GeneratedSuggestion, editedValue?: string) => void;
+  onAccepted?: (suggestion: GeneratedSuggestion, editedValue?: string) => void | Promise<void>;
   getAcceptanceError?: (suggestion: GeneratedSuggestion) => string | null;
 }
 
@@ -27,7 +27,8 @@ export interface UseSuggestionsReturn {
   isLoading: boolean;
   error: string | null;
   request: () => Promise<void>;
-  accept: (index: number) => void;
+  accept: (index: number) => Promise<void>;
+  acceptingIndices: ReadonlySet<number>;
   reject: (index: number) => void;
   edit: (index: number, value: string) => void;
   markDistinct: (index: number, candidate: DuplicateCandidate) => void;
@@ -72,6 +73,8 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const acceptingRef = useRef(new Set<number>());
+  const [acceptingIndices, setAcceptingIndices] = useState<ReadonlySet<number>>(new Set());
 
   const store = useSuggestionStore;
   const scope = useMemo(() => ({ projectId, branch }), [projectId, branch]);
@@ -119,10 +122,11 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     }
   }, [projectId, entityIri, branch, suggestionType, batchSize, canUseLLM, accessToken, byoKey, store, scope]);
 
-  const accept = useCallback((index: number) => {
+  const accept = useCallback(async (index: number) => {
     if (!entityIri) return;
+    if (acceptingRef.current.has(index)) return;
     const stored = store.getState().suggestions[storeKey(scope, entityIri, suggestionType)]?.[index];
-    if (!stored) return;
+    if (!stored || stored.status !== "pending") return;
     if ((stored.suggestion.validation_errors?.length ?? 0) > 0) {
       setError("This suggestion cannot be accepted until its validation errors are resolved.");
       return;
@@ -133,8 +137,20 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
       return;
     }
     setError(null);
-    store.getState().acceptSuggestion(scope, entityIri, suggestionType, index);
-    onAccepted?.(stored.suggestion, stored.editedValue);
+    acceptingRef.current.add(index);
+    setAcceptingIndices(new Set(acceptingRef.current));
+    try {
+      await onAccepted?.(stored.suggestion, stored.editedValue);
+      store.getState().acceptSuggestion(scope, entityIri, suggestionType, index);
+    } catch (err) {
+      const reason = err instanceof Error && err.message
+        ? err.message
+        : "The change could not be persisted.";
+      setError(`Could not accept this suggestion. ${reason}`);
+    } finally {
+      acceptingRef.current.delete(index);
+      setAcceptingIndices(new Set(acceptingRef.current));
+    }
   }, [entityIri, suggestionType, store, onAccepted, getAcceptanceError, scope]);
 
   const reject = useCallback((index: number) => {
@@ -158,5 +174,15 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     );
   }, [entityIri, suggestionType, store, scope]);
 
-  return { items, isLoading, error, request, accept, reject, edit, markDistinct };
+  return {
+    items,
+    isLoading,
+    error,
+    request,
+    accept,
+    acceptingIndices,
+    reject,
+    edit,
+    markDistinct,
+  };
 }

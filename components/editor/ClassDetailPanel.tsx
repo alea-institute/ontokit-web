@@ -104,7 +104,7 @@ interface ClassDetailPanelProps {
   canUseLLM?: boolean;
   byoKey?: string;
   userRole?: ProjectRole;
-  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => void;
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => Promise<void>;
   /** When true, auto-fire annotation suggestions when classIri changes (D-09) */
   autoSuggestAnnotationsOnMount?: boolean;
 }
@@ -601,10 +601,11 @@ export function ClassDetailPanel({
 
   // Accept handlers
   const handleAcceptChildSuggestion = useCallback(
-    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+    async (suggestion: GeneratedSuggestion, editedValue?: string) => {
       // D-07: Create entity directly in tree WITHOUT opening AddEntityDialog
       // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — currently dropped on accept. See QA queue.
-      onAddSuggestedChild?.(suggestion.iri, editedValue ?? suggestion.label, classIri!);
+      if (!onAddSuggestedChild) throw new Error("Generated entity persistence is unavailable.");
+      await onAddSuggestedChild(suggestion.iri, editedValue ?? suggestion.label, classIri!);
     },
     [onAddSuggestedChild, classIri],
   );
@@ -621,10 +622,11 @@ export function ClassDetailPanel({
   }, [classDetail?.parent_iris]);
 
   const handleAcceptSiblingSuggestion = useCallback(
-    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+    async (suggestion: GeneratedSuggestion, editedValue?: string) => {
       const parentIri = classDetail?.parent_iris[0];
-      if (!parentIri) return;
-      onAddSuggestedChild?.(suggestion.iri, editedValue ?? suggestion.label, parentIri);
+      if (!parentIri) throw new Error("Choose a parent before accepting this sibling suggestion.");
+      if (!onAddSuggestedChild) throw new Error("Generated entity persistence is unavailable.");
+      await onAddSuggestedChild(suggestion.iri, editedValue ?? suggestion.label, parentIri);
     },
     [classDetail?.parent_iris, onAddSuggestedChild],
   );
@@ -758,9 +760,10 @@ export function ClassDetailPanel({
               <SuggestionCard
                 key={item.suggestion.iri ?? i}
                 item={item}
-                onAccept={() => suggestions.accept(i)}
+                onAccept={() => { void suggestions.accept(i); }}
                 onReject={() => suggestions.reject(i)}
-                onEdit={(val) => { suggestions.edit(i, val); suggestions.accept(i); }}
+                onEdit={(val) => { suggestions.edit(i, val); void suggestions.accept(i); }}
+                busy={suggestions.acceptingIndices.has(i)}
                 onMarkDistinct={canEdit && accessToken ? async (candidate, reason) => {
                   const parentIri = item.suggestion.suggestion_type === "children"
                     ? classIri

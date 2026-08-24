@@ -29,6 +29,10 @@ import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
 import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
+import {
+  persistGeneratedEntity,
+  type GeneratedEntityPersistenceMode,
+} from "@/lib/editor/generatedEntityPersistence";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
 import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
@@ -460,33 +464,79 @@ export default function EditorPage() {
     [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
   );
 
-  // Handle accepted child suggestion — creates a CLASS entity directly in tree (D-07)
-  const handleAddSuggestedChild = useCallback((iri: string, label: string, parentIri: string) => {
-    // Generate Turtle snippet for the new entity (same as handleEntityConfirm)
-    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — the accepted suggestion's metadata is dropped here. See QA queue.
-    const snippet = generateTurtleSnippet({
-      iri,
-      label,
-      entityType: "class",
-      parentIri,
+  const generatedEntityAccessToken = session?.accessToken;
+  const persistAcceptedGeneratedEntity = useCallback(async (
+    entity: {
+      iri: string;
+      label: string;
+      parentIri: string;
+      entityType: "class" | "objectProperty" | "dataProperty" | "annotationProperty";
+    },
+  ) => {
+    const mode: GeneratedEntityPersistenceMode = isAnonymousProposalMode
+      ? "anonymous-suggestion"
+      : isSuggestionMode
+        ? "authenticated-suggestion"
+        : "direct";
+    const content = await persistGeneratedEntity({
+      mode,
+      projectId,
+      branch: activeBranch,
+      accessToken: generatedEntityAccessToken,
+      ontologyPath: project?.git_ontology_path,
+      entity,
       ontologyPrefix,
       ontologyNamespace,
+      suggestionSession: {
+        startSession: suggestionSession.startSession,
+        saveToSession: suggestionSession.saveToSession,
+      },
+      anonymousSession: {
+        startSession: anonymousSuggestion.startSession,
+        saveToSession: anonymousSuggestion.saveToSession,
+      },
     });
 
-    // Insert into source
-    if (sourceEditorRef.current) {
-      sourceEditorRef.current.insertAtEnd(snippet);
-      setSourceContent(sourceEditorRef.current.getValue());
-    } else if (sourceContent) {
-      setSourceContent((prev) => prev + snippet);
+    // Only update client state after the authoritative branch confirms the
+    // entity. A rejected save leaves the card pending and these values intact.
+    setSourceContent(content);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+    setDetailRefreshKey((key) => key + 1);
+    if (mode === "direct" && generatedEntityAccessToken) {
+      queryClient.invalidateQueries({
+        queryKey: branchQueryKeys.list(projectId, generatedEntityAccessToken),
+      });
     }
+  }, [
+    isAnonymousProposalMode,
+    isSuggestionMode,
+    projectId,
+    activeBranch,
+    generatedEntityAccessToken,
+    project?.git_ontology_path,
+    ontologyPrefix,
+    ontologyNamespace,
+    suggestionSession.startSession,
+    suggestionSession.saveToSession,
+    anonymousSuggestion.startSession,
+    anonymousSuggestion.saveToSession,
+    setSourceContent,
+    setSourceIriIndex,
+    queryClient,
+  ]);
 
-    // Add to tree immediately (D-07)
+  // Handle accepted child suggestion — persist first, then update the tree (D-07)
+  const handleAddSuggestedChild = useCallback(async (
+    iri: string,
+    label: string,
+    parentIri: string,
+  ) => {
+    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — the accepted suggestion's metadata is dropped here. See QA queue.
+    await persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType: "class" });
     addOptimisticNode(iri, label, parentIri);
-
-    // Track as accepted-suggestion IRI for sparkle badge
     setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
-  }, [ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, setSourceContent]);
+  }, [persistAcceptedGeneratedEntity, addOptimisticNode]);
 
   // Handle accepted sub-PROPERTY suggestion (B-1). Distinct from
   // handleAddSuggestedChild (classes): emits the correct OWL property rdf:type
@@ -506,26 +556,11 @@ export default function EditorPage() {
           : "objectProperty";
 
     // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped here; only label/type/parent are emitted. See QA queue.
-    const snippet = generateTurtleSnippet({
-      iri,
-      label,
-      entityType,
-      parentIri,
-      ontologyPrefix,
-      ontologyNamespace,
-    });
-
-    // Insert into source (no class-tree optimistic insert — this is a property)
-    if (sourceEditorRef.current) {
-      sourceEditorRef.current.insertAtEnd(snippet);
-      setSourceContent(sourceEditorRef.current.getValue());
-    } else if (sourceContent) {
-      setSourceContent((prev) => prev + snippet);
-    }
-
-    // Track as accepted-suggestion IRI for sparkle badge
-    setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
-  }, [ontologyPrefix, ontologyNamespace, sourceContent, setSourceContent]);
+    return persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType })
+      .then(() => {
+        setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
+      });
+  }, [persistAcceptedGeneratedEntity]);
 
   // Handle copy IRI
   const handleCopyIri = useCallback(async (iri: string) => {

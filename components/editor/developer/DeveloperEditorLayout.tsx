@@ -142,9 +142,9 @@ export interface DeveloperEditorLayoutProps {
   isAnonymousProposalMode?: boolean;
 
   // LLM suggestion support
-  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => void;
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => Promise<void>;
   /** Create a new PROPERTY entity from an accepted sub-property suggestion (B-1). */
-  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation") => void;
+  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation") => Promise<void>;
   acceptedSuggestionIris?: Set<string>;
 }
 

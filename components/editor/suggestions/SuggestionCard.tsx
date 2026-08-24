@@ -23,6 +23,7 @@ export interface SuggestionCardProps {
   onEdit: (editedValue: string) => void;
   onMarkDistinct?: (candidate: DuplicateCandidate, reason: string) => Promise<void>;
   disabled?: boolean;
+  busy?: boolean;
 }
 
 function confidenceBadgeClass(confidence: number): string {
@@ -42,6 +43,7 @@ export function SuggestionCard({
   onEdit,
   onMarkDistinct,
   disabled,
+  busy,
 }: SuggestionCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
@@ -271,7 +273,7 @@ export function SuggestionCard({
             <button
               type="button"
               onClick={onAccept}
-              disabled={disabled || isBlocked || isInvalid}
+              disabled={disabled || busy || isBlocked || isInvalid}
               aria-label="Accept suggestion"
               className="rounded-sm p-1 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -280,15 +282,16 @@ export function SuggestionCard({
             <button
               type="button"
               onClick={onReject}
+              disabled={busy}
               aria-label="Reject suggestion"
-              className="rounded-sm p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+              className="rounded-sm p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-red-900/20"
             >
               <X className="h-3.5 w-3.5" />
             </button>
             <button
               type="button"
               onClick={handleEditClick}
-              disabled={isInvalid}
+              disabled={busy || isInvalid}
               aria-label="Edit suggestion before accepting"
               className="rounded-sm p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-700"
             >

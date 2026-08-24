@@ -24,7 +24,8 @@ export interface UseAnonymousSuggestionReturn {
   entitiesModified: string[];
   isActive: boolean;
   isStarting: boolean;
-  startSession: () => Promise<void>;
+  /** Returns the active anonymous branch, or null when a session could not be started. */
+  startSession: () => Promise<string | null>;
   /** Resolves true only when the save actually reached the session branch. */
   saveToSession: (content: string, entityIri: string, entityLabel: string) => Promise<boolean>;
   /** `website` is the honeypot value — forward verbatim from CreditModal. */
@@ -71,7 +72,10 @@ export function useAnonymousSuggestion({
 
   const savingRef = useRef(false);
   const submittingRef = useRef(false);
-  const startingRef = useRef<Promise<void> | null>(null);
+  const startingRef = useRef<Promise<string | null> | null>(null);
+  const sessionIdRef = useRef<string | null>(null);
+  const branchRef = useRef<string | null>(null);
+  const anonymousTokenRef = useRef<string | null>(null);
   const restoredRef = useRef(false);
 
   // Restore any unexpired active session from sessionStorage on mount
@@ -81,6 +85,9 @@ export function useAnonymousSuggestion({
 
     const entry = tokenStore.getToken(projectId);
     if (entry) {
+      sessionIdRef.current = entry.sessionId;
+      branchRef.current = entry.branch;
+      anonymousTokenRef.current = entry.token;
       setSessionId(entry.sessionId);
       setBranch(entry.branch);
       setAnonymousToken(entry.token);
@@ -90,9 +97,9 @@ export function useAnonymousSuggestion({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  const startSession = useCallback((): Promise<void> => {
+  const startSession = useCallback((): Promise<string | null> => {
     // Don't create a duplicate session if one already exists
-    if (sessionId) return Promise.resolve();
+    if (sessionIdRef.current) return Promise.resolve(branchRef.current);
     if (startingRef.current) return startingRef.current;
 
     const startPromise = (async () => {
@@ -111,16 +118,21 @@ export function useAnonymousSuggestion({
           Number.isNaN(serverIssuedAt) ? Date.now() : serverIssuedAt,
         );
 
+        sessionIdRef.current = session.session_id;
+        branchRef.current = session.branch;
+        anonymousTokenRef.current = session.anonymous_token;
         setSessionId(session.session_id);
         setBranch(session.branch);
         setAnonymousToken(session.anonymous_token);
         setStatus("active");
         setError(null);
+        return session.branch;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "Failed to start anonymous suggestion session";
         setStatus("error");
         setError(msg);
         onError?.(msg);
+        return null;
       } finally {
         setIsStarting(false);
         startingRef.current = null;
@@ -129,7 +141,7 @@ export function useAnonymousSuggestion({
 
     startingRef.current = startPromise;
     return startPromise;
-  }, [sessionId, projectId, tokenStore, onError]);
+  }, [projectId, tokenStore, onError]);
 
   const saveToSession = useCallback(async (
     content: string,
@@ -139,7 +151,9 @@ export function useAnonymousSuggestion({
     // Returns true only when the save actually happened — callers must NOT
     // report success (or update local state) on a false return (a concurrent
     // save was in flight, the session is missing, or the request failed).
-    if (!sessionId || !anonymousToken || savingRef.current) return false;
+    const currentSessionId = sessionIdRef.current;
+    const currentAnonymousToken = anonymousTokenRef.current;
+    if (!currentSessionId || !currentAnonymousToken || savingRef.current) return false;
 
     savingRef.current = true;
     setStatus("saving");
@@ -151,7 +165,12 @@ export function useAnonymousSuggestion({
         entity_iri: entityIri,
         entity_label: entityLabel,
       };
-      const result = await anonymousSuggestionsApi.save(projectId, sessionId, payload, anonymousToken);
+      const result = await anonymousSuggestionsApi.save(
+        projectId,
+        currentSessionId,
+        payload,
+        currentAnonymousToken,
+      );
       setChangesCount(result.changes_count);
 
       // Track modified entities (deduplicated by label)
@@ -171,7 +190,7 @@ export function useAnonymousSuggestion({
     } finally {
       savingRef.current = false;
     }
-  }, [sessionId, anonymousToken, projectId, onError]);
+  }, [projectId, onError]);
 
   const submitSession = useCallback(async (
     summary?: string,
@@ -213,6 +232,9 @@ export function useAnonymousSuggestion({
       setSessionId(null);
       setBranch(null);
       setAnonymousToken(null);
+      sessionIdRef.current = null;
+      branchRef.current = null;
+      anonymousTokenRef.current = null;
       setChangesCount(0);
       setEntitiesModified([]);
     } catch (err) {
@@ -240,6 +262,9 @@ export function useAnonymousSuggestion({
     setSessionId(null);
     setBranch(null);
     setAnonymousToken(null);
+    sessionIdRef.current = null;
+    branchRef.current = null;
+    anonymousTokenRef.current = null;
     setChangesCount(0);
     setEntitiesModified([]);
     setStatus("idle");

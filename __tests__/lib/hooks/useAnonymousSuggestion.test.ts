@@ -116,6 +116,29 @@ describe("useAnonymousSuggestion", () => {
     expect(localStorage.getItem("ontokit-anonymous-token")).toBeNull();
   });
 
+  it("can save immediately after starting with callbacks from the same render", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-immediate",
+      branch: "anon/sess-immediate",
+      created_at: "2026-08-24T12:00:00Z",
+      anonymous_token: "tok-immediate",
+    });
+    mockedSave.mockResolvedValue({
+      commit_hash: "abc123",
+      branch: "anon/sess-immediate",
+      changes_count: 1,
+    });
+    const { result } = renderHook(() => useAnonymousSuggestion({ projectId: PROJECT_ID }));
+    const { startSession, saveToSession } = result.current;
+
+    await act(async () => {
+      expect(await startSession()).toBe("anon/sess-immediate");
+      expect(await saveToSession("content", "http://ex.org/A", "A")).toBe(true);
+    });
+
+    expect(mockedSave).toHaveBeenCalledTimes(1);
+  });
+
   it("startSession does nothing if a session is already active", async () => {
     mockedCreateSession.mockResolvedValue({
       session_id: "sess-1",
@@ -149,8 +172,8 @@ describe("useAnonymousSuggestion", () => {
     const setToken = vi.spyOn(useAnonymousTokenStore.getState(), "setToken");
     const { result } = renderHook(() => useAnonymousSuggestion({ projectId: PROJECT_ID }));
 
-    let first!: Promise<void>;
-    let second!: Promise<void>;
+    let first!: Promise<string | null>;
+    let second!: Promise<string | null>;
     act(() => {
       first = result.current.startSession();
       second = result.current.startSession();

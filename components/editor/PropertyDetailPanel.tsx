@@ -84,7 +84,7 @@ interface PropertyDetailPanelProps {
     label: string,
     parentIri: string,
     propertyType: "object" | "data" | "annotation",
-  ) => void;
+  ) => Promise<void>;
 }
 
 export function PropertyDetailPanel({
@@ -481,12 +481,13 @@ export function PropertyDetailPanel({
   );
 
   const handleAcceptChildProperty = useCallback(
-    (suggestion: GeneratedSuggestion, editedValue?: string) => {
+    async (suggestion: GeneratedSuggestion, editedValue?: string) => {
       // PROP-02 / B-1: Create a new PROPERTY entity (not a class). Pass the
       // parent property's OWL kind so the snippet emits the correct rdf:type
       // and the node is NOT injected into the class tree.
       // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped on accept. See QA queue.
-      onAddSuggestedProperty?.(
+      if (!onAddSuggestedProperty) throw new Error("Generated entity persistence is unavailable.");
+      await onAddSuggestedProperty(
         suggestion.iri,
         editedValue ?? suggestion.label,
         propertyIri!,
@@ -538,9 +539,10 @@ export function PropertyDetailPanel({
               <SuggestionCard
                 key={item.suggestion.iri ?? i}
                 item={item}
-                onAccept={() => suggestions.accept(i)}
+                onAccept={() => { void suggestions.accept(i); }}
                 onReject={() => suggestions.reject(i)}
-                onEdit={(val) => { suggestions.edit(i, val); suggestions.accept(i); }}
+                onEdit={(val) => { suggestions.edit(i, val); void suggestions.accept(i); }}
+                busy={suggestions.acceptingIndices.has(i)}
                 onMarkDistinct={canEdit && accessToken ? async (candidate, reason) => {
                   await distinctDecisionsApi.mark(projectId, {
                     proposed_iri: item.suggestion.iri,

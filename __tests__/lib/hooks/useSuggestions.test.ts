@@ -135,7 +135,62 @@ describe("useSuggestions", () => {
     expect(useSuggestionStore.getState().suggestions[storeKey(SCOPE, entityIri, suggestionType)][0].status).toBe("accepted");
   });
 
-  it("keeps malformed suggestions pending across plain and edited accept attempts", () => {
+  it("keeps a suggestion pending until its async acceptance callback succeeds", async () => {
+    const entityIri = "http://ex.org/Foo";
+    const suggestionType = "children" as const;
+    useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, suggestionType, [makeSuggestion()]);
+    let resolvePersistence!: () => void;
+    const onAccepted = vi.fn(() => new Promise<void>((resolve) => {
+      resolvePersistence = resolve;
+    }));
+    const { result } = renderHook(() => useSuggestions({
+      projectId: SCOPE.projectId,
+      branch: SCOPE.branch,
+      entityIri,
+      suggestionType,
+      canUseLLM: true,
+      accessToken: "token",
+      onAccepted,
+    }));
+
+    let acceptance!: Promise<void>;
+    act(() => {
+      acceptance = result.current.accept(0);
+    });
+
+    expect(result.current.items[0].status).toBe("pending");
+    expect(result.current.acceptingIndices.has(0)).toBe(true);
+
+    resolvePersistence();
+    await act(async () => { await acceptance; });
+
+    expect(result.current.items[0].status).toBe("accepted");
+    expect(onAccepted).toHaveBeenCalledTimes(1);
+  });
+
+  it("surfaces persistence failure and leaves the suggestion pending for retry", async () => {
+    const entityIri = "http://ex.org/Foo";
+    const suggestionType = "children" as const;
+    useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, suggestionType, [makeSuggestion()]);
+    const onAccepted = vi.fn().mockRejectedValue(new Error("Session branch rejected the save"));
+    const { result } = renderHook(() => useSuggestions({
+      projectId: SCOPE.projectId,
+      branch: SCOPE.branch,
+      entityIri,
+      suggestionType,
+      canUseLLM: true,
+      accessToken: "token",
+      onAccepted,
+    }));
+
+    await act(async () => { await result.current.accept(0); });
+
+    expect(result.current.items[0].status).toBe("pending");
+    expect(result.current.error).toContain("Session branch rejected the save");
+    expect(result.current.acceptingIndices.size).toBe(0);
+  });
+
+  it("keeps malformed suggestions pending across plain and edited accept attempts", async () => {
     const entityIri = "http://ex.org/Foo";
     const suggestionType = "children" as const;
     useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, suggestionType, [
@@ -156,9 +211,9 @@ describe("useSuggestions", () => {
       onAccepted,
     }));
 
-    act(() => result.current.accept(0));
+    await act(async () => { await result.current.accept(0); });
     act(() => result.current.edit(0, "Edited label"));
-    act(() => result.current.accept(0));
+    await act(async () => { await result.current.accept(0); });
 
     expect(onAccepted).not.toHaveBeenCalled();
     expect(result.current.items[0].status).toBe("pending");

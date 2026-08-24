@@ -24,8 +24,10 @@ export interface UseSuggestionSessionReturn {
   entitiesModified: string[];
   isActive: boolean;
   isResumed: boolean;
-  startSession: () => Promise<void>;
-  saveToSession: (content: string, entityIri: string, entityLabel: string) => Promise<void>;
+  /** Returns the active suggestion branch, or null when a session could not be started. */
+  startSession: () => Promise<string | null>;
+  /** Resolves true only when the source reached the suggestion branch. */
+  saveToSession: (content: string, entityIri: string, entityLabel: string) => Promise<boolean>;
   submitSession: (summary?: string) => Promise<void>;
   discardSession: () => Promise<void>;
   resumeSession: (sessionId: string, branch: string) => void;
@@ -60,32 +62,50 @@ export function useSuggestionSession({
 
   const savingRef = useRef(false);
   const resumeAttemptedRef = useRef(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const branchRef = useRef<string | null>(null);
+  const startingRef = useRef<Promise<string | null> | null>(null);
 
-  const startSession = useCallback(async () => {
-    if (sessionId || !accessToken) return;
-    try {
-      const session = await suggestionsApi.createSession(projectId, accessToken);
-      setSessionId(session.session_id);
-      setBranch(session.branch);
-      // The backend may return a beacon token in the session response;
-      // for now we derive it from the session_id (backend will sign it).
-      setBeaconToken(session.session_id);
-      setStatus("active");
-      setError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to start suggestion session";
-      setStatus("error");
-      setError(msg);
-      onError?.(msg);
-    }
-  }, [sessionId, accessToken, projectId, onError]);
+  const startSession = useCallback((): Promise<string | null> => {
+    if (sessionIdRef.current) return Promise.resolve(branchRef.current);
+    if (!accessToken) return Promise.resolve(null);
+    if (startingRef.current) return startingRef.current;
+
+    const startPromise = (async () => {
+      try {
+        const session = await suggestionsApi.createSession(projectId, accessToken);
+        sessionIdRef.current = session.session_id;
+        branchRef.current = session.branch;
+        setSessionId(session.session_id);
+        setBranch(session.branch);
+        // The backend may return a beacon token in the session response;
+        // for now we derive it from the session_id (backend will sign it).
+        setBeaconToken(session.session_id);
+        setStatus("active");
+        setError(null);
+        return session.branch;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to start suggestion session";
+        setStatus("error");
+        setError(msg);
+        onError?.(msg);
+        return null;
+      } finally {
+        startingRef.current = null;
+      }
+    })();
+
+    startingRef.current = startPromise;
+    return startPromise;
+  }, [accessToken, projectId, onError]);
 
   const saveToSession = useCallback(async (
     content: string,
     entityIri: string,
     entityLabel: string,
-  ) => {
-    if (!sessionId || !accessToken || savingRef.current) return;
+  ): Promise<boolean> => {
+    const currentSessionId = sessionIdRef.current;
+    if (!currentSessionId || !accessToken || savingRef.current) return false;
 
     savingRef.current = true;
     setStatus("saving");
@@ -97,7 +117,7 @@ export function useSuggestionSession({
         entity_iri: entityIri,
         entity_label: entityLabel,
       };
-      const result = await suggestionsApi.save(projectId, sessionId, payload, accessToken);
+      const result = await suggestionsApi.save(projectId, currentSessionId, payload, accessToken);
       setChangesCount(result.changes_count);
 
       // Track modified entities (deduplicated)
@@ -107,15 +127,17 @@ export function useSuggestionSession({
       });
 
       setStatus("active");
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save suggestion";
       setStatus("error");
       setError(msg);
       onError?.(msg);
+      return false;
     } finally {
       savingRef.current = false;
     }
-  }, [sessionId, accessToken, projectId, onError]);
+  }, [accessToken, projectId, onError]);
 
   const submitSession = useCallback(async (summary?: string) => {
     if (!sessionId || !accessToken) return;
@@ -136,6 +158,8 @@ export function useSuggestionSession({
       // Reset session state so a new session can start
       setSessionId(null);
       setBranch(null);
+      sessionIdRef.current = null;
+      branchRef.current = null;
       setBeaconToken(null);
       setChangesCount(0);
       setEntitiesModified([]);
@@ -158,6 +182,8 @@ export function useSuggestionSession({
 
     setSessionId(null);
     setBranch(null);
+    sessionIdRef.current = null;
+    branchRef.current = null;
     setBeaconToken(null);
     setChangesCount(0);
     setEntitiesModified([]);
@@ -168,6 +194,8 @@ export function useSuggestionSession({
 
   /** Resume an existing changes-requested session without creating a new one. */
   const resumeSession = useCallback((sid: string, branchName: string) => {
+    sessionIdRef.current = sid;
+    branchRef.current = branchName;
     setSessionId(sid);
     setBranch(branchName);
     setBeaconToken(sid);
@@ -196,6 +224,8 @@ export function useSuggestionSession({
       // Reset session state
       setSessionId(null);
       setBranch(null);
+      sessionIdRef.current = null;
+      branchRef.current = null;
       setBeaconToken(null);
       setChangesCount(0);
       setEntitiesModified([]);
