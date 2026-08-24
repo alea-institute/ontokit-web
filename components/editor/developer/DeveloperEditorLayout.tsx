@@ -138,6 +138,7 @@ export interface DeveloperEditorLayoutProps {
   // Anonymous proposal mode
   canPropose?: boolean;
   onProposeEdit?: () => void;
+  isProposeEditStarting?: boolean;
   isAnonymousProposalMode?: boolean;
 
   // LLM suggestion support
@@ -199,6 +200,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     onSignInToEdit,
     canPropose,
     onProposeEdit,
+    isProposeEditStarting,
     isAnonymousProposalMode,
     onAddSuggestedChild,
     onAddSuggestedProperty,
@@ -677,6 +679,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   onSignInToEdit={onSignInToEdit}
                   canPropose={canPropose}
                   onProposeEdit={onProposeEdit}
+                  isProposeEditStarting={isProposeEditStarting}
                   isAnonymousProposalMode={isAnonymousProposalMode}
                   canUseLLM={llmGate.canUseLLM}
                   byoKey={byoEntry?.key}

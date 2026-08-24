@@ -23,6 +23,7 @@ export interface UseAnonymousSuggestionReturn {
   error: string | null;
   entitiesModified: string[];
   isActive: boolean;
+  isStarting: boolean;
   startSession: () => Promise<void>;
   /** Resolves true only when the save actually reached the session branch. */
   saveToSession: (content: string, entityIri: string, entityLabel: string) => Promise<boolean>;
@@ -66,9 +67,11 @@ export function useAnonymousSuggestion({
   const [status, setStatus] = useState<SuggestionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [entitiesModified, setEntitiesModified] = useState<string[]>([]);
+  const [isStarting, setIsStarting] = useState(false);
 
   const savingRef = useRef(false);
   const submittingRef = useRef(false);
+  const startingRef = useRef<Promise<void> | null>(null);
   const restoredRef = useRef(false);
 
   // Restore any unexpired active session from sessionStorage on mount
@@ -87,35 +90,45 @@ export function useAnonymousSuggestion({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  const startSession = useCallback(async () => {
+  const startSession = useCallback((): Promise<void> => {
     // Don't create a duplicate session if one already exists
-    if (sessionId) return;
+    if (sessionId) return Promise.resolve();
+    if (startingRef.current) return startingRef.current;
 
-    try {
-      const session = await anonymousSuggestionsApi.createSession(projectId);
+    const startPromise = (async () => {
+      setIsStarting(true);
+      try {
+        const session = await anonymousSuggestionsApi.createSession(projectId);
 
-      // Persist the 24-hour token lifetime before updating state. The server's
-      // created_at is authoritative when valid; Date.now is the safe fallback.
-      const serverIssuedAt = Date.parse(session.created_at);
-      tokenStore.setToken(
-        projectId,
-        session.anonymous_token,
-        session.session_id,
-        session.branch,
-        Number.isNaN(serverIssuedAt) ? Date.now() : serverIssuedAt,
-      );
+        // Persist the 24-hour token lifetime before updating state. The server's
+        // created_at is authoritative when valid; Date.now is the safe fallback.
+        const serverIssuedAt = Date.parse(session.created_at);
+        tokenStore.setToken(
+          projectId,
+          session.anonymous_token,
+          session.session_id,
+          session.branch,
+          Number.isNaN(serverIssuedAt) ? Date.now() : serverIssuedAt,
+        );
 
-      setSessionId(session.session_id);
-      setBranch(session.branch);
-      setAnonymousToken(session.anonymous_token);
-      setStatus("active");
-      setError(null);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to start anonymous suggestion session";
-      setStatus("error");
-      setError(msg);
-      onError?.(msg);
-    }
+        setSessionId(session.session_id);
+        setBranch(session.branch);
+        setAnonymousToken(session.anonymous_token);
+        setStatus("active");
+        setError(null);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to start anonymous suggestion session";
+        setStatus("error");
+        setError(msg);
+        onError?.(msg);
+      } finally {
+        setIsStarting(false);
+        startingRef.current = null;
+      }
+    })();
+
+    startingRef.current = startPromise;
+    return startPromise;
   }, [sessionId, projectId, tokenStore, onError]);
 
   const saveToSession = useCallback(async (
@@ -242,6 +255,7 @@ export function useAnonymousSuggestion({
     error,
     entitiesModified,
     isActive: status === "active" || status === "saving",
+    isStarting,
     startSession,
     saveToSession,
     submitSession,

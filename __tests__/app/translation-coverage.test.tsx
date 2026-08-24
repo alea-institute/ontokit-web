@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api/client";
@@ -9,6 +9,21 @@ const coverageState = vi.hoisted(() => ({
   projectRole: "admin",
   launchError: null as Error | null,
 }));
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
+const previewResult = (literalCount: number, expectedCost: number) => ({
+  literal_count: literalCount,
+  expected_cost_usd: expectedCost,
+  upper_bound_cost_usd: expectedCost * 2,
+  batch_discount_applied: true,
+});
 
 vi.mock("next-auth/react", () => ({
   useSession: () => ({ data: { accessToken: "token" }, status: "authenticated" }),
@@ -57,7 +72,8 @@ import TranslationCoveragePage from "@/app/projects/[id]/translations/page";
 
 describe("Translation coverage page", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    previewBackfill.mockReset();
+    launchBackfill.mockReset();
     coverageState.projectRole = "admin";
     coverageState.launchError = null;
   });
@@ -125,6 +141,60 @@ describe("Translation coverage page", () => {
     // the mutation error the real React Query subscription would push.
     await user.type(screen.getByLabelText(/language/i), "r");
     expect((await screen.findByRole("alert")).textContent).toMatch(/already active/i);
+  });
+
+  it("ignores a stale preview response after a newer request completes", async () => {
+    const first = deferred<ReturnType<typeof previewResult>>();
+    const second = deferred<ReturnType<typeof previewResult>>();
+    previewBackfill
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const user = userEvent.setup();
+    render(<TranslationCoveragePage />);
+
+    await user.type(screen.getByLabelText(/language/i), "fr");
+    await user.click(screen.getByRole("button", { name: /preview cost/i }));
+    await user.clear(screen.getByLabelText(/language/i));
+    await user.type(screen.getByLabelText(/language/i), "es");
+    await user.click(screen.getByRole("button", { name: /preview cost/i }));
+
+    await act(async () => {
+      second.resolve(previewResult(20, 2));
+      await second.promise;
+    });
+    expect(await screen.findByText(/\$2\.00/)).toBeDefined();
+    await act(async () => {
+      first.resolve(previewResult(10, 1));
+      await first.promise;
+    });
+    expect(screen.queryByText(/\$1\.00/)).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /confirm backfill/i }));
+    expect(launchBackfill).toHaveBeenCalledWith({
+      branch: "main",
+      language: "es",
+      era_before: undefined,
+      never_confirmed: undefined,
+    });
+  });
+
+  it("invalidates an in-flight preview when a filter changes", async () => {
+    const pending = deferred<ReturnType<typeof previewResult>>();
+    previewBackfill.mockReturnValue(pending.promise);
+    const user = userEvent.setup();
+    render(<TranslationCoveragePage />);
+
+    await user.type(screen.getByLabelText(/language/i), "fr");
+    await user.click(screen.getByRole("button", { name: /preview cost/i }));
+    await user.clear(screen.getByLabelText(/language/i));
+    await user.type(screen.getByLabelText(/language/i), "es");
+    await act(async () => {
+      pending.resolve(previewResult(10, 1));
+      await pending.promise;
+    });
+
+    expect(screen.queryByText(/\$1\.00/)).toBeNull();
+    expect((screen.getByRole("button", { name: /confirm backfill/i }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("does not show launch controls to non-admin project members", () => {

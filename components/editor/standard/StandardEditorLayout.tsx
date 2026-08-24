@@ -109,6 +109,7 @@ export interface StandardEditorLayoutProps {
   // Anonymous proposal mode
   canPropose?: boolean;
   onProposeEdit?: () => void;
+  isProposeEditStarting?: boolean;
   isAnonymousProposalMode?: boolean;
 
   // LLM suggestion support
@@ -159,6 +160,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     onSignInToEdit,
     canPropose,
     onProposeEdit,
+    isProposeEditStarting,
     isAnonymousProposalMode,
     onAddSuggestedChild,
     onAddSuggestedProperty,
@@ -578,6 +580,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             onSignInToEdit={onSignInToEdit}
             canPropose={canPropose}
             onProposeEdit={onProposeEdit}
+            isProposeEditStarting={isProposeEditStarting}
             isAnonymousProposalMode={isAnonymousProposalMode}
             canUseLLM={llmGate.canUseLLM}
             byoKey={byoEntry?.key}

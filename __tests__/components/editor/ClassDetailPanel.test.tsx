@@ -223,6 +223,22 @@ describe("ClassDetailPanel", () => {
     mockMarkDistinctDecision.mockResolvedValue({ id: "decision-1" });
   });
 
+  it("disables the proposal trigger while its session is starting", async () => {
+    render(
+      <ClassDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit={false}
+        canPropose
+        onProposeEdit={vi.fn()}
+        isProposeEditStarting
+      />,
+    );
+
+    const button = await screen.findByRole("button", { name: "Starting…" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(button.getAttribute("aria-busy")).toBe("true");
+  });
+
   it("shows language flags and calm provisional values without committing them", async () => {
     translationItems = [{
       predicate: "rdfs:label",

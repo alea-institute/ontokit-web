@@ -1435,6 +1435,7 @@ export default function EditorPage() {
                   onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
                   canPropose={canPropose && !isAnonymousProposalMode}
                   onProposeEdit={handleProposeEdit}
+                  isProposeEditStarting={anonymousSuggestion.isStarting}
                   isAnonymousProposalMode={isAnonymousProposalMode}
                   onAddSuggestedChild={handleAddSuggestedChild}
                   onAddSuggestedProperty={handleAddSuggestedProperty}
@@ -1489,6 +1490,7 @@ export default function EditorPage() {
                 onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
                 canPropose={canPropose && !isAnonymousProposalMode}
                 onProposeEdit={handleProposeEdit}
+                isProposeEditStarting={anonymousSuggestion.isStarting}
                 isAnonymousProposalMode={isAnonymousProposalMode}
                 onAddSuggestedChild={handleAddSuggestedChild}
                 onAddSuggestedProperty={handleAddSuggestedProperty}

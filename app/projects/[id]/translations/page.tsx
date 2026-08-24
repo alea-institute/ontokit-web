@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -18,6 +18,12 @@ import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import { useTranslationCoverage } from "@/lib/hooks/useTranslationCoverage";
 
+interface TranslationPreviewState {
+  preview: TranslationBackfillPreview;
+  filters: Readonly<TranslationBackfillFilters>;
+  generation: number;
+}
+
 function TranslationCoverageContent({ projectId, token }: { projectId: string; token?: string }) {
   const { currentBranch } = useBranch();
   const projectHomeHref = useProjectHomeHref(projectId);
@@ -27,7 +33,8 @@ function TranslationCoverageContent({ projectId, token }: { projectId: string; t
   const [language, setLanguage] = useState("");
   const [eraBefore, setEraBefore] = useState("");
   const [neverConfirmed, setNeverConfirmed] = useState(false);
-  const [preview, setPreview] = useState<TranslationBackfillPreview | null>(null);
+  const [previewState, setPreviewState] = useState<TranslationPreviewState | null>(null);
+  const previewGenerationRef = useRef(0);
   const previewError = coverageState.previewError
     ? getTranslationErrorMessage(coverageState.previewError, "Cost preview failed.")
     : null;
@@ -37,30 +44,48 @@ function TranslationCoverageContent({ projectId, token }: { projectId: string; t
       : getTranslationErrorMessage(coverageState.launchError, "Backfill could not be launched.")
     : null;
 
-  const filters = (): TranslationBackfillFilters => ({
+  const snapshotFilters = (): Readonly<TranslationBackfillFilters> => Object.freeze({
     branch: currentBranch,
     language: language || undefined,
     era_before: eraBefore || undefined,
     never_confirmed: neverConfirmed || undefined,
   });
-  const resetPreview = () => {
-    setPreview(null);
+  const invalidatePreview = () => {
+    previewGenerationRef.current += 1;
+    setPreviewState(null);
     coverageState.resetPreview?.();
     coverageState.resetLaunch?.();
   };
+
+  useEffect(() => {
+    previewGenerationRef.current += 1;
+  }, [currentBranch]);
+
+  const currentPreviewState = previewState?.filters.branch === currentBranch
+    ? previewState
+    : null;
+
   const handlePreview = async () => {
-    resetPreview();
+    const requestFilters = snapshotFilters();
+    const generation = previewGenerationRef.current + 1;
+    previewGenerationRef.current = generation;
+    setPreviewState(null);
+    coverageState.resetPreview?.();
+    coverageState.resetLaunch?.();
     try {
-      setPreview(await coverageState.previewBackfill(filters()));
+      const preview = await coverageState.previewBackfill(requestFilters);
+      if (previewGenerationRef.current === generation) {
+        setPreviewState({ preview, filters: requestFilters, generation });
+      }
     } catch {
       // The mutation exposes the error used by the rendered message.
     }
   };
   const handleLaunch = async () => {
-    if (!preview) return;
+    if (!currentPreviewState) return;
     coverageState.resetLaunch?.();
     try {
-      await coverageState.launchBackfill(filters());
+      await coverageState.launchBackfill(currentPreviewState.filters);
     } catch {
       // The mutation exposes the error used by the rendered message.
     }
@@ -132,25 +157,25 @@ function TranslationCoverageContent({ projectId, token }: { projectId: string; t
             <div className="mt-4 space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
                 <label className="text-sm font-medium">Language (optional)
-                  <input aria-label="Language" value={language} onChange={(event) => { setLanguage(event.target.value); resetPreview(); }} placeholder="e.g. fr" className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800" />
+                  <input aria-label="Language" value={language} onChange={(event) => { setLanguage(event.target.value); invalidatePreview(); }} placeholder="e.g. fr" className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800" />
                 </label>
                 <label className="text-sm font-medium">Produced before (optional)
-                  <input aria-label="Produced before" type="date" value={eraBefore} onChange={(event) => { setEraBefore(event.target.value); resetPreview(); }} className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800" />
+                  <input aria-label="Produced before" type="date" value={eraBefore} onChange={(event) => { setEraBefore(event.target.value); invalidatePreview(); }} className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-2 dark:border-slate-600 dark:bg-slate-800" />
                 </label>
                 <label className="flex items-center gap-2 self-end py-2 text-sm font-medium">
-                  <input aria-label="Never native-confirmed" type="checkbox" checked={neverConfirmed} onChange={(event) => { setNeverConfirmed(event.target.checked); resetPreview(); }} />
+                  <input aria-label="Never native-confirmed" type="checkbox" checked={neverConfirmed} onChange={(event) => { setNeverConfirmed(event.target.checked); invalidatePreview(); }} />
                   Never native-confirmed
                 </label>
               </div>
               <Button variant="outline" onClick={handlePreview} disabled={coverageState.isPreviewing}>Preview cost</Button>
               {previewError && <p role="alert" className="text-sm text-red-600">{previewError}</p>}
-              {preview && (
+              {currentPreviewState && (
                 <div className="rounded-md border border-primary-200 bg-primary-50 p-4 dark:border-primary-800 dark:bg-primary-950/30">
-                  <p className="font-medium">{preview.literal_count.toLocaleString()} literals · ${preview.expected_cost_usd.toFixed(2)} expected</p>
-                  <p className="text-sm text-slate-600 dark:text-slate-300">Up to ${preview.upper_bound_cost_usd.toFixed(2)}{preview.batch_discount_applied ? " · batch discount applied" : " · no batch discount"}</p>
+                  <p className="font-medium">{currentPreviewState.preview.literal_count.toLocaleString()} literals · ${currentPreviewState.preview.expected_cost_usd.toFixed(2)} expected</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">Up to ${currentPreviewState.preview.upper_bound_cost_usd.toFixed(2)}{currentPreviewState.preview.batch_discount_applied ? " · batch discount applied" : " · no batch discount"}</p>
                 </div>
               )}
-              <Button onClick={handleLaunch} disabled={!preview || coverageState.isLaunching}>Confirm backfill</Button>
+              <Button onClick={handleLaunch} disabled={!currentPreviewState || coverageState.isLaunching}>Confirm backfill</Button>
               {launchError && <p role="alert" className="text-sm text-red-600">{launchError}</p>}
             </div>
           )}

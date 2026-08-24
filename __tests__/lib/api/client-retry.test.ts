@@ -1,15 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { api, ApiError } from "@/lib/api/client";
 
-/**
- * The `retryOn5xx` opt-out (KTD16 client half).
- *
- * The shared client retries any 5xx up to three attempts. For a read that is
- * harmless; for an actuation (a verdict, a merge) it is a double-actuation
- * vector, and React Query's `retry: false` cannot reach it — the retry happens
- * *inside* one `queryFn` call. These tests pin the opt-out at the layer that
- * actually owns the loop.
- */
+/** Method-aware 5xx retry posture at the layer that owns the retry loop. */
 
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
@@ -62,7 +54,7 @@ describe("request retryOn5xx opt-out", () => {
   });
 });
 
-describe("request retry default (opt-out is off by default)", () => {
+describe("request retry defaults", () => {
   beforeEach(() => {
     mockFetch.mockReset();
     vi.useFakeTimers();
@@ -72,7 +64,7 @@ describe("request retry default (opt-out is off by default)", () => {
     vi.useRealTimers();
   });
 
-  it("still retries 5xx three times for callers that pass no flag", async () => {
+  it("retries GET 5xx responses three times by default", async () => {
     mockFetch.mockResolvedValue(mock5xx());
 
     let caught: unknown;
@@ -87,17 +79,44 @@ describe("request retry default (opt-out is off by default)", () => {
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 
-  it("still retries when retryOn5xx is explicitly true", async () => {
-    mockFetch
-      .mockResolvedValueOnce(mock5xx())
-      .mockResolvedValueOnce(mock5xx())
-      .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve('{"ok":true}') });
+  const mutationRequests = {
+    POST: (options?: { retryOn5xx?: boolean }) => api.post("/api/v1/flaky", { value: 1 }, options),
+    PUT: (options?: { retryOn5xx?: boolean }) => api.put("/api/v1/flaky", { value: 1 }, options),
+    PATCH: (options?: { retryOn5xx?: boolean }) => api.patch("/api/v1/flaky", { value: 1 }, options),
+    DELETE: (options?: { retryOn5xx?: boolean }) => api.delete("/api/v1/flaky", options),
+  };
 
-    const promise = api.get("/api/v1/flaky", { retryOn5xx: true });
-    await vi.advanceTimersByTimeAsync(1000);
-    await vi.advanceTimersByTimeAsync(2000);
+  it.each(Object.entries(mutationRequests))(
+    "%s does not retry a 5xx by default",
+    async (_method, makeRequest) => {
+      mockFetch.mockResolvedValue(mock5xx());
 
-    await expect(promise).resolves.toEqual({ ok: true });
-    expect(mockFetch).toHaveBeenCalledTimes(3);
-  });
+      let caught: unknown;
+      const handled = makeRequest().catch((error) => {
+        caught = error;
+      });
+      await vi.advanceTimersByTimeAsync(3000);
+      await handled;
+
+      expect(caught).toBeInstanceOf(ApiError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each(Object.entries(mutationRequests))(
+    "%s retries when retryOn5xx is explicitly true",
+    async (_method, makeRequest) => {
+      mockFetch
+        .mockResolvedValueOnce(mock5xx())
+        .mockResolvedValueOnce(mock5xx())
+        .mockResolvedValueOnce({ ok: true, text: () => Promise.resolve('{"ok":true}') });
+
+      const promise = makeRequest({ retryOn5xx: true });
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+
+      await expect(promise).resolves.toEqual({ ok: true });
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    },
+  );
 });

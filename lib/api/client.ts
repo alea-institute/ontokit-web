@@ -53,12 +53,8 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 export interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
   /**
-   * Retry 5xx responses (default true).
-   *
-   * Actuations — anything that submits a review, merges, or posts a comment —
-   * must pass `false`. React Query's `retry: false` cannot reach this loop:
-   * the retries happen *inside* a single mutationFn call, so a flaky 500 would
-   * silently submit the same action up to three times.
+   * Retry 5xx responses. Defaults to true for GET/HEAD and false for mutation
+   * methods. Callers may explicitly override either posture.
    */
   retryOn5xx?: boolean;
 }
@@ -73,9 +69,11 @@ async function request<T>(
   const {
     params,
     signal: externalSignal,
-    retryOn5xx = true,
+    retryOn5xx: retryOn5xxOption,
     ...fetchOptions
   } = options;
+  const method = (fetchOptions.method ?? "GET").toUpperCase();
+  const retryOn5xx = retryOn5xxOption ?? (method === "GET" || method === "HEAD");
 
   // Build URL with query params
   const url = new URL(`${API_BASE}${endpoint}`);

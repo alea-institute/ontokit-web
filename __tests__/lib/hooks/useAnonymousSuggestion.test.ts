@@ -136,6 +136,50 @@ describe("useAnonymousSuggestion", () => {
     expect(mockedCreateSession).toHaveBeenCalledTimes(1);
   });
 
+  it("coalesces concurrent startSession calls into one persisted session", async () => {
+    let resolveSession!: (session: {
+      session_id: string;
+      branch: string;
+      created_at: string;
+      anonymous_token: string;
+    }) => void;
+    mockedCreateSession.mockReturnValue(new Promise((resolve) => {
+      resolveSession = resolve;
+    }));
+    const setToken = vi.spyOn(useAnonymousTokenStore.getState(), "setToken");
+    const { result } = renderHook(() => useAnonymousSuggestion({ projectId: PROJECT_ID }));
+
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    act(() => {
+      first = result.current.startSession();
+      second = result.current.startSession();
+    });
+
+    expect(mockedCreateSession).toHaveBeenCalledTimes(1);
+    expect(first).toBe(second);
+    expect(result.current.isStarting).toBe(true);
+
+    resolveSession({
+      session_id: "sess-coalesced",
+      branch: "anon/sess-coalesced",
+      created_at: "2026-08-24T12:00:00Z",
+      anonymous_token: "tok-coalesced",
+    });
+    await act(async () => {
+      await Promise.all([first, second]);
+    });
+
+    expect(setToken).toHaveBeenCalledTimes(1);
+    expect(useAnonymousTokenStore.getState().getToken(PROJECT_ID)).toMatchObject({
+      sessionId: "sess-coalesced",
+      branch: "anon/sess-coalesced",
+      token: "tok-coalesced",
+    });
+    expect(result.current.sessionId).toBe("sess-coalesced");
+    expect(result.current.isStarting).toBe(false);
+  });
+
   it("startSession surfaces errors via onError and status", async () => {
     mockedCreateSession.mockRejectedValue(new Error("network down"));
     const onError = vi.fn();

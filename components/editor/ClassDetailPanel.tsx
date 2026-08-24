@@ -95,6 +95,8 @@ interface ClassDetailPanelProps {
   canPropose?: boolean;
   /** Called when anonymous user clicks "Propose Edit" */
   onProposeEdit?: () => void;
+  /** True while an anonymous proposal session is being created. */
+  isProposeEditStarting?: boolean;
   /** True when anonymous proposal mode is active (editing is allowed) */
   isAnonymousProposalMode?: boolean;
 
@@ -124,6 +126,7 @@ export function ClassDetailPanel({
   onSignInToEdit,
   canPropose,
   onProposeEdit,
+  isProposeEditStarting,
   isAnonymousProposalMode: _isAnonymousProposalMode,
   canUseLLM,
   byoKey,
@@ -917,11 +920,13 @@ export function ClassDetailPanel({
                   <>
                     <button
                       onClick={onProposeEdit}
+                      disabled={isProposeEditStarting}
+                      aria-busy={isProposeEditStarting}
                       className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                       title="Propose an edit to this class"
                     >
                       <Pencil className="h-3.5 w-3.5" />
-                      Propose Edit
+                      {isProposeEditStarting ? "Starting…" : "Propose Edit"}
                     </button>
                     {showSignInToEdit && onSignInToEdit && (
                       <button
