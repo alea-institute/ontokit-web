@@ -1,0 +1,17 @@
+.git
+.next
+node_modules
+coverage
+test-results
+
+.env
+.env.*
+!.env.example
+.npmrc
+*.log
+*.pem
+*.key
+
+.claude
+.codex
+.worker-reports
