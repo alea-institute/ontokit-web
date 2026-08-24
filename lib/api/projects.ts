@@ -64,6 +64,11 @@ export interface ProjectListResponse {
   limit: number;
 }
 
+export interface ProjectListFilters {
+  isDemo?: boolean;
+  demoSourceProjectId?: string;
+}
+
 export interface ProjectCreate {
   name: string;
   description?: string;
@@ -155,14 +160,30 @@ export const projectApi = {
    * @param limit - Maximum results
    * @param filter - Filter type: 'public', 'private', 'mine', or undefined for all accessible
    * @param token - Access token for authentication
+   * @param search - Optional project-name or description search
+   * @param demoFilters - Optional server-side demo identity filters
    */
-  list: (skip = 0, limit = 20, filter?: "public" | "private" | "mine", token?: string, search?: string) => {
+  list: (
+    skip = 0,
+    limit = 20,
+    filter?: "public" | "private" | "mine",
+    token?: string,
+    search?: string,
+    demoFilters: ProjectListFilters = {},
+  ) => {
     const headers: HeadersInit = {};
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
     return api.get<ProjectListResponse>("/api/v1/projects", {
-      params: { skip, limit, filter, search: search || undefined },
+      params: {
+        skip,
+        limit,
+        filter,
+        search: search || undefined,
+        is_demo: demoFilters.isDemo,
+        demo_source_project_id: demoFilters.demoSourceProjectId,
+      },
       headers,
     });
   },

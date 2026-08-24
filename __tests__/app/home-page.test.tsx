@@ -104,6 +104,17 @@ describe("HomePage public projects", () => {
     expect(listProjects).toHaveBeenCalledOnce();
   });
 
+  it("keeps the public query gated while required-auth session state is loading", async () => {
+    sessionState.status = "loading";
+    process.env.NEXT_PUBLIC_AUTH_MODE = "required";
+    listProjects.mockResolvedValue(seededResponse);
+
+    renderPage();
+
+    expect(await screen.findByText("Demo entry")).toBeDefined();
+    expect(listProjects).not.toHaveBeenCalled();
+  });
+
   it("shows the empty state only after a genuinely empty successful response", async () => {
     listProjects.mockResolvedValue({
       items: [],

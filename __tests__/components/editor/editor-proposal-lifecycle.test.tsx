@@ -8,12 +8,16 @@ const lifecycle = vi.hoisted(() => ({
   anonymousOptions: null as null | {
     onSubmitted?: (prNumber: number, prUrl: string | null) => void;
   },
+  sessionState: {
+    data: null as { accessToken?: string } | null,
+    status: "unauthenticated" as "loading" | "authenticated" | "unauthenticated",
+  },
 }));
 
 const noop = vi.fn();
 
 vi.mock("next-auth/react", () => ({
-  useSession: () => ({ data: null, status: "unauthenticated" }),
+  useSession: () => lifecycle.sessionState,
   signIn: vi.fn(),
 }));
 
@@ -189,8 +193,18 @@ import EditorPage from "@/app/projects/[id]/editor/page";
 describe("anonymous proposal submission lifecycle", () => {
   beforeEach(() => {
     lifecycle.anonymousOptions = null;
+    lifecycle.sessionState.data = null;
+    lifecycle.sessionState.status = "unauthenticated";
     vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
     vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "false");
+  });
+
+  it("renders the public editor while optional-auth session state is loading", () => {
+    lifecycle.sessionState.status = "loading";
+
+    renderWithQueryClient(<EditorPage />);
+
+    expect(screen.getByTestId("standard-layout")).toBeDefined();
   });
 
   it("opens from onSubmitted and clears the page-owned dialog state when closed", async () => {

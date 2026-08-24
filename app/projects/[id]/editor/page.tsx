@@ -1045,7 +1045,7 @@ export default function EditorPage() {
 
   // --- Render ---
 
-  if (isLoading || status === "loading") {
+  if (isLoading || (status === "loading" && authMode === "required")) {
     return (
       <>
         <Header />

@@ -5,8 +5,8 @@ const { projectState } = vi.hoisted(() => ({
   projectState: {
     is_demo: false,
     name: "FOLIO Demo",
-    demo_source_project_id: "folio-live",
-    demo_repository_full_name: "alea-institute/ontokit-demo-folio",
+    demo_source_project_id: "folio-live" as string | undefined,
+    demo_repository_full_name: "alea-institute/ontokit-demo-folio" as string | undefined,
   },
 }));
 
@@ -26,6 +26,8 @@ import { DemoProjectBanner } from "@/components/projects/demo-project-banner";
 describe("DemoProjectBanner", () => {
   beforeEach(() => {
     projectState.is_demo = false;
+    projectState.demo_source_project_id = "folio-live";
+    projectState.demo_repository_full_name = "alea-institute/ontokit-demo-folio";
   });
 
   it("renders only when the project response says it is a demo", () => {
@@ -38,5 +40,17 @@ describe("DemoProjectBanner", () => {
     expect(screen.getByText(/alea-institute\/ontokit-demo-folio/)).toBeDefined();
     expect(screen.getByRole("link", { name: /Return to source/ }).getAttribute("href"))
       .toBe("/projects/folio-live");
+  });
+
+  it("falls back to honest project metadata when optional demo links are absent", () => {
+    projectState.is_demo = true;
+    projectState.demo_source_project_id = undefined;
+    projectState.demo_repository_full_name = undefined;
+
+    render(<DemoProjectBanner />);
+
+    expect(screen.getByText(/Demo workspace: FOLIO Demo/)).toBeDefined();
+    expect(screen.getByRole("link", { name: /Return to source/ }).getAttribute("href"))
+      .toBe("/");
   });
 });

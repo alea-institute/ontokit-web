@@ -55,6 +55,19 @@ describe("projectApi", () => {
       expect(url).toContain("search=test");
     });
 
+    it("passes bounded demo discovery filters", async () => {
+      mockOk({ items: [], total: 0, unfiltered_total: 0, skip: 0, limit: 1 });
+
+      await projectApi.list(0, 1, "public", undefined, undefined, {
+        isDemo: true,
+        demoSourceProjectId: "folio-live",
+      });
+
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toContain("is_demo=true");
+      expect(url).toContain("demo_source_project_id=folio-live");
+    });
+
     it("passes Authorization header when token provided", async () => {
       mockOk({ items: [], total: 0, unfiltered_total: 0, skip: 0, limit: 20 });
 

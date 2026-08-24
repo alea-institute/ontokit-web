@@ -7,26 +7,26 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { projectApi, type Project } from "@/lib/api/projects";
 
-const DEMO_PAGE_SIZE = 100;
+const DEMO_ENTRY_LIMIT = 2;
 
 export interface DemoLoadResult {
   projects: Project[];
   unavailable: boolean;
 }
 
+export interface DemoLookupResult {
+  project: Project | null;
+  unavailable: boolean;
+}
+
 export async function loadDemoProjects(): Promise<DemoLoadResult> {
   try {
-    const demos: Project[] = [];
-    let skip = 0;
-    let total = Number.POSITIVE_INFINITY;
-
-    while (skip < total && demos.length < 2) {
-      const page = await projectApi.list(skip, DEMO_PAGE_SIZE, "public");
-      demos.push(...page.items.filter((project) => project.is_demo));
-      total = page.total;
-      skip += page.limit;
-      if (page.limit <= 0) break;
-    }
+    const page = await projectApi.list(0, DEMO_ENTRY_LIMIT, "public", undefined, undefined, {
+      isDemo: true,
+    });
+    const demos = page.items
+      .filter((project) => project.is_demo)
+      .slice(0, DEMO_ENTRY_LIMIT);
 
     return {
       projects: demos.sort((left, right) => left.name.localeCompare(right.name)),
@@ -37,14 +37,28 @@ export async function loadDemoProjects(): Promise<DemoLoadResult> {
   }
 }
 
-export function DemoProjectEntry({
-  loader = loadDemoProjects,
-}: {
-  loader?: () => Promise<DemoLoadResult>;
-}) {
+export async function loadDemoProjectForSource(
+  sourceProjectId: string,
+): Promise<DemoLookupResult> {
+  try {
+    const page = await projectApi.list(0, 1, "public", undefined, undefined, {
+      isDemo: true,
+      demoSourceProjectId: sourceProjectId,
+    });
+    const project = page.items.find(
+      (candidate) =>
+        candidate.is_demo && candidate.demo_source_project_id === sourceProjectId,
+    );
+    return { project: project ?? null, unavailable: false };
+  } catch {
+    return { project: null, unavailable: true };
+  }
+}
+
+export function DemoProjectEntry() {
   const query = useQuery({
     queryKey: ["demo-projects"],
-    queryFn: loader,
+    queryFn: loadDemoProjects,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -88,8 +102,14 @@ export function DemoProjectEntry({
             <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
               <p className="font-medium text-amber-100">Demo workspaces are temporarily unavailable.</p>
               <p className="mt-1 text-sm text-amber-100/75">Public projects still work normally.</p>
-              <Button variant="outline" size="sm" className="mt-3 border-amber-200/40 bg-transparent text-amber-50 hover:bg-amber-100/10" onClick={() => query.refetch()}>
-                Try again
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3 border-amber-200/40 bg-transparent text-amber-50 hover:bg-amber-100/10"
+                disabled={query.isFetching}
+                onClick={() => void query.refetch()}
+              >
+                {query.isFetching ? "Trying again…" : "Try again"}
               </Button>
             </div>
           ) : query.data?.projects.length ? (
@@ -126,22 +146,21 @@ export function DemoProjectEntry({
 
 export function DemoProjectLink({ sourceProjectId }: { sourceProjectId: string }) {
   const query = useQuery({
-    queryKey: ["demo-projects"],
-    queryFn: loadDemoProjects,
+    queryKey: ["demo-project", "source", sourceProjectId],
+    queryFn: () => loadDemoProjectForSource(sourceProjectId),
     staleTime: 5 * 60 * 1000,
   });
-  const demo = query.data?.projects.find(
-    (project) => project.demo_source_project_id === sourceProjectId,
-  );
+  const demo = query.data?.project;
 
   if (!demo) return null;
 
   return (
-    <Link href={`/projects/${demo.id}`}>
-      <Button variant="outline" size="sm" className="gap-1.5">
-        <FlaskConical className="h-4 w-4" />
-        Try demo
-      </Button>
+    <Link
+      href={`/projects/${demo.id}`}
+      className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-transparent px-3 text-sm font-medium transition-colors hover:bg-slate-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 dark:border-slate-600 dark:hover:bg-slate-800 dark:focus-visible:ring-offset-slate-900"
+    >
+      <FlaskConical className="h-4 w-4" />
+      Try demo
     </Link>
   );
 }

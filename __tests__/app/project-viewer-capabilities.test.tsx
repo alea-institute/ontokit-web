@@ -1,14 +1,18 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { viewerState } = vi.hoisted(() => ({
+const { viewerState, sessionState } = vi.hoisted(() => ({
   viewerState: {
     canSuggest: true,
+  },
+  sessionState: {
+    data: null as { accessToken?: string } | null,
+    status: "unauthenticated" as "loading" | "authenticated" | "unauthenticated",
   },
 }));
 
 vi.mock("next-auth/react", () => ({
-  useSession: () => ({ data: null, status: "unauthenticated" }),
+  useSession: () => sessionState,
   signIn: vi.fn(),
 }));
 
@@ -84,7 +88,11 @@ vi.mock("@/lib/context/ToastContext", () => ({
 vi.mock("@/components/layout/header", () => ({ Header: () => <header /> }));
 vi.mock("@/components/editor/ModeSwitcher", () => ({ ModeSwitcher: () => null }));
 vi.mock("@/components/editor/ShareButton", () => ({ ShareButton: () => null }));
-vi.mock("@/components/projects/demo-project-entry", () => ({ DemoProjectLink: () => null }));
+vi.mock("@/components/projects/demo-project-entry", () => ({
+  DemoProjectLink: ({ sourceProjectId }: { sourceProjectId: string }) => (
+    <a href={`/projects/${sourceProjectId}-demo`}>Try demo marker</a>
+  ),
+}));
 vi.mock("@/components/editor/standard/StandardEditorLayout", () => ({ StandardEditorLayout: () => null }));
 vi.mock("@/components/editor/developer/DeveloperEditorLayout", () => ({ DeveloperEditorLayout: () => null }));
 vi.mock("@/lib/stores/editorModeStore", () => ({ useEditorModeStore: () => "standard" }));
@@ -95,12 +103,25 @@ import ProjectViewerPage from "@/app/projects/[id]/page";
 describe("Project viewer capability affordances", () => {
   beforeEach(() => {
     viewerState.canSuggest = true;
+    sessionState.data = null;
+    sessionState.status = "unauthenticated";
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
   });
 
   it("renders the editor switcher for an anonymous auth-disabled principal with can_suggest", () => {
     render(<ProjectViewerPage />);
 
     expect(screen.getByRole("link", { name: "Editor" })).toBeDefined();
+    expect(screen.getByRole("link", { name: "Try demo marker" }).getAttribute("href"))
+      .toBe("/projects/proj-1-demo");
     expect(screen.queryByText("Sign in to edit")).toBeNull();
+  });
+
+  it("does not hide a public viewer behind loading session state when auth is disabled", () => {
+    sessionState.status = "loading";
+
+    render(<ProjectViewerPage />);
+
+    expect(screen.getByRole("link", { name: "Try demo marker" })).toBeDefined();
   });
 });
