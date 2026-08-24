@@ -11,6 +11,10 @@ The durable local implementation heads are:
 
 Both implementation worktrees are clean. Every commit is local only, unpushed, and unmerged.
 
+## Publication update - 2026-08-24
+
+After the checkpoint above, the exact reviewed heads were pushed to the ALEA remotes as archival branches: API `upstream-queue/t4-distinct-t5-sync-api` at `1029cd26` and web `upstream-queue/t4-distinct-t5-sync-web` at `6890216b`. Their base synthesis branches were also mirrored to ALEA. This preserves recovery without asserting that the CatholicOS delivery batch has begun: no CatholicOS issue, pull request, branch, repository, deployment, or organization asset was changed, and none of these archival branches was merged into an unrelated ALEA integration branch.
+
 ## Implemented stack
 
 The API stack now contains:
@@ -52,7 +56,7 @@ Web final head:
 4. Synthesize T8 cross-feature correctness/dependency residuals.
 5. Classify and place or explicitly omit T9 documentation learnings.
 6. Synthesize T10 demo mode while keeping domain, DNS, repository-credential, and live deployment activation gated.
-7. Run final cross-tranche review and repository gates, freeze exact heads, refresh CatholicOS bases, then execute the authorized issue-first issue/PR batch with explicit links. Never self-merge.
+7. Run final cross-tranche review and repository gates, freeze exact heads, refresh CatholicOS bases, then execute the separately gated CatholicOS issue-first issue/PR batch with explicit links. Never self-merge CatholicOS delivery PRs.
 
 No new user judgment or taste decision is required for the next local synthesis step.
 
@@ -61,8 +65,8 @@ No new user judgment or taste decision is required for the next local synthesis 
 - Authenticated DEV acceptance for elapsed quiet-period auto-accept, objection halt/resume, TRUSTED gating, and the `system:auto-accept` outcome is not yet a live UAT receipt.
 - D5 is code-complete but no application-key rotation or stored-ciphertext rewrap has been executed.
 - CatholicOS/ALEA domain-name resolution, `ontokit.org` registration/delegation confirmation, DNS, AWS, PROD, demo credentials/repositories, organization answerer publication, and reviewer outreach retain their explicit approval gates.
-- Issues, PRs, pushes, and links remain held until the final authorized batch after the remaining local synthesis work.
+- CatholicOS issues, PRs, pushes, and links remain held until the final separately authorized delivery batch after the remaining synthesis work. ALEA archival branch publication is recorded above.
 
 ## Protected state
 
-The authoritative `feat/roundup-brainstorm` checkout remains at `16fe6411` with exactly its seven preserved untracked paths. This documentation checkpoint is isolated, contains no secrets, credentials, personal roster data, or unrelated private information, and must remain local until publication is separately authorized.
+At the original checkpoint, authoritative `feat/roundup-brainstorm` remained at `16fe6411` with exactly seven preserved untracked paths. Those durable paths were subsequently reviewed and merged into that ALEA branch through PR #20; generated session artifacts are now ignored locally. This documentation checkpoint contains no secrets, credentials, personal roster data, or unrelated private information.
