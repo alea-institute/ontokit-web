@@ -460,6 +460,52 @@ describe("StandardEditorLayout", () => {
     expect(_toolbarProps.canAdd).toBe(false);
   });
 
+  it("exposes minting affordances to a trusted contributor in suggestion mode", () => {
+    render(
+      <StandardEditorLayout
+        {...defaultProps({
+          nodes: sampleNodes,
+          canEdit: false,
+          isSuggestionMode: true,
+          trustGate: {
+            tier: "trusted",
+            locked: false,
+            isLoading: false,
+            isError: false,
+            progress: null,
+          },
+        })}
+      />,
+    );
+
+    expect(_toolbarProps.canAdd).toBe(true);
+    expect(_classTreeProps.onAddChild).toBeDefined();
+  });
+
+  it("keeps minting visible but locked for an untrusted contributor in suggestion mode", () => {
+    render(
+      <StandardEditorLayout
+        {...defaultProps({
+          nodes: sampleNodes,
+          canEdit: false,
+          isSuggestionMode: true,
+          trustGate: {
+            tier: "untrusted",
+            locked: true,
+            isLoading: false,
+            isError: false,
+            progress: { accepted: 1, threshold: 5, remaining: 4 },
+          },
+        })}
+      />,
+    );
+
+    expect(_toolbarProps.canAdd).toBe(true);
+    expect(_toolbarProps.addLocked).toBe(true);
+    expect(_classTreeProps.onAddChild).toBeDefined();
+    expect(_classTreeProps.addChildLocked).toBe(true);
+  });
+
   // --- ClassDetailPanel prop forwarding ---
   it("passes canEdit=true to ClassDetailPanel when isSuggestionMode is true", () => {
     render(

@@ -45,6 +45,9 @@ import { RemoteSyncIndicator } from "@/components/editor/RemoteSyncIndicator";
 import { ShareButton } from "@/components/editor/ShareButton";
 import { useAnonymousSuggestion } from "@/lib/hooks/useAnonymousSuggestion";
 import { CreditModal } from "@/components/suggestions/CreditModal";
+import { ProposalSubmittedDialog } from "@/components/editor/ProposalSubmittedDialog";
+import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
+import type { TrustGate } from "@/components/editor/TrustExplainer";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
@@ -132,6 +135,43 @@ export default function EditorPage() {
   // project actually has LLM access (H-1).
   const llmGate = useLLMGate(projectId, project?.user_role);
   const canUseLLM = llmGate.canUseLLM;
+
+  // Trust ladder (R8, KTD3) — the single client-side source of tier truth.
+  // Minting stays locked while capabilities are loading and when the fetch
+  // failed: an affordance that appears before its permission is known invites
+  // a contributor into an action the server will refuse.
+  const {
+    tier: trustTier,
+    canMintEntities,
+    isLoading: isTrustLoading,
+    isError: isTrustError,
+    promotionProgress,
+    refetch: refetchTrust,
+  } = useTrustCapabilities(projectId);
+
+  const trustGate: TrustGate = useMemo(
+    () => ({
+      tier: trustTier,
+      locked: !canMintEntities,
+      isLoading: isTrustLoading,
+      isError: isTrustError,
+      onRetry: () => { void refetchTrust(); },
+      progress: promotionProgress,
+      onSignIn:
+        trustTier === "anonymous" && zitadelConfigured
+          ? () => signIn("zitadel", { callbackUrl: window.location.href })
+          : undefined,
+    }),
+    [
+      trustTier,
+      canMintEntities,
+      isTrustLoading,
+      isTrustError,
+      promotionProgress,
+      refetchTrust,
+      zitadelConfigured,
+    ],
+  );
 
   // UI state (editor-only)
   const [showHistory, setShowHistory] = useState(false);
@@ -226,10 +266,17 @@ export default function EditorPage() {
   const [creditModalOpen, setCreditModalOpen] = useState(false);
   const [discardProposalConfirmOpen, setDiscardProposalConfirmOpen] = useState(false);
 
+  // Post-submit success state for anonymous proposals (R7, KTD12). A dialog
+  // rather than a toast, because this is the one moment the account nudge has
+  // the contributor's attention — and a toast that vanishes cannot carry a CTA.
+  const [submittedProposal, setSubmittedProposal] = useState<
+    { prNumber: number; prUrl: string | null } | null
+  >(null);
+
   const anonymousSuggestion = useAnonymousSuggestion({
     projectId,
-    onSubmitted: (prNumber) => {
-      toast.success(`Proposal submitted as PR #${prNumber}`);
+    onSubmitted: (prNumber, prUrl) => {
+      setSubmittedProposal({ prNumber, prUrl });
     },
     onError: (msg) => toast.error("Proposal error", msg),
   });
@@ -372,6 +419,9 @@ export default function EditorPage() {
   const handleEntityConfirm = useCallback(
     async (entity: NewEntityInfo) => {
       if (!canSuggest) return;
+      // Trust gate (R8): the dialog already disables Create, but the confirm
+      // path is the one the server would refuse, so it carries the guard too.
+      if (trustGate.locked) return;
       const snippet = generateTurtleSnippet({
         iri: entity.iri,
         label: entity.label,
@@ -407,7 +457,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [canSuggest, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
+    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
   );
 
   // Handle accepted child suggestion — creates a CLASS entity directly in tree (D-07)
@@ -1336,6 +1386,7 @@ export default function EditorPage() {
                   userRole={project?.user_role}
                   entityNavigationRef={entityNavigationRef}
                   canSuggest={!!canSuggest}
+                  trustGate={trustGate}
                   isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
@@ -1398,6 +1449,7 @@ export default function EditorPage() {
                 canEdit={isAnonymousProposalMode ? true : !!canEdit}
                 userRole={project?.user_role}
                 canSuggest={!!canSuggest}
+                trustGate={trustGate}
                 entityNavigationRef={entityNavigationRef}
                 isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
                 nodes={nodes}
@@ -1495,6 +1547,7 @@ export default function EditorPage() {
           ontologyNamespace={ontologyNamespace}
           parentIri={addEntityParentIri}
           parentLabel={addEntityParentLabel}
+          trustGate={trustGate}
         />
       )}
 
@@ -1555,6 +1608,20 @@ export default function EditorPage() {
       <CreditModal
         open={creditModalOpen}
         onSubmitCredit={handleAnonymousSubmit}
+      />
+
+      {/* Anonymous submit-success + account nudge (R7) */}
+      <ProposalSubmittedDialog
+        open={!!submittedProposal}
+        onOpenChange={(open) => { if (!open) setSubmittedProposal(null); }}
+        prNumber={submittedProposal?.prNumber ?? null}
+        prUrl={submittedProposal?.prUrl ?? null}
+        isSignedIn={!!session?.accessToken}
+        onSignIn={
+          zitadelConfigured
+            ? () => signIn("zitadel", { callbackUrl: window.location.href })
+            : undefined
+        }
       />
     </BranchProvider>
   );

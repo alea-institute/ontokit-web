@@ -1,5 +1,13 @@
 /**
- * User Settings API client — GitHub token management and repo listing.
+ * User Settings API client.
+ *
+ * The GitHub PAT WRITE surface is retired (R3/KD6): all mirror operations now
+ * authenticate as the system mirror identity, and a lay contributor should
+ * never be asked for a GitHub credential. `getGitHubTokenStatus` remains
+ * read-only for one release so a project mid-migration renders coherently.
+ *
+ * `commitIdentity` is what replaces it in the UI: how a contributor's commits
+ * are credited in public git history (R14, R15).
  */
 
 import { api } from "./client";
@@ -11,12 +19,20 @@ export interface GitHubTokenStatus {
   github_username?: string;
 }
 
-export interface GitHubTokenResponse {
-  github_username?: string;
-  token_scopes?: string;
-  token_preview?: string;
-  created_at: string;
-  updated_at?: string;
+export interface CommitIdentity {
+  display_name?: string | null;
+  /** The synthetic alias used by default. Never a real address. */
+  noreply_alias: string;
+  commit_email?: string | null;
+  commit_email_verified: boolean;
+  use_verified_email: boolean;
+  /** The address that will actually appear in the next commit. */
+  effective_email: string;
+}
+
+export interface CommitIdentityUpdate {
+  commit_email?: string | null;
+  use_verified_email?: boolean;
 }
 
 export interface GitHubRepoInfo {
@@ -55,17 +71,15 @@ export const userSettingsApi = {
       headers: { Authorization: `Bearer ${token}` },
     }),
 
-  /** Validate and store a GitHub PAT. */
-  saveGitHubToken: (pat: string, token: string) =>
-    api.post<GitHubTokenResponse>(
-      "/api/v1/users/me/github-token",
-      { token: pat },
-      { headers: { Authorization: `Bearer ${token}` } }
-    ),
+  /** How this contributor's commits are authored in public git history. */
+  getCommitIdentity: (token: string) =>
+    api.get<CommitIdentity>("/api/v1/users/me/commit-identity", {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
 
-  /** Remove the stored GitHub PAT. */
-  deleteGitHubToken: (token: string) =>
-    api.delete("/api/v1/users/me/github-token", {
+  /** Set the opt-in authoring address, or toggle its use. */
+  updateCommitIdentity: (data: CommitIdentityUpdate, token: string) =>
+    api.patch<CommitIdentity>("/api/v1/users/me/commit-identity", data, {
       headers: { Authorization: `Bearer ${token}` },
     }),
 

@@ -3,16 +3,10 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Pencil, Save } from "lucide-react";
-import { GithubIcon as Github } from "@/components/icons/github";
+import { ArrowLeft, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Pencil, Save } from "lucide-react";
 import { Header } from "@/components/layout/header";
-import { Button } from "@/components/ui/button";
-import {
-  userSettingsApi,
-  type GitHubTokenStatus,
-  type GitHubTokenResponse,
-} from "@/lib/api/userSettings";
-import { ApiError } from "@/lib/api/client";
+import { CommitIdentityCard } from "@/components/settings/CommitIdentityCard";
+import { userSettingsApi, type CommitIdentity } from "@/lib/api/userSettings";
 import { cn } from "@/lib/utils";
 import {
   useEditorModeStore,
@@ -23,90 +17,56 @@ import {
 export default function UserSettingsPage() {
   const { data: session, status } = useSession();
 
-  const [tokenStatus, setTokenStatus] = useState<GitHubTokenStatus | null>(null);
-  const [tokenDetail, setTokenDetail] = useState<GitHubTokenResponse | null>(null);
+  const [identity, setIdentity] = useState<CommitIdentity | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  // PAT input
-  const [patInput, setPatInput] = useState("");
-  const [isSavingToken, setIsSavingToken] = useState(false);
-  const [isDeletingToken, setIsDeletingToken] = useState(false);
+  const [isSavingIdentity, setIsSavingIdentity] = useState(false);
 
   const isAuthenticated = status === "authenticated";
 
   useEffect(() => {
-    const fetchTokenStatus = async () => {
+    const fetchIdentity = async () => {
       if (!session?.accessToken) {
         setIsLoading(false);
         return;
       }
       setIsLoading(true);
       try {
-        const result = await userSettingsApi.getGitHubTokenStatus(session.accessToken);
-        setTokenStatus(result);
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 404) {
-          setTokenStatus({ has_token: false });
-        } else {
-          setError("Failed to check GitHub token status");
-          setTokenStatus(null);
-        }
+        setIdentity(await userSettingsApi.getCommitIdentity(session.accessToken));
+      } catch {
+        setError("Couldn't load your credit settings. Try again in a moment.");
+        setIdentity(null);
       } finally {
         setIsLoading(false);
       }
     };
 
     if (status !== "loading" && isAuthenticated) {
-      fetchTokenStatus();
+      fetchIdentity();
     } else if (status !== "loading" && !isAuthenticated) {
       setIsLoading(false);
     }
   }, [session?.accessToken, status, isAuthenticated]);
 
-  const handleSaveToken = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!session?.accessToken || !patInput.trim()) return;
-
-    setIsSavingToken(true);
+  const handleToggleVerifiedEmail = async (useVerified: boolean) => {
+    if (!session?.accessToken) return;
+    setIsSavingIdentity(true);
     setError(null);
     setSuccessMessage(null);
-
     try {
-      const result = await userSettingsApi.saveGitHubToken(patInput.trim(), session.accessToken);
-      setTokenDetail(result);
-      setTokenStatus({
-        has_token: true,
-        github_username: result.github_username,
-      });
-      setPatInput("");
-      setSuccessMessage("GitHub account connected successfully");
+      setIdentity(
+        await userSettingsApi.updateCommitIdentity(
+          { use_verified_email: useVerified },
+          session.accessToken,
+        ),
+      );
+      setSuccessMessage("Credit settings updated");
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save token");
+      setError(err instanceof Error ? err.message : "Couldn't update credit settings");
     } finally {
-      setIsSavingToken(false);
-    }
-  };
-
-  const handleDeleteToken = async () => {
-    if (!session?.accessToken) return;
-    if (!confirm("Are you sure you want to disconnect your GitHub account? Projects using this token will lose GitHub sync.")) return;
-
-    setIsDeletingToken(true);
-    setError(null);
-
-    try {
-      await userSettingsApi.deleteGitHubToken(session.accessToken);
-      setTokenStatus({ has_token: false });
-      setTokenDetail(null);
-      setSuccessMessage("GitHub account disconnected");
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to disconnect");
-    } finally {
-      setIsDeletingToken(false);
+      setIsSavingIdentity(false);
     }
   };
 
@@ -190,120 +150,12 @@ export default function UserSettingsPage() {
           {/* Editor Preferences */}
           <EditorPreferencesSection />
 
-          {/* Connected Accounts */}
-          <section className="mt-6 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
-            <div className="mb-4 flex items-center gap-2">
-              <Github className="h-5 w-5 text-slate-500" />
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Connected Accounts
-              </h2>
-            </div>
-
-            {tokenStatus?.has_token ? (
-              <div className="space-y-4">
-                <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-700/50">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 dark:bg-white">
-                        <Github className="h-5 w-5 text-white dark:text-slate-900" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-white">
-                          GitHub
-                        </p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          Connected as{" "}
-                          <span className="font-medium">
-                            {tokenStatus.github_username || tokenDetail?.github_username || "unknown"}
-                          </span>
-                        </p>
-                        {tokenDetail?.token_scopes && (
-                          <p className="text-xs text-slate-400 dark:text-slate-500">
-                            Scopes: {tokenDetail.token_scopes}
-                          </p>
-                        )}
-                        {tokenDetail?.token_preview && (
-                          <p className="font-mono text-xs text-slate-400 dark:text-slate-500">
-                            Token: {tokenDetail.token_preview}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleDeleteToken}
-                      disabled={isDeletingToken}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="mr-1 h-4 w-4" />
-                      {isDeletingToken ? "Disconnecting..." : "Disconnect"}
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-2 text-sm text-slate-500 dark:text-slate-400">
-                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-                  <p>
-                    Your token is stored encrypted and is used to sync pull
-                    requests with GitHub repositories connected in your projects.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  Connect your GitHub account to enable repository syncing for
-                  your projects. You need a{" "}
-                  <a
-                    href="https://github.com/settings/tokens?type=beta"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary-600 hover:underline dark:text-primary-400"
-                  >
-                    GitHub Personal Access Token
-                  </a>{" "}
-                  with the <code className="rounded-sm bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">repo</code> scope.
-                </p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Optional: add the <code className="rounded-sm bg-slate-100 px-1 py-0.5 text-xs dark:bg-slate-700">admin:repo_hook</code> scope
-                  to allow OntoKit to auto-configure GitHub webhooks for instant sync from remote.
-                </p>
-
-                <form onSubmit={handleSaveToken} className="space-y-3">
-                  <div>
-                    <label
-                      htmlFor="github-pat"
-                      className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300"
-                    >
-                      Personal Access Token
-                    </label>
-                    <input
-                      id="github-pat"
-                      type="password"
-                      value={patInput}
-                      onChange={(e) => setPatInput(e.target.value)}
-                      placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                      className={cn(
-                        "w-full rounded-md border px-3 py-2 text-sm font-mono",
-                        "border-slate-300 focus:border-primary-500 focus:ring-primary-500",
-                        "dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
-                      )}
-                      required
-                      disabled={isSavingToken}
-                    />
-                    <p className="mt-1 text-xs text-slate-500">
-                      Your token will be encrypted before storage. We never store tokens in plain text.
-                    </p>
-                  </div>
-                  <Button type="submit" disabled={isSavingToken || !patInput.trim()}>
-                    <Github className="mr-2 h-4 w-4" />
-                    {isSavingToken ? "Connecting..." : "Connect GitHub"}
-                  </Button>
-                </form>
-              </div>
-            )}
-          </section>
+          {/* How your contributions are credited */}
+          <CommitIdentityCard
+            identity={identity}
+            isSaving={isSavingIdentity}
+            onToggleVerifiedEmail={handleToggleVerifiedEmail}
+          />
         </div>
       </main>
     </>

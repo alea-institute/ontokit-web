@@ -55,6 +55,25 @@ describe("EntityTreeToolbar", () => {
     expect(onAdd).toHaveBeenCalledOnce();
   });
 
+  it("keeps the add callback inert while entity minting is locked", async () => {
+    const onAdd = vi.fn();
+    render(
+      <EntityTreeToolbar
+        {...baseProps}
+        canAdd
+        onAdd={onAdd}
+        addLocked
+        addLockedReason="Creating new entries requires trusted status."
+      />,
+    );
+
+    const add = screen.getByLabelText("Add entity") as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    expect(add.title).toBe("Creating new entries requires trusted status.");
+    await userEvent.click(add);
+    expect(onAdd).not.toHaveBeenCalled();
+  });
+
   it("calls onToggleSearch when search button is clicked", async () => {
     const onToggleSearch = vi.fn();
     render(<EntityTreeToolbar {...baseProps} onToggleSearch={onToggleSearch} />);

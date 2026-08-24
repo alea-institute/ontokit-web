@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -25,8 +25,12 @@ import { useProject, derivePermissions } from "@/lib/hooks/useProject";
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import {
   suggestionsApi,
+  type BulkReviewAction,
   type SuggestionSessionSummary,
 } from "@/lib/api/suggestions";
+import { QueueFilterTabs, type QueueFilter } from "@/components/suggestions/QueueFilterTabs";
+import { BulkActionBar } from "@/components/suggestions/BulkActionBar";
+import { TierBadge } from "@/components/suggestions/TierBadge";
 import {
   pullRequestsApi,
   type PRDiffResponse,
@@ -153,6 +157,8 @@ function DiffView({ diff }: { diff: PRDiffResponse }) {
 
 type DetailTab = "summary" | "files";
 
+const MAX_BULK_SELECTION = 100;
+
 export default function SuggestionReviewPage() {
   const { data: session, status } = useSession();
   const params = useParams();
@@ -165,6 +171,16 @@ export default function SuggestionReviewPage() {
   const [sessions, setSessions] = useState<SuggestionSessionSummary[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
+
+  // Triage queue (R9, KTD13): a tier filter on the same list, plus selection
+  // state for the bulk actions. Selection is local — nothing about it belongs
+  // on the server — and per-item failures are kept alongside it, because a
+  // partial-success response must not collapse into one toast.
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [bulkFailures, setBulkFailures] = useState<Record<string, string>>({});
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
+  const sessionsRequestIdRef = useRef(0);
 
   const isLoading = isProjectLoading || isLoadingSessions;
   const error = projectError || sessionsError;
@@ -181,21 +197,45 @@ export default function SuggestionReviewPage() {
   const [actionInProgress, setActionInProgress] = useState(false);
 
   const fetchSessions = useCallback(async () => {
+    const requestId = ++sessionsRequestIdRef.current;
     if (!session?.accessToken) {
-      setIsLoadingSessions(false);
+      if (requestId === sessionsRequestIdRef.current) {
+        setSessions([]);
+        setSelectedIds(new Set());
+        setBulkFailures({});
+        setIsLoadingSessions(false);
+      }
       return;
     }
     setIsLoadingSessions(true);
     setSessionsError(null);
     try {
-      const pendingList = await suggestionsApi.listPending(projectId, session.accessToken);
+      const pendingList = await suggestionsApi.listPending(
+        projectId,
+        session.accessToken,
+        queueFilter === "all" ? undefined : queueFilter,
+      );
+      if (requestId !== sessionsRequestIdRef.current) return;
+
       setSessions(pendingList.items);
+      const visibleIds = new Set(pendingList.items.map((item) => item.session_id));
+      setSelectedIds((previous) => {
+        const next = new Set([...previous].filter((id) => visibleIds.has(id)));
+        return next.size === previous.size ? previous : next;
+      });
+      setBulkFailures((previous) => {
+        const next = Object.fromEntries(
+          Object.entries(previous).filter(([id]) => visibleIds.has(id)),
+        );
+        return Object.keys(next).length === Object.keys(previous).length ? previous : next;
+      });
     } catch (err) {
+      if (requestId !== sessionsRequestIdRef.current) return;
       setSessionsError(err instanceof Error ? err.message : "Failed to load suggestions");
     } finally {
-      setIsLoadingSessions(false);
+      if (requestId === sessionsRequestIdRef.current) setIsLoadingSessions(false);
     }
-  }, [projectId, session?.accessToken]);
+  }, [projectId, session?.accessToken, queueFilter]);
 
   useEffect(() => {
     fetchSessions();
@@ -218,6 +258,91 @@ export default function SuggestionReviewPage() {
     return () => { cancelled = true; };
   }, [selectedSession, activeTab, diff, isDiffLoading, projectId, session?.accessToken]);
 
+  // Switching queues starts a fresh selection: ids that are no longer on
+  // screen must not ride along into the next bulk call.
+  const handleQueueChange = useCallback((next: QueueFilter) => {
+    setQueueFilter(next);
+    setSelectedIds(new Set());
+    setBulkFailures({});
+    setSelectedSession(null);
+    setDiff(null);
+  }, []);
+
+  const toggleSelected = useCallback((sessionId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(sessionId)) next.delete(sessionId);
+      else if (next.size < MAX_BULK_SELECTION) next.add(sessionId);
+      return next;
+    });
+  }, []);
+
+  const bulkSelectableSessions = useMemo(
+    () => sessions.slice(0, MAX_BULK_SELECTION),
+    [sessions],
+  );
+  const allSelected =
+    bulkSelectableSessions.length > 0 &&
+    bulkSelectableSessions.every((s) => selectedIds.has(s.session_id));
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedIds((prev) => {
+      const everySelected =
+        bulkSelectableSessions.length > 0 &&
+        bulkSelectableSessions.every((s) => prev.has(s.session_id));
+      return everySelected
+        ? new Set()
+        : new Set(bulkSelectableSessions.map((s) => s.session_id));
+    });
+  }, [bulkSelectableSessions]);
+
+  const removeFromSelection = useCallback((sessionId: string) => {
+    setSelectedIds((previous) => {
+      if (!previous.has(sessionId)) return previous;
+      const next = new Set(previous);
+      next.delete(sessionId);
+      return next;
+    });
+    setBulkFailures((previous) => {
+      if (!(sessionId in previous)) return previous;
+      const next = { ...previous };
+      delete next[sessionId];
+      return next;
+    });
+  }, []);
+
+  const handleBulkReview = useCallback(
+    async (action: BulkReviewAction) => {
+      if (!session?.accessToken || selectedIds.size === 0) return;
+      setSessionsError(null);
+      setBulkFailures({});
+      setIsBulkBusy(true);
+      try {
+        const result = await suggestionsApi.bulkReview(
+          projectId,
+          { session_ids: Array.from(selectedIds), action },
+          session.accessToken,
+        );
+        // Partial success: what worked leaves the selection, what failed stays
+        // selected next to its reason, so a retry is one click and the
+        // reviewer never wonders which items are still pending.
+        const failures: Record<string, string> = {};
+        for (const failure of result.failed) failures[failure.session_id] = failure.reason;
+        setBulkFailures(failures);
+        setSelectedIds(new Set(result.failed.map((f) => f.session_id)));
+        window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+        setSelectedSession(null);
+        setDiff(null);
+        await fetchSessions();
+      } catch (err) {
+        setSessionsError(err instanceof Error ? err.message : "Failed to review suggestions");
+      } finally {
+        setIsBulkBusy(false);
+      }
+    },
+    [projectId, session?.accessToken, selectedIds, fetchSessions],
+  );
+
   const handleSelectSession = (s: SuggestionSessionSummary) => {
     if (selectedSession?.session_id === s.session_id) {
       setSelectedSession(null);
@@ -231,14 +356,16 @@ export default function SuggestionReviewPage() {
 
   const handleApprove = async () => {
     if (!selectedSession || !session?.accessToken) return;
+    const sessionId = selectedSession.session_id;
     setSessionsError(null);
     setActionInProgress(true);
     try {
-      await suggestionsApi.approve(projectId, selectedSession.session_id, session.accessToken);
+      await suggestionsApi.approve(projectId, sessionId, session.accessToken);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+      removeFromSelection(sessionId);
       setSelectedSession(null);
       setDiff(null);
-      fetchSessions();
+      void fetchSessions();
     } catch (err) {
       setSessionsError(err instanceof Error ? err.message : "Failed to approve suggestion");
     } finally {
@@ -248,14 +375,16 @@ export default function SuggestionReviewPage() {
 
   const handleReject = async (reason: string) => {
     if (!selectedSession || !session?.accessToken) return;
+    const sessionId = selectedSession.session_id;
     setSessionsError(null);
     setActionInProgress(true);
     try {
-      await suggestionsApi.reject(projectId, selectedSession.session_id, { reason }, session.accessToken);
+      await suggestionsApi.reject(projectId, sessionId, { reason }, session.accessToken);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+      removeFromSelection(sessionId);
       setSelectedSession(null);
       setDiff(null);
-      fetchSessions();
+      void fetchSessions();
     } catch (err) {
       setSessionsError(err instanceof Error ? err.message : "Failed to reject suggestion");
     } finally {
@@ -263,16 +392,37 @@ export default function SuggestionReviewPage() {
     }
   };
 
-  const handleRequestChanges = async (feedback: string) => {
+  const handleDismiss = async () => {
     if (!selectedSession || !session?.accessToken) return;
+    const sessionId = selectedSession.session_id;
     setSessionsError(null);
     setActionInProgress(true);
     try {
-      await suggestionsApi.requestChanges(projectId, selectedSession.session_id, { feedback }, session.accessToken);
+      await suggestionsApi.dismiss(projectId, sessionId, session.accessToken);
       window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+      removeFromSelection(sessionId);
       setSelectedSession(null);
       setDiff(null);
-      fetchSessions();
+      void fetchSessions();
+    } catch (err) {
+      setSessionsError(err instanceof Error ? err.message : "Failed to dismiss suggestion");
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  const handleRequestChanges = async (feedback: string) => {
+    if (!selectedSession || !session?.accessToken) return;
+    const sessionId = selectedSession.session_id;
+    setSessionsError(null);
+    setActionInProgress(true);
+    try {
+      await suggestionsApi.requestChanges(projectId, sessionId, { feedback }, session.accessToken);
+      window.dispatchEvent(new Event(NOTIFICATIONS_CHANGED_EVENT));
+      removeFromSelection(sessionId);
+      setSelectedSession(null);
+      setDiff(null);
+      void fetchSessions();
     } catch (err) {
       setSessionsError(err instanceof Error ? err.message : "Failed to request changes");
     } finally {
@@ -370,12 +520,49 @@ export default function SuggestionReviewPage() {
             </p>
           </div>
 
+          {/* Queue filter (R9): triage is where anonymous and new-contributor
+              work lands; the trusted queue is the one auto-accept drains. */}
+          <div className="mb-4">
+            <QueueFilterTabs
+              value={queueFilter}
+              onChange={handleQueueChange}
+              disabled={isBulkBusy}
+            />
+            {sessions.length > MAX_BULK_SELECTION && (
+              <p
+                id="bulk-selection-limit"
+                className="mt-2 text-xs text-slate-500 dark:text-slate-400"
+              >
+                Bulk actions are limited to {MAX_BULK_SELECTION} suggestions at a time.
+                Select all chooses the first {MAX_BULK_SELECTION} shown.
+              </p>
+            )}
+          </div>
+
+          {/* Bulk action bar — only for reviewers, only with a selection */}
+          {selectedIds.size > 0 && (
+            <BulkActionBar
+              selectedCount={selectedIds.size}
+              totalCount={Math.min(sessions.length, MAX_BULK_SELECTION)}
+              allSelected={allSelected}
+              onToggleSelectAll={toggleSelectAll}
+              onClearSelection={() => setSelectedIds(new Set())}
+              onBulkAccept={() => handleBulkReview("accept")}
+              onBulkDismiss={() => handleBulkReview("dismiss")}
+              isBusy={isBulkBusy}
+            />
+          )}
+
           {/* Pending list */}
           {sessions.length === 0 ? (
             <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
               <Lightbulb className="mx-auto h-12 w-12 text-slate-400" />
               <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-white">
-                No pending suggestions
+                {queueFilter === "triage"
+                  ? "Nothing waiting in triage"
+                  : queueFilter === "review"
+                    ? "No trusted suggestions waiting"
+                    : "No pending suggestions"}
               </h3>
               <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                 All suggestion submissions have been reviewed.
@@ -394,11 +581,32 @@ export default function SuggestionReviewPage() {
                     <div
                       className={cn(
                         "flex items-center rounded-lg border bg-white transition-colors dark:bg-slate-800",
-                        isSelected
-                          ? "border-primary-300 ring-1 ring-primary-300 dark:border-primary-600 dark:ring-primary-600"
-                          : "border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600",
+                        bulkFailures[s.session_id]
+                          ? "border-red-300 dark:border-red-800"
+                          : isSelected
+                            ? "border-primary-300 ring-1 ring-primary-300 dark:border-primary-600 dark:ring-primary-600"
+                            : "border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600",
                       )}
                     >
+                      <label className="flex cursor-pointer items-center self-stretch pl-4 pr-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(s.session_id)}
+                          onChange={() => toggleSelected(s.session_id)}
+                          disabled={
+                            isBulkBusy ||
+                            (!selectedIds.has(s.session_id) &&
+                              selectedIds.size >= MAX_BULK_SELECTION)
+                          }
+                          aria-label={`Select suggestion from ${s.submitter?.name || s.submitter?.email || (s.is_anonymous ? "Anonymous" : "Unknown user")}`}
+                          aria-describedby={
+                            sessions.length > MAX_BULK_SELECTION
+                              ? "bulk-selection-limit"
+                              : undefined
+                          }
+                          className="h-4 w-4 rounded-sm border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600"
+                        />
+                      </label>
                       <button
                         onClick={() => handleSelectSession(s)}
                         className="flex-1 p-4 text-left"
@@ -409,7 +617,8 @@ export default function SuggestionReviewPage() {
                               <span className="text-sm font-medium text-slate-900 dark:text-white">
                                 {s.submitter?.name || s.submitter?.email || (s.is_anonymous ? "Anonymous" : "Unknown user")}
                               </span>
-                              {s.is_anonymous && (
+                              <TierBadge tier={s.submitter_tier} />
+                              {s.is_anonymous && !s.submitter_tier && (
                                 <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                   Anonymous
                                 </span>
@@ -471,6 +680,16 @@ export default function SuggestionReviewPage() {
                       )}
                     </div>
 
+                    {/* Why this one didn't go through in the last bulk pass */}
+                    {bulkFailures[s.session_id] && (
+                      <p
+                        role="alert"
+                        className="mt-1 rounded-md bg-red-50 px-3 py-1.5 text-xs text-red-700 dark:bg-red-900/20 dark:text-red-400"
+                      >
+                        Not processed: {bulkFailures[s.session_id]}
+                      </p>
+                    )}
+
                     {/* Detail panel */}
                     {isSelected && (
                       <div className="mt-2 rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
@@ -519,7 +738,8 @@ export default function SuggestionReviewPage() {
                                   <p className="text-sm text-slate-900 dark:text-white">
                                     {s.submitter?.name || s.submitter?.email || (s.is_anonymous ? "Anonymous" : "Unknown user")}
                                   </p>
-                                  {s.is_anonymous && (
+                                  <TierBadge tier={s.submitter_tier} />
+                                  {s.is_anonymous && !s.submitter_tier && (
                                     <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
                                       Anonymous
                                     </span>
@@ -624,6 +844,17 @@ export default function SuggestionReviewPage() {
 
                         {/* Action bar */}
                         <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3 dark:border-slate-700">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1.5 border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+                            onClick={handleDismiss}
+                            disabled={actionInProgress}
+                            title="Close without merging and without writing a rejection reason"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Dismiss
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"

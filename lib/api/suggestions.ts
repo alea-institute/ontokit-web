@@ -10,6 +10,7 @@
  */
 
 import { api } from "./client";
+import type { TrustTier } from "./trust";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -66,6 +67,18 @@ export interface SuggestionSessionSummary {
   revision?: number;
   summary?: string;
   is_anonymous?: boolean;
+  /**
+   * Rung the submitter sat on when they submitted (R9). Present so a reviewer
+   * sees provenance without a second call — identity, tier and provenance are
+   * meant to be self-evident on the row.
+   */
+  submitter_tier?: TrustTier | null;
+  /** LLM-generated suggestions are never auto-accepted, at any tier (R13). */
+  is_llm_generated?: boolean;
+  /** When the quiet period elapses and this merges itself (R11). */
+  auto_accept_after?: string | null;
+  /** Set when a reviewer objection stopped the clock (R12). */
+  auto_accept_halted_at?: string | null;
 }
 
 export interface SuggestionSessionListResponse {
@@ -92,6 +105,34 @@ export interface SuggestionRequestChangesPayload {
 
 export interface SuggestionResubmitPayload {
   summary?: string;
+}
+
+/** Which review queue a listing targets (R9, KTD13). */
+export type SuggestionQueue = "triage" | "review";
+
+/** Bulk triage verbs. Accept merges; dismiss closes without merging. */
+export type BulkReviewAction = "accept" | "dismiss";
+
+export interface BulkReviewPayload {
+  /** Capped server-side at 100 ids per request. */
+  session_ids: string[];
+  action: BulkReviewAction;
+  note?: string;
+}
+
+export interface BulkReviewFailure {
+  session_id: string;
+  reason: string;
+}
+
+/**
+ * Partial-success by design: one stale session must not abort a 40-item
+ * dismissal, so the caller renders per-item failures rather than one toast.
+ */
+export interface BulkReviewResponse {
+  action: BulkReviewAction;
+  succeeded: string[];
+  failed: BulkReviewFailure[];
 }
 
 export interface SuggestionBeaconPayload {
@@ -210,11 +251,46 @@ export const suggestionsApi = {
 
   /**
    * List pending suggestion sessions for review (editors/admins only).
+   *
+   * `queue` splits the list by submitter tier (R9): "triage" for anonymous
+   * and untrusted submissions, "review" for trusted ones. Omitting it returns
+   * everything, which is the pre-ladder behaviour.
    */
-  listPending: (projectId: string, token: string) =>
+  listPending: (projectId: string, token: string, queue?: SuggestionQueue) =>
     api.get<SuggestionSessionListResponse>(
       `/api/v1/projects/${projectId}/suggestions/pending`,
-      { headers: { Authorization: `Bearer ${token}` } },
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: queue ? { queue } : undefined,
+      },
+    ),
+
+  /**
+   * Dismiss a triage-queue suggestion without merging it (editors/admins).
+   */
+  dismiss: (projectId: string, sessionId: string, token: string, note?: string) =>
+    api.post<void>(
+      `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/dismiss`,
+      undefined,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        params: note ? { note } : undefined,
+        retryOn5xx: false,
+      },
+    ),
+
+  /**
+   * Accept or dismiss many suggestions at once (editors/admins only).
+   *
+   * The response reports per-session failures rather than aborting the batch,
+   * so callers must render `failed` — a single error toast would silently
+   * lose which items are still pending.
+   */
+  bulkReview: (projectId: string, data: BulkReviewPayload, token: string) =>
+    api.post<BulkReviewResponse>(
+      `/api/v1/projects/${projectId}/suggestions/bulk-review`,
+      data,
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
     ),
 
   /**

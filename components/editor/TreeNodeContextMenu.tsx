@@ -1,9 +1,10 @@
 "use client";
 
-import { Plus, Copy, Code, Trash2 } from "lucide-react";
+import { Plus, Copy, Code, Trash2, Lock } from "lucide-react";
 import {
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuLabel,
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
 interface TreeNodeContextMenuProps {
@@ -12,6 +13,10 @@ interface TreeNodeContextMenuProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  /** Trust ladder (R8): creating entities is above this contributor's rung. */
+  addChildLocked?: boolean;
+  /** Plain-language reason, rendered under the disabled item (AE2). */
+  addChildLockedReason?: string;
 }
 
 export function TreeNodeContextMenu({
@@ -20,6 +25,8 @@ export function TreeNodeContextMenu({
   onCopyIri,
   onDelete,
   onViewInSource,
+  addChildLocked = false,
+  addChildLockedReason,
 }: TreeNodeContextMenuProps) {
   const label = node.label || node.iri;
 
@@ -27,10 +34,22 @@ export function TreeNodeContextMenu({
     <ContextMenuContent>
       {onAddChild && (
         <>
-          <ContextMenuItem onSelect={() => onAddChild(node.iri)}>
-            <Plus className="h-4 w-4" />
+          <ContextMenuItem
+            disabled={addChildLocked}
+            onSelect={() => onAddChild(node.iri)}
+          >
+            {addChildLocked ? (
+              <Lock className="h-4 w-4" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
             Add Subclass
           </ContextMenuItem>
+          {addChildLocked && addChildLockedReason && (
+            <ContextMenuLabel className="max-w-[220px] whitespace-normal font-normal leading-snug">
+              {addChildLockedReason}
+            </ContextMenuLabel>
+          )}
           <ContextMenuSeparator />
         </>
       )}

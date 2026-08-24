@@ -187,16 +187,20 @@ vi.mock("@/components/editor/IndividualDetailPanel", () => ({
   ),
 }));
 
+let _toolbarProps: Record<string, unknown> = {};
 vi.mock("@/components/editor/shared/EntityTreeToolbar", () => ({
-  EntityTreeToolbar: (props: Record<string, unknown>) => (
-    <div data-testid="entity-tree-toolbar">
-      {typeof props.onAdd === "function" && (
-        <button data-testid="toolbar-add-btn" onClick={props.onAdd as () => void}>
-          Add entity
-        </button>
-      )}
-    </div>
-  ),
+  EntityTreeToolbar: (props: Record<string, unknown>) => {
+    _toolbarProps = props;
+    return (
+      <div data-testid="entity-tree-toolbar">
+        {typeof props.onAdd === "function" && (
+          <button data-testid="toolbar-add-btn" onClick={props.onAdd as () => void}>
+            Add entity
+          </button>
+        )}
+      </div>
+    );
+  },
 }));
 
 vi.mock("@/components/editor/shared/DraggableTreeWrapper", () => ({
@@ -1166,6 +1170,27 @@ describe("DeveloperEditorLayout", () => {
 
     fireEvent.click(screen.getByTestId("toolbar-add-btn"));
     expect(onAddEntity).toHaveBeenCalledWith();
+  });
+
+  it("exposes minting affordances to a trusted contributor in suggestion mode", () => {
+    render(
+      <DeveloperEditorLayout
+        {...defaultProps({
+          nodes: [makeNode()],
+          canEdit: false,
+          isSuggestionMode: true,
+          trustGate: {
+            tier: "trusted",
+            locked: false,
+            isLoading: false,
+            isError: false,
+            progress: null,
+          },
+        })}
+      />,
+    );
+
+    expect(_toolbarProps.canAdd).toBe(true);
   });
 
   it("calls onAddEntity with parentIri via ClassTree onAddChild", () => {

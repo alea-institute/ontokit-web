@@ -17,6 +17,7 @@ import {
   labelToLocalName,
   uuidToBase62,
 } from "@/lib/ontology/iriGeneration";
+import { TrustExplainerPanel, type TrustGate } from "@/components/editor/TrustExplainer";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -37,6 +38,13 @@ interface AddEntityDialogProps {
   parentIri?: string;
   /** Human-readable label for the parent entity (shown in dialog description) */
   parentLabel?: string;
+  /**
+   * Trust-ladder state for entity minting (R8, AE2). When `locked`, the form
+   * stays visible but Create is disabled and the explainer says how trust is
+   * earned — the action is explained, never hidden. Omit it entirely on
+   * surfaces where the ladder does not apply.
+   */
+  trustGate?: TrustGate;
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -60,7 +68,9 @@ export function AddEntityDialog({
   ontologyNamespace,
   parentIri,
   parentLabel,
+  trustGate,
 }: AddEntityDialogProps) {
+  const mintingLocked = trustGate?.locked === true;
   const [label, setLabel] = useState("");
   const [entityType, setEntityType] = useState<EntityType>("class");
   const [iri, setIri] = useState("");
@@ -123,6 +133,9 @@ export function AddEntityDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // Belt and braces: the button is disabled, but Enter-to-submit must honour
+    // the same gate or the keyboard path becomes the bypass.
+    if (mintingLocked) return;
     const trimmedLabel = label.trim();
     const trimmedIri = iri.trim();
     if (!trimmedLabel || !trimmedIri) return;
@@ -174,6 +187,12 @@ export function AddEntityDialog({
             </DialogDescription>
           </DialogHeader>
 
+          {/* Trust gate (R8, AE2) — the explanation comes before the form it
+              disables, so the reason is read before the dead controls. */}
+          {mintingLocked && trustGate && (
+            <TrustExplainerPanel gate={trustGate} className="mt-4" />
+          )}
+
           <div className="my-4 space-y-4">
             {/* Label input */}
             <div>
@@ -191,7 +210,8 @@ export function AddEntityDialog({
                 onChange={(e) => setLabel(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="e.g., Privileged Altar"
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+                disabled={mintingLocked}
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
                 autoComplete="off"
               />
             </div>
@@ -208,7 +228,7 @@ export function AddEntityDialog({
                 id="entity-type"
                 value={entityType}
                 onChange={(e) => setEntityType(e.target.value as EntityType)}
-                disabled={!!parentIri}
+                disabled={!!parentIri || mintingLocked}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"
               >
                 {ENTITY_TYPE_OPTIONS.map((opt) => (
@@ -254,7 +274,8 @@ export function AddEntityDialog({
                       iriManuallyEdited.current = true;
                       setIri(e.target.value);
                     }}
-                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs placeholder:text-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+                    disabled={mintingLocked}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-xs placeholder:text-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
                   />
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     {iriPattern === "uuid" && "Auto-generated UUID-based IRI"}
@@ -274,7 +295,7 @@ export function AddEntityDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={!label.trim()}>
+            <Button type="submit" disabled={!label.trim() || mintingLocked}>
               Create
             </Button>
           </DialogFooter>

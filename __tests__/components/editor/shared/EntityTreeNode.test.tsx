@@ -306,6 +306,25 @@ describe("EntityTreeNodeRow", () => {
     expect(onAddChild).toHaveBeenCalledWith("http://ex.org/A");
   });
 
+  it("keeps the quick-add callback inert while child minting is locked", async () => {
+    const onAddChild = vi.fn();
+    render(
+      <EntityTreeNodeRow
+        {...baseProps}
+        node={makeNode({ iri: "http://ex.org/A", label: "Alpha" })}
+        onAddChild={onAddChild}
+        addChildLocked
+        addChildLockedReason="Creating new entries requires trusted status."
+      />,
+    );
+
+    const add = screen.getByLabelText("Add subclass") as HTMLButtonElement;
+    expect(add.disabled).toBe(true);
+    expect(add.title).toBe("Creating new entries requires trusted status.");
+    await userEvent.click(add);
+    expect(onAddChild).not.toHaveBeenCalled();
+  });
+
   it("shows loading indicator when node isLoading", () => {
     const { container } = render(
       <EntityTreeNodeRow

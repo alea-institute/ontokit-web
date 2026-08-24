@@ -167,6 +167,129 @@ describe("suggestionsApi", () => {
       expect(url).toContain("/api/v1/projects/p1/suggestions/pending");
       expect(options.headers.get("Authorization")).toBe("Bearer tok");
     });
+
+    it("sends no queue param when the caller wants everything (backward compatible)", async () => {
+      mockOk({ items: [] });
+
+      await suggestionsApi.listPending("p1", "tok");
+
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).not.toContain("queue=");
+    });
+
+    it("passes the triage queue filter through as a query param (R9)", async () => {
+      mockOk({ items: [] });
+
+      await suggestionsApi.listPending("p1", "tok", "triage");
+
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toContain("queue=triage");
+    });
+
+    it("passes the trusted-review queue filter through", async () => {
+      mockOk({ items: [] });
+
+      await suggestionsApi.listPending("p1", "tok", "review");
+
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toContain("queue=review");
+    });
+  });
+
+  // --- dismiss ---
+
+  describe("dismiss", () => {
+    it("calls POST /sessions/:sessionId/dismiss", async () => {
+      mockEmpty();
+
+      await suggestionsApi.dismiss("p1", "s1", "tok");
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/suggestions/sessions/s1/dismiss");
+      expect(url).not.toContain("note=");
+      expect(options.method).toBe("POST");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+    });
+
+    it("passes an optional note through", async () => {
+      mockEmpty();
+
+      await suggestionsApi.dismiss("p1", "s1", "tok", "spam");
+
+      const [url] = mockFetch.mock.calls[0];
+      expect(url).toContain("note=spam");
+    });
+
+    it("does not replay a dismissal after a 5xx response", async () => {
+      mockError(500, "Internal Server Error", "ambiguous dismissal outcome");
+      mockEmpty();
+
+      await expect(suggestionsApi.dismiss("p1", "s1", "tok")).rejects.toThrow(ApiError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // --- bulkReview ---
+
+  describe("bulkReview", () => {
+    it("calls POST /suggestions/bulk-review with the ids and action", async () => {
+      const response = { action: "dismiss", succeeded: ["s1", "s2"], failed: [] };
+      mockOk(response);
+
+      const result = await suggestionsApi.bulkReview(
+        "p1",
+        { session_ids: ["s1", "s2"], action: "dismiss" },
+        "tok",
+      );
+      expect(result).toEqual(response);
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/suggestions/bulk-review");
+      expect(options.method).toBe("POST");
+      expect(JSON.parse(options.body)).toEqual({
+        session_ids: ["s1", "s2"],
+        action: "dismiss",
+      });
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+    });
+
+    it("returns per-session failures rather than throwing on partial success", async () => {
+      mockOk({
+        action: "accept",
+        succeeded: ["s1"],
+        failed: [{ session_id: "s2", reason: "Session already merged" }],
+      });
+
+      const result = await suggestionsApi.bulkReview(
+        "p1",
+        { session_ids: ["s1", "s2"], action: "accept" },
+        "tok",
+      );
+
+      expect(result.succeeded).toEqual(["s1"]);
+      expect(result.failed[0]).toEqual({
+        session_id: "s2",
+        reason: "Session already merged",
+      });
+    });
+
+    it("throws ApiError when the whole batch is refused", async () => {
+      mockError(403, "Forbidden", "Reviewer access required");
+
+      await expect(
+        suggestionsApi.bulkReview("p1", { session_ids: ["s1"], action: "accept" }, "tok"),
+      ).rejects.toThrow(ApiError);
+    });
+
+    it("does not replay a bulk review after a 5xx response", async () => {
+      mockError(500, "Internal Server Error", "ambiguous bulk outcome");
+      mockOk({ action: "accept", succeeded: ["s1"], failed: [] });
+
+      await expect(
+        suggestionsApi.bulkReview("p1", { session_ids: ["s1"], action: "accept" }, "tok"),
+      ).rejects.toThrow(ApiError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   // --- approve ---
@@ -181,8 +304,9 @@ describe("suggestionsApi", () => {
       expect(url).toContain("/api/v1/projects/p1/suggestions/sessions/s1/approve");
       expect(options.method).toBe("POST");
       expect(options.headers.get("Authorization")).toBe("Bearer tok");
-    });
   });
+});
+
 
   // --- reject ---
 
