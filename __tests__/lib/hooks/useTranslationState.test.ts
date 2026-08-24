@@ -73,7 +73,7 @@ describe("useTranslationState on-demand polling", () => {
     });
 
     const { result } = setup();
-    await act(async () => { await vi.runOnlyPendingTimersAsync(); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(result.current.state?.items[0]?.state).toBe("pending");
 
     const callsBeforeTimeout = vi.mocked(translationsApi.getEntityState).mock.calls.length;

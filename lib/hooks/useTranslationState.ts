@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   translationsApi,
@@ -16,12 +16,12 @@ export function useTranslationState(
 ) {
   const pollingIdentity = `${projectId}\u0000${entityIri ?? ""}\u0000${branch}\u0000${accessToken ?? ""}`;
   const [outstanding, setOutstanding] = useState<{ predicate: OnDemandTranslationPredicate; startedAt: number; identity: string } | null>(null);
-  const serverPendingObservationRef = useRef<{ startedAt: number; identity: string } | null>(null);
+  const [serverPendingObservation, setServerPendingObservation] = useState<{ startedAt: number; identity: string } | null>(null);
   const [pendingNotice, setPendingNotice] = useState<string | null>(null);
   const [timedOutIdentity, setTimedOutIdentity] = useState<string | null>(null);
   const activeOutstanding = outstanding?.identity === pollingIdentity ? outstanding : null;
-  const activeServerPendingObservation = serverPendingObservationRef.current?.identity === pollingIdentity
-    ? serverPendingObservationRef.current
+  const activeServerPendingObservation = serverPendingObservation?.identity === pollingIdentity
+    ? serverPendingObservation
     : null;
   const queryClient = useQueryClient();
   const queryKey = translationQueryKeys.entityState(projectId, entityIri, branch);
@@ -36,9 +36,9 @@ export function useTranslationState(
       }
       const hasPending = response.items.some((item) => item.state === "pending");
       if (hasPending && !activeServerPendingObservation) {
-        serverPendingObservationRef.current = { identity: pollingIdentity, startedAt: Date.now() };
+        setServerPendingObservation({ identity: pollingIdentity, startedAt: Date.now() });
       } else if (!hasPending && activeServerPendingObservation) {
-        serverPendingObservationRef.current = null;
+        setServerPendingObservation(null);
       }
       return response;
     },
@@ -83,7 +83,7 @@ export function useTranslationState(
     const remaining = Math.max(0, TRANSLATION_POLL_TIMEOUT_MS - (Date.now() - pendingSince));
     const timer = window.setTimeout(() => {
       setOutstanding(null);
-      serverPendingObservationRef.current = null;
+      setServerPendingObservation(null);
       setTimedOutIdentity(pollingIdentity);
       setPendingNotice("Translation is taking longer than expected. You can retry.");
     }, remaining);
@@ -105,7 +105,7 @@ export function useTranslationState(
     resetTranslation: () => {
       translateMutation.reset();
       setOutstanding(null);
-      serverPendingObservationRef.current = null;
+      setServerPendingObservation(null);
       setTimedOutIdentity(null);
       setPendingNotice(null);
     },
