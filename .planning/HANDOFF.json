@@ -1,12 +1,12 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-29T03:48:23Z",
+  "timestamp": "2026-08-29T05:17:20Z",
   "trigger": "precompact-auto",
   "phase": "16-reviewer-enhancements",
   "phase_dir": ".planning/phases/16-reviewer-enhancements",
   "git": {
     "branch": "dev",
-    "head": "de86c07c",
+    "head": "76850d69",
     "modified_files": 1
   },
   "note": "Auto-saved by PreCompact hook. Run /gsd-resume-work in a fresh session."
