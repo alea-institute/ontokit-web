@@ -1,9 +1,9 @@
 # Decision Sheet — Recent OntoKit Plan Residuals
 
 Created: 2026-08-20
-Updated: 2026-08-24 after T5–T8 synthesis and a fresh PyPI check
+Updated: 2026-08-28 after the ALEA implementation merges and final structured review
 
-The recommended choices are first. Reply with short answers such as `D1 = 1; D2 = 1; D3 = 1; D4 = 1; D5 = 1; D6 = 2`.
+The recommended choices are first. D1–D6 are settled. The shortest useful reply is `D7 = 1; D8 = 1; D9 = 1; D10 = 1` (or change any number).
 
 ## D1. How should the main line reach PROD?
 
@@ -45,6 +45,8 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 
 **Decision:** Prepare as much implementation and mapping work as possible first, then create the CatholicOS issues and their linked PRs together as one final batch. This is explicit authorization for that final batch after local work and validation are complete; it is not authorization to self-merge.
 
+**Current scope:** the later instruction to clean and publish on the ALEA side holds the external batch. Web #30 preserves the prepared work until the user resumes CatholicOS-side execution.
+
 ## D5. What should happen with PR Party’s unwired reviewer-PAT encryption rewrap?
 
 **What is being rotated:** not the GitHub token. `rotate_reviewer_token` keeps the same reviewer PAT and re-encrypts its stored ciphertext under OntoKit’s current `SECRET_KEY`, allowing `SECRET_KEY_PREVIOUS` to be retired. GitHub PAT replacement or revocation is a separate reviewer-controlled action.
@@ -57,7 +59,7 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 
 **Decision:** `D5 = 1` — implement the operator-triggered bulk rewrap with best-practice safety controls.
 
-**Execution status (2026-08-21):** Implemented, reviewed, and committed locally in the API repository as `f3c4251d` on `fix/pr-party-credential-rewrap`. The task is dry-run by default, requires exact confirmation plus the expected stable job ID at the worker boundary, rotates all reviewer-credential ciphertext atomically, redacts SQL parameters, and returns only counts and credential-row UUIDs. Unit, real-Postgres, Ruff, mypy, and Pyright checks pass. The branch is not pushed, merged, deployed, or executed against stored credentials; it belongs in the authorized final CatholicOS issue/PR batch after the remaining local work.
+**Execution status (2026-08-28):** Implemented, reviewed, validated, and merged into ALEA `dev` by API PR #24. The task is dry-run by default, requires exact confirmation plus the expected stable job ID at the worker boundary, rotates all reviewer-credential ciphertext atomically, redacts SQL parameters, and returns only counts and credential-row UUIDs. It has not been deployed or executed against stored credentials.
 
 ## D6. Do you want to register `ontokit.org` now?
 
@@ -85,18 +87,60 @@ Prepare the implementation and outreach package locally. Begin outreach only whe
 
 ## Current decision queue
 
-There are no unanswered judgment or taste questions. The remaining holds are activation conditions, not choices:
+These are the only unanswered judgment or taste questions found by the final review. Each has a durable ALEA issue; answering them does not authorize deployment or external mutation.
 
-- AWS/PROD waits for Mike's access and the already-selected parallel stand-up prerequisites.
-- Demo repository activation waits for the two separately scoped credentials.
-- Domain-dependent work waits for externally observable CatholicOS/ALEA domain resolution and `ontokit.org` DNS control.
-- CatholicOS delivery waits for the issue-first final batch after local synthesis and validation; self-merge remains prohibited.
+### D7. How should a multi-store demo refresh become visible?
+
+**Why this matters:** Git, database provisioning, and index preparation cannot commit in one transaction. Readers must not observe a mixed old/new demo generation.
+
+1. **Prepare the complete generation off to the side and atomically switch visibility — recommended.** Coherent, uninterrupted reads; more implementation and temporary storage.
+2. Temporarily unpublish the demo during refresh. Simpler; accepts a maintenance window.
+
+**Your answer:** `D7 = 1 or 2` — tracked in [API #25](https://github.com/alea-institute/ontokit-api/issues/25).
+
+### D8. What context may the PR Party `@claude` answerer read?
+
+**Why this matters:** the answerer has no tools, but unbounded PR text can still carry prompt injection or unrelated sensitive context.
+
+1. **PR title, triggering comment, and a small allowlisted metadata envelope — recommended.** Strongest containment and simplest audit; sometimes less context.
+2. A larger nonce-delimited PR excerpt. Richer answers; larger injection and disclosure surface.
+
+**Your answer:** `D8 = 1 or 2` — tracked in [API #26](https://github.com/alea-institute/ontokit-api/issues/26).
+
+### D9. Where should the persistent demo notice live?
+
+**Why this matters:** the current fixed bottom `z-50` banner remains visible, but can overlap editor or modal controls on small viewports.
+
+1. **Put it in the project shell's layout flow, sticky with reserved space — recommended.** Persistent without modal overlap.
+2. Keep it fixed and add responsive offsets/collision handling. Smaller change; more overlay edge cases.
+
+**Your answer:** `D9 = 1 or 2` — tracked in [web #24](https://github.com/alea-institute/ontokit-web/issues/24).
+
+### D10. What should prevent whole-document lost updates?
+
+**Why this matters:** local draft and mutation-state safeguards do not stop two collaborators from saving from the same server revision.
+
+1. **Add revision-based compare-and-set first — recommended.** Smallest complete boundary; stale saves receive a typed reconcile conflict.
+2. Replace whole-document saves with atomic semantic API mutations now. Better long-term collaboration semantics; materially larger redesign.
+
+Option 1 can be followed by option 2 later.
+
+**Your answer:** `D10 = 1 or 2` — tracked in [web #26](https://github.com/alea-institute/ontokit-web/issues/26).
+
+## Activation gates that do not need a decision now
+
+- Authenticated DEV acceptance waits for an approved UAT session and explicit throwaway-state authority: [web #27](https://github.com/alea-institute/ontokit-web/issues/27).
+- Demo repository activation waits for source-owner release approval, clean content scans, two separately scoped credentials, and explicit live-write/cron authority: [API #25](https://github.com/alea-institute/ontokit-api/issues/25).
+- AWS/PROD waits for Mike's access and the already-selected parallel stand-up plus runtime-network prerequisites: [API #27](https://github.com/alea-institute/ontokit-api/issues/27).
+- Domain-dependent picker work waits for registration, both destination domain names, and DNS/TLS authority: [web #28](https://github.com/alea-institute/ontokit-web/issues/28).
+- Google federation waits for both domain contracts and private OAuth provisioning: [API #28](https://github.com/alea-institute/ontokit-api/issues/28).
+- `folio-python` replacement waits for the first verified safe official release at or above 0.4.0: [API #29](https://github.com/alea-institute/ontokit-api/issues/29).
+- CatholicOS delivery is held in the ALEA queue pending refreshed bases and renewed cross-organization authority; self-merge remains prohibited: [web #30](https://github.com/alea-institute/ontokit-web/issues/30).
 
 ## Defaults that do not need a decision
 
-- PyPI currently lists `folio-python` 0.3.6 as the latest release, not 0.4.0. The dependency change remains parked until a verified 0.4.0 release exists; the unresolvable 0.4.0 pin was not replayed.
-- Web #348/#359/#360, Turtle stability, the production-build blocker, and API #208/#211/#212 are synthesized and pushed on the T7/T8 ALEA archival branches. Authenticated auto-accept live UAT remains activation-gated.
-- T5–T8 archival heads are pushed to ALEA: web `4083e906`, `bafce3da`, `a8140836`/`ab9988db`, `93f0c62a`; API `07ccdc39`, `334df1b1`, `355c66e3`, `d26e63cd`.
-- The T3 security closure ledger is implemented locally through API `738f20a6` and web `a272c8dc`, including ordinary-generation spend reservation and atomic dimension-safe vector snapshots. The paired current-upstream candidates are green at API `1b8bde28` and web `2c6a7813`; no new decision is needed.
-- T2 DEV deploy/CI and dormant PROD Stage A are synthesized and green at API `56800cda` and web `256d2344`. This grants no PROD activation authority and needs no new design decision.
-- CatholicOS issue/PR mutation is authorized only as the final linked batch after the current local implementation and validation work. No self-merge is authorized.
+- PyPI currently lists `folio-python` 0.3.6 as the latest release. The dependency change remains parked until a verified safe official release at or above 0.4.0 exists; the unresolvable 0.4.0 pin was not replayed.
+- The complete reviewed ALEA web stack is merged by [web PR #25](https://github.com/alea-institute/ontokit-web/pull/25); the complete reviewed API stack is merged by [API PR #24](https://github.com/alea-institute/ontokit-api/pull/24).
+- Web final validation passed 217 files/3,365 tests, type-check, zero-error lint, and an optional-auth release-fidelity build. API final validation passed 2,932 tests with 32 external-fixture skips, Ruff, formatting, Pyright 0/0, one Alembic head, and remote CI.
+- The ALEA deployment, security, and feature synthesis, including the security closure and dormant PROD Stage A, is incorporated in the two merged implementation PRs. This grants no deployment or PROD activation authority.
+- The current execution scope is ALEA-only. CatholicOS issue/PR mutation remains held in web #30; no self-merge is authorized.
