@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   ANONYMOUS_TOKEN_TTL_MS,
@@ -7,13 +7,19 @@ import {
 
 const PROJECT_ID = "project-1";
 const STORAGE_KEY = "ontokit-anonymous-token";
+const NOW = new Date("2026-08-24T12:00:00Z");
 
 describe("anonymous token store", () => {
   beforeEach(() => {
-    vi.useRealTimers();
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
     useAnonymousTokenStore.setState({ tokens: {} });
     window.localStorage.clear();
     window.sessionStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("persists bearer tokens only for the tab with 24-hour lifetime metadata", () => {
@@ -34,7 +40,6 @@ describe("anonymous token store", () => {
   });
 
   it("rehydrates an unexpired token for same-tab reload/navigation resume", async () => {
-    vi.setSystemTime(new Date("2026-08-24T12:00:00Z"));
     useAnonymousTokenStore.setState({ tokens: {} });
     window.sessionStorage.setItem(
       STORAGE_KEY,
@@ -62,7 +67,6 @@ describe("anonymous token store", () => {
   });
 
   it("clears expired and legacy metadata-free entries during rehydration", async () => {
-    vi.setSystemTime(new Date("2026-08-24T12:00:00Z"));
     useAnonymousTokenStore.setState({ tokens: {} });
     window.sessionStorage.setItem(
       STORAGE_KEY,

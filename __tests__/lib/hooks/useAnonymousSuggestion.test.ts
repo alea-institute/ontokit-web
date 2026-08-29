@@ -186,7 +186,7 @@ describe("useAnonymousSuggestion", () => {
     resolveSession({
       session_id: "sess-coalesced",
       branch: "anon/sess-coalesced",
-      created_at: "2026-08-24T12:00:00Z",
+      created_at: new Date().toISOString(),
       anonymous_token: "tok-coalesced",
     });
     await act(async () => {
