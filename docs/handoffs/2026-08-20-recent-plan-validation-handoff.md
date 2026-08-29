@@ -137,7 +137,9 @@ commit, merge, rebase, or publish the canonical checkout without explicit author
 The prior closeout is merged by [web PR #31](https://github.com/alea-institute/ontokit-web/pull/31)
 into `feat/roundup-brainstorm`. This 2026-08-29 refresh is authored on focused branch
 `docs/decision-sheet-resolution-20260829`, based on current merged documentation head
-`75915d087fb88c45f62623f767d047cc2869f6da`. Publication is pending; the completing
-session must replace this sentence with the PR and final merge receipt.
+`75915d087fb88c45f62623f767d047cc2869f6da`. Commit `7a2f3095` is pushed and
+published as [web PR #39](https://github.com/alea-institute/ontokit-web/pull/39)
+against `feat/roundup-brainstorm`; repository history is authoritative for its final
+merge state.
 
 No secrets, credentials, personal roster data, or unrelated private information are included.
