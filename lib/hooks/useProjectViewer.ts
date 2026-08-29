@@ -60,13 +60,17 @@ export function useProjectViewer({
   const sourceContent = sourceSnapshot.content;
   const sourceRevision = sourceSnapshot.revision;
   const setSourceContent = useCallback((next: React.SetStateAction<string>) => {
-    setSourceSnapshotState((previous) => ({
-      ...previous,
-      content: typeof next === "function" ? next(previous.content) : next,
-    }));
+    setSourceSnapshotState((previous) => {
+      const content = typeof next === "function" ? next(previous.content) : next;
+      return content === previous.content ? previous : { ...previous, content };
+    });
   }, []);
   const setSourceSnapshot = useCallback((content: string, revision: string) => {
-    setSourceSnapshotState({ content, revision });
+    setSourceSnapshotState((previous) => (
+      previous.content === content && previous.revision === revision
+        ? previous
+        : { content, revision }
+    ));
   }, []);
   const [isLoadingSource, setIsLoadingSource] = useState(false);
   const [sourceError, setSourceError] = useState<string | null>(null);

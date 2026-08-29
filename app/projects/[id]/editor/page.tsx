@@ -40,7 +40,11 @@ import { saveSuggestionUpdate } from "@/lib/editor/suggestionSessionPersistence"
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
 import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
-import { detectPatternFromIriIndex, type IriSuffixPattern } from "@/lib/ontology/iriGeneration";
+import {
+  detectPatternFromIriIndex,
+  type EntityType,
+  type IriSuffixPattern,
+} from "@/lib/ontology/iriGeneration";
 import { commonPrefixes } from "@/lib/editor/languages/turtle";
 
 import { useKeyboardShortcuts, type ShortcutDefinition } from "@/lib/hooks/useKeyboardShortcuts";
@@ -521,7 +525,7 @@ export default function EditorPage() {
       iri: string;
       label: string;
       parentIri: string;
-      entityType: "class" | "objectProperty" | "dataProperty" | "annotationProperty";
+      entityType: EntityType;
     },
   ) => {
     const mode: GeneratedEntityPersistenceMode = isAnonymousProposalMode
@@ -611,6 +615,15 @@ export default function EditorPage() {
     setSourceSnapshot(response.content, response.revision);
     return { content: response.content, revision: response.revision };
   }, [activeBranch, project?.git_ontology_path, projectId, session?.accessToken, setSourceSnapshot, sourceContent, sourceRevision]);
+
+  const refreshAfterDirectEntitySave = useCallback(() => {
+    setDetailRefreshKey((key) => key + 1);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+    void queryClient.invalidateQueries({
+      queryKey: branchQueryKeys.list(projectId, session?.accessToken),
+    });
+  }, [projectId, queryClient, session?.accessToken, setSourceIriIndex]);
 
   // Handle accepted child suggestion — persist first, then update the tree (D-07)
   const handleAddSuggestedChild = useCallback(async (
@@ -719,13 +732,8 @@ export default function EditorPage() {
 
     // Update the tree node label in-place (preserves expansion state)
     updateNodeLabel(classIri, label);
-    setDetailRefreshKey((k) => k + 1);
-
-    // Re-index source IRIs
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
-    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
-  }, [session, activeBranch, toast, updateNodeLabel, queryClient, setSourceIriIndex, getDirectSourceSnapshot, saveDirectSource, projectId]);
+    refreshAfterDirectEntitySave();
+  }, [session, activeBranch, toast, updateNodeLabel, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle update property (form-based editing)
   const handleUpdateProperty = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
@@ -744,11 +752,8 @@ export default function EditorPage() {
 
     await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
-    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
-  }, [session, activeBranch, toast, queryClient, setSourceIriIndex, getDirectSourceSnapshot, saveDirectSource, projectId]);
+    refreshAfterDirectEntitySave();
+  }, [session, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle update individual (form-based editing)
   const handleUpdateIndividual = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
@@ -767,11 +772,8 @@ export default function EditorPage() {
 
     await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
-    setDetailRefreshKey((k) => k + 1);
-    setSourceIriIndex(new Map());
-    iriPatternDetectedRef.current = false;
-    queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
-  }, [session, activeBranch, toast, queryClient, setSourceIriIndex, getDirectSourceSnapshot, saveDirectSource, projectId]);
+    refreshAfterDirectEntitySave();
+  }, [session, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle suggestion-mode class update
   // Instead of directly committing, sends modified source to the suggestion branch

@@ -94,14 +94,13 @@ export function useSourceRevisionGuard({
     try {
       const response = await reloadSourceContent();
       if (!response) throw new Error("No source snapshot is available for this branch.");
-      setSourceSnapshot(response.content, response.revision);
       onLoadLatest?.(response.content);
       setStoredConflict(null);
       return response;
     } finally {
       setIsLoadingLatest(false);
     }
-  }, [onLoadLatest, reloadSourceContent, setSourceSnapshot]);
+  }, [onLoadLatest, reloadSourceContent]);
 
   return {
     conflict,

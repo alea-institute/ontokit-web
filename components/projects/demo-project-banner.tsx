@@ -49,14 +49,6 @@ function DemoProjectNotice({ project }: { project: Project }) {
   );
 }
 
-export function DemoProjectBanner() {
-  const project = useCurrentProject();
-
-  if (!project?.is_demo) return null;
-
-  return <DemoProjectNotice project={project} />;
-}
-
 export function DemoProjectShell({ children }: { children: ReactNode }) {
   const project = useCurrentProject();
 

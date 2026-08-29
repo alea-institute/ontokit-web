@@ -22,10 +22,7 @@ vi.mock("@/lib/hooks/useProject", () => ({
   useProject: () => ({ project: projectState }),
 }));
 
-import {
-  DemoProjectBanner,
-  DemoProjectShell,
-} from "@/components/projects/demo-project-banner";
+import { DemoProjectShell } from "@/components/projects/demo-project-banner";
 
 describe("DemoProjectBanner", () => {
   beforeEach(() => {
@@ -35,11 +32,13 @@ describe("DemoProjectBanner", () => {
   });
 
   it("renders only when the project response says it is a demo", () => {
-    const { rerender } = render(<DemoProjectBanner />);
+    const { rerender } = render(
+      <DemoProjectShell><main>Project route</main></DemoProjectShell>,
+    );
     expect(screen.queryByLabelText("Demo workspace notice")).toBeNull();
 
     projectState.is_demo = true;
-    rerender(<DemoProjectBanner />);
+    rerender(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
     expect(screen.getByLabelText("Demo workspace notice")).toBeDefined();
     expect(screen.getByText(/alea-institute\/ontokit-demo-folio/)).toBeDefined();
     expect(screen.getByRole("link", { name: /Return to source/ }).getAttribute("href"))
@@ -49,7 +48,7 @@ describe("DemoProjectBanner", () => {
   it("stays in the project shell flow below modal layers", () => {
     projectState.is_demo = true;
 
-    render(<DemoProjectBanner />);
+    render(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
 
     const notice = screen.getByLabelText("Demo workspace notice");
     expect(notice.className).toContain("sticky");
@@ -65,7 +64,7 @@ describe("DemoProjectBanner", () => {
     projectState.is_demo = true;
     const user = userEvent.setup();
 
-    render(<DemoProjectBanner />);
+    render(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
 
     const notice = screen.getByLabelText("Demo workspace notice");
     const noticeContent = notice.firstElementChild as HTMLElement;
@@ -111,7 +110,7 @@ describe("DemoProjectBanner", () => {
     projectState.demo_source_project_id = undefined;
     projectState.demo_repository_full_name = undefined;
 
-    render(<DemoProjectBanner />);
+    render(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
 
     expect(screen.getByText(/Demo workspace: FOLIO Demo/)).toBeDefined();
     expect(screen.getByRole("link", { name: /Return to source/ }).getAttribute("href"))
