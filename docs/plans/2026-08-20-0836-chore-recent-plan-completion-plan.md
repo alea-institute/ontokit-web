@@ -362,18 +362,3 @@ flowchart TB
 ## Execution checkpoint — 2026-08-21
 
 All autonomous correctness residuals named by the audit and the expanded security closure ledger are implemented on isolated local branches. Paired current-upstream deployment/CI candidates are green at API `56800cda`/web `256d2344`; security-hardening candidates are green at API `1b8bde28`/web `2c6a7813`. A read-only refresh confirmed they descend from unchanged CatholicOS `dev` heads. The remaining engineering queue is the local current-upstream synthesis covering trust/audit, PR Party, translations, annotations, residual stabilization, and demo mode, plus activation work whose existing gates are demo credentials/repositories, authenticated DEV UAT, AWS/PROD authority, domain/DNS visibility, and the held final CatholicOS batch. No settled user decision needs to be re-asked.
-
-## Final execution checkpoint — 2026-08-28
-
-The autonomous ALEA code path is complete and merged: web PR #25 and API PR #24 incorporate the reviewed deployment, security, and feature synthesis, including optional auth without Zitadel, PR Party, translations, annotation parity, trust/audit controls, demo isolation, credential rewrap, and dormant deployment preparation. The completed implementation trackers are closed as web #23 and API #23.
-
-Every remaining unit is durably queued with a named activation condition:
-
-- judgment/taste: web #24 and #26; API #25 and #26;
-- authenticated environment acceptance: web #27;
-- domain-triggered picker and federation: web #28 and API #28;
-- AWS/parallel-PROD rehearsal: API #27;
-- unavailable FOLIO release: API #29; and
-- held CatholicOS delivery: web #30.
-
-The final documentation closeout is tracked in web #22. No CatholicOS, AWS, DNS, DEV, PROD, credential, or external-organization mutation occurred during this final ALEA publication pass.
