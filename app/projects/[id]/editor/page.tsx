@@ -297,15 +297,8 @@ export default function EditorPage() {
   }, [sourceRevisionConflict]);
 
   const handleLoadLatest = useCallback(async () => {
-    try {
-      await loadLatest();
-      toast.success("Latest source loaded", "The stale draft was discarded after your confirmation.");
-    } catch (error) {
-      toast.error(
-        "Failed to load latest source",
-        error instanceof Error ? error.message : "Unknown error",
-      );
-    }
+    await loadLatest();
+    toast.success("Latest source loaded", "The stale draft was discarded after your confirmation.");
   }, [loadLatest, toast]);
 
   // Keyboard shortcut help dialog
