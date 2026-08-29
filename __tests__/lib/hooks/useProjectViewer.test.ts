@@ -71,7 +71,13 @@ vi.mock("@/lib/hooks/usePendingSuggestionCount", () => ({
 
 vi.mock("@/lib/api/revisions", () => ({
   revisionsApi: {
-    getFileAtVersion: vi.fn().mockResolvedValue({ content: "@prefix ex: <http://example.org/> .\nex:A a owl:Class ." }),
+    getFileAtVersion: vi.fn().mockResolvedValue({
+      project_id: "p1",
+      version: "main",
+      revision: "revision-1",
+      filename: "ontology.ttl",
+      content: "@prefix ex: <http://example.org/> .\nex:A a owl:Class .",
+    }),
   },
 }));
 
@@ -452,12 +458,15 @@ describe("useProjectViewer", () => {
     );
 
     expect(result.current.sourceContent).toBe("");
+    expect(result.current.sourceRevision).toBeNull();
     expect(result.current.isLoadingSource).toBe(false);
     expect(result.current.sourceError).toBeNull();
     expect(result.current.isPreloading).toBe(false);
     expect(result.current.sourceIriIndex.size).toBe(0);
     expect(result.current.isIndexing).toBe(false);
     expect(typeof result.current.loadSourceContent).toBe("function");
+    expect(typeof result.current.reloadSourceContent).toBe("function");
+    expect(typeof result.current.setSourceSnapshot).toBe("function");
     expect(typeof result.current.resetSourceState).toBe("function");
   });
 
@@ -522,8 +531,142 @@ describe("useProjectViewer", () => {
     expect(result.current.sourceContent).toBe(
       "@prefix ex: <http://example.org/> .\nex:A a owl:Class ."
     );
+    expect(result.current.sourceRevision).toBe("revision-1");
     expect(result.current.isLoadingSource).toBe(false);
     expect(result.current.sourceError).toBeNull();
+  });
+
+  it("reloadSourceContent replaces content and revision from one latest response", async () => {
+    mockUseProject.mockReturnValue({
+      project: makeProject(),
+      isLoading: false,
+      error: null,
+      errorKind: null,
+    });
+    const { result } = renderHook(() => useProjectViewer({
+      projectId: "p1",
+      accessToken: "tok",
+      sessionStatus: "authenticated",
+      activeBranch: "main",
+    }));
+
+    await act(async () => { await result.current.loadSourceContent(); });
+    vi.mocked(revisionsApi.getFileAtVersion).mockResolvedValueOnce({
+      project_id: "p1",
+      version: "main",
+      revision: "revision-2",
+      filename: "ontology.ttl",
+      content: "latest source",
+    });
+
+    await act(async () => { await result.current.reloadSourceContent(); });
+
+    expect(result.current.sourceContent).toBe("latest source");
+    expect(result.current.sourceRevision).toBe("revision-2");
+  });
+
+  it("does not restore a stale in-flight snapshot after source state is reset", async () => {
+    mockUseProject.mockReturnValue({
+      project: makeProject(),
+      isLoading: false,
+      error: null,
+      errorKind: null,
+    });
+    let resolveLoad!: (value: RevisionFileResponse) => void;
+    vi.mocked(revisionsApi.getFileAtVersion).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveLoad = resolve; }),
+    );
+    const { result } = renderHook(() => useProjectViewer({
+      projectId: "p1",
+      accessToken: "tok",
+      sessionStatus: "authenticated",
+      activeBranch: "main",
+    }));
+
+    let loadPromise!: Promise<void>;
+    act(() => { loadPromise = result.current.loadSourceContent(); });
+    act(() => { result.current.resetSourceState(); });
+    await act(async () => {
+      resolveLoad({
+        project_id: "p1",
+        version: "main",
+        revision: "stale-revision",
+        filename: "ontology.ttl",
+        content: "stale source",
+      });
+      await loadPromise;
+    });
+
+    expect(result.current.sourceContent).toBe("");
+    expect(result.current.sourceRevision).toBeNull();
+  });
+
+  it("does not install an authoritative read that completes after switching branches", async () => {
+    mockUseProject.mockReturnValue({
+      project: makeProject(),
+      isLoading: false,
+      error: null,
+      errorKind: null,
+    });
+    let resolveLoad!: (value: RevisionFileResponse) => void;
+    vi.mocked(revisionsApi.getFileAtVersion).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveLoad = resolve; }),
+    );
+    const { result, rerender } = renderHook(
+      ({ branch }) => useProjectViewer({
+        projectId: "p1",
+        accessToken: "tok",
+        sessionStatus: "authenticated",
+        activeBranch: branch,
+      }),
+      { initialProps: { branch: "main" } },
+    );
+
+    let loadPromise!: Promise<void>;
+    act(() => { loadPromise = result.current.loadSourceContent(); });
+    rerender({ branch: "feature" });
+    act(() => { result.current.resetSourceState(); });
+    await act(async () => {
+      resolveLoad({
+        project_id: "p1",
+        version: "main",
+        revision: "main-revision",
+        filename: "ontology.ttl",
+        content: "main source",
+      });
+      await loadPromise;
+    });
+
+    expect(result.current.sourceContent).toBe("");
+    expect(result.current.sourceRevision).toBeNull();
+    expect(result.current.isLoadingSource).toBe(false);
+  });
+
+  it("ignores a snapshot setter captured before a branch switch", () => {
+    mockUseProject.mockReturnValue({
+      project: makeProject(),
+      isLoading: false,
+      error: null,
+      errorKind: null,
+    });
+    const { result, rerender } = renderHook(
+      ({ branch }) => useProjectViewer({
+        projectId: "p1",
+        accessToken: "tok",
+        sessionStatus: "authenticated",
+        activeBranch: branch,
+      }),
+      { initialProps: { branch: "main" } },
+    );
+    const staleSnapshotSetter = result.current.setSourceSnapshot;
+
+    rerender({ branch: "feature" });
+    act(() => {
+      staleSnapshotSetter("main source", "main-revision");
+    });
+
+    expect(result.current.sourceContent).toBe("");
+    expect(result.current.sourceRevision).toBeNull();
   });
 
   it("loadSourceContent sets sourceError on failure", async () => {
@@ -625,7 +768,13 @@ describe("useProjectViewer", () => {
 
     // Resolve the load
     await act(async () => {
-      resolveLoad({ project_id: "p1", version: "main", filename: "ontology.ttl", content: "@prefix ex: <http://example.org/> .\nex:A a owl:Class ." });
+      resolveLoad({
+        project_id: "p1",
+        version: "main",
+        revision: "revision-1",
+        filename: "ontology.ttl",
+        content: "@prefix ex: <http://example.org/> .\nex:A a owl:Class .",
+      });
       await loadPromise!;
     });
 
@@ -816,7 +965,7 @@ describe("useProjectViewer", () => {
 
   // --- resetSourceState ---
 
-  it("resetSourceState clears sourceContent, sourceError, and sourceIriIndex", async () => {
+  it("resetSourceState clears paired source content, revision, error, and IRI index", async () => {
     const project = makeProject();
     mockUseProject.mockReturnValue({
       project,
@@ -839,6 +988,7 @@ describe("useProjectViewer", () => {
       await result.current.loadSourceContent();
     });
     expect(result.current.sourceContent).not.toBe("");
+    expect(result.current.sourceRevision).toBe("revision-1");
 
     // Wait for IRI index to be built
     await waitFor(() => {
@@ -851,6 +1001,7 @@ describe("useProjectViewer", () => {
     });
 
     expect(result.current.sourceContent).toBe("");
+    expect(result.current.sourceRevision).toBeNull();
     expect(result.current.sourceError).toBeNull();
     expect(result.current.sourceIriIndex.size).toBe(0);
   });

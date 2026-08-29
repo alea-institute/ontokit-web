@@ -45,6 +45,8 @@ export interface RevisionDiffResponse {
 export interface RevisionFileResponse {
   project_id: string;
   version: string;
+  /** Immutable full commit hash for optimistic concurrency checks. */
+  revision: string;
   filename: string;
   content: string;
 }

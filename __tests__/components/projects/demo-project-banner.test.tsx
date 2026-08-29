@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { projectState } = vi.hoisted(() => ({
@@ -21,7 +22,7 @@ vi.mock("@/lib/hooks/useProject", () => ({
   useProject: () => ({ project: projectState }),
 }));
 
-import { DemoProjectBanner } from "@/components/projects/demo-project-banner";
+import { DemoProjectShell } from "@/components/projects/demo-project-banner";
 
 describe("DemoProjectBanner", () => {
   beforeEach(() => {
@@ -31,15 +32,77 @@ describe("DemoProjectBanner", () => {
   });
 
   it("renders only when the project response says it is a demo", () => {
-    const { rerender } = render(<DemoProjectBanner />);
+    const { rerender } = render(
+      <DemoProjectShell><main>Project route</main></DemoProjectShell>,
+    );
     expect(screen.queryByLabelText("Demo workspace notice")).toBeNull();
 
     projectState.is_demo = true;
-    rerender(<DemoProjectBanner />);
+    rerender(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
     expect(screen.getByLabelText("Demo workspace notice")).toBeDefined();
     expect(screen.getByText(/alea-institute\/ontokit-demo-folio/)).toBeDefined();
     expect(screen.getByRole("link", { name: /Return to source/ }).getAttribute("href"))
       .toBe("/projects/folio-live");
+  });
+
+  it("stays in the project shell flow below modal layers", () => {
+    projectState.is_demo = true;
+
+    render(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
+
+    const notice = screen.getByLabelText("Demo workspace notice");
+    expect(notice.className).toContain("sticky");
+    expect(notice.className).toContain("top-0");
+    expect(notice.className).toContain("z-30");
+    expect(notice.className).toContain("w-full");
+    expect(notice.className).not.toContain("fixed");
+    expect(notice.className).not.toContain("bottom-3");
+    expect(notice.className).not.toContain("z-50");
+  });
+
+  it("keeps the status text and exit control usable at mobile widths", async () => {
+    projectState.is_demo = true;
+    const user = userEvent.setup();
+
+    render(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
+
+    const notice = screen.getByLabelText("Demo workspace notice");
+    const noticeContent = notice.firstElementChild as HTMLElement;
+    expect(noticeContent.className).toContain("flex-col");
+    expect(noticeContent.className).toContain("sm:flex-row");
+    expect(screen.getByText(/Changes may disappear when this project resets/)).toBeDefined();
+    const exitLink = screen.getByRole("link", { name: /Return to source/ });
+    expect(exitLink.className).toContain("min-h-11");
+    await user.tab();
+    expect(document.activeElement).toBe(exitLink);
+  });
+
+  it("reserves viewport space and scrolls project routes below the notice", () => {
+    projectState.is_demo = true;
+
+    const { container } = render(
+      <DemoProjectShell><main>Project route marker</main></DemoProjectShell>,
+    );
+
+    const shell = container.firstElementChild as HTMLElement;
+    const routeScroller = screen.getByTestId("project-route-scroll-region");
+    expect(shell.className).toContain("h-dvh");
+    expect(shell.className).toContain("overflow-hidden");
+    expect(routeScroller.className).toContain("min-h-0");
+    expect(routeScroller.className).toContain("flex-1");
+    expect(routeScroller.className).toContain("overflow-auto");
+    expect(shell.firstElementChild).toBe(screen.getByLabelText("Demo workspace notice"));
+    expect(shell.lastElementChild).toBe(routeScroller);
+  });
+
+  it("does not change the project route layout outside demo workspaces", () => {
+    const { container } = render(
+      <DemoProjectShell><main>Project route marker</main></DemoProjectShell>,
+    );
+
+    expect(screen.queryByLabelText("Demo workspace notice")).toBeNull();
+    expect(screen.queryByTestId("project-route-scroll-region")).toBeNull();
+    expect(container.firstElementChild?.tagName).toBe("MAIN");
   });
 
   it("falls back to honest project metadata when optional demo links are absent", () => {
@@ -47,7 +110,7 @@ describe("DemoProjectBanner", () => {
     projectState.demo_source_project_id = undefined;
     projectState.demo_repository_full_name = undefined;
 
-    render(<DemoProjectBanner />);
+    render(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
 
     expect(screen.getByText(/Demo workspace: FOLIO Demo/)).toBeDefined();
     expect(screen.getByRole("link", { name: /Return to source/ }).getAttribute("href"))

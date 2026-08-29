@@ -854,8 +854,15 @@ describe("projectOntologyApi", () => {
     expect(url).toContain("branch=main");
   });
 
-  it("saveSource sends PUT with content and commit message", async () => {
-    await projectOntologyApi.saveSource("p1", "@prefix ex: <http://ex.org/> .", "save source", "tok", "dev");
+  it("saveSource sends PUT with content, commit message, and immutable base revision", async () => {
+    await projectOntologyApi.saveSource(
+      "p1",
+      "@prefix ex: <http://ex.org/> .",
+      "save source",
+      "tok",
+      "dev",
+      "0123456789abcdef",
+    );
     const [url, options] = mockFetch.mock.calls[0];
     expect(url).toContain("/api/v1/projects/p1/source");
     expect(url).toContain("branch=dev");
@@ -863,7 +870,35 @@ describe("projectOntologyApi", () => {
     const body = JSON.parse(options.body as string);
     expect(body.content).toBe("@prefix ex: <http://ex.org/> .");
     expect(body.commit_message).toBe("save source");
+    expect(body.base_revision).toBe("0123456789abcdef");
     const headers = options.headers as Headers;
     expect(headers.get("Authorization")).toBe("Bearer tok");
+  });
+
+  it("parses a structured source revision conflict without accepting lookalikes", async () => {
+    const { ApiError, getSourceRevisionConflict } = await import("@/lib/api/client");
+    const conflict = new ApiError(
+      409,
+      "Conflict",
+      JSON.stringify({
+        detail: {
+          code: "SOURCE_REVISION_CONFLICT",
+          message: "The source changed on the server.",
+          base_revision: "base-sha",
+          current_revision: "current-sha",
+          branch: "main",
+        },
+      }),
+    );
+
+    expect(getSourceRevisionConflict(conflict)).toEqual({
+      code: "SOURCE_REVISION_CONFLICT",
+      message: "The source changed on the server.",
+      base_revision: "base-sha",
+      current_revision: "current-sha",
+      branch: "main",
+    });
+    expect(getSourceRevisionConflict(new ApiError(400, "Bad Request", conflict.message))).toBeNull();
+    expect(getSourceRevisionConflict(new ApiError(409, "Conflict", '{"detail":{"code":"OTHER"}}'))).toBeNull();
   });
 });
