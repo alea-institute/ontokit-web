@@ -601,6 +601,74 @@ describe("useProjectViewer", () => {
     expect(result.current.sourceRevision).toBeNull();
   });
 
+  it("does not install an authoritative read that completes after switching branches", async () => {
+    mockUseProject.mockReturnValue({
+      project: makeProject(),
+      isLoading: false,
+      error: null,
+      errorKind: null,
+    });
+    let resolveLoad!: (value: RevisionFileResponse) => void;
+    vi.mocked(revisionsApi.getFileAtVersion).mockImplementationOnce(
+      () => new Promise((resolve) => { resolveLoad = resolve; }),
+    );
+    const { result, rerender } = renderHook(
+      ({ branch }) => useProjectViewer({
+        projectId: "p1",
+        accessToken: "tok",
+        sessionStatus: "authenticated",
+        activeBranch: branch,
+      }),
+      { initialProps: { branch: "main" } },
+    );
+
+    let loadPromise!: Promise<void>;
+    act(() => { loadPromise = result.current.loadSourceContent(); });
+    rerender({ branch: "feature" });
+    act(() => { result.current.resetSourceState(); });
+    await act(async () => {
+      resolveLoad({
+        project_id: "p1",
+        version: "main",
+        revision: "main-revision",
+        filename: "ontology.ttl",
+        content: "main source",
+      });
+      await loadPromise;
+    });
+
+    expect(result.current.sourceContent).toBe("");
+    expect(result.current.sourceRevision).toBeNull();
+    expect(result.current.isLoadingSource).toBe(false);
+  });
+
+  it("ignores a snapshot setter captured before a branch switch", () => {
+    mockUseProject.mockReturnValue({
+      project: makeProject(),
+      isLoading: false,
+      error: null,
+      errorKind: null,
+    });
+    const { result, rerender } = renderHook(
+      ({ branch }) => useProjectViewer({
+        projectId: "p1",
+        accessToken: "tok",
+        sessionStatus: "authenticated",
+        activeBranch: branch,
+      }),
+      { initialProps: { branch: "main" } },
+    );
+    const staleSnapshotSetter = result.current.setSourceSnapshot;
+
+    rerender({ branch: "feature" });
+    act(() => {
+      staleSnapshotSetter("main source", "main-revision");
+    });
+
+    expect(result.current.sourceContent).toBe("");
+    expect(result.current.sourceRevision).toBeNull();
+  });
+
   it("loadSourceContent sets sourceError on failure", async () => {
     const project = makeProject();
     mockUseProject.mockReturnValue({

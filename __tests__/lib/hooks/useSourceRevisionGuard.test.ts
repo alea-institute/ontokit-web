@@ -10,6 +10,16 @@ vi.mock("@/lib/api/client", async (importOriginal) => ({
 
 const saveSource = vi.mocked(projectOntologyApi.saveSource);
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 function conflictError() {
   return new ApiError(409, "Conflict", JSON.stringify({
     detail: {
@@ -82,6 +92,88 @@ describe("useSourceRevisionGuard", () => {
         .rejects.toThrow(/draft is preserved/i);
     });
     expect(saveSource).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not let an earlier successful completion erase a later save conflict", async () => {
+    type SaveResponse = Awaited<ReturnType<typeof projectOntologyApi.saveSource>>;
+    const successfulRequest = deferred<SaveResponse>();
+    const conflictingRequest = deferred<SaveResponse>();
+    saveSource
+      .mockImplementationOnce(() => successfulRequest.promise)
+      .mockImplementationOnce(() => conflictingRequest.promise);
+    const setSourceSnapshot = vi.fn();
+    const { result } = renderHook(() => useSourceRevisionGuard({
+      projectId: "project-1",
+      accessToken: "token",
+      activeBranch: "main",
+      sourceRevision: "revision-1",
+      setSourceSnapshot,
+      reloadSourceContent: vi.fn(),
+    }));
+
+    let successfulSave!: Promise<SaveResponse>;
+    let conflictingSave!: Promise<SaveResponse>;
+    act(() => {
+      successfulSave = result.current.saveSource("winning source", "Winning edit");
+      conflictingSave = result.current.saveSource("preserved draft", "Stale edit");
+    });
+    const observedConflict = conflictingSave.catch((error) => error);
+
+    await act(async () => {
+      conflictingRequest.reject(conflictError());
+      await observedConflict;
+    });
+    expect(result.current.conflict?.draftContent).toBe("preserved draft");
+
+    await act(async () => {
+      successfulRequest.resolve({
+        success: true,
+        commit_hash: "revision-2",
+        commit_message: "Winning edit",
+        branch: "main",
+      });
+      await successfulSave;
+    });
+
+    expect(setSourceSnapshot).toHaveBeenCalledWith("winning source", "revision-2");
+    expect(result.current.conflict?.draftContent).toBe("preserved draft");
+  });
+
+  it("does not install a completed save snapshot after switching branches", async () => {
+    type SaveResponse = Awaited<ReturnType<typeof projectOntologyApi.saveSource>>;
+    const request = deferred<SaveResponse>();
+    saveSource.mockImplementationOnce(() => request.promise);
+    const setSourceSnapshot = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ branch }) => useSourceRevisionGuard({
+        projectId: "project-1",
+        accessToken: "token",
+        activeBranch: branch,
+        sourceRevision: "revision-1",
+        setSourceSnapshot,
+        reloadSourceContent: vi.fn(),
+      }),
+      { initialProps: { branch: "main" } },
+    );
+
+    let pendingSave!: Promise<SaveResponse>;
+    act(() => {
+      pendingSave = result.current.saveSource("main source", "Main edit");
+    });
+    rerender({ branch: "feature" });
+
+    await act(async () => {
+      request.resolve({
+        success: true,
+        commit_hash: "main-revision-2",
+        commit_message: "Main edit",
+        branch: "main",
+      });
+      await pendingSave;
+    });
+
+    expect(setSourceSnapshot).not.toHaveBeenCalled();
+    expect(result.current.conflict).toBeNull();
   });
 
   it("loads the latest paired snapshot explicitly and uses it for the next save", async () => {

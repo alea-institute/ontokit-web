@@ -57,6 +57,15 @@ export function useProjectViewer({
     content: string;
     revision: string | null;
   }>({ content: "", revision: null });
+  const sourceScopeKey = `${projectId}\0${activeBranch ?? ""}`;
+  const sourceScopeRef = useRef({ key: sourceScopeKey, epoch: 0 });
+  if (sourceScopeRef.current.key !== sourceScopeKey) {
+    sourceScopeRef.current = {
+      key: sourceScopeKey,
+      epoch: sourceScopeRef.current.epoch + 1,
+    };
+  }
+  const sourceScopeEpoch = sourceScopeRef.current.epoch;
   const sourceContent = sourceSnapshot.content;
   const sourceRevision = sourceSnapshot.revision;
   const setSourceContent = useCallback((next: React.SetStateAction<string>) => {
@@ -66,12 +75,13 @@ export function useProjectViewer({
     });
   }, []);
   const setSourceSnapshot = useCallback((content: string, revision: string) => {
+    if (sourceScopeRef.current.epoch !== sourceScopeEpoch) return;
     setSourceSnapshotState((previous) => (
       previous.content === content && previous.revision === revision
         ? previous
         : { content, revision }
     ));
-  }, []);
+  }, [sourceScopeEpoch]);
   const [isLoadingSource, setIsLoadingSource] = useState(false);
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [isPreloading, setIsPreloading] = useState(false);
@@ -137,22 +147,41 @@ export function useProjectViewer({
         accessToken,
         project?.git_ontology_path
       );
-      if (requestId !== sourceRequestIdRef.current) return;
+      if (
+        requestId !== sourceRequestIdRef.current
+        || sourceScopeEpoch !== sourceScopeRef.current.epoch
+      ) return;
       setSourceSnapshot(response.content, response.revision);
       return response;
     } catch (err) {
       console.error("Failed to load source:", err);
-      if (!isPreload) {
+      if (
+        !isPreload
+        && requestId === sourceRequestIdRef.current
+        && sourceScopeEpoch === sourceScopeRef.current.epoch
+      ) {
         setSourceError(err instanceof Error ? err.message : "Failed to load source content");
       }
     } finally {
-      if (isPreload) {
-        setIsPreloading(false);
-      } else {
-        setIsLoadingSource(false);
+      if (
+        requestId === sourceRequestIdRef.current
+        && sourceScopeEpoch === sourceScopeRef.current.epoch
+      ) {
+        if (isPreload) {
+          setIsPreloading(false);
+        } else {
+          setIsLoadingSource(false);
+        }
       }
     }
-  }, [projectId, accessToken, activeBranch, project?.git_ontology_path, setSourceSnapshot]);
+  }, [
+    projectId,
+    accessToken,
+    activeBranch,
+    project?.git_ontology_path,
+    setSourceSnapshot,
+    sourceScopeEpoch,
+  ]);
 
   // Load once for the current branch. Content and immutable revision always
   // come from the same response so direct saves cannot mix snapshots.
@@ -268,7 +297,13 @@ export function useProjectViewer({
   // Reset source state (used by editor when switching branches)
   const resetSourceState = useCallback(() => {
     sourceRequestIdRef.current += 1;
+    sourceScopeRef.current = {
+      ...sourceScopeRef.current,
+      epoch: sourceScopeRef.current.epoch + 1,
+    };
     setSourceSnapshotState({ content: "", revision: null });
+    setIsLoadingSource(false);
+    setIsPreloading(false);
     setSourceError(null);
     setSourceIriIndex(new Map());
     preloadStartedRef.current = false;

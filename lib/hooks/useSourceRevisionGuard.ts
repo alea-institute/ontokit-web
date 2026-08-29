@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   getSourceRevisionConflict,
   projectOntologyApi,
@@ -38,17 +38,36 @@ export function useSourceRevisionGuard({
   reloadSourceContent,
   onLoadLatest,
 }: UseSourceRevisionGuardOptions) {
-  const [storedConflict, setStoredConflict] = useState<SourceRevisionConflictState | null>(null);
-  const [isLoadingLatest, setIsLoadingLatest] = useState(false);
-  const conflict = storedConflict?.detail.branch === activeBranch ? storedConflict : null;
+  const scopeKey = `${projectId}\0${activeBranch ?? ""}`;
+  const scopeRef = useRef({ key: scopeKey, epoch: 0 });
+  if (scopeRef.current.key !== scopeKey) {
+    scopeRef.current = { key: scopeKey, epoch: scopeRef.current.epoch + 1 };
+  }
+  const scopeEpoch = scopeRef.current.epoch;
+  const [storedConflict, setStoredConflict] = useState<{
+    scopeEpoch: number;
+    state: SourceRevisionConflictState;
+  } | null>(null);
+  const loadLatestRequestIdRef = useRef(0);
+  const [loadingLatest, setLoadingLatest] = useState<{
+    scopeEpoch: number;
+    requestId: number;
+  } | null>(null);
+  const isLoadingLatest = loadingLatest?.scopeEpoch === scopeEpoch;
+  const conflict = storedConflict?.scopeEpoch === scopeEpoch
+    && storedConflict.state.detail.branch === activeBranch
+    ? storedConflict.state
+    : null;
 
   const captureConflict = useCallback((error: unknown, draftContent: string): Error | null => {
     const detail = getSourceRevisionConflict(error);
     if (!detail) return null;
     const state = { detail, draftContent };
-    setStoredConflict(state);
+    if (scopeRef.current.epoch === scopeEpoch) {
+      setStoredConflict({ scopeEpoch, state });
+    }
     return new SourceRevisionConflictError(state);
-  }, []);
+  }, [scopeEpoch]);
 
   const saveSource = useCallback(async (
     content: string,
@@ -72,8 +91,9 @@ export function useSourceRevisionGuard({
         activeBranch,
         baseRevision,
       );
-      setSourceSnapshot(content, response.commit_hash);
-      setStoredConflict(null);
+      if (scopeRef.current.epoch === scopeEpoch) {
+        setSourceSnapshot(content, response.commit_hash);
+      }
       return response;
     } catch (error) {
       const conflictError = captureConflict(error, content);
@@ -86,21 +106,37 @@ export function useSourceRevisionGuard({
     conflict,
     projectId,
     setSourceSnapshot,
+    scopeEpoch,
     sourceRevision,
   ]);
 
   const loadLatest = useCallback(async () => {
-    setIsLoadingLatest(true);
+    const requestId = ++loadLatestRequestIdRef.current;
+    setLoadingLatest({ scopeEpoch, requestId });
     try {
       const response = await reloadSourceContent();
       if (!response) throw new Error("No source snapshot is available for this branch.");
-      onLoadLatest?.(response.content);
-      setStoredConflict(null);
+      if (
+        scopeRef.current.epoch === scopeEpoch
+        && requestId === loadLatestRequestIdRef.current
+      ) {
+        onLoadLatest?.(response.content);
+        setStoredConflict(null);
+      }
       return response;
     } finally {
-      setIsLoadingLatest(false);
+      if (
+        scopeRef.current.epoch === scopeEpoch
+        && requestId === loadLatestRequestIdRef.current
+      ) {
+        setLoadingLatest((current) => (
+          current?.scopeEpoch === scopeEpoch && current.requestId === requestId
+            ? null
+            : current
+        ));
+      }
     }
-  }, [onLoadLatest, reloadSourceContent]);
+  }, [onLoadLatest, reloadSourceContent, scopeEpoch]);
 
   return {
     conflict,

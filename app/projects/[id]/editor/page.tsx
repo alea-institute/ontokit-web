@@ -291,6 +291,10 @@ export default function EditorPage() {
     reloadSourceContent,
     onLoadLatest: handleLoadLatestSource,
   });
+  const sourceRevisionConflictRef = useRef(sourceRevisionConflict);
+  useEffect(() => {
+    sourceRevisionConflictRef.current = sourceRevisionConflict;
+  }, [sourceRevisionConflict]);
 
   const handleLoadLatest = useCallback(async () => {
     try {
@@ -505,7 +509,7 @@ export default function EditorPage() {
             session.accessToken,
             project?.git_ontology_path
           );
-          setSourceContent(response.content + snippet);
+          setSourceSnapshot(response.content + snippet, response.revision);
         } catch {
           toast.error("Failed to load source before adding entity");
           return;
@@ -516,7 +520,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent],
+    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent, setSourceSnapshot],
   );
 
   const generatedEntityAccessToken = session?.accessToken;
@@ -533,33 +537,44 @@ export default function EditorPage() {
       : isSuggestionMode
         ? "authenticated-suggestion"
         : "direct";
+    if (mode === "direct" && sourceRevisionConflictRef.current) {
+      throw new SourceRevisionConflictError(sourceRevisionConflictRef.current);
+    }
     const persistenceScope = `${projectId}:${mode}:${activeBranch ?? "pending"}`;
     let result;
     try {
       result = await generatedEntityPersistenceQueue.current.run(
         persistenceScope,
-        () => persistGeneratedEntity({
-          mode,
-          projectId,
-          branch: activeBranch,
-          accessToken: generatedEntityAccessToken,
-          ontologyPath: project?.git_ontology_path,
-          entity,
-          ontologyPrefix,
-          ontologyNamespace,
-          suggestionSession: {
-            startSession: suggestionSession.startSession,
-            saveToSession: suggestionSession.saveToSession,
-          },
-          anonymousSession: {
-            startSession: anonymousSuggestion.startSession,
-            saveToSession: anonymousSuggestion.saveToSession,
-          },
-        }),
+        () => {
+          if (mode === "direct" && sourceRevisionConflictRef.current) {
+            throw new SourceRevisionConflictError(sourceRevisionConflictRef.current);
+          }
+          return persistGeneratedEntity({
+            mode,
+            projectId,
+            branch: activeBranch,
+            accessToken: generatedEntityAccessToken,
+            ontologyPath: project?.git_ontology_path,
+            entity,
+            ontologyPrefix,
+            ontologyNamespace,
+            suggestionSession: {
+              startSession: suggestionSession.startSession,
+              saveToSession: suggestionSession.saveToSession,
+            },
+            anonymousSession: {
+              startSession: anonymousSuggestion.startSession,
+              saveToSession: anonymousSuggestion.saveToSession,
+            },
+          });
+        },
       );
     } catch (error) {
       if (mode === "direct" && error instanceof GeneratedEntitySaveError) {
         const conflictError = captureSourceConflict(error.cause, error.draftContent);
+        if (conflictError instanceof SourceRevisionConflictError) {
+          sourceRevisionConflictRef.current = conflictError.conflict;
+        }
         throw conflictError ?? error;
       }
       throw error;
@@ -693,8 +708,9 @@ export default function EditorPage() {
         activeBranch
       );
       toast.success(`Deleted "${deleteTargetLabel}"`);
-      // Invalidate cached source so the next edit re-fetches from the server
-      setSourceContent("");
+      // Invalidate the paired source snapshot and its scope so the next form
+      // edit must re-fetch content and revision from the authoritative branch.
+      resetSourceState();
       // Reload tree to ensure consistency
       loadRootClasses();
       queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
@@ -706,7 +722,7 @@ export default function EditorPage() {
       // Reload tree to restore state
       loadRootClasses();
     }
-  }, [deleteTargetIri, deleteTargetLabel, session, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, setSourceContent]);
+  }, [deleteTargetIri, deleteTargetLabel, session, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, resetSourceState]);
 
   // Handle update class (form-based editing)
   // Routes through source save: modifies the Turtle text and commits via PUT /source
