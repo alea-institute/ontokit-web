@@ -10,10 +10,11 @@ vi.mock("@/lib/api/revisions", () => ({
   revisionsApi: { getFileAtVersion: vi.fn() },
 }));
 
-import { projectOntologyApi } from "@/lib/api/client";
+import { ApiError, projectOntologyApi } from "@/lib/api/client";
 import { revisionsApi } from "@/lib/api/revisions";
 import {
   createGeneratedEntityPersistenceQueue,
+  GeneratedEntitySaveError,
   persistGeneratedEntity,
 } from "@/lib/editor/generatedEntityPersistence";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
@@ -37,6 +38,7 @@ beforeEach(() => {
   mockedLoad.mockResolvedValue({
     project_id: "project-1",
     version: "main",
+    revision: "abc",
     filename: "ontology.ttl",
     content: BASE_SOURCE,
   });
@@ -109,7 +111,7 @@ describe("persistGeneratedEntity", () => {
   });
 
   it("loads the authoritative branch and saves a generated child directly", async () => {
-    const content = await persistGeneratedEntity({
+    const result = await persistGeneratedEntity({
       mode: "direct",
       projectId: "project-1",
       branch: "main",
@@ -132,8 +134,44 @@ describe("persistGeneratedEntity", () => {
       'Add generated class "Child"',
       "token",
       "main",
+      "abc",
     );
-    expect(content).toContain("rdfs:subClassOf ex:Parent");
+    expect(result.content).toContain("rdfs:subClassOf ex:Parent");
+    expect(result.revision).toBe("def");
+  });
+
+  it("carries the generated draft through a stale direct-save conflict", async () => {
+    mockedDirectSave.mockRejectedValueOnce(new ApiError(409, "Conflict", JSON.stringify({
+      detail: {
+        code: "SOURCE_REVISION_CONFLICT",
+        message: "The source changed.",
+        base_revision: "abc",
+        current_revision: "newer",
+        branch: "main",
+      },
+    })));
+
+    const save = persistGeneratedEntity({
+      mode: "direct",
+      projectId: "project-1",
+      branch: "main",
+      accessToken: "token",
+      entity: {
+        iri: "http://example.org/ont#Child",
+        label: "Child",
+        parentIri: "http://example.org/ont#Parent",
+        entityType: "class",
+      },
+      ontologyPrefix: "ex",
+      ontologyNamespace: "http://example.org/ont#",
+    });
+
+    await expect(save).rejects.toMatchObject({
+      name: "GeneratedEntitySaveError",
+      draftContent: expect.stringContaining("ex:Child a owl:Class"),
+      cause: expect.any(ApiError),
+    } satisfies Partial<GeneratedEntitySaveError>);
+    expect(mockedDirectSave).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the real suggestion card state pending until the API-bound helper succeeds", async () => {
@@ -184,7 +222,7 @@ describe("persistGeneratedEntity", () => {
       saveToSession: vi.fn().mockResolvedValue(true),
     };
 
-    const content = await persistGeneratedEntity({
+    const result = await persistGeneratedEntity({
       mode: "authenticated-suggestion",
       projectId: "project-1",
       branch: "main",
@@ -207,7 +245,8 @@ describe("persistGeneratedEntity", () => {
       "http://example.org/ont#childProperty",
       "child property",
     );
-    expect(content).toContain("rdfs:subPropertyOf ex:parentProperty");
+    expect(result.content).toContain("rdfs:subPropertyOf ex:parentProperty");
+    expect(result.revision).toBeNull();
     expect(mockedDirectSave).not.toHaveBeenCalled();
   });
 
@@ -262,11 +301,12 @@ describe("persistGeneratedEntity", () => {
     mockedLoad.mockResolvedValue({
       project_id: "project-1",
       version: "main",
+      revision: "already-present-revision",
       filename: "ontology.ttl",
       content: `${BASE_SOURCE}\nex:Child a owl:Class ;\n    rdfs:label "Child"@en .\n`,
     });
 
-    const content = await persistGeneratedEntity({
+    const result = await persistGeneratedEntity({
       mode: "direct",
       projectId: "project-1",
       branch: "main",
@@ -281,7 +321,8 @@ describe("persistGeneratedEntity", () => {
       ontologyNamespace: "http://example.org/ont#",
     });
 
-    expect(content.match(/ex:Child a owl:Class/g)).toHaveLength(1);
+    expect(result.content.match(/ex:Child a owl:Class/g)).toHaveLength(1);
+    expect(result.revision).toBe("already-present-revision");
     expect(mockedDirectSave).not.toHaveBeenCalled();
   });
 });

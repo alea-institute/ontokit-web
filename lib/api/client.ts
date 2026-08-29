@@ -50,6 +50,35 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error) return error.message || fallback;
   return fallback;
 }
+
+export interface SourceRevisionConflictDetail {
+  code: "SOURCE_REVISION_CONFLICT";
+  message: string;
+  base_revision: string;
+  current_revision: string;
+  branch: string;
+}
+
+/** Return the typed stale-source detail only when the API contract is complete. */
+export function getSourceRevisionConflict(
+  error: unknown,
+): SourceRevisionConflictDetail | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  if (!error.detail || typeof error.detail !== "object") return null;
+
+  const detail = error.detail as Partial<SourceRevisionConflictDetail>;
+  if (
+    detail.code !== "SOURCE_REVISION_CONFLICT"
+    || typeof detail.message !== "string"
+    || typeof detail.base_revision !== "string"
+    || typeof detail.current_revision !== "string"
+    || typeof detail.branch !== "string"
+  ) {
+    return null;
+  }
+
+  return detail as SourceRevisionConflictDetail;
+}
 export interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
   /**
@@ -633,11 +662,12 @@ export const projectOntologyApi = {
     content: string,
     commitMessage: string,
     token: string,
-    branch?: string
+    branch: string | undefined,
+    baseRevision: string,
   ) =>
     api.put<SourceContentSaveResponse>(
       `/api/v1/projects/${projectId}/source`,
-      { content, commit_message: commitMessage },
+      { content, commit_message: commitMessage, base_revision: baseRevision },
       {
         headers: { Authorization: `Bearer ${token}` },
         params: { branch },

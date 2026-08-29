@@ -34,6 +34,16 @@ interface PersistGeneratedEntityOptions {
   anonymousSession?: GeneratedEntitySessionWriter;
 }
 
+export class GeneratedEntitySaveError extends Error {
+  constructor(
+    public readonly cause: unknown,
+    public readonly draftContent: string,
+  ) {
+    super(cause instanceof Error ? cause.message : "Could not save the generated entity.");
+    this.name = "GeneratedEntitySaveError";
+  }
+}
+
 export interface GeneratedEntityPersistenceQueue {
   run: <T>(scope: string, operation: () => Promise<T>) => Promise<T>;
 }
@@ -90,7 +100,7 @@ function requireSession(
  */
 export async function persistGeneratedEntity(
   options: PersistGeneratedEntityOptions,
-): Promise<string> {
+): Promise<{ content: string; revision: string | null }> {
   const {
     mode,
     projectId,
@@ -139,7 +149,12 @@ export async function persistGeneratedEntity(
 
   // A previous attempt may have reached the server even if its response was
   // lost. Authoritative presence is sufficient proof to finish acceptance.
-  if (entityAlreadyExists(source, entity.iri)) return source;
+  if (entityAlreadyExists(source, entity.iri)) {
+    return {
+      content: source,
+      revision: mode === "direct" ? response.revision : null,
+    };
+  }
 
   const content = source + generateTurtleSnippet({
     ...entity,
@@ -149,13 +164,20 @@ export async function persistGeneratedEntity(
 
   if (mode === "direct") {
     const kind = entity.entityType === "class" ? "class" : "property";
-    await projectOntologyApi.saveSource(
-      projectId,
-      content,
-      `Add generated ${kind} "${entity.label}"`,
-      targetToken!,
-      targetBranch,
-    );
+    let saved;
+    try {
+      saved = await projectOntologyApi.saveSource(
+        projectId,
+        content,
+        `Add generated ${kind} "${entity.label}"`,
+        targetToken!,
+        targetBranch,
+        response.revision,
+      );
+    } catch (error) {
+      throw new GeneratedEntitySaveError(error, content);
+    }
+    return { content, revision: saved.commit_hash };
   } else {
     const saved = await session!.saveToSession(content, entity.iri, entity.label);
     if (!saved) {
@@ -163,5 +185,5 @@ export async function persistGeneratedEntity(
     }
   }
 
-  return content;
+  return { content, revision: null };
 }

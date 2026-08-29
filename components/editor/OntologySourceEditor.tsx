@@ -40,6 +40,8 @@ export interface OntologySourceEditorRef {
   insertAtEnd: (text: string) => void;
   /** Get the current editor content (for syncing back to parent state) */
   getValue: () => string;
+  /** Replace the draft and saved baseline after an explicit reconciliation. */
+  replaceValue: (content: string) => void;
 }
 
 /**
@@ -192,12 +194,19 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
     return model?.getValue() ?? value;
   }, [value]);
 
+  const replaceValue = useCallback((content: string) => {
+    setValue(content);
+    setOriginalValue(content);
+    setSaveError(null);
+  }, []);
+
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     scrollToIri,
     insertAtEnd,
     getValue,
-  }), [scrollToIri, insertAtEnd, getValue]);
+    replaceValue,
+  }), [scrollToIri, insertAtEnd, getValue, replaceValue]);
 
   // Handle pendingScrollIri prop when component mounts with prebuilt index
   useEffect(() => {

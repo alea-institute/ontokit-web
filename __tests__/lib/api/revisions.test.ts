@@ -79,11 +79,19 @@ describe("revisionsApi", () => {
 
   describe("getFileAtVersion", () => {
     it("calls GET with version and default filename", async () => {
-      const response = { project_id: "p1", version: "abc123", filename: "ontology.ttl", content: "@prefix..." };
+      const response = {
+        project_id: "p1",
+        version: "main",
+        revision: "abc123def456",
+        filename: "ontology.ttl",
+        content: "@prefix...",
+      };
       mockOk(response);
 
       const result = await revisionsApi.getFileAtVersion("p1", "abc123", "tok");
       expect(result).toEqual(response);
+      expect(result.version).toBe("main");
+      expect(result.revision).toBe("abc123def456");
 
       const [url] = mockFetch.mock.calls[0];
       expect(url).toContain("/api/v1/projects/p1/revisions/file");

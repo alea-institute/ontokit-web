@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
+import { SourceRevisionConflictBanner } from "@/components/editor/SourceRevisionConflictBanner";
 import { AddEntityDialog, type NewEntityInfo } from "@/components/editor/AddEntityDialog";
 import { useToast } from "@/lib/context/ToastContext";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
@@ -31,6 +32,7 @@ import { getLocalName } from "@/lib/utils";
 import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
 import {
   createGeneratedEntityPersistenceQueue,
+  GeneratedEntitySaveError,
   persistGeneratedEntity,
   type GeneratedEntityPersistenceMode,
 } from "@/lib/editor/generatedEntityPersistence";
@@ -56,6 +58,10 @@ import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
 import type { TrustGate } from "@/components/editor/TrustExplainer";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+import {
+  SourceRevisionConflictError,
+  useSourceRevisionGuard,
+} from "@/lib/hooks/useSourceRevisionGuard";
 
 /**
  * True when a suggestion card (role="listitem") currently owns focus. Used to
@@ -131,8 +137,9 @@ export default function EditorPage() {
     hasExpandableNodes, hasExpandedNodes, isExpandingAll,
     reparentOptimistic, rollbackReparent,
     selectedNodeFallback,
-    sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
-    loadSourceContent, sourceIriIndex, setSourceIriIndex,
+    sourceContent, setSourceContent, sourceRevision, setSourceSnapshot,
+    isLoadingSource, sourceError, isPreloading,
+    loadSourceContent, reloadSourceContent, sourceIriIndex, setSourceIriIndex,
     connectionStatus, wsEndpoint, wsPurpose,
     resetSourceState,
   } = viewer;
@@ -258,6 +265,41 @@ export default function EditorPage() {
   // Pending scroll IRI for source navigation
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
 
+  const handleLoadLatestSource = useCallback((content: string) => {
+    sourceEditorRef.current?.replaceValue(content);
+    setSourceIriIndex(new Map());
+    iriPatternDetectedRef.current = false;
+    setDetailRefreshKey((key) => key + 1);
+  }, [setSourceIriIndex]);
+
+  const {
+    conflict: sourceRevisionConflict,
+    isLoadingLatest,
+    saveSource: saveDirectSource,
+    loadLatest,
+    captureConflict: captureSourceConflict,
+  } = useSourceRevisionGuard({
+    projectId,
+    accessToken: session?.accessToken,
+    activeBranch,
+    sourceRevision,
+    setSourceSnapshot,
+    reloadSourceContent,
+    onLoadLatest: handleLoadLatestSource,
+  });
+
+  const handleLoadLatest = useCallback(async () => {
+    try {
+      await loadLatest();
+      toast.success("Latest source loaded", "The stale draft was discarded after your confirmation.");
+    } catch (error) {
+      toast.error(
+        "Failed to load latest source",
+        error instanceof Error ? error.message : "Unknown error",
+      );
+    }
+  }, [loadLatest, toast]);
+
   // Keyboard shortcut help dialog
   const [shortcutDialogOpen, setShortcutDialogOpen] = useState(false);
 
@@ -331,15 +373,21 @@ export default function EditorPage() {
       throw new Error("Not authenticated or no content to save");
     }
 
-    await projectOntologyApi.saveSource(
-      projectId,
-      pendingSaveContent,
-      commitMessage,
-      session.accessToken,
-      activeBranch
-    );
-
-    setSourceContent(pendingSaveContent);
+    try {
+      await saveDirectSource(pendingSaveContent, commitMessage);
+    } catch (error) {
+      if (error instanceof SourceRevisionConflictError) {
+        // A stale raw save is terminal for this commit attempt. Reject the
+        // source editor's pending promise so its draft stays editable, close
+        // the dialog, and require the explicit reconcile action.
+        pendingSaveRejectRef.current?.(error);
+        pendingSaveResolveRef.current = null;
+        pendingSaveRejectRef.current = null;
+        setPendingSaveContent(null);
+        setCommitDialogOpen(false);
+      }
+      throw error;
+    }
     setSourceIriIndex(new Map());
     loadRootClasses();
     iriPatternDetectedRef.current = false;
@@ -349,7 +397,7 @@ export default function EditorPage() {
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session, pendingSaveContent, activeBranch, loadRootClasses, queryClient, setSourceContent, setSourceIriIndex]);
+  }, [projectId, session, pendingSaveContent, loadRootClasses, queryClient, setSourceIriIndex, saveDirectSource]);
 
   const handleCommitDialogClose = useCallback((open: boolean) => {
     setCommitDialogOpen(open);
@@ -482,31 +530,44 @@ export default function EditorPage() {
         ? "authenticated-suggestion"
         : "direct";
     const persistenceScope = `${projectId}:${mode}:${activeBranch ?? "pending"}`;
-    const content = await generatedEntityPersistenceQueue.current.run(
-      persistenceScope,
-      () => persistGeneratedEntity({
-        mode,
-        projectId,
-        branch: activeBranch,
-        accessToken: generatedEntityAccessToken,
-        ontologyPath: project?.git_ontology_path,
-        entity,
-        ontologyPrefix,
-        ontologyNamespace,
-        suggestionSession: {
-          startSession: suggestionSession.startSession,
-          saveToSession: suggestionSession.saveToSession,
-        },
-        anonymousSession: {
-          startSession: anonymousSuggestion.startSession,
-          saveToSession: anonymousSuggestion.saveToSession,
-        },
-      }),
-    );
+    let result;
+    try {
+      result = await generatedEntityPersistenceQueue.current.run(
+        persistenceScope,
+        () => persistGeneratedEntity({
+          mode,
+          projectId,
+          branch: activeBranch,
+          accessToken: generatedEntityAccessToken,
+          ontologyPath: project?.git_ontology_path,
+          entity,
+          ontologyPrefix,
+          ontologyNamespace,
+          suggestionSession: {
+            startSession: suggestionSession.startSession,
+            saveToSession: suggestionSession.saveToSession,
+          },
+          anonymousSession: {
+            startSession: anonymousSuggestion.startSession,
+            saveToSession: anonymousSuggestion.saveToSession,
+          },
+        }),
+      );
+    } catch (error) {
+      if (mode === "direct" && error instanceof GeneratedEntitySaveError) {
+        const conflictError = captureSourceConflict(error.cause, error.draftContent);
+        throw conflictError ?? error;
+      }
+      throw error;
+    }
 
     // Only update client state after the authoritative branch confirms the
     // entity. A rejected save leaves the card pending and these values intact.
-    setSourceContent(content);
+    if (mode === "direct" && result.revision) {
+      setSourceSnapshot(result.content, result.revision);
+    } else {
+      setSourceContent(result.content);
+    }
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     setDetailRefreshKey((key) => key + 1);
@@ -529,9 +590,27 @@ export default function EditorPage() {
     anonymousSuggestion.startSession,
     anonymousSuggestion.saveToSession,
     setSourceContent,
+    setSourceSnapshot,
     setSourceIriIndex,
     queryClient,
+    captureSourceConflict,
   ]);
+
+  const getDirectSourceSnapshot = useCallback(async () => {
+    if (sourceRevision) {
+      return { content: sourceContent, revision: sourceRevision };
+    }
+    if (!activeBranch) throw new Error("No branch selected");
+
+    const response = await revisionsApi.getFileAtVersion(
+      projectId,
+      activeBranch,
+      session?.accessToken,
+      project?.git_ontology_path,
+    );
+    setSourceSnapshot(response.content, response.revision);
+    return { content: response.content, revision: response.revision };
+  }, [activeBranch, project?.git_ontology_path, projectId, session?.accessToken, setSourceSnapshot, sourceContent, sourceRevision]);
 
   // Handle accepted child suggestion — persist first, then update the tree (D-07)
   const handleAddSuggestedChild = useCallback(async (
@@ -626,35 +705,16 @@ export default function EditorPage() {
       throw new Error("No branch selected");
     }
 
-    // Ensure source content is loaded
-    let source = sourceContent;
-    if (!source) {
-      const response = await revisionsApi.getFileAtVersion(
-        projectId,
-        activeBranch,
-        session.accessToken,
-        project?.git_ontology_path,
-      );
-      source = response.content;
-    }
+    const snapshot = await getDirectSourceSnapshot();
 
     // Apply the update to the Turtle source text
-    const modifiedSource = updateClassInTurtle(source, classIri, data);
+    const modifiedSource = updateClassInTurtle(snapshot.content, classIri, data);
 
     // Save via the source endpoint (the only project-level write path)
     const label = data.labels[0]?.value || getLocalName(classIri);
     const commitMessage = `Update class ${label}`;
 
-    await projectOntologyApi.saveSource(
-      projectId,
-      modifiedSource,
-      commitMessage,
-      session.accessToken,
-      activeBranch,
-    );
-
-    // Update local source content to match what was saved
-    setSourceContent(modifiedSource);
+    await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
 
     // Update the tree node label in-place (preserves expansion state)
@@ -665,7 +725,7 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
-  }, [session, projectId, activeBranch, project, sourceContent, toast, updateNodeLabel, queryClient, setSourceContent, setSourceIriIndex]);
+  }, [session, activeBranch, toast, updateNodeLabel, queryClient, setSourceIriIndex, getDirectSourceSnapshot, saveDirectSource, projectId]);
 
   // Handle update property (form-based editing)
   const handleUpdateProperty = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
@@ -676,36 +736,19 @@ export default function EditorPage() {
       throw new Error("No branch selected");
     }
 
-    let source = sourceContent;
-    if (!source) {
-      const response = await revisionsApi.getFileAtVersion(
-        projectId,
-        activeBranch,
-        session.accessToken,
-        project?.git_ontology_path,
-      );
-      source = response.content;
-    }
+    const snapshot = await getDirectSourceSnapshot();
 
-    const modifiedSource = updatePropertyInTurtle(source, propertyIri, data);
+    const modifiedSource = updatePropertyInTurtle(snapshot.content, propertyIri, data);
     const label = data.labels[0]?.value || getLocalName(propertyIri);
     const commitMessage = `Update property ${label}`;
 
-    await projectOntologyApi.saveSource(
-      projectId,
-      modifiedSource,
-      commitMessage,
-      session.accessToken,
-      activeBranch,
-    );
-
-    setSourceContent(modifiedSource);
+    await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
-  }, [session, projectId, activeBranch, project, sourceContent, toast, queryClient, setSourceContent, setSourceIriIndex]);
+  }, [session, activeBranch, toast, queryClient, setSourceIriIndex, getDirectSourceSnapshot, saveDirectSource, projectId]);
 
   // Handle update individual (form-based editing)
   const handleUpdateIndividual = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
@@ -716,36 +759,19 @@ export default function EditorPage() {
       throw new Error("No branch selected");
     }
 
-    let source = sourceContent;
-    if (!source) {
-      const response = await revisionsApi.getFileAtVersion(
-        projectId,
-        activeBranch,
-        session.accessToken,
-        project?.git_ontology_path,
-      );
-      source = response.content;
-    }
+    const snapshot = await getDirectSourceSnapshot();
 
-    const modifiedSource = updateIndividualInTurtle(source, individualIri, data);
+    const modifiedSource = updateIndividualInTurtle(snapshot.content, individualIri, data);
     const label = data.labels[0]?.value || getLocalName(individualIri);
     const commitMessage = `Update individual ${label}`;
 
-    await projectOntologyApi.saveSource(
-      projectId,
-      modifiedSource,
-      commitMessage,
-      session.accessToken,
-      activeBranch,
-    );
-
-    setSourceContent(modifiedSource);
+    await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
-  }, [session, projectId, activeBranch, project, sourceContent, toast, queryClient, setSourceContent, setSourceIriIndex]);
+  }, [session, activeBranch, toast, queryClient, setSourceIriIndex, getDirectSourceSnapshot, saveDirectSource, projectId]);
 
   // Handle suggestion-mode class update
   // Instead of directly committing, sends modified source to the suggestion branch
@@ -1211,6 +1237,13 @@ export default function EditorPage() {
     <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch}>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
+        {sourceRevisionConflict && (
+          <SourceRevisionConflictBanner
+            conflict={sourceRevisionConflict}
+            isLoadingLatest={isLoadingLatest}
+            onLoadLatest={handleLoadLatest}
+          />
+        )}
         {/* Editor Header */}
         <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
           <div className="flex items-center justify-between">

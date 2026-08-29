@@ -346,7 +346,7 @@ describe("OntologySourceEditor", () => {
 
   // ── useImperativeHandle ref ──
 
-  it("exposes scrollToIri, insertAtEnd, getValue via ref", async () => {
+  it("exposes source navigation, editing, and explicit snapshot replacement via ref", async () => {
     const ref = createRef<OntologySourceEditorRef>();
     render(<OntologySourceEditor {...DEFAULT_PROPS} ref={ref} />);
 
@@ -358,6 +358,13 @@ describe("OntologySourceEditor", () => {
     expect(typeof ref.current!.scrollToIri).toBe("function");
     expect(typeof ref.current!.insertAtEnd).toBe("function");
     expect(typeof ref.current!.getValue).toBe("function");
+    expect(typeof ref.current!.replaceValue).toBe("function");
+
+    ref.current!.replaceValue("latest source");
+    await waitFor(() => {
+      expect((screen.getByTestId("turtle-editor") as HTMLTextAreaElement).value).toBe("latest source");
+    });
+    expect(screen.queryByText("Unsaved changes")).toBeNull();
   });
 
   it("getValue returns current editor content", async () => {

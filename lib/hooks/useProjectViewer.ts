@@ -6,7 +6,7 @@ import { useOpenPRCount } from "@/lib/hooks/useOpenPRCount";
 import { useLintSummary } from "@/lib/hooks/useLintSummary";
 import { useNormalizationStatus } from "@/lib/hooks/useNormalizationStatus";
 import { usePendingSuggestionCount } from "@/lib/hooks/usePendingSuggestionCount";
-import { revisionsApi } from "@/lib/api/revisions";
+import { revisionsApi, type RevisionFileResponse } from "@/lib/api/revisions";
 import type { TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
 import type { IriPosition } from "@/lib/editor/indexWorker";
 
@@ -53,11 +53,26 @@ export function useProjectViewer({
   );
 
   // Source state
-  const [sourceContent, setSourceContent] = useState<string>("");
+  const [sourceSnapshot, setSourceSnapshotState] = useState<{
+    content: string;
+    revision: string | null;
+  }>({ content: "", revision: null });
+  const sourceContent = sourceSnapshot.content;
+  const sourceRevision = sourceSnapshot.revision;
+  const setSourceContent = useCallback((next: React.SetStateAction<string>) => {
+    setSourceSnapshotState((previous) => ({
+      ...previous,
+      content: typeof next === "function" ? next(previous.content) : next,
+    }));
+  }, []);
+  const setSourceSnapshot = useCallback((content: string, revision: string) => {
+    setSourceSnapshotState({ content, revision });
+  }, []);
   const [isLoadingSource, setIsLoadingSource] = useState(false);
   const [sourceError, setSourceError] = useState<string | null>(null);
   const [isPreloading, setIsPreloading] = useState(false);
   const preloadStartedRef = useRef(false);
+  const sourceRequestIdRef = useRef(0);
 
   // IRI indexing
   const [sourceIriIndex, setSourceIriIndex] = useState<Map<string, IriPosition>>(new Map());
@@ -98,10 +113,11 @@ export function useProjectViewer({
     return findInTree(nodes);
   }, [selectedIri, nodes]);
 
-  // Load source content
-  const loadSourceContent = useCallback(async (isPreload = false) => {
+  const fetchSourceContent = useCallback(async (
+    isPreload: boolean,
+  ): Promise<RevisionFileResponse | undefined> => {
     if (!projectId || !activeBranch) return;
-    if (sourceContent) return;
+    const requestId = ++sourceRequestIdRef.current;
 
     if (isPreload) {
       setIsPreloading(true);
@@ -117,7 +133,9 @@ export function useProjectViewer({
         accessToken,
         project?.git_ontology_path
       );
-      setSourceContent(response.content);
+      if (requestId !== sourceRequestIdRef.current) return;
+      setSourceSnapshot(response.content, response.revision);
+      return response;
     } catch (err) {
       console.error("Failed to load source:", err);
       if (!isPreload) {
@@ -130,7 +148,20 @@ export function useProjectViewer({
         setIsLoadingSource(false);
       }
     }
-  }, [projectId, accessToken, sourceContent, activeBranch, project?.git_ontology_path]);
+  }, [projectId, accessToken, activeBranch, project?.git_ontology_path, setSourceSnapshot]);
+
+  // Load once for the current branch. Content and immutable revision always
+  // come from the same response so direct saves cannot mix snapshots.
+  const loadSourceContent = useCallback(async (isPreload = false) => {
+    if (sourceContent) return;
+    await fetchSourceContent(isPreload);
+  }, [sourceContent, fetchSourceContent]);
+
+  // Explicit reconciliation bypasses the ordinary already-loaded guard.
+  const reloadSourceContent = useCallback(
+    () => fetchSourceContent(false),
+    [fetchSourceContent],
+  );
 
   // Background preload source content after initial page load
   useEffect(() => {
@@ -232,7 +263,8 @@ export function useProjectViewer({
 
   // Reset source state (used by editor when switching branches)
   const resetSourceState = useCallback(() => {
-    setSourceContent("");
+    sourceRequestIdRef.current += 1;
+    setSourceSnapshotState({ content: "", revision: null });
     setSourceError(null);
     setSourceIriIndex(new Map());
     preloadStartedRef.current = false;
@@ -287,10 +319,13 @@ export function useProjectViewer({
     // Source
     sourceContent,
     setSourceContent,
+    sourceRevision,
+    setSourceSnapshot,
     isLoadingSource,
     sourceError,
     isPreloading,
     loadSourceContent,
+    reloadSourceContent,
     sourceIriIndex,
     setSourceIriIndex,
     isIndexing,
