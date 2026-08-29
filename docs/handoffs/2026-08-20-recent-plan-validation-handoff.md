@@ -81,6 +81,6 @@ No WIP was discarded or published.
 
 ## Publication state
 
-This handoff is authored on focused branch `docs/recent-plan-final-closeout-20260828`, based on merged documentation head `576dc204`. Its final commit, push, PR, and merge status must be reported in the completing session; the repository history is authoritative if this paragraph becomes stale.
+This handoff is authored on focused branch `docs/recent-plan-final-closeout-20260828`, based on merged documentation head `576dc204`. Initial closeout commit `4879b734` is pushed to ALEA and published as [web PR #31](https://github.com/alea-institute/ontokit-web/pull/31). The completing session must report the PR's final merge state; repository history is authoritative if this paragraph becomes stale.
 
 No secrets, credentials, personal roster data, or unrelated private information are included.
