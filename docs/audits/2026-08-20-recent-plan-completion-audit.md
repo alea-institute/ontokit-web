@@ -10,6 +10,61 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 
 ## Executive result
 
+### Decision implementation closeout — 2026-08-29
+
+This section supersedes the D7–D10 decision-pending and implementation-queue rows
+below while preserving the earlier execution history.
+
+- D7 atomic demo-generation publication is merged by
+  [API PR #35](https://github.com/alea-institute/ontokit-api/pull/35) as
+  `d84b52831e9cd77bdc608018d0c288d342475258`. The design stages a complete
+  generation, serializes attempts across hosts, fences stale attempts, and switches
+  visibility only after the generation is coherent. API #25 is closed.
+- D9 sticky, space-reserving demo notice and D10 conflict-preserving editor behavior
+  are merged by [web PR #35](https://github.com/alea-institute/ontokit-web/pull/35)
+  as `dcc6326fc2564f1abc353fd4bff590943e32cc49`. Web #24 and #26 are closed.
+- D10's final discard-confirmation residual is merged by
+  [web PR #37](https://github.com/alea-institute/ontokit-web/pull/37) as
+  `bbf8ec3250d86a324f171d667e2d527f5f641411`. It adds explicit cancel,
+  confirm, duplicate-submit, success, and failed-reload states; web #36 is closed.
+- D10 API compare-and-set, immutable revision/content pairing, atomic Git ref update,
+  guarded compensation, and typed conflict contract are merged by
+  [API PR #34](https://github.com/alea-institute/ontokit-api/pull/34) as
+  `5b355bbca6d9afcd1c43d7bc0c2643dd846071ea`. API #33 is closed.
+- API PR #34 passed its full remote matrix after one mypy-only naming correction;
+  API PR #35 passed all 2,995 tests plus lint, Pyright, build, Docker preflight, and
+  static analysis after its route fixture was updated for the new fail-closed demo
+  mutability lookup. Web PR #35 passed 219 files/3,388 tests, type-check, zero-error
+  lint, and the production webpack build. Each PR then remained review-clean,
+  current-base mergeable, and unchanged through its five-minute babysit window.
+- Web PR #37 passed the full remote matrix, remained current-base clean and
+  review-backlog-free, and was unchanged for 322 seconds before merge.
+- All earlier decisions D1–D10 are settled. Final review discovered two judgment
+  calls: D11 retired-demo URL behavior, durably queued in
+  [web #34](https://github.com/alea-institute/ontokit-web/issues/34) with
+  redirect-to-current recommended; and D12 named activation-queue stewardship,
+  queued in [web #38](https://github.com/alea-institute/ontokit-web/issues/38) with
+  Damien-as-umbrella-steward recommended.
+
+| Remaining queue after implementation closeout | Durable ALEA authority |
+|---|---|
+| Execute the already-merged reviewer-PAT ciphertext rewrap after release gates | [API #30](https://github.com/alea-institute/ontokit-api/issues/30) |
+| Activate the already-bounded PR Party answerer after demo-readiness, private credential, installation-approval, and outreach gates | [API #26](https://github.com/alea-institute/ontokit-api/issues/26) |
+| Create/seed demo repositories and activate atomic refresh after credential, scan, cron, and live-write gates | [API #31](https://github.com/alea-institute/ontokit-api/issues/31) |
+| Bound retired demo-generation storage with a D11-compatible, rollback-safe retention policy | [API #32](https://github.com/alea-institute/ontokit-api/issues/32) |
+| Choose stable retired-demo URL behavior (D11) | [web #34](https://github.com/alea-institute/ontokit-web/issues/34) |
+| Assign a named steward to the recurring activation queue (D12) | [web #38](https://github.com/alea-institute/ontokit-web/issues/38) |
+| Authenticated DEV acceptance and live auto-accept proof | [web #27](https://github.com/alea-institute/ontokit-web/issues/27) |
+| `ontokit.org` picker and domain gate | [web #28](https://github.com/alea-institute/ontokit-web/issues/28) |
+| Held CatholicOS delivery | [web #30](https://github.com/alea-institute/ontokit-web/issues/30) |
+| Parallel PROD rehearsal | [API #27](https://github.com/alea-institute/ontokit-api/issues/27) |
+| Domain-triggered Google federation | [API #28](https://github.com/alea-institute/ontokit-api/issues/28) |
+| First verified safe `folio-python` release at or above 0.4.0 | [API #29](https://github.com/alea-institute/ontokit-api/issues/29) |
+
+No CatholicOS, AWS, DNS, DEV, PROD, demo repository, credential store, OAuth console,
+cron, or other live service was mutated during this closeout. Optional mode without
+Zitadel remains supported.
+
 ### Final ALEA closeout refresh — 2026-08-28
 
 This section supersedes every older local-only or publication-pending statement below; the older receipts remain as execution history.
@@ -22,19 +77,23 @@ This section supersedes every older local-only or publication-pending statement 
 
 | Remaining queue | Formal units covered | Durable ALEA authority |
 |---|---|---|
-| Demo banner placement | U9 browser polish | [web #24](https://github.com/alea-institute/ontokit-web/issues/24) |
-| Whole-document concurrency boundary | Cross-tab/editor integrity residual | [web #26](https://github.com/alea-institute/ontokit-web/issues/26) |
+| Demo banner placement | U9 browser polish | Completed by [web PR #35](https://github.com/alea-institute/ontokit-web/pull/35); web #24 closed. |
+| Whole-document concurrency boundary | Cross-tab/editor integrity residual | Completed by [API PR #34](https://github.com/alea-institute/ontokit-api/pull/34) and [web PR #35](https://github.com/alea-institute/ontokit-web/pull/35); API #33/web #26 closed. |
 | Authenticated DEV acceptance and live auto-accept proof | Roundup U7; acceptance tails for U9/U12 | [web #27](https://github.com/alea-institute/ontokit-web/issues/27) |
 | `ontokit.org` picker and domain gate | Roundup U17 | [web #28](https://github.com/alea-institute/ontokit-web/issues/28) |
 | Held upstream delivery | Roundup U11/U14 and CatholicOS delivery tails | [web #30](https://github.com/alea-institute/ontokit-web/issues/30) |
-| Demo refresh atomicity, repositories, credentials, and live activation | Roundup U8/U9 | [API #25](https://github.com/alea-institute/ontokit-api/issues/25) |
+| Demo refresh atomicity, repositories, credentials, and live activation | Roundup U8/U9 | Atomicity completed by [API PR #35](https://github.com/alea-institute/ontokit-api/pull/35); live activation moved to [API #31](https://github.com/alea-institute/ontokit-api/issues/31). |
 | PR Party answerer context and external activation | Roundup U16 | [API #26](https://github.com/alea-institute/ontokit-api/issues/26) |
 | Parallel PROD rehearsal | Roundup U10/U12/U13/U15 | [API #27](https://github.com/alea-institute/ontokit-api/issues/27) |
 | Domain-triggered Google federation | Google federation U1–U3 | [API #28](https://github.com/alea-institute/ontokit-api/issues/28) |
 | First verified safe `folio-python` release at or above 0.4.0 | Completion-plan U15 / API #209 tail | [API #29](https://github.com/alea-institute/ontokit-api/issues/29) |
-| Ledger, Decision Sheet, and durable handoff publication | Roundup U18 / completion-plan U16 | [web #22](https://github.com/alea-institute/ontokit-web/issues/22) |
+| Ledger, Decision Sheet, and durable handoff publication | Roundup U18 / completion-plan U16 | Completed through the merged documentation series; [web #22](https://github.com/alea-institute/ontokit-web/issues/22) is closed. |
 
-The four remaining judgment/taste questions are D7–D10 in the Decision Sheet. All other rows are activation gates, not unanswered design choices. Optional mode without Zitadel remains supported. No CatholicOS, AWS, DNS, DEV, PROD, credential, or external-organization mutation occurred during this final ALEA closeout.
+D7–D10 were the four remaining judgment/taste questions at this 2026-08-28
+checkpoint; all were settled on 2026-08-29 and D7/D9/D10 are merged. D11 and D12
+are the only current judgment calls. All other current rows are activation or retention gates.
+Optional mode without Zitadel remains supported. No CatholicOS, AWS, DNS, DEV, PROD,
+credential, or external-organization mutation occurred during this final ALEA closeout.
 
 ### Execution refresh — 2026-08-24
 
