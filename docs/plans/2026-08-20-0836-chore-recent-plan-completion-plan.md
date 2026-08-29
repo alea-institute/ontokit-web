@@ -358,7 +358,3 @@ flowchart TB
 - No secret or broad demo credential enters Git history.
 - Abandoned implementation attempts and temporary UAT state are removed.
 - One durable handoff under `docs/handoffs/` records the remaining queue plus commit, push, and merge state.
-
-## Execution checkpoint — 2026-08-21
-
-All autonomous correctness residuals named by the audit and the expanded security closure ledger are implemented on isolated local branches. Paired current-upstream deployment/CI candidates are green at API `56800cda`/web `256d2344`; security-hardening candidates are green at API `1b8bde28`/web `2c6a7813`. A read-only refresh confirmed they descend from unchanged CatholicOS `dev` heads. The remaining engineering queue is the local current-upstream synthesis covering trust/audit, PR Party, translations, annotations, residual stabilization, and demo mode, plus activation work whose existing gates are demo credentials/repositories, authenticated DEV UAT, AWS/PROD authority, domain/DNS visibility, and the held final CatholicOS batch. No settled user decision needs to be re-asked.
