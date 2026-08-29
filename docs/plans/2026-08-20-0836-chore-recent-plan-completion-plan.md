@@ -96,10 +96,11 @@ flowchart TB
 
 1. Execute U1–U6 on the owning writable integration branches. Run U7 as soon as the deployed trust/audit stack is healthy; rerun it only if a later residual changes the auto-accept path.
 2. Execute U8/U9 when D3’s credential condition is satisfied.
-3. Execute U10 when D1 and D2 clear its rollout and access gates.
+3. Execute U10 Stage A now; execute Stage B only after D1 and D2 clear the rollout and access gates.
 4. Draft and scratch-validate U11 against current cutoff SHAs now; append U9/U10 deltas and freeze exact accounting before any authorized send.
-5. Activate U12–U15 only when their explicit trigger is true.
-6. Finish U16 after every unit is either evidenced complete or still parked with a current gate.
+5. Before executing any imported source-plan unit, record which source clauses remain binding, revalidate its external premises, and record any superseding decision.
+6. Activate U12–U15 only when their explicit trigger is true.
+7. Finish U16 after every unit is either evidenced complete or parked with a named owner, observable trigger source, maximum recheck interval, and activation receipt.
 
 ---
 
@@ -120,8 +121,8 @@ flowchart TB
 | U11 | Upstream delivery map | roundup docs + scratch cherry-pick proof | current-cutoff draft now; final freeze after U9/U10 |
 | U12 | PR Party external gate | both repos + CatholicOS org | D4/D5 and org gates |
 | U13 | Picker activation | static site + hosting | D6 registration |
-| U14 | Google federation activation | Zitadel config + docs | login-friction trigger + OAuth credentials |
-| U15 | FOLIO dependency change | API dependencies | gate cleared by verified `folio-python` 0.4.0 release |
+| U14 | Google federation activation | Zitadel config + docs | final ALEA/CatholicOS domain contract + OAuth credentials |
+| U15 | FOLIO dependency change | API dependencies | first verified safe official `folio-python` release at or above 0.4.0; queued in ALEA API #29 |
 | U16 | Reconciliation closeout | audit, decision sheet, handoff | U1–U15 dispositioned |
 
 ### U1. Close audit UI review residuals
@@ -230,15 +231,17 @@ flowchart TB
 
 - **Goal:** Complete roundup U8 with credential separation intact.
 - **Requirements:** R3, R5, R8; KTD5.
-- **Dependencies:** D3 selects the secure credential path and the two scoped credentials exist.
+- **Dependencies:** D3 selects the secure credential path; source-owner release approval, clean content scans, and the two scoped credentials exist.
 - **Files:** two private ALEA GitHub repositories and the API-owned refresh/deploy assets.
-- **Approach:** Seed FOLIO and Semantic Canon snapshots, refresh only default branches, preserve demo-authored branches, and serialize the repo refresh with demo-project resync.
+- **Approach:** Require source-owner approval for an exact release manifest, export only approved snapshot content without source Git history, and fail closed if secret or sensitive-data scanning fails. Seed FOLIO and Semantic Canon snapshots, refresh only default branches, preserve demo-authored branches, and serialize the repo refresh with demo-project resync.
 - **Test scenarios:**
   - Both repos are private and importable by OntoKit.
   - The destination token can push only to the two demo repos.
   - The source credential cannot push to either source.
+  - No unapproved file, source history, secret, or sensitive datum enters the destination snapshot.
+  - A changed release manifest or failed scan blocks refresh with a redacted receipt.
   - Refresh advances the default snapshot without changing a demo branch.
-- **Verification:** A manual refresh receipt proves separate credentials, target scope, and read-only source behavior.
+- **Verification:** A manual refresh receipt proves source-owner approval, the exact release manifest, history-free export, clean scans, separate credentials, target scope, and read-only source behavior.
 
 ### U9. Build cloned-project demo mode
 
@@ -246,26 +249,27 @@ flowchart TB
 - **Requirements:** R3, R4, R5.
 - **Dependencies:** U8.
 - **Files:** both repos’ project model/provisioning, GitHub mutation authorization, demo navigation/banner, and tests.
-- **Approach:** Follow the source roundup plan’s KTD3/KTD3-a/KTD3-b. One project-aware authorizer must cover every outbound GitHub mutation. The web flow includes entry from the originating live project, a blocking provisioning/loading state, an actionable unavailable state, a persistent banner naming the demo repository, and an exit control returning to the originating live project.
+- **Approach:** Follow the source roundup plan’s KTD3/KTD3-a/KTD3-b. One project-aware authorizer must cover every outbound GitHub mutation. The web flow includes entry from the originating live project, a blocking provisioning/loading state, a persistent banner naming the demo repository, and an exit control returning to the originating live project. The unavailable state shows a safe failure reason, offers Retry for retryable provisioning failures, and always offers return to the originating live project.
 - **Test scenarios:** Use every refusal, provisioning-idempotence, server-truth banner, and live-isolation scenario from the source plan.
 - **Verification:** Both suites pass and live DEV writes only to the selected dummy repository. Browser proof includes keyboard-only entry/exit, visible focus, semantic status/banner announcements, non-color-only state, and responsive touch targets.
 
 ### U10. Build the gated PROD promotion path
 
-- **Goal:** Complete roundup U13 and prepare U15 without touching the box prematurely.
+- **Goal:** Complete roundup U13 and prepare roundup U15 without touching the box prematurely.
 - **Requirements:** R3, R5, R8; KTD6.
 - **Dependencies:** Stage A is autonomous and rollout-neutral. Stage B begins only after D1 settles rollout shape and D2 clears access for installation and live proof.
 - **Files:** API deployment assets, GitHub Actions workflows, release manifest, and runbook.
 - **Approach:**
   - **Stage A — prepare now:** Port the verified U12 forced-command/environment pattern, bind immutable matched web/API revisions, and rehearse the write-path smoke against DEV.
   - **Stage B — activate when D1/D2 clear:** Execute the selected stand-up or rebuild, verify the running revisions, activate the protected promotion gate, and disposition the original roundup U15 demo-gibberish cleanup. Choose reseed-from-scratch versus migrate-and-purge at activation and keep cleanup as a separately reported gate until verified complete.
-  - **Authority-chain checklist:** Before enabling PROD, require reviewed branch protection, a deploy-branch-restricted GitHub Environment for PROD secrets, CODEOWNERS approval for `.github/workflows/**`, explicit least-privilege workflow permissions, and proof that the forced-command deploy key cannot execute arbitrary shell.
+  - **Authority-chain checklist:** Before enabling PROD, require reviewed branch protection, a deploy-branch-restricted GitHub Environment for PROD secrets, CODEOWNERS approval for `.github/workflows/**`, explicit least-privilege workflow permissions, and proof that the forced-command deploy key cannot execute arbitrary shell. Also require documented security-group and host-firewall allowlists, public exposure limited to intended TLS ingress, private binding for Postgres/Redis/object-storage and administrative ports, least-privilege service identities and secret injection, and an external port-and-TLS verification receipt.
 - **Test scenarios:**
   - A green matched revision passes smoke and reaches the gated promotion step.
   - A failed write-path smoke blocks promotion.
   - A mismatched or mutable revision is refused.
   - The PROD gate stays disabled until its environment and host prerequisites exist.
-- **Verification:** Stage A ends with workflow validation and a DEV rehearsal. Stage B ends with the live installation/rebuild receipt, running-revision proof, promotion-gate proof, and a complete or explicitly gated cleanup disposition.
+  - External port scanning proves that only intended TLS ingress is public and that data-plane and administrative services are private.
+- **Verification:** Stage A ends with workflow validation and a DEV rehearsal. Stage B ends with the live installation/rebuild receipt, running-revision proof, promotion-gate proof, network-and-TLS verification receipt, and a complete or explicitly gated cleanup disposition.
 
 ### U11. Produce the upstream delivery map
 
@@ -301,9 +305,9 @@ flowchart TB
 
 - **Goal:** Execute the trigger-gated federation plan without creating a second issuer.
 - **Requirements:** R3, R8.
-- **Dependencies:** A documented login-friction trigger and Google OAuth credentials.
+- **Dependencies:** The final ALEA/CatholicOS domain contract and approved Google OAuth credentials.
 - **Files:** the owning API provisioning/runbook files and optional web copy from the source plan.
-- **Approach:** Execute U1–U3 of the source federation plan unchanged.
+- **Approach:** Revalidate the source plan's domain, OAuth, and issuer premises, record any superseding decision, then execute U1–U3 without changing the still-binding single-issuer contract.
 - **Test scenarios:** First-time Google user, same-email link, password login, and stable Zitadel identity.
 - **Verification:** Full DEV round-trip and UAT log evidence.
 
@@ -311,7 +315,7 @@ flowchart TB
 
 - **Goal:** Close CatholicOS API #209 without pinning a vulnerable release.
 - **Requirements:** R2, R8.
-- **Dependencies:** Cleared on 2026-08-18 by the verified `folio-python` 0.4.0 PyPI release; compatibility still must be proven before pinning.
+- **Dependencies:** Not cleared. The official package index still listed 0.3.6 as the latest verified release during the final audit. Activate on the first verified safe official release at or above 0.4.0 that contains the required fix and passes the documented compatibility/security gates; tracked in ALEA API #29.
 - **Files:** API dependency manifest, lockfile, and existing duplicate-check integration tests.
 - **Approach:** Pin the safe release, remove unused `owlready2`, preserve graceful degradation, and regenerate the lock.
 - **Test scenarios:**
@@ -326,7 +330,7 @@ flowchart TB
 - **Requirements:** R1–R9.
 - **Dependencies:** U1–U15 each complete or held on a current activation condition.
 - **Files:** `docs/audits/2026-08-20-recent-plan-completion-audit.md`, `docs/decision-sheets/2026-08-20-recent-plan-decisions.md`, and `docs/handoffs/`.
-- **Approach:** Refresh GitHub, DNS, access, PyPI, tests, and deployed evidence. Retire superseded handoffs and write one durable continuation artifact.
+- **Approach:** Refresh GitHub, DNS, access, PyPI, tests, and deployed evidence. Retire superseded handoffs and write one durable continuation artifact. For every queued gate, record its owner, observable trigger source, maximum recheck interval, and the receipt that promotes it into active work.
 - **Test scenarios:** Test expectation: none — reconciliation deliverable; proof is one-to-one task accounting and clean links.
 - **Verification:** Every source-plan unit appears exactly once as complete, queued, or gated; the handoff reports commit, push, and merge state.
 
@@ -357,4 +361,19 @@ flowchart TB
 
 ## Execution checkpoint — 2026-08-21
 
-All autonomous correctness residuals named by the audit and the expanded T3 security closure ledger are implemented on isolated local branches. Paired current-upstream candidates are green for T2 at API `56800cda`/web `256d2344` and T3 at API `1b8bde28`/web `2c6a7813`. A read-only refresh confirmed they descend from unchanged CatholicOS `dev` heads. The remaining engineering queue is T4–T10 local current-upstream synthesis plus activation work whose existing gates are demo credentials/repositories, authenticated DEV UAT, AWS/PROD authority, domain/DNS visibility, and the held final CatholicOS batch. No settled user decision needs to be re-asked.
+All autonomous correctness residuals named by the audit and the expanded security closure ledger are implemented on isolated local branches. Paired current-upstream deployment/CI candidates are green at API `56800cda`/web `256d2344`; security-hardening candidates are green at API `1b8bde28`/web `2c6a7813`. A read-only refresh confirmed they descend from unchanged CatholicOS `dev` heads. The remaining engineering queue is the local current-upstream synthesis covering trust/audit, PR Party, translations, annotations, residual stabilization, and demo mode, plus activation work whose existing gates are demo credentials/repositories, authenticated DEV UAT, AWS/PROD authority, domain/DNS visibility, and the held final CatholicOS batch. No settled user decision needs to be re-asked.
+
+## Final execution checkpoint — 2026-08-28
+
+The autonomous ALEA code path is complete and merged: web PR #25 and API PR #24 incorporate the reviewed deployment, security, and feature synthesis, including optional auth without Zitadel, PR Party, translations, annotation parity, trust/audit controls, demo isolation, credential rewrap, and dormant deployment preparation. The completed implementation trackers are closed as web #23 and API #23.
+
+Every remaining unit is durably queued with a named activation condition:
+
+- judgment/taste: web #24 and #26; API #25 and #26;
+- authenticated environment acceptance: web #27;
+- domain-triggered picker and federation: web #28 and API #28;
+- AWS/parallel-PROD rehearsal: API #27;
+- unavailable FOLIO release: API #29; and
+- held CatholicOS delivery: web #30.
+
+The final documentation closeout is tracked in web #22. No CatholicOS, AWS, DNS, DEV, PROD, credential, or external-organization mutation occurred during this final ALEA publication pass.

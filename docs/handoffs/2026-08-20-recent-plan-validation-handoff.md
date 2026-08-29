@@ -1,80 +1,86 @@
-# Recent Plan Validation Handoff — 2026-08-20
+# Recent Plan Validation Handoff — Final ALEA Closeout
+
+Created: 2026-08-20
+
+Final refresh: 2026-08-28
 
 ## Outcome
 
-The 21-day plan audit is complete. Seven formal plan artifacts were found for 2026-07-30 through 2026-08-20. Their 52 formal units are accounted for: 37 are complete on shared integration history, two more are implemented and tested on a local web residual branch, and 13 remain queued or intentionally gated. All five later review/execution follow-ups are implemented and tested on isolated local branches; paired API/web T3 synthesis is complete locally, while the other tranche syntheses and publication remain.
+The 21-day audit found seven formal plans and 52 formal units. Every unit is now either complete on ALEA or durably queued with one current activation condition. No remaining task exists only in chat, an untracked worktree, or an ambiguous “later” bucket.
 
-Use these artifacts as the continuation source:
+The autonomous ALEA implementation is merged:
+
+- Web: [PR #25](https://github.com/alea-institute/ontokit-web/pull/25), merged to `dev`; completed tracker [web #23](https://github.com/alea-institute/ontokit-web/issues/23) is closed.
+- API: [PR #24](https://github.com/alea-institute/ontokit-api/pull/24), squash-merged to `dev` as `474d90d669bfdbeeaafcfa1078ef90bc42e107a7`; completed tracker [API #23](https://github.com/alea-institute/ontokit-api/issues/23) is closed.
+- Documentation corrections: [web PR #29](https://github.com/alea-institute/ontokit-web/pull/29), merged to `feat/roundup-brainstorm` as `576dc2048a5356fab36a8fe0480184f51f2df61d`.
+
+Optional mode without Zitadel remains supported. No CatholicOS, AWS, DNS, DEV, PROD, credential, demo-repository, OAuth-console, or external-organization mutation occurred during the final ALEA publication pass.
+
+## Durable continuation sources
 
 - Audit ledger: `docs/audits/2026-08-20-recent-plan-completion-audit.md`
-- Implementation-ready ce-work plan: `docs/plans/2026-08-20-0836-chore-recent-plan-completion-plan.md`
-- Human Decision Sheet: `docs/decision-sheets/2026-08-20-recent-plan-decisions.md`
-- Held final-batch manifest: `docs/roundup-2026-08/tranche-drafts/FINAL-BATCH-MANIFEST.md`
+- Execution plan: `docs/plans/2026-08-20-0836-chore-recent-plan-completion-plan.md`
+- Decision Sheet: `docs/decision-sheets/2026-08-20-recent-plan-decisions.md`
+- Held upstream manifest: `docs/roundup-2026-08/tranche-drafts/FINAL-BATCH-MANIFEST.md`
 
-The preliminary audit and Decision Sheet committed at `e219328b` are explicitly marked superseded. That commit also retired two completed handoffs and refreshed the DEV runbook/UAT record; its history was preserved.
+## Validation receipts
 
-## What this session completed autonomously
+Web PR #25 finished with 217 test files and 3,365 tests passing, TypeScript type-check passing, ESLint at zero errors, and an optional-auth release-fidelity Docker build passing without Zitadel configuration. The final structured review had no actionable findings.
 
-- Searched every reachable web-repo ref and the sibling API history for in-window plans, including two August 13 plans absent from this checkout.
-- Reconciled every formal unit against commits, merged ALEA PRs, tests, UAT logs, deployment receipts, current GitHub state, DNS, DEV/PROD HTTP health, AWS SSH reachability, and the official PyPI release page.
-- Replaced stale external facts: the refreshed CatholicOS gap is 277 commits (113 web, 164 API), PROD is HTTP 200, DEV health is green, AWS SSH is still closed/filtered, and PyPI lists `folio-python` 0.4.0. A 2026-08-21 refresh additionally found no public `ontokit.org` RDAP registration or NS/A delegation yet.
-- Produced one ordered queue with activation conditions and a six-question Decision Sheet; the former optional-auth question was resolved by preserving existing behavior.
-- Ran the required non-interactive document review with coherence, feasibility, scope, security, design, product, and adversarial lenses. The independent cross-model Claude jobs reached their bounded deadline without usable output and are not counted as corroboration.
-- Folded review corrections into the plan: writable-branch preflight, corrected decision references, early auto-accept UAT, two-stage upstream mapping, rollout-neutral PROD prework plus access-gated activation, deployment authority controls, PR Party draft prework and workflow-integrity proof, explicit demo-data cleanup tracking, annotation-property classification, UI/accessibility acceptance, and a version-agnostic secure FOLIO release gate.
+API PR #24 finished with 2,932 tests passing and 32 external-fixture integration tests skipped; Ruff check and formatting passed; Pyright reported 0 errors and 0 warnings; Alembic exposed one head, `g5h6i7j8k9l0`; remote CI was fully green. The final structured review applied all 12 validated findings and left no actionable findings. One CI-only `MissingGreenlet` failure was diagnosed as a test retaining an expired ORM object across an intentional rollback; caching the UUID before the rollback fixed the test without changing production behavior.
 
-## Autonomous implementation completed in an isolated checkout
+Documentation PR #29 passed build, lint, test, and type-check. It remained mergeable, clean, and review-signal-free through the babysit quiet window before merge.
 
-Because `feat/roundup-brainstorm` is a documentation branch 442 commits behind `origin/feat/pr-party`, implementation used an isolated clone based on integration head `83b62b0b`. The reviewed commits were imported into durable local branch `fix/plan-audit-web-residuals` without switching this dirty documentation checkout.
+The final closeout document review covered coherence, feasibility, design, security, scope, and adversarial lenses. It corrected Stage A/Stage B sequencing, undefined historical tranche labels, demo recovery behavior, source-content release controls, PROD runtime-network controls, imported-plan authority refresh, queue liveness, and the overly exact FOLIO version gate. Feasibility and scope found no additional issues. The automatic cross-model pass did not run because the environment denied private-plan egress to the external provider without separate disclosure authorization; it is not counted as corroboration.
 
-Web U1–U4 plus the production-build repair are implemented in commits `6f5ee59f`, `fea85b6b`, `5ef55edc`, `1697e5e7`, and `4a4dc5bf`. The final tree passes 208 test files/3,298 tests, type-check, lint with zero errors, the optional-auth production build with 24 static pages, and diff checks. The branch is local only.
+## Decisions saved for the user
 
-The sibling API's durable local branch `fix/recent-plan-api-residuals` ends at `0a54857a`. It contains six commits for project-bound audit cursors, declaration-aware annotation parity, `folio-python==0.4.0` with `owlready2` removed, truthful preflight/runtime deploy status, a dormant fail-closed PROD promotion scaffold, and its immutable release pair. The complete API suite passes 2,738 tests against real PostgreSQL and Redis; Ruff, mypy across 182 source files, both deploy harnesses, lock validation, and diff checks pass. No push or merge occurred.
+The Decision Sheet contains the full context and recommended-first options. The short reply format is `D7 = 1; D8 = 1; D9 = 1; D10 = 1`.
 
-The child API branch `feat/demo-refresh-scaffold` ends at `e894f20f`. It prepares U8 without weakening D3: only the two approved source/destination routes, distinct token enforcement, ambient credential-helper disablement, default-branch-only refresh, preserved demo branches, token-scrubbed resync, nonoverlap lock, inert cron, and runbook. Six focused tests pass, including a real local Git branch-preservation proof. Activation still requires the two private repos, two scoped tokens, manual scope receipts, host installation, and live cron. No external or host state changed.
+- D7: demo refresh visibility — off-side generation plus atomic switch is recommended; [API #25](https://github.com/alea-institute/ontokit-api/issues/25).
+- D8: PR Party answerer context — title, triggering comment, and allowlisted metadata is recommended; [API #26](https://github.com/alea-institute/ontokit-api/issues/26).
+- D9: demo banner placement — sticky in layout flow with reserved space is recommended; [web #24](https://github.com/alea-institute/ontokit-web/issues/24).
+- D10: whole-document concurrency — revision compare-and-set first is recommended; [web #26](https://github.com/alea-institute/ontokit-web/issues/26).
 
-U9 is now locally implemented on API branch `feat/demo-project-isolation` at `b5b13d8f` and web branch `feat/demo-project-ui` at `d7e490ec`. The API supplies database-enforced demo identity, idempotent provisioning/full reindex, one project-aware outbound-target authorizer, and exact repository identity; the web supplies home and originating-project entry, preparation/unavailable states, server-truth badges and notice, exact resettable-repository naming, and return to the live source. The API tree previously passed 2,760 tests against real PostgreSQL and its 86 project-service unit tests remain green after the response follow-up. The web passes 210 files/3,298 tests, type-check, and lint with zero errors/19 existing warnings; light/dark browser inspection is clean. Both branches are local only. Live repo creation, scoped-token proof, deployment, keyboard/responsive acceptance, and write isolation remain activation-gated.
+These decisions do not grant deployment or external-mutation authority.
 
-D5 is locally complete in the API repository at `f3c4251d` on `fix/pr-party-credential-rewrap`. It adds the explicit operator-only reviewer-credential rewrap chosen by the user: dry-run default, exact apply confirmation at both CLI and worker boundaries, stable mode-specific job IDs, all-row transactional rotation, counts/UUID-only receipts, SQL parameter redaction, and a runbook that separates ciphertext rewrap from GitHub PAT replacement and global key retirement. Seventy-eight focused unit tests and two disposable real-Postgres integration tests pass; Ruff, authoritative mypy, and advisory Pyright are clean. The branch is local only and no stored credential was read or changed.
+## Activation queue
 
-The autonomous T3 security branch now ends at API `738f20a6`. Its nine commits cover exact-origin/DNS-pinned provider networking, project-level quality-job serialization, atomic paid embedding/connection-test and ordinary-generation reservations, provider-key HKDF migration, crash-repairable limiter TTLs, safe paid-provider transitions, redacted fail-soft alerts, and atomic dimension-safe vector snapshots. Web branch `fix/t3-security-web` remains at `a272c8dc`, preserving structured API bodies while presenting safe project-analysis conflict messages. The generation slice passes 54 focused tests; the final vector-adjacent slice passes 137 unit tests; five disposable real-PostgreSQL tests prove concurrent spend serialization, migration/index validity, unique snapshot IDs, and duplicate behavior; Ruff, strict mypy, advisory Pyright, and diff checks are green. The broad synchronous `TestClient` route harness still stalls on its first anonymous-route case in this environment and is not claimed as passing. The two substantive T3 closure-ledger gaps are now implemented; both branches remain local only.
+- Authenticated DEV acceptance and auto-accept proof: [web #27](https://github.com/alea-institute/ontokit-web/issues/27). Requires an approved authenticated session and throwaway-state write authority.
+- Demo repositories, scoped credentials, atomic refresh, cron, and live acceptance: [API #25](https://github.com/alea-institute/ontokit-api/issues/25). Requires source-owner approval for an exact history-free release manifest, clean secret/sensitive-data scans, separately scoped read/write credentials, and explicit live activation.
+- Parallel PROD stand-up and rehearsal: [API #27](https://github.com/alea-institute/ontokit-api/issues/27). Requires Mike/AWS or scoped IAM access, protected-environment and runtime-network prerequisites, and separate deployment/write-drain/DNS approvals.
+- `ontokit.org` picker: [web #28](https://github.com/alea-institute/ontokit-web/issues/28). Registration was selected; do not re-ask. Wait for observable control, both destination domain names, and DNS/TLS authority.
+- Google federation: [API #28](https://github.com/alea-institute/ontokit-api/issues/28). Wait for both domain contracts and approved private OAuth provisioning.
+- `folio-python` migration: [API #29](https://github.com/alea-institute/ontokit-api/issues/29). Wait for the first verified safe official release at or above 0.4.0; the last verified latest release was 0.3.6.
+- CatholicOS delivery: [web #30](https://github.com/alea-institute/ontokit-web/issues/30). Refresh both upstream bases before the held issue-first batch; the current closeout scope is ALEA-only and self-merge remains prohibited.
 
-API T3 is synthesized on `upstream-queue/t3-api-synthesis` at `1b8bde28`, based on T1 head `d2c31aea`. The checkpoint contains the 22-commit T3 feature foundation plus the final reviewed hardening seam. An empty disposable PostgreSQL database upgraded through the single Alembic head; 154 focused non-`TestClient` unit tests, four direct route-hardening tests, and two real-PostgreSQL vector-integrity tests pass. Ruff, formatting, and diff checks pass. Targeted mypy reports only the pre-existing FOLIO import-annotation mismatch outside T3.
+## Queue liveness contract
 
-Web T3 is synthesized on `upstream-queue/t3-web-synthesis` at `2c6a7813`, based on T1 head `4986135c`. All 175 test files and 2,891 tests pass; type-check passes; lint has zero errors and 18 warnings; and the optional/no-Zitadel production build emits 22 static pages. The synthesis preserves T1 anonymous proposal behavior, retains the reviewed page-module build fix, and excludes the mixed `.claude` artifact. A read-only refresh on 2026-08-21 confirmed CatholicOS `dev` is still web `c714c74b` and API `a21b7d5c`, so the pair is current. Both branches are local only and unpushed.
+Recheck each open gate at the start of a resumed planning/release session and at least every 30 days while OntoKit work is active. The named receipt, not observation alone, moves an issue into active execution.
 
-T2 is synthesized locally at API `upstream-queue/t2-api-synthesis` `56800cda` and web `upstream-queue/t2-web-synthesis` `256d2344`, both based on T1. API carries the complete DEV IaC/CI foundation, current pinned Actions, truthful revision preflight/status, immutable manifest, isolated smoke, and dormant fail-closed PROD promotion; web carries best-effort Codecov. API verification: deploy harness 8/8, promotion harness 6/6, manifest tests 6/6, workflow YAML, Bash syntax, Ruff/format/diff, and Compose structure green. Web workflow YAML and diff checks pass. Both branches are local only and unpushed; no runtime or settings state changed.
+| Queue | Responsible owner | Observable trigger source | Activation receipt |
+|---|---|---|---|
+| Web #24 and #26 | Product owner | Decision Sheet reply | Decision recorded on the issue |
+| API #25 and #26 | Product owner, then ALEA security/release owner | Decision reply plus named credential/organization gates | Decision comment and controlled activation receipt |
+| Web #27 | ALEA release owner | Approved authenticated UAT session and throwaway-state authority | Dated UAT and cleanup log |
+| API #27 | ALEA release owner | AWS/scoped-IAM access and protected/runtime environment checks | Parallel-host deploy, scan, smoke, rollback, and UAT receipt |
+| Web #28 | ALEA release owner | Registration/RDAP, final destination domains, DNS/TLS approval | Public DNS, TLS, link, and accessibility receipt |
+| API #28 | ALEA identity owner | Final domain contract and approved OAuth client | DEV federation UAT receipt |
+| API #29 | API dependency owner | Official package index release metadata | Lock, provenance, compatibility, test, and security receipt |
+| Web #30 | ALEA release owner | Explicit resumption of CatholicOS work and refreshed upstream heads | Issue-first delivery map and linked PR receipts |
 
-The upstream map, T1 drafts, and held T2–T10 final-batch manifest now exist under `docs/roundup-2026-08/`. They account for all 277 cutoff commits, the post-cutoff local branches, issue-first ordering, exact owner-link semantics, dependent-PR branch rules, a crash-safe correlation journal, and no-self-merge rules. A seven-persona local document review was applied; its external cross-model pass was not retried after the earlier export-authorization denial. Complete green T1 synthesis heads are API `d2c31aea` and web `4986135c`; only the deliberately last-minute base refresh and clean replay remain before the authorized batch.
+## Preserved local state
 
-Live public browser evidence covers the FOLIO landing/project viewer and both Standard and Developer layouts with no errors or warnings. Authenticated auto-save, translation/audit views, personas, and the auto-accept clock remain credential-gated acceptance work.
+No WIP was discarded or published.
 
-Public RDAP and authoritative DNS checks on 2026-08-21 still show no registered/delegated `ontokit.org`. Registration remains selected; do not re-ask the choice. Recheck the public state before beginning picker work.
+- Web canonical checkout is clean on ALEA `dev` tracking `origin/dev`.
+- The interrupted integration line remains preserved at `safety/recent-plan-integration-autosave-20260828-final` and `upstream-queue/recent-plan-integration-web`, both at `10dea248`.
+- The later generated phase-16 auto-save is preserved at `safety/web-phase16-precompact-20260828`, commit `72c641b0`.
+- API canonical checkout is clean on ALEA `dev` tracking `origin/dev` at `474d90d6`.
+- Clean API recovery/review worktrees remain at `/tmp/ontokit-api-stalled-cli-recovery-handoff` (`8d0d8ea6`) and `/tmp/ontokit-api-final-review` (`6305087f`). They were not deleted because they are preserved recovery artifacts, not dirty trees.
 
-## Next execution order
+## Publication state
 
-1. Continue local current-upstream synthesis for the remaining T4–T10 feature seams. Preserve one-owner issue/PR boundaries and do not push implementation branches.
-2. Activate U8/U9 only after the two private repositories and separately scoped source/destination credentials exist; then install refresh/resync, seed, run the manual scope receipt, and complete live keyboard/responsive/write-isolation acceptance.
-3. Include U9 heads `b5b13d8f` and `d7e490ec`, now recorded in the upstream map, in the final refreshed scratch replay.
-4. Use `tranche-drafts/FINAL-BATCH-MANIFEST.md` as the held T2–T10 publication queue. Immediately before the authorized final batch, refresh CatholicOS `dev` and replay the already-green T1 pair: API `d2c31aea` and web `4986135c`. Create/update issues first, link the PRs, and do not self-merge.
-5. Run authenticated DEV acceptance for auto-save, translations/audit, personas, and the auto-accept clock when a suitable UAT session/credential is available.
-6. Keep PROD Stage B dormant until branch/environment/CODEOWNERS, smoke credential, AWS access, forced-command, data-path, parallel-host, and UAT gates clear. DNS cutover remains separately approved.
-7. Include D5 branch `fix/pr-party-credential-rewrap` at `f3c4251d` in the final issue/PR batch. Deploy or execute it only during a controlled application-key rotation with the previous key retained and every worker on one deployment generation. Activate the already-prepared held PR Party package after demo readiness; outreach waits for the demo.
-8. Finish closeout only when every remaining item is complete or has a current, explicit activation condition.
+This handoff is authored on focused branch `docs/recent-plan-final-closeout-20260828`, based on merged documentation head `576dc204`. Its final commit, push, PR, and merge status must be reported in the completing session; the repository history is authoritative if this paragraph becomes stale.
 
-## Protected local state
-
-The following pre-existing files were intentionally excluded from all validation commits:
-
-- `.claude/`
-- `.codex/`
-- `.worker-reports/`
-- `AGENTS.md`
-- `WORKER-REPORT-u7-docs.md`
-- `WORKER-REPORT-u7-flip-docs.md`
-- `docs/residual-review-findings/2026-08-08-llm-subsystem-review.md`
-
-No secrets, credentials, personal roster data, AWS mutation, DNS mutation, CatholicOS issue/PR mutation, DEV write, or PROD mutation occurred during this validation pass.
-
-## Commit and publication state
-
-The prior documentation state was committed and pushed through `ee14b76e` on `feat/roundup-brainstorm`. The web residual branch `fix/plan-audit-web-residuals` at `4a4dc5bf`, API residual branch `fix/recent-plan-api-residuals` at `0a54857a`, API demo-refresh branch `feat/demo-refresh-scaffold` at `e894f20f`, API demo-isolation branch `feat/demo-project-isolation` at `b5b13d8f`, web demo-UI branch `feat/demo-project-ui` at `d7e490ec`, API D5 branch `fix/pr-party-credential-rewrap` at `f3c4251d`, API T3 source branch `fix/t3-security-api` at `738f20a6`, web T3 source branch `fix/t3-security-web` at `a272c8dc`, T1 synthesis branches API `d2c31aea` and web `4986135c`, T2 synthesis branches API `56800cda` and web `256d2344`, and T3 synthesis branches API `1b8bde28` and web `2c6a7813` are durable local branches only; none is pushed or merged.
+No secrets, credentials, personal roster data, or unrelated private information are included.

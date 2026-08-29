@@ -10,6 +10,32 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 
 ## Executive result
 
+### Final ALEA closeout refresh — 2026-08-28
+
+This section supersedes every older local-only or publication-pending statement below; the older receipts remain as execution history.
+
+- All seven in-window plans and all 52 formal units remain accounted for exactly once.
+- The autonomous ALEA implementation is merged: [web PR #25](https://github.com/alea-institute/ontokit-web/pull/25) and [API PR #24](https://github.com/alea-institute/ontokit-api/pull/24). Their implementation trackers, web #23 and API #23, are closed.
+- Final web evidence: 217 files/3,365 tests, type-check, zero-error lint, optional-without-Zitadel release-fidelity build, and no actionable structured-review findings.
+- Final API evidence: 2,932 tests passed with 32 external-fixture skips; Ruff, formatting, Pyright 0/0, one Alembic head `g5h6i7j8k9l0`, remote CI, and all 12 validated final-review findings applied.
+- Every uncompleted operational, trigger-gated, cross-organization, or judgment-dependent unit now has one ALEA issue with an explicit activation condition. No plan task remains only in chat or an untracked local branch.
+
+| Remaining queue | Formal units covered | Durable ALEA authority |
+|---|---|---|
+| Demo banner placement | U9 browser polish | [web #24](https://github.com/alea-institute/ontokit-web/issues/24) |
+| Whole-document concurrency boundary | Cross-tab/editor integrity residual | [web #26](https://github.com/alea-institute/ontokit-web/issues/26) |
+| Authenticated DEV acceptance and live auto-accept proof | Roundup U7; acceptance tails for U9/U12 | [web #27](https://github.com/alea-institute/ontokit-web/issues/27) |
+| `ontokit.org` picker and domain gate | Roundup U17 | [web #28](https://github.com/alea-institute/ontokit-web/issues/28) |
+| Held upstream delivery | Roundup U11/U14 and CatholicOS delivery tails | [web #30](https://github.com/alea-institute/ontokit-web/issues/30) |
+| Demo refresh atomicity, repositories, credentials, and live activation | Roundup U8/U9 | [API #25](https://github.com/alea-institute/ontokit-api/issues/25) |
+| PR Party answerer context and external activation | Roundup U16 | [API #26](https://github.com/alea-institute/ontokit-api/issues/26) |
+| Parallel PROD rehearsal | Roundup U10/U12/U13/U15 | [API #27](https://github.com/alea-institute/ontokit-api/issues/27) |
+| Domain-triggered Google federation | Google federation U1–U3 | [API #28](https://github.com/alea-institute/ontokit-api/issues/28) |
+| First verified safe `folio-python` release at or above 0.4.0 | Completion-plan U15 / API #209 tail | [API #29](https://github.com/alea-institute/ontokit-api/issues/29) |
+| Ledger, Decision Sheet, and durable handoff publication | Roundup U18 / completion-plan U16 | [web #22](https://github.com/alea-institute/ontokit-web/issues/22) |
+
+The four remaining judgment/taste questions are D7–D10 in the Decision Sheet. All other rows are activation gates, not unanswered design choices. Optional mode without Zitadel remains supported. No CatholicOS, AWS, DNS, DEV, PROD, credential, or external-organization mutation occurred during this final ALEA closeout.
+
 ### Execution refresh — 2026-08-24
 
 This refresh supersedes the local-only publication statements below while preserving their historical test receipts. T4 through T8 are now synthesized on isolated current-upstream branches and pushed to ALEA. T9 documentation is dispositioned in `docs/roundup-2026-08/T9-DOCUMENTATION-DISPOSITION.md`. No CatholicOS repository, deployment, AWS resource, DNS record, PROD system, or external organization asset was changed.
@@ -90,7 +116,7 @@ The earlier PyPI premise was wrong: the official `folio-python` project currentl
 |---|---|---|
 | U1–U2 federated logout | Complete | Commit `cbe58a0b`, regression tests, ALEA web PR #18, deployed DEV proof. |
 | U3–U5 suggester save | Complete | Commit `5826c7f5` covers class, property, and individual handlers; ALEA web PR #18, deployed DEV proof. |
-| U6 audit residuals | **Synthesized and pushed; delivery pending** | Source commit `6f5ee59f` is included in ALEA web T8 head `93f0c62a`. Focused tests, type-check, zero-error lint, and the optional-without-Zitadel production build pass. CatholicOS delivery remains in the held final batch. |
+| U6 audit residuals | **Complete on ALEA; CatholicOS delivery queued** | Source commit `6f5ee59f` is included in merged ALEA web PR #25. Focused tests, type-check, zero-error lint, and the optional-without-Zitadel production build pass. CatholicOS delivery is tracked in web #30. |
 
 CatholicOS issues #344 and #345 remain open because the ALEA fixes have not been delivered upstream. That does not invalidate the plan’s ALEA PR and DEV Definition of Done, but it belongs to the upstream-delivery queue.
 
@@ -103,7 +129,7 @@ CatholicOS issues #344 and #345 remain open because the ALEA fixes have not been
 | U1 indexed label-property fix | Complete | API commit `8a6575d1`; ALEA API PR #22 merged. |
 | U2 indexed/RDFLib parity proof | Complete for the scoped allowlist | API regression coverage merged; broader predicate parity became API #212. |
 | U3 round-trip-safe class writer | Complete | Web commit `72ee0522`; ALEA web PR #19 merged; 13 multilingual altLabels preserved in live DEV UAT. |
-| U4 serialization churn | **Synthesized and pushed; delivery pending** | Source commit `1697e5e7` is included in ALEA web T7 head `ab9988db`; 127 focused Turtle/detail-panel tests, type-check, and zero-error lint pass. CatholicOS delivery remains in the held final batch. |
+| U4 serialization churn | **Complete on ALEA; CatholicOS delivery queued** | Source commit `1697e5e7` is included in merged ALEA web PR #25; 127 focused Turtle/detail-panel tests, type-check, and zero-error lint pass. CatholicOS delivery is tracked in web #30. |
 
 CatholicOS issue #361 remains open pending upstream delivery.
 
