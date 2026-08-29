@@ -10,6 +10,20 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 
 ## Executive result
 
+### Execution refresh — 2026-08-24
+
+This refresh supersedes the local-only publication statements below while preserving their historical test receipts. T4 through T8 are now synthesized on isolated current-upstream branches and pushed to ALEA. T9 documentation is dispositioned in `docs/roundup-2026-08/T9-DOCUMENTATION-DISPOSITION.md`. No CatholicOS repository, deployment, AWS resource, DNS record, PROD system, or external organization asset was changed.
+
+| Tranche | Web ALEA head | API ALEA head | Current disposition |
+|---|---|---|---|
+| T4/T5 foundation | `6890216b` | `1029cd26` | Reviewed archival branches pushed. |
+| T5 PR Party | `4083e906` | `07ccdc39` | Synthesized and pushed; live activation remains gated. |
+| T6 translations | `bafce3da` | `334df1b1` | Synthesized, corrected, verified, and pushed. |
+| T7 editor/annotations | `a8140836`, `ab9988db` | `355c66e3` | Synthesized, verified, and pushed; authenticated UI/live acceptance remains gated. |
+| T8 residuals | `93f0c62a` | `d26e63cd` | Audit, deterministic storage, page-module build repair, annotation parity, and audit-API hardening synthesized, verified, and pushed. |
+
+The earlier PyPI premise was wrong: the official `folio-python` project currently lists 0.3.6 as its latest release. The 0.4.0 dependency commit is therefore not deliverable and remains queued behind the exact activation condition “PyPI publishes a verified `folio-python` 0.4.0 release.”
+
 - **37 of 52 formal plan units are complete on shared integration history.** Two more formal units—the U7 audit tail and annotation serialization tail—are implemented and fully tested on the local `fix/plan-audit-web-residuals` branch, pending publication/integration. Roundup U13 Stage A and U14's initial map/drafts are also implemented locally but are not yet complete units.
 - **13 formal units remain queued or gated.** Ten belong to the roundup plan, including strict U11/U12 acceptance gaps, and three belong to the trigger-gated Google federation plan.
 - All enumerated review/execution residuals are now implemented and tested on local isolated branches, including web #348/#359/#360 and API #208/#209/#211/#212. The paired T3 seam is synthesized onto the current CatholicOS cutoffs at API `1b8bde28` and web `2c6a7813`; remaining tranche synthesis, publication, and live acceptance are separate gates.
@@ -76,7 +90,7 @@ Completion is derived from commits, merged PRs, tests, UAT evidence, deployed-st
 |---|---|---|
 | U1–U2 federated logout | Complete | Commit `cbe58a0b`, regression tests, ALEA web PR #18, deployed DEV proof. |
 | U3–U5 suggester save | Complete | Commit `5826c7f5` covers class, property, and individual handlers; ALEA web PR #18, deployed DEV proof. |
-| U6 audit residuals | **Implemented locally; integration pending** | Local commit `6f5ee59f` centralizes `formatTimeAgo`, adds erasure fallbacks, aligns the type contract, and removes the empty type-only test. Full web gates pass on `fix/plan-audit-web-residuals`; the branch is not pushed or merged. |
+| U6 audit residuals | **Synthesized and pushed; delivery pending** | Source commit `6f5ee59f` is included in ALEA web T8 head `93f0c62a`. Focused tests, type-check, zero-error lint, and the optional-without-Zitadel production build pass. CatholicOS delivery remains in the held final batch. |
 
 CatholicOS issues #344 and #345 remain open because the ALEA fixes have not been delivered upstream. That does not invalidate the plan’s ALEA PR and DEV Definition of Done, but it belongs to the upstream-delivery queue.
 
@@ -89,7 +103,7 @@ CatholicOS issues #344 and #345 remain open because the ALEA fixes have not been
 | U1 indexed label-property fix | Complete | API commit `8a6575d1`; ALEA API PR #22 merged. |
 | U2 indexed/RDFLib parity proof | Complete for the scoped allowlist | API regression coverage merged; broader predicate parity became API #212. |
 | U3 round-trip-safe class writer | Complete | Web commit `72ee0522`; ALEA web PR #19 merged; 13 multilingual altLabels preserved in live DEV UAT. |
-| U4 serialization churn | **Implemented locally; integration pending** | Subject-form preservation was already present in the #361 fix. Local commit `1697e5e7` adds source-aware preservation for unchanged untagged labels and proves a comment edit changes only the comment. Full web gates pass; the branch is not pushed or merged. |
+| U4 serialization churn | **Synthesized and pushed; delivery pending** | Source commit `1697e5e7` is included in ALEA web T7 head `ab9988db`; 127 focused Turtle/detail-panel tests, type-check, and zero-error lint pass. CatholicOS delivery remains in the held final batch. |
 
 CatholicOS issue #361 remains open pending upstream delivery.
 
@@ -97,13 +111,13 @@ CatholicOS issue #361 remains open pending upstream delivery.
 
 | Item | Authority | Disposition |
 |---|---|---|
-| Audit UI hardening | CatholicOS/ontokit-web#348 | Implemented locally in `6f5ee59f`; publication/integration remains. |
-| Deterministic Node 25 test storage | CatholicOS/ontokit-web#359 | Implemented locally in `fea85b6b`; plain Node 25 suite passes. Publication/integration remains. |
-| Server-side Zitadel issuer fail-fast | CatholicOS/ontokit-web#360 | Implemented locally in `5ef55edc`; preserves optional-without-Zitadel and removes the localhost fallback. Publication/integration remains. |
-| Audit API integration hardening | CatholicOS/ontokit-api#208 | Implemented locally in `a31ebf78`; project-bound cursors reject cross-project replay. |
-| Full annotation-path parity | CatholicOS/ontokit-api#212 | Implemented locally in `4a4db9c9`; cold and indexed paths share declaration-aware classification with real-PostgreSQL parity proof. |
-| Pin `folio-python` and remove `owlready2` | CatholicOS/ontokit-api#209 | Implemented locally in `a990b231`; exact 0.4.0 pin, compatible lock, fallback tests, and no new dependency vulnerabilities. |
-| Restore production-build validity | Local build evidence | Implemented locally in web `4a4dc5bf`; `AUTH_MODE=optional npm run build -- --webpack` succeeds with 24 static pages. |
+| Audit UI hardening | CatholicOS/ontokit-web#348 | Synthesized in pushed ALEA web T8 head `93f0c62a`; CatholicOS delivery remains. |
+| Deterministic Node 25 test storage | CatholicOS/ontokit-web#359 | Synthesized in pushed ALEA web T8 head `93f0c62a`; plain Node 25 tests pass without caller flags. |
+| Server-side Zitadel issuer fail-fast | CatholicOS/ontokit-web#360 | Synthesized from `5ef55edc` into the pushed ALEA T5–T8 web chain; optional-without-Zitadel remains supported and configured/required OIDC fails coherently without a localhost fallback. |
+| Audit API integration hardening | CatholicOS/ontokit-api#208 | Synthesized in pushed ALEA API T8 head `d26e63cd`; project-bound cursors reject cross-project replay and the focused audit suite passes 216 tests with 12 expected real-database skips. |
+| Full annotation-path parity | CatholicOS/ontokit-api#212 | Synthesized in pushed ALEA API T7 head `355c66e3`; cold and indexed paths share declaration-aware classification. |
+| Pin `folio-python` and remove `owlready2` | CatholicOS/ontokit-api#209 | **Queued, not deliverable.** PyPI still tops out at 0.3.6, so source commit `a990b231` was deliberately excluded. Activate only after a verified 0.4.0 release and fresh compatibility/security proof. |
+| Restore production-build validity | Local build evidence | Synthesized in pushed ALEA web T8 head `93f0c62a`; the production build succeeds with no Zitadel configuration and a required disposable NextAuth signing secret. |
 | T3 provider-network hardening | Final-batch T3 security ledger | Implemented locally in API `a4be506b`: exact-origin private-provider authorization, resolve-once DNS-answer pinning, metadata/redirect refusal, and safe outbound failure reporting. Publication/integration remains. |
 | T3 project-analysis serialization | Final-batch T3 security ledger | Implemented locally in API `5a67885f`: one active job per project, deterministic queue identity, atomic lease lifecycle, cancellation-safe retry behavior, and ambiguous-enqueue reconciliation. Publication/integration remains. |
 | T3 structured conflict UX | Final-batch T3 web acceptance | Implemented locally in web `a272c8dc`: raw structured errors remain available to existing consumers while project-analysis conflicts show safe, actionable messages. Publication/integration remains. |
@@ -121,7 +135,7 @@ CatholicOS issue #361 remains open pending upstream delivery.
 - `https://ontokit.dev.openlegalstandard.org/health` returns `{"status":"healthy"}`.
 - TCP 22 to 54.224.195.12 is closed or filtered from the home box.
 - Public RDAP returns not found for `ontokit.org`, and authoritative NS/A lookups return no records as of 2026-08-21.
-- PyPI lists `folio-python` 0.4.0, released 2026-08-18; the tested local API branch pins it exactly and removes `owlready2`.
+- PyPI lists `folio-python` 0.3.6 as the latest release as of 2026-08-24. No 0.4.0 distribution is available, so the dependency change remains parked.
 
 ## 2026-08-20 autonomous execution receipt
 

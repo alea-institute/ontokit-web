@@ -1,7 +1,7 @@
 # Decision Sheet — Recent OntoKit Plan Residuals
 
 Created: 2026-08-20
-Updated: 2026-08-21 after D5 implementation and the latest public domain-status check
+Updated: 2026-08-24 after T5–T8 synthesis and a fresh PyPI check
 
 The recommended choices are first. Reply with short answers such as `D1 = 1; D2 = 1; D3 = 1; D4 = 1; D5 = 1; D6 = 2`.
 
@@ -23,7 +23,7 @@ The recommended choices are first. Reply with short answers such as `D1 = 1; D2 
 2. Not sent; put the final paste-ready message in chat again.
 3. You have console access and will add the rule yourself.
 
-**Your answer:** `D2 = 1, 2, or 3`
+**Decision:** `D2 = 1` — the request was sent; wait for Mike and recheck access without re-asking.
 
 ## D3. Should we activate the demo-mode prerequisite work now?
 
@@ -83,10 +83,20 @@ Google federation remains parked until the CatholicOS-side and ALEA-side domain-
 
 Prepare the implementation and outreach package locally. Begin outreach only when the demo is ready; do not contact the CatholicOS organization earlier.
 
+## Current decision queue
+
+There are no unanswered judgment or taste questions. The remaining holds are activation conditions, not choices:
+
+- AWS/PROD waits for Mike's access and the already-selected parallel stand-up prerequisites.
+- Demo repository activation waits for the two separately scoped credentials.
+- Domain-dependent work waits for externally observable CatholicOS/ALEA domain resolution and `ontokit.org` DNS control.
+- CatholicOS delivery waits for the issue-first final batch after local synthesis and validation; self-merge remains prohibited.
+
 ## Defaults that do not need a decision
 
-- `folio-python` 0.4.0 is published; the tested local API branch now pins it exactly and removes `owlready2`.
-- Web #348/#359/#360, cosmetic Turtle churn, the production-build blocker, and API #208/#209/#211/#212 are implemented on tested local branches. Publication/integration and the authenticated auto-accept live UAT remain.
+- PyPI currently lists `folio-python` 0.3.6 as the latest release, not 0.4.0. The dependency change remains parked until a verified 0.4.0 release exists; the unresolvable 0.4.0 pin was not replayed.
+- Web #348/#359/#360, Turtle stability, the production-build blocker, and API #208/#211/#212 are synthesized and pushed on the T7/T8 ALEA archival branches. Authenticated auto-accept live UAT remains activation-gated.
+- T5–T8 archival heads are pushed to ALEA: web `4083e906`, `bafce3da`, `a8140836`/`ab9988db`, `93f0c62a`; API `07ccdc39`, `334df1b1`, `355c66e3`, `d26e63cd`.
 - The T3 security closure ledger is implemented locally through API `738f20a6` and web `a272c8dc`, including ordinary-generation spend reservation and atomic dimension-safe vector snapshots. The paired current-upstream candidates are green at API `1b8bde28` and web `2c6a7813`; no new decision is needed.
 - T2 DEV deploy/CI and dormant PROD Stage A are synthesized and green at API `56800cda` and web `256d2344`. This grants no PROD activation authority and needs no new design decision.
 - CatholicOS issue/PR mutation is authorized only as the final linked batch after the current local implementation and validation work. No self-merge is authorized.
