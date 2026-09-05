@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import {
   mockFetch,
   mockOk,
@@ -215,6 +215,13 @@ describe("createQualityWebSocket", () => {
     // Use a class-style mock so `new WebSocket(...)` works
     WsMock = vi.fn().mockImplementation(function () { return mockWsInstance; });
     vi.stubGlobal("WebSocket", WsMock);
+    vi.stubEnv("NEXT_PUBLIC_WS_URL", "");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://localhost:8000");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it("creates WebSocket with correct URL and token", () => {

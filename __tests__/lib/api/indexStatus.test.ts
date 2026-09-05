@@ -51,9 +51,11 @@ describe("createIndexWebSocket", () => {
     global.WebSocket = MockWebSocket as unknown as typeof WebSocket;
     delete process.env.NEXT_PUBLIC_WS_URL;
     delete process.env.NEXT_PUBLIC_API_URL;
+    vi.stubEnv("NODE_ENV", "development");
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     process.env = { ...originalEnv };
   });
 
@@ -183,9 +185,11 @@ describe("IndexWebSocketManager", () => {
 
     delete process.env.NEXT_PUBLIC_WS_URL;
     delete process.env.NEXT_PUBLIC_API_URL;
+    vi.stubEnv("NODE_ENV", "development");
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });

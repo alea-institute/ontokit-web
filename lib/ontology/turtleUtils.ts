@@ -265,7 +265,7 @@ export function findBlock(
       }
 
       // Match patterns like  :LocalName  or  prefix:LocalName  at line start
-      const localNamePattern = new RegExp(
+      const localNamePattern = new RegExp( // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp  Reason: localName is passed through escapeRegex() (defined below in this file), so the pattern cannot contain unescaped metacharacters.
         `^(\\w*:)?${escapeRegex(localName)}(\\s|$)`,
       );
       if (localNamePattern.test(trimmed)) {

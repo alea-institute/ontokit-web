@@ -4,6 +4,8 @@
  * Mirrors the pattern in lib/api/lint.ts for lint WebSocket updates.
  */
 
+import { getWebSocketUrl } from "./websocketUrl";
+
 export interface IndexWebSocketMessage {
   type: "index_started" | "index_complete" | "index_failed";
   project_id: string;
@@ -22,10 +24,7 @@ export function createIndexWebSocket(
   onClose?: (event: CloseEvent) => void,
   token?: string
 ): WebSocket {
-  const wsUrl =
-    process.env.NEXT_PUBLIC_WS_URL ||
-    process.env.NEXT_PUBLIC_API_URL?.replace(/^http/, "ws") ||
-    "ws://localhost:8000";
+  const wsUrl = getWebSocketUrl();
 
   const params = token ? `?token=${encodeURIComponent(token)}` : "";
   const ws = new WebSocket(

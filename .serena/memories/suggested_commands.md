@@ -34,8 +34,7 @@ npm run test:coverage    # vitest --coverage
 ## Docker
 ```bash
 docker build \
-  --build-arg NEXT_PUBLIC_API_URL=http://api:8000 \
-  --build-arg NEXT_PUBLIC_WS_URL=ws://api:8000 \
+  --build-arg NEXT_PUBLIC_API_URL=https://ontokit.example.org \
   -t ontokit-web .
 
 docker run -p 3000:3000 ontokit-web

@@ -73,13 +73,19 @@ The app will be available at http://localhost:3000
 ```bash
 # Build the image
 docker build \
-  --build-arg NEXT_PUBLIC_API_URL=http://api:8000 \
-  --build-arg NEXT_PUBLIC_WS_URL=ws://api:8000 \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.example.com \
+  --build-arg NEXT_PUBLIC_WS_URL=wss://api.example.com \
   -t ontokit-web .
 
 # Run the container
 docker run -p 3000:3000 ontokit-web
 ```
+
+Replace `api.example.com` with your public API hostname. These build arguments
+are embedded in the browser bundle; TLS-served builds require `wss://` for
+WebSocket connections. When `NEXT_PUBLIC_WS_URL` is omitted, its scheme is derived
+from `NEXT_PUBLIC_API_URL` (`https` → `wss`, `http` → `ws`). The localhost default
+is available only in development; other builds must configure one of these URLs.
 
 ## Project Structure
 

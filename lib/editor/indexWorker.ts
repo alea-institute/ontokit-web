@@ -233,7 +233,7 @@ self.onmessage = (event: MessageEvent<IndexWorkerMessage>) => {
 
   // Log debugging info
   if (unmatchedIris.length > 0) {
-    console.log(`[IndexWorker] ${unmatchedIris.length} unmatched IRIs. Examples:`, unmatchedIris.slice(0, 5));
+    console.log("[IndexWorker] %d unmatched IRIs. Examples:", unmatchedIris.length, unmatchedIris.slice(0, 5));
 
     // Log what's in the index that might be similar
     const sampleIri = unmatchedIris[0];

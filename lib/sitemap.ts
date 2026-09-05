@@ -128,7 +128,7 @@ export async function addSitemapEntry(
 
   // Remove existing entry for this URL to avoid duplicates
   const fullUrl = `${SITE_URL}${url}`;
-  const entryPattern = new RegExp(
+  const entryPattern = new RegExp( // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp  Reason: fullUrl is passed through escapeRegExp(), so the pattern cannot contain unescaped metacharacters.
     `\\s*<url>\\s*<loc>${escapeRegExp(fullUrl)}</loc>[\\s\\S]*?</url>`,
     "g"
   );
@@ -154,7 +154,7 @@ export async function removeSitemapEntry(url: string): Promise<void> {
   }
 
   const fullUrl = `${SITE_URL}${url}`;
-  const entryPattern = new RegExp(
+  const entryPattern = new RegExp( // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp  Reason: fullUrl is passed through escapeRegExp(), so the pattern cannot contain unescaped metacharacters.
     `\\s*<url>\\s*<loc>${escapeRegExp(fullUrl)}</loc>[\\s\\S]*?</url>`,
     "g"
   );

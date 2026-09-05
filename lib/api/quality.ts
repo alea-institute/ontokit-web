@@ -3,6 +3,7 @@
  */
 
 import { api } from "./client";
+import { getWebSocketUrl } from "./websocketUrl";
 import type {
   CrossReferencesResponse,
   ConsistencyCheckResult,
@@ -157,10 +158,7 @@ export function createQualityWebSocket(
   token?: string,
   onOpen?: () => void
 ): WebSocket {
-  const wsUrl =
-    process.env.NEXT_PUBLIC_WS_URL ||
-    process.env.NEXT_PUBLIC_API_URL?.replace(/^http/, "ws") ||
-    "ws://localhost:8000";
+  const wsUrl = getWebSocketUrl();
 
   const params = token ? `?token=${encodeURIComponent(token)}` : "";
   const ws = new WebSocket(`${wsUrl}/api/v1/projects/${projectId}/quality/ws${params}`);
