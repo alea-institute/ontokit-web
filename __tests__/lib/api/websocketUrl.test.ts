@@ -27,13 +27,20 @@ describe("getWebSocketUrl", () => {
     expect(getWebSocketUrl()).toBe("wss://socket.example.com");
   });
 
-  it("defaults to localhost only in development", () => {
+  it("defaults to localhost in development", () => {
     vi.stubEnv("NODE_ENV", "development");
     expect(getWebSocketUrl()).toBe("ws://localhost:8000");
   });
 
-  it("requires configuration in production instead of connecting to plaintext localhost", () => {
-    expect(getWebSocketUrl).toThrow("Set NEXT_PUBLIC_API_URL or NEXT_PUBLIC_WS_URL");
+  it("derives wss from the page origin when the page is served over TLS and nothing is configured", () => {
+    vi.stubGlobal("window", { location: { protocol: "https:", host: "ontokit.example.org" } });
+    expect(getWebSocketUrl()).toBe("wss://ontokit.example.org");
+  });
+
+  it("falls back to the localhost default without throwing when nothing is configured", () => {
+    expect(getWebSocketUrl()).toBe("ws://localhost:8000");
+    vi.stubEnv("NODE_ENV", "test");
+    expect(getWebSocketUrl()).toBe("ws://localhost:8000");
   });
 });
 

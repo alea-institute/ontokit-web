@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { getWebSocketUrl } from "@/lib/api/websocketUrl";
 import type { ConnectionState } from "@/components/ui/ConnectionStatus";
 
 interface UseCollaborationStatusOptions {
@@ -27,8 +28,7 @@ export function useCollaborationStatus({
   const connectRef = useRef<() => void>(() => {});
 
   const getWsUrl = useCallback(() => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    const wsUrl = apiUrl.replace(/^http/, "ws");
+    const wsUrl = getWebSocketUrl();
     const params = token ? `?token=${encodeURIComponent(token)}` : "";
     return `${wsUrl}/api/v1/projects/${projectId}/lint/ws${params}`;
   }, [projectId, token]);
