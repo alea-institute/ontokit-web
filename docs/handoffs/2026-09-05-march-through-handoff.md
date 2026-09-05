@@ -11,3 +11,8 @@ Plan: `docs/plans/2026-09-05-1153-chore-recent-plan-march-through-plan.md` (this
 
 ## Resume
 Read the plan's Goal Capsule, Sequencing, and the active unit; resume the controller run named in the private handoff; keep every push behind the perimeter scan (KTD10).
+
+## Closing state (2026-09-05, end of session)
+- Merged: web #42 (`b83c50c1`, push-event Semgrep on `dev` now succeeds) and API #36 (`3201775d`; ALEA API #29 closed with the receipt).
+- Review receipts: web used the harness-native review as the interactive fallback with every correctness finding applied before merge; API was a mechanical diff (dependency pin, lock, config, byte-identical replay of a reviewed test) plus one CI-driven type-ignore removal.
+- Remaining autonomous lane: U4, U5, U20 (B6 provisional mark recorded), U6, U8. Gated units unchanged. Resume from this file plus the private handoff.
