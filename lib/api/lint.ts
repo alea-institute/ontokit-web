@@ -3,6 +3,7 @@
  */
 
 import { api } from "./client";
+import { getWebSocketUrl } from "./websocketUrl";
 
 // Types
 export type LintIssueType = "error" | "warning" | "info";
@@ -263,10 +264,7 @@ export function createLintWebSocket(
   onClose?: (event: CloseEvent) => void,
   token?: string
 ): WebSocket {
-  const wsUrl =
-    process.env.NEXT_PUBLIC_WS_URL ||
-    process.env.NEXT_PUBLIC_API_URL?.replace(/^http/, "ws") ||
-    "ws://localhost:8000";
+  const wsUrl = getWebSocketUrl();
 
   const params = token ? `?token=${encodeURIComponent(token)}` : "";
   const ws = new WebSocket(`${wsUrl}/api/v1/projects/${projectId}/lint/ws${params}`);
