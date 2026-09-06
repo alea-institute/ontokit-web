@@ -224,3 +224,30 @@ No assignee was inferred during closeout.
 - The ALEA deployment, security, and feature synthesis, including the security closure and dormant PROD Stage A, is incorporated in the two merged implementation PRs. This grants no deployment or PROD activation authority.
 - D7, D9, and D10 are incorporated in merged API PRs #34/#35 and web PR #35. Their implementation trackers are closed; only D11 and named activation/retention gates remain.
 - The current execution scope is ALEA-only. CatholicOS issue/PR mutation remains held in web #30; CatholicOS self-merge is not authorized.
+
+## Status as of 2026-09-06
+
+Under `docs/plans/2026-09-05-1153-chore-recent-plan-march-through-plan.md`, D11 and D12 now live on the Cockpit as B3 and B4 on stem `ontokit-web-2026-09-05-1722-march-judgment`; both are unanswered. D1-D10 remain settled. The following batches were filed in U19 on 2026-09-05; as of 2026-09-06 none has a submitted answer.
+
+| B-item | Cockpit stem | Status |
+|---|---|---|
+| B1 | `ontokit-web-2026-09-05-1719-march-dev-hard-blocks` | Unanswered |
+| B2 | `ontokit-web-2026-09-05-1720-march-repo-hard-blocks` | Unanswered |
+| B3 (D11) | `ontokit-web-2026-09-05-1722-march-judgment` | Unanswered |
+| B4 (D12) | `ontokit-web-2026-09-05-1722-march-judgment` | Unanswered |
+| B5 | `ontokit-web-2026-09-05-1722-march-judgment` | Unanswered |
+| B6 | `ontokit-web-2026-09-05-1722-march-judgment` | Unanswered; provisionally marked `mark-20260905T173214-f70e1b` |
+| B7 | `ontokit-web-2026-09-05-1723-march-tasks` | Unanswered |
+| B8 | `ontokit-web-2026-09-05-1723-march-tasks` | Unanswered |
+| B9 | `ontokit-web-2026-09-05-1722-march-judgment` | Unanswered |
+| B11 | `ontokit-web-2026-09-05-1719-march-dev-hard-blocks` | Unanswered |
+| B12 | `ontokit-web-2026-09-05-1720-march-repo-hard-blocks` | Unanswered |
+| B13 | `ontokit-web-2026-09-05-1719-march-dev-hard-blocks` | Unanswered |
+
+B6's provisional recommendation is yes, `dev` is the line; freeze `feat/pr-party`. The mark was recorded before U20 merged; it is not a submitted answer.
+
+Activation-gate movement relative to the historical "Activation gates that do not need a decision now" section:
+
+- `folio-python` replacement: done through API #36 (`3201775d`, 2026-09-05), adopting 0.4.0 and removing `owlready2` with clean OSV, install, and regression receipts; ALEA API #29 closed with the receipt.
+- DEV deploy assets: on `dev` via U5/API #38 (`aab70cbb`) and U20/API #39 (`503e90d4`), both merged 2026-09-06. The trigger now watches pushes to `dev` restricted to `deploy/release-manifest.json`; no deploy run started. U9 still waits on B11, B12, and B1; live write-path smoke remains part of its deploy receipt.
+- Everything else in the activation gates is unchanged. U8's runbook is complete (`920a9cda`), but authenticated DEV acceptance remains gated; U10's auto-accept proof requires a multi-day observation window because the quiet-period floor is one day.

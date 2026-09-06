@@ -243,3 +243,50 @@ The web T3 delivery seam is synthesized on `upstream-queue/t3-web-synthesis` at 
 T2 is synthesized as a local pair on API `upstream-queue/t2-api-synthesis` at `56800cda` and web `upstream-queue/t2-web-synthesis` at `256d2344`, each based on its green T1 candidate. The API seam includes the complete DEV IaC/CI foundation, current pinned Actions with least-privilege checkout, truthful deploy preflight/status, immutable release manifest, isolated write smoke, and a visibly dormant fail-closed PROD promotion workflow; historical scratch reports are excluded. The deploy harness passes 8/8 cases, the promotion harness 6/6, all six manifest unit tests pass, workflow YAML and shell syntax parse, Ruff/format/diff checks pass, and Compose validates without resolving the intentionally absent runtime env file. The web workflow YAML parses and makes Codecov uploads best-effort. Both branches are local only—not pushed or merged—and no environment, credential, AWS, GitHub setting, DEV, or PROD state changed.
 
 The held publication choreography now includes `docs/roundup-2026-08/tranche-drafts/FINAL-BATCH-MANIFEST.md`. It defines issue-first ordering, one-owner link semantics, dependent-PR stacking/retarget rules, proposed titles/scopes for T2–T10, security and UX closure gates, a crash-safe correlation journal, exact stop conditions, and the final no-self-merge checklist. A seven-persona local document review corrected duplicate tranche ownership, accidental picker/demo coupling, unsafe publication-resume behavior, incomplete credential/deploy gates, and acceptance-contract drift. The independent cross-model pass was not retried because its earlier external-export authorization was denied. The manifest grants no CatholicOS, GitHub-configuration, credential, AWS, DNS, DEV, or PROD mutation authority.
+
+## 2026-09-06 march-through addendum
+
+Post-march state verified by the orchestrator on 2026-09-06 under `docs/plans/2026-09-05-1153-chore-recent-plan-march-through-plan.md`; the earlier entries above remain historical receipts.
+
+**U19 — Complete.** The gate register was filed on 2026-09-05. Decision Sheet batches are on the Cockpit under `ontokit-web-2026-09-05-1719-march-dev-hard-blocks` (B11, B1, B13), `ontokit-web-2026-09-05-1720-march-repo-hard-blocks` (B12, B2), `ontokit-web-2026-09-05-1722-march-judgment` (B3=D11, B4=D12, B5, B6, B9), and `ontokit-web-2026-09-05-1723-march-tasks` (B7, B8). As of 2026-09-06 none has a submitted answer; B6 carries provisional mark `mark-20260905T173214-f70e1b` (recommendation: yes, `dev` is the line; freeze `feat/pr-party`).
+
+**U1 — Complete (2026-09-05).** Nine held branches scanned clean and were pushed to ALEA at their tips. T3 API tip `6692f0f4` is on `upstream-queue/t3-api-synthesis`; the manifest-cited `1b8bde28` is its ancestor.
+
+**U7 — Complete (2026-09-05; re-done 2026-09-06 after each merge).** Local web `dev` carries four `.planning` auto-save commits rebased onto `origin/dev`; local API `dev` fast-forwards cleanly. Both canonical checkouts are on `dev` at or ahead of `origin/dev`.
+
+**U2 — Complete.** ALEA web #42 merged `b83c50c1` on 2026-09-05. With the API Dependabot cooldown in API #36 (merged `3201775d`), push-event Semgrep on `dev` is green on both forks (R5) and stayed green after every later merge.
+
+**U3 — Complete.** API #36 merged `3201775d` on 2026-09-05: `folio-python` 0.4.0, `owlready2` removed, OSV clean, install and regression run green. ALEA API #29 closed with the receipt.
+
+**U4 web — Complete.** ALEA web #43 merged `4cbe4d4c` on 2026-09-06. Ledger `docs/audits/2026-09-05-pr-party-dev-parity-ledger.md` on `dev`: 191 rows and 15 removed exports, 17 carry / 154 dev supersedes / 20 drop; 17 paths carried (accepted-suggestion provenance bridge, PROV-O emission, missing-issuer logout guard, server-issued beacon token, public issuer, regression tests). Findings F1 (auth-disabled capability routing) and F2 (provider Docker build args) stay `dev supersedes` pending review. Review: ce-code-review run `20260906-101232-439dc65a`, independent Codex adversarial pass, four findings applied (`f9d0e7fe`).
+
+**U4 API — Complete.** ALEA API #37 merged `df3d2f79` on 2026-09-06. Ledger on `dev`: 240 rows and 14 removed-symbol candidates, 13 carry / 200 dev supersedes / 17 superseded by U5 / 10 drop; Alembic lineage of all 41 frozen revisions recorded (35 identical, 5 same id different content, 1 superseded; `dev` head `h6i7j8k9l0m1`), status-constraint values equal set for set. Headline carry: `dev` called a nonexistent `git_service.commit_to_branch` at all three suggestion-save sites (hidden by a type-ignore and test mocks); saves now call `commit_changes`. Three policy findings (VALID-04 namespace policy, editor review authorization, entity kinds in mint gates) stay `dev supersedes` pending review. Review: run `20260906-103407-cbc7d2dd`, seven findings applied (`cce04250`); two pre-existing findings recorded in the PR (prod compose default Zitadel masterkey/admin password; submit-path budget errors unmapped).
+
+**U5 — Complete.** ALEA API #38 merged `aab70cbb` on 2026-09-06: T2 deploy seam (`56800cda`) replayed byte-identical with modes, manifest pinned to API `435dc393` / web `83b62b0b`, push trigger still `feat/pr-party`, no `Deploy DEV` run started. One inherited defect was fixed: the promotion job's `runner.temp` job-level env moved to a resolve-paths step; actionlint clean. The live write-path `smoke-release.sh` run is deferred to U9's deploy receipt.
+
+**U20 — Complete.** ALEA API #39 merged `503e90d4` on 2026-09-06: `deploy-dev.yml` now triggers on pushes to `dev` restricted to `deploy/release-manifest.json`; `workflow_dispatch` consumes no inputs. No run started (the merge did not change the manifest). B6 provisional mark `mark-20260905T173214-f70e1b` was recorded before the merge.
+
+**U8 — Complete.** `docs/roundup-2026-08/DEV-UAT-RUNBOOK-web27.md` committed on this branch (`920a9cda`). Finding for U10: the quiet-period floor is one day, so the auto-accept proof needs a multi-day observation window; a single sitting cannot prove it.
+
+| Unit | Disposition | Evidence |
+|---|---|---|
+| U19 | Complete | Four Cockpit batches filed 2026-09-05; stems and B6 provisional mark recorded above. |
+| U1 | Complete | Nine clean-scanned branches published to ALEA; T3 API tip `6692f0f4`, ancestor `1b8bde28`. |
+| U2 | Complete | ALEA web #42 `b83c50c1`; API #36 `3201775d`; push-event Semgrep green on both forks after every merge. |
+| U3 | Complete | API #36 `3201775d`; clean OSV, install, and regression receipts; ALEA API #29 closed. |
+| U4 | Complete | Web #43 `4cbe4d4c`, API #37 `df3d2f79`; parity ledgers and review receipts above. |
+| U5 | Complete | API #38 `aab70cbb`; byte-identical T2 seam with modes, pinned pair, actionlint clean; live smoke deferred to U9. |
+| U6 | Complete | This addendum, Decision Sheet status, T3 manifest update, and `docs/handoffs/2026-09-06-march-through-handoff.md`; two superseded handoffs retired. Cockpit on-deck queue remains orchestrator-owned. |
+| U7 | Complete | Both canonical `dev` checkouts reconciled after each merge; four web auto-save commits preserved by rebase. |
+| U8 | Complete | UAT runbook `920a9cda`; multi-day auto-accept observation requirement recorded. |
+| U20 | Complete | API #39 `503e90d4`; manifest-restricted `dev` trigger, no dispatch inputs, no run started; B6 provisionally marked. |
+| U9 | Queued on B11, B12, B1 | DEV reset and deploy await the named gates. |
+| U10 | Queued on U8, U9, B5 | U8 complete; authenticated acceptance and multi-day auto-accept proof await U9 and B5. |
+| U11 | Queued on B2 | CatholicOS T1 replay and issue-first send await renewed authority. |
+| U12 | Queued on U9, B8 | Demo repositories and atomic refresh await deploy and provisioning. |
+| U13 | Queued on U9, B13 | Reviewer-PAT ciphertext rewrap awaits deploy and the authorized operator window. |
+| U14 | Queued on B3/D11 | Retired demo URL behavior and retention await the recorded choice. |
+| U15 | Queued on B4/D12 | Activation-queue stewardship awaits the recorded choice. |
+| U16 | Queued on B7 | Picker activation awaits the registration task. |
+| U17 | Queued on U5, B9 | U5 complete; parallel PROD rehearsal awaits B9. |
+| U18 | Queued on U12, E1-E3 | PR Party external activation awaits demo readiness and external receipts. |
