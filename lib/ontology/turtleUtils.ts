@@ -21,6 +21,81 @@ export interface BlockRange {
   endLine: number;
 }
 
+export interface ExistingTurtleBlock {
+  subject: string;
+  predicateObjects: Array<{ predicate: string; text: string }>;
+}
+
+export function parseExistingTurtleBlock(block: string): ExistingTurtleBlock {
+  const subjectMatch = block.match(/^\s*(<[^>]+>|(?:[A-Za-z_][\w-]*)?:[\w-]+)/u);
+  if (!subjectMatch) {
+    throw new Error("Could not parse the subject from its Turtle block");
+  }
+
+  const body = block.slice(subjectMatch[0].length);
+  const parts: string[] = [];
+  let start = 0;
+  let depth = 0;
+  let quote = "";
+  let longString = false;
+  let inIri = false;
+
+  for (let index = 0; index < body.length; index++) {
+    const char = body[index];
+
+    if (quote) {
+      if (longString) {
+        if (body.slice(index, index + 3) === quote.repeat(3)) {
+          quote = "";
+          longString = false;
+          index += 2;
+        }
+      } else if (char === "\\") {
+        index++;
+      } else if (char === quote) {
+        quote = "";
+      }
+      continue;
+    }
+
+    if (inIri) {
+      if (char === ">") inIri = false;
+      continue;
+    }
+
+    if (body.slice(index, index + 3) === '\"\"\"' || body.slice(index, index + 3) === "'''") {
+      quote = char;
+      longString = true;
+      index += 2;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      continue;
+    }
+    if (char === "<") {
+      inIri = true;
+      continue;
+    }
+    if (char === "[" || char === "(") depth++;
+    if (char === "]" || char === ")") depth--;
+
+    if (depth === 0 && (char === ";" || (char === "." && /\s|$/.test(body[index + 1] ?? "")))) {
+      const part = body.slice(start, index).trim();
+      if (part) parts.push(part);
+      start = index + 1;
+    }
+  }
+
+  return {
+    subject: subjectMatch[1],
+    predicateObjects: parts.map((text) => ({
+      predicate: text.match(/^\S+/u)?.[0] ?? "",
+      text,
+    })),
+  };
+}
+
 // ── Prefix / base helpers ─────────────────────────────────────────────
 
 export function parseDeclarations(source: string): ParsedDeclarations {

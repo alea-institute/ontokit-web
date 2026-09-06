@@ -29,6 +29,7 @@ const nextConfig: NextConfig = {
     // Must use the SAME predicate as server-side isZitadelConfigured() (issuer AND
     // client id) — otherwise the client shows a "Sign in" button while the server
     // has no provider, and clicking it dead-ends.
+    NEXT_PUBLIC_ZITADEL_ISSUER: process.env.ZITADEL_ISSUER,
     NEXT_PUBLIC_ZITADEL_CONFIGURED:
       process.env.ZITADEL_ISSUER && process.env.ZITADEL_CLIENT_ID ? "true" : "false",
   },

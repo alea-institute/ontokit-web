@@ -147,6 +147,52 @@ describe("UserMenu", () => {
     );
   });
 
+  it("navigates to the configured federated logout endpoint with an encoded redirect", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_ISSUER", "https://auth.example.test");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CLIENT_ID", "client-123");
+    vi.resetModules();
+    const { UserMenu: ConfiguredUserMenu } = await import(
+      "@/components/auth/user-menu"
+    );
+    mockUseSession.mockReturnValue({
+      data: { user: { name: "Alice", email: "alice@test.com", image: null } },
+      status: "authenticated",
+    });
+
+    render(<ConfiguredUserMenu />);
+    await userEvent.click(screen.getByText("A"));
+    await userEvent.click(screen.getByText("Sign out"));
+
+    expect(window.location.href).toBe(
+      "https://auth.example.test/oidc/v1/end_session?client_id=client-123&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000",
+    );
+  });
+
+  it("fails loudly without an issuer and never redirects to localhost", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_ISSUER", "");
+    vi.resetModules();
+    const { UserMenu: MisconfiguredUserMenu } = await import(
+      "@/components/auth/user-menu"
+    );
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockUseSession.mockReturnValue({
+      data: { user: { name: "Alice", email: "alice@test.com", image: null } },
+      status: "authenticated",
+    });
+
+    render(<MisconfiguredUserMenu />);
+    await userEvent.click(screen.getByText("A"));
+    await userEvent.click(screen.getByText("Sign out"));
+
+    expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
+    expect(window.location.href).toBe("");
+    expect(window.location.href).not.toContain("localhost:8080");
+    expect(consoleError).toHaveBeenCalledWith(
+      "Cannot complete federated logout: NEXT_PUBLIC_ZITADEL_ISSUER is not configured",
+    );
+    consoleError.mockRestore();
+  });
+
   it("shows U as initial when name is undefined", () => {
     mockUseSession.mockReturnValue({
       data: { user: { name: undefined, email: "test@test.com", image: null } },

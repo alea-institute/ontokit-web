@@ -41,6 +41,7 @@ import { useIriLabels } from "@/lib/hooks/useIriLabels";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
 import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
 import type { GeneratedSuggestion } from "@/lib/api/generation";
+import { provenanceFromSuggestion, type AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
 import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
@@ -84,6 +85,7 @@ interface PropertyDetailPanelProps {
     label: string,
     parentIri: string,
     propertyType: "object" | "data" | "annotation",
+    provenance?: AcceptedSuggestionProvenance,
   ) => Promise<void>;
 }
 
@@ -441,7 +443,7 @@ export function PropertyDetailPanel({
   const handleAcceptAnnotation = useCallback(
     (suggestion: GeneratedSuggestion, editedValue?: string) => {
       if (!suggestion.property_iri) return;
-      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — only the value survives into the edit draft. See QA queue.
+      // PR-6 provenance decision (q9): NOT persisted here — this accept edits an EXISTING entity; statement-level provenance is not expressible in plain Turtle (needs reification/RDF-star) and stamping the whole entity prov:wasGeneratedBy would be false. Kept in the suggestion session + audit log (D-08).
       const newValue = { value: editedValue ?? suggestion.value ?? suggestion.label, lang: suggestion.lang ?? "en" };
       if (suggestion.property_iri.endsWith("#label")) {
         setEditLabels((prev) => [...prev.filter((l) => l.value.trim()), newValue]);
@@ -468,7 +470,7 @@ export function PropertyDetailPanel({
   const handleAcceptDomainRange = useCallback(
     (suggestion: GeneratedSuggestion, _editedValue?: string) => {
       const targetIri = suggestion.target_iri ?? suggestion.iri;
-      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped when the domain/range is added. See QA queue.
+      // PR-6 provenance decision (q9): NOT persisted here — this accept edits an EXISTING entity; statement-level provenance is not expressible in plain Turtle (needs reification/RDF-star) and stamping the whole entity prov:wasGeneratedBy would be false. Kept in the suggestion session + audit log (D-08).
       // Use relationship_type to distinguish domain vs range; default to domain
       if (suggestion.relationship_type?.includes("range")) {
         setEditRangeIris((prev) => prev.includes(targetIri) ? prev : [...prev, targetIri]);
@@ -485,13 +487,14 @@ export function PropertyDetailPanel({
       // PROP-02 / B-1: Create a new PROPERTY entity (not a class). Pass the
       // parent property's OWL kind so the snippet emits the correct rdf:type
       // and the node is NOT injected into the class tree.
-      // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped on accept. See QA queue.
+      // New properties retain the accepted suggestion's AI origin (PROV-O).
       if (!onAddSuggestedProperty) throw new Error("Generated entity persistence is unavailable.");
       await onAddSuggestedProperty(
         suggestion.iri,
         editedValue ?? suggestion.label,
         propertyIri!,
         detail?.propertyType ?? "object",
+        provenanceFromSuggestion(suggestion),
       );
     },
     [onAddSuggestedProperty, propertyIri, detail?.propertyType],

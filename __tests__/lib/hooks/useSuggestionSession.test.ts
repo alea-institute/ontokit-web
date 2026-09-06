@@ -49,6 +49,7 @@ describe("useSuggestionSession", () => {
       session_id: "sess-1",
       branch: "suggest/sess-1",
       created_at: "2024-01-01T00:00:00Z",
+      beacon_token: "signed-beacon-token",
     });
 
     const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
@@ -60,9 +61,41 @@ describe("useSuggestionSession", () => {
     expect(result.current.status).toBe("active");
     expect(result.current.sessionId).toBe("sess-1");
     expect(result.current.branch).toBe("suggest/sess-1");
-    expect(result.current.beaconToken).toBe("sess-1");
+    expect(result.current.beaconToken).toBe("signed-beacon-token");
     expect(result.current.isActive).toBe(true);
     expect(mockedCreateSession).toHaveBeenCalledWith("proj-1", "token-123");
+  });
+
+  it("does not issue another save while a save is in flight", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-1",
+      branch: "suggest/sess-1",
+      created_at: "2024-01-01T00:00:00Z",
+    });
+    let resolveSave!: (value: {
+      commit_hash: string;
+      branch: string;
+      changes_count: number;
+    }) => void;
+    mockedSave.mockImplementation(
+      () => new Promise((resolve) => { resolveSave = resolve; }),
+    );
+    const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
+    await act(async () => {
+      await result.current.startSession();
+    });
+
+    let firstSave!: Promise<boolean>;
+    await act(async () => {
+      firstSave = result.current.saveToSession("one", "http://ex.org/A", "A");
+      await expect(
+        result.current.saveToSession("two", "http://ex.org/B", "B"),
+      ).resolves.toBe(false);
+    });
+    expect(mockedSave).toHaveBeenCalledTimes(1);
+
+    resolveSave({ commit_hash: "abc", branch: "suggest/sess-1", changes_count: 1 });
+    await act(async () => { await firstSave; });
   });
 
   it("startSession does nothing when session already exists", async () => {
@@ -345,8 +378,49 @@ describe("useSuggestionSession", () => {
 
     expect(result.current.sessionId).toBe("sess-2");
     expect(result.current.branch).toBe("suggest/sess-2");
+    expect(result.current.beaconToken).not.toBe("sess-2");
+    expect(result.current.beaconToken).toBeNull();
     expect(result.current.status).toBe("active");
     expect(result.current.isResumed).toBe(true);
+  });
+
+  it("clears a previous session's beacon token on resume", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-1",
+      branch: "suggest/sess-1",
+      created_at: "2024-01-01T00:00:00Z",
+      beacon_token: "signed-beacon-token",
+    });
+    const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
+    await act(async () => { await result.current.startSession(); });
+    expect(result.current.beaconToken).toBe("signed-beacon-token");
+
+    act(() => { result.current.resumeSession("sess-2", "suggest/sess-2"); });
+
+    expect(result.current.beaconToken).toBeNull();
+  });
+
+  it("saves through a resumed session id", async () => {
+    mockedSave.mockResolvedValue({
+      commit_hash: "abc",
+      branch: "suggest/sess-2",
+      changes_count: 1,
+    });
+    const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
+
+    act(() => {
+      result.current.resumeSession("sess-2", "suggest/sess-2");
+    });
+    await act(async () => {
+      await result.current.saveToSession("content", "http://ex.org/A", "A");
+    });
+
+    expect(mockedSave).toHaveBeenCalledWith(
+      "proj-1",
+      "sess-2",
+      expect.any(Object),
+      "token-123",
+    );
   });
 
   it("resubmitSession submits and resets state", async () => {
@@ -399,6 +473,8 @@ describe("useSuggestionSession", () => {
 
     await waitFor(() => expect(result.current.status).toBe("active"));
     expect(result.current.sessionId).toBe("sess-resume");
+    expect(result.current.beaconToken).not.toBe("sess-resume");
+    expect(result.current.beaconToken).toBeNull();
     expect(result.current.isResumed).toBe(true);
   });
 
