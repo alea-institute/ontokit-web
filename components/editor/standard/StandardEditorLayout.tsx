@@ -1,5 +1,7 @@
 "use client";
 
+import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
+
 import { useState, useMemo, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
@@ -113,9 +115,9 @@ export interface StandardEditorLayoutProps {
   isAnonymousProposalMode?: boolean;
 
   // LLM suggestion support
-  onAddSuggestedChild?: (iri: string, label: string, parentIri: string) => Promise<void>;
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string, provenance?: AcceptedSuggestionProvenance) => Promise<void>;
   /** Create a new PROPERTY entity from an accepted sub-property suggestion (B-1). */
-  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation") => Promise<void>;
+  onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation", provenance?: AcceptedSuggestionProvenance) => Promise<void>;
   acceptedSuggestionIris?: Set<string>;
 }
 

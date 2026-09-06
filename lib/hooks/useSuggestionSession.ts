@@ -78,9 +78,7 @@ export function useSuggestionSession({
         branchRef.current = session.branch;
         setSessionId(session.session_id);
         setBranch(session.branch);
-        // The backend may return a beacon token in the session response;
-        // for now we derive it from the session_id (backend will sign it).
-        setBeaconToken(session.session_id);
+        setBeaconToken(session.beacon_token);
         setStatus("active");
         setError(null);
         return session.branch;

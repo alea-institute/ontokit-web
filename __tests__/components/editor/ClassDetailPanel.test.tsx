@@ -396,6 +396,8 @@ describe("ClassDetailPanel", () => {
         iri: "http://example.org/ontology#Sibling",
         suggestion_type: "siblings",
         label: "Suggested sibling",
+        model: "model-1",
+        prompt_template: "siblings",
         provenance: "llm-proposed",
         validation_errors: [],
         duplicate_verdict: "pass",
@@ -419,6 +421,7 @@ describe("ClassDetailPanel", () => {
       "http://example.org/ontology#Sibling",
       "Suggested sibling",
       "http://example.org/ontology#Agent",
+      { model: "model-1", promptTemplate: "siblings" },
     );
   });
 

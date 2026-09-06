@@ -29,6 +29,7 @@ import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { revisionsApi } from "@/lib/api/revisions";
 import { projectOntologyApi, type ClassUpdatePayload } from "@/lib/api/client";
 import { getLocalName } from "@/lib/utils";
+import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
 import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
 import {
   createGeneratedEntityPersistenceQueue,
@@ -523,6 +524,7 @@ export default function EditorPage() {
       label: string;
       parentIri: string;
       entityType: EntityType;
+      provenance?: AcceptedSuggestionProvenance;
     },
   ) => {
     const mode: GeneratedEntityPersistenceMode = isAnonymousProposalMode
@@ -638,9 +640,11 @@ export default function EditorPage() {
     iri: string,
     label: string,
     parentIri: string,
+    provenance?: AcceptedSuggestionProvenance,
   ) => {
-    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — the accepted suggestion's metadata is dropped here. See QA queue.
-    await persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType: "class" });
+    // The persistence helper spreads the entity into the snippet after reading
+    // authoritative source. Let the snippet bind PROV-O at the appended block.
+    await persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType: "class", provenance });
     addOptimisticNode(iri, label, parentIri);
     setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
   }, [persistAcceptedGeneratedEntity, addOptimisticNode]);
@@ -654,6 +658,7 @@ export default function EditorPage() {
     label: string,
     parentIri: string,
     propertyType: "object" | "data" | "annotation" = "object",
+    provenance?: AcceptedSuggestionProvenance,
   ) => {
     const entityType =
       propertyType === "data"
@@ -662,8 +667,7 @@ export default function EditorPage() {
           ? "annotationProperty"
           : "objectProperty";
 
-    // TODO(PR-6/provenance): persist provenance/model/prompt_template/confidence — dropped here; only label/type/parent are emitted. See QA queue.
-    return persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType })
+    return persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType, provenance })
       .then(() => {
         setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
       });
