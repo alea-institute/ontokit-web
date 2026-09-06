@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { updatePropertyInTurtle } from "@/lib/ontology/turtlePropertyUpdater";
+import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
 import { TURTLE_FIXTURE } from "./fixtures";
 
 describe("updatePropertyInTurtle", () => {
@@ -25,6 +26,30 @@ describe("updatePropertyInTurtle", () => {
     expect(result).toContain('rdfs:label "has part"@en');
     expect(result).toContain("rdfs:domain ex:Animal");
     expect(result).toContain("rdfs:range ex:Animal");
+  });
+
+  it("preserves accepted suggestion provenance when editing a property label", () => {
+    const propertyIri = "http://example.org/ont#hasComponent";
+    const snippet = generateTurtleSnippet({
+      iri: propertyIri,
+      label: "has component",
+      entityType: "objectProperty",
+      parentIri: "http://example.org/ont#hasPart",
+      ontologyPrefix: "ex",
+      ontologyNamespace: "http://example.org/ont#",
+      provenance: { model: "model-1", promptTemplate: "sub-properties" },
+    });
+    const result = updatePropertyInTurtle(TURTLE_FIXTURE + snippet, propertyIri, {
+      ...baseData,
+      labels: [{ value: "has new component", lang: "en" }],
+      parentIris: ["http://example.org/ont#hasPart"],
+    });
+
+    expect(result).toContain('rdfs:label "has new component"@en');
+    expect(result).not.toContain('rdfs:label "has component"@en');
+    expect(result).toContain(snippet.slice(snippet.indexOf("prov:wasGeneratedBy")));
+    expect(result).toContain('rdfs:label "model-1"');
+    expect(result).toContain('rdfs:label "sub-properties"');
   });
 
   it("throws when property IRI is not found", () => {

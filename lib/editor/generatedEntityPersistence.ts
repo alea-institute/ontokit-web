@@ -1,7 +1,8 @@
 import { projectOntologyApi } from "@/lib/api/client";
 import { revisionsApi } from "@/lib/api/revisions";
 import type { EntityType } from "@/lib/ontology/iriGeneration";
-import { generateTurtleSnippet } from "@/lib/ontology/turtleSnippetGenerator";
+import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
+import { generateTurtleSnippet, isProvPrefixBoundToProvO } from "@/lib/ontology/turtleSnippetGenerator";
 import { findBlock, parseDeclarations } from "@/lib/ontology/turtleUtils";
 
 export type GeneratedEntityPersistenceMode =
@@ -19,6 +20,7 @@ interface GeneratedEntityInput {
   label: string;
   parentIri: string;
   entityType: EntityType;
+  provenance?: AcceptedSuggestionProvenance;
 }
 
 interface PersistGeneratedEntityOptions {
@@ -160,6 +162,9 @@ export async function persistGeneratedEntity(
     ...entity,
     ontologyPrefix,
     ontologyNamespace,
+    provenance: entity.provenance
+      ? { ...entity.provenance, declarePrefix: !isProvPrefixBoundToProvO(source) }
+      : undefined,
   });
 
   if (mode === "direct") {

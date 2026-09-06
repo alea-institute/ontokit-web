@@ -378,8 +378,26 @@ describe("useSuggestionSession", () => {
 
     expect(result.current.sessionId).toBe("sess-2");
     expect(result.current.branch).toBe("suggest/sess-2");
+    expect(result.current.beaconToken).not.toBe("sess-2");
+    expect(result.current.beaconToken).toBeNull();
     expect(result.current.status).toBe("active");
     expect(result.current.isResumed).toBe(true);
+  });
+
+  it("clears a previous session's beacon token on resume", async () => {
+    mockedCreateSession.mockResolvedValue({
+      session_id: "sess-1",
+      branch: "suggest/sess-1",
+      created_at: "2024-01-01T00:00:00Z",
+      beacon_token: "signed-beacon-token",
+    });
+    const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
+    await act(async () => { await result.current.startSession(); });
+    expect(result.current.beaconToken).toBe("signed-beacon-token");
+
+    act(() => { result.current.resumeSession("sess-2", "suggest/sess-2"); });
+
+    expect(result.current.beaconToken).toBeNull();
   });
 
   it("saves through a resumed session id", async () => {
@@ -455,6 +473,8 @@ describe("useSuggestionSession", () => {
 
     await waitFor(() => expect(result.current.status).toBe("active"));
     expect(result.current.sessionId).toBe("sess-resume");
+    expect(result.current.beaconToken).not.toBe("sess-resume");
+    expect(result.current.beaconToken).toBeNull();
     expect(result.current.isResumed).toBe(true);
   });
 

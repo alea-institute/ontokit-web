@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // ── Configurable mock state (tests can override before render) ──
@@ -228,6 +228,46 @@ describe("PropertyDetailPanel", () => {
     mockExtractPropertyDetail.mockReturnValue(null);
     render(<PropertyDetailPanel {...DEFAULT_PROPS} />);
     expect(screen.getByText("hasParent")).toBeDefined();
+  });
+
+  it("passes accepted sub-property provenance to generated entity persistence", async () => {
+    const onAddSuggestedProperty = vi.fn().mockResolvedValue(undefined);
+    useSuggestionStore.getState().setSuggestions(
+      { projectId: "proj-1", branch: "main" },
+      DEFAULT_PROPS.propertyIri,
+      "children",
+      [{
+        iri: "http://example.org/ontology#hasMother",
+        suggestion_type: "children",
+        label: "has mother",
+        model: "model-1",
+        prompt_template: "sub-properties",
+        provenance: "llm-proposed",
+        validation_errors: [],
+        duplicate_verdict: "pass",
+        duplicate_candidates: [],
+      }],
+    );
+    render(
+      <PropertyDetailPanel
+        {...DEFAULT_PROPS}
+        canEdit
+        canUseLLM
+        onAddSuggestedProperty={onAddSuggestedProperty}
+      />,
+    );
+
+    const card = (await screen.findByText("has mother")).closest<HTMLElement>('[role="listitem"]');
+    expect(card).not.toBeNull();
+    await userEvent.click(within(card!).getByRole("button", { name: "Accept suggestion" }));
+
+    expect(onAddSuggestedProperty).toHaveBeenCalledWith(
+      "http://example.org/ontology#hasMother",
+      "has mother",
+      DEFAULT_PROPS.propertyIri,
+      "object",
+      { model: "model-1", promptTemplate: "sub-properties" },
+    );
   });
 
   it("preserves a cross-branch candidate and marks the proposed entity as a property", async () => {

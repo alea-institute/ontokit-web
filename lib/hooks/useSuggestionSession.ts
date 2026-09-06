@@ -196,7 +196,8 @@ export function useSuggestionSession({
     branchRef.current = branchName;
     setSessionId(sid);
     setBranch(branchName);
-    setBeaconToken(sid);
+    // Session summaries do not provide a server-issued beacon token.
+    setBeaconToken(null);
     setStatus("active");
     setError(null);
     setIsResumed(true);

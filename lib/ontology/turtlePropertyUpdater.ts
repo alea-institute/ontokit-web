@@ -12,6 +12,8 @@ import {
   findBlock,
   literal,
   isIriValue,
+  iriTurtleForms,
+  parseExistingTurtleBlock,
 } from "@/lib/ontology/turtleUtils";
 import type { PropertyType } from "@/lib/ontology/entityDetailExtractors";
 
@@ -59,6 +61,7 @@ function genPropertyBlock(
   iri: string,
   data: TurtlePropertyUpdateData,
   rev: Map<string, string>,
+  carriedPredicateObjects: string[] = [],
 ): string {
   const subject = toTurtle(iri, rev);
   const po: string[] = [];
@@ -144,6 +147,8 @@ function genPropertyBlock(
     }
   }
 
+  po.push(...carriedPredicateObjects);
+
   if (po.length <= 1) {
     return `${subject} ${po[0] || `a ${PROPERTY_TYPE_MAP[data.propertyType]}`} .`;
   }
@@ -178,7 +183,33 @@ export function updatePropertyInTurtle(
     );
   }
 
-  const newBlock = genPropertyBlock(propertyIri, data, rev);
+  const existing = parseExistingTurtleBlock(
+    lines.slice(block.startLine, block.endLine + 1).join("\n"),
+  );
+  const described = new Set<string>(["a"]);
+  const describedIris = [
+    "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
+    "http://www.w3.org/2000/01/rdf-schema#label",
+    "http://www.w3.org/2000/01/rdf-schema#comment",
+    "http://www.w3.org/2004/02/skos/core#definition",
+    "http://www.w3.org/2000/01/rdf-schema#domain",
+    "http://www.w3.org/2000/01/rdf-schema#range",
+    "http://www.w3.org/2000/01/rdf-schema#subPropertyOf",
+    "http://www.w3.org/2002/07/owl#inverseOf",
+    "http://www.w3.org/2002/07/owl#deprecated",
+    "http://www.w3.org/2002/07/owl#equivalentProperty",
+    "http://www.w3.org/2002/07/owl#propertyDisjointWith",
+    "http://www.w3.org/2000/01/rdf-schema#seeAlso",
+    "http://www.w3.org/2000/01/rdf-schema#isDefinedBy",
+    ...(data.annotations ?? []).map((annotation) => annotation.property_iri),
+  ];
+  for (const iri of describedIris) {
+    for (const form of iriTurtleForms(iri, prefixes, base)) described.add(form);
+  }
+  const carriedPredicateObjects = existing.predicateObjects
+    .filter(({ predicate }) => !described.has(predicate))
+    .map(({ text }) => text);
+  const newBlock = genPropertyBlock(propertyIri, data, rev, carriedPredicateObjects);
   const before = lines.slice(0, block.startLine);
   const after = lines.slice(block.endLine + 1);
 

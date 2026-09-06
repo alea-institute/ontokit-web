@@ -402,14 +402,18 @@ describe("isProvPrefixBoundToProvO (B1: IRI-aware prefix detection)", () => {
 describe("accepted provenance through dev persistence", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it.each(["direct", "authenticated-suggestion", "anonymous-suggestion"] as const)(
-    "persists provenance through %s without replacing the branch source",
-    async (mode) => {
+  it.each(
+    (["direct", "authenticated-suggestion", "anonymous-suggestion"] as const).flatMap((mode) =>
+      [PROV_NAMESPACE, "http://example.org/other#"].map((namespace) => ({ mode, namespace })),
+    ),
+  )(
+    "persists provenance through $mode with existing prov binding $namespace without replacing the branch source",
+    async ({ mode, namespace }) => {
       const { persistGeneratedEntity } = await import("@/lib/editor/generatedEntityPersistence");
       const { provenanceFromSuggestion } = await import("@/lib/ontology/suggestionProvenance");
       const { revisionsApi } = await import("@/lib/api/revisions");
       const { projectOntologyApi } = await import("@/lib/api/client");
-      const source = '@prefix prov: <http://example.org/other#> .\n<http://example.org/Parent> a <http://www.w3.org/2002/07/owl#Class> .\n';
+      const source = `@prefix prov: <${namespace}> .\n<http://example.org/Parent> a <http://www.w3.org/2002/07/owl#Class> .\n`;
       vi.spyOn(revisionsApi, "getFileAtVersion").mockResolvedValue({
         project_id: "project-1", version: "main", revision: "rev-1",
         filename: "ontology.ttl", content: source,
@@ -438,6 +442,7 @@ describe("accepted provenance through dev persistence", () => {
         expect(result.content).toContain('rdfs:label "model-1"');
         expect(result.content).toContain('rdfs:label "children"');
         expect(isProvPrefixBoundToProvO(result.content)).toBe(true);
+        expect(result.content.match(/^@prefix prov:/gm)).toHaveLength(namespace === PROV_NAMESPACE ? 1 : 2);
         if (mode === "direct") {
           expect(saveSource).toHaveBeenLastCalledWith(
             "project-1", result.content, expect.any(String), "token", "main", "rev-1",
