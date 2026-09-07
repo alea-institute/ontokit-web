@@ -3,8 +3,17 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
 import { derivePermissions, useProject } from "@/lib/hooks/useProject";
-import { ApiError } from "@/lib/api/client";
+import { ApiError, getDemoGenerationRetired } from "@/lib/api/client";
 import type { Project } from "@/lib/api/projects";
+
+const navigation = vi.hoisted(() => ({ search: "" }));
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(navigation.search),
+}));
+
+const OLD = "11111111-1111-4111-8111-111111111111";
+const NEW = "22222222-2222-4222-8222-222222222222";
+const retiredDetail = { code: "demo_generation_retired", current_project_id: NEW, retired_at: null };
 
 // Mock the projectApi module
 vi.mock("@/lib/api/projects", () => ({
@@ -162,6 +171,7 @@ describe("derivePermissions", () => {
 describe("useProject", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    navigation.search = "";
   });
 
   it("returns loading state initially", () => {
@@ -301,5 +311,71 @@ describe("useProject", () => {
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(typeof result.current.refetch).toBe("function");
+  });
+});
+
+
+describe("retired project contract", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    navigation.search = "";
+  });
+
+  it.each([null, "2026-09-07T12:00:00Z"])("accepts retirement with retired_at=%s", (retired_at) => {
+    const detail = { ...retiredDetail, retired_at };
+    expect(getDemoGenerationRetired(new ApiError(410, "Gone", JSON.stringify({ detail })))).toEqual(detail);
+  });
+
+  it.each([
+    null, "gone", {},
+    { ...retiredDetail, code: undefined },
+    { ...retiredDetail, code: "other" },
+    { ...retiredDetail, current_project_id: 123 },
+    { ...retiredDetail, current_project_id: "not-a-uuid" },
+    { ...retiredDetail, current_project_id: `${NEW}\n` },
+    { ...retiredDetail, retired_at: undefined },
+    { ...retiredDetail, retired_at: 123 },
+  ])("rejects malformed detail %j", (detail) => {
+    expect(getDemoGenerationRetired(new ApiError(410, "Gone", JSON.stringify({ detail })))).toBeNull();
+  });
+
+  it("rejects other statuses and non-ApiError values", () => {
+    expect(getDemoGenerationRetired(new ApiError(404, "Gone", JSON.stringify({ detail: retiredDetail })))).toBeNull();
+    expect(getDemoGenerationRetired({ status: 410, detail: retiredDetail })).toBeNull();
+  });
+
+  it("AE1: redirects on the first 410 without retrying", async () => {
+    mockedGet.mockRejectedValue(new ApiError(410, "Gone", JSON.stringify({ detail: retiredDetail })));
+    const { result } = renderHook(() => useProject(OLD), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.isRetiredRedirecting).toBe(true));
+    expect(result.current.retiredRedirect).toEqual(retiredDetail);
+    expect(result.current.errorKind).toBeNull();
+    expect(mockedGet).toHaveBeenCalledTimes(1);
+  });
+
+  it("AE3: maps a target already in the chain to not-found", async () => {
+    navigation.search = `retired_from=${NEW}`;
+    mockedGet.mockRejectedValue(new ApiError(410, "Gone", JSON.stringify({ detail: retiredDetail })));
+    const { result } = renderHook(() => useProject(OLD), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.errorKind).toBe("not-found"));
+    expect(result.current.error).toBe("Project not found");
+    expect(result.current.isRetiredRedirecting).toBe(false);
+    expect(result.current.retiredRedirect).toBeNull();
+  });
+
+  it("treats a self pointer as not-found", async () => {
+    mockedGet.mockRejectedValue(new ApiError(410, "Gone", JSON.stringify({ detail: retiredDetail })));
+    const { result } = renderHook(() => useProject(NEW), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.errorKind).toBe("not-found"));
+    expect(result.current.isRetiredRedirecting).toBe(false);
+  });
+
+  it("treats a 410 without the discriminator as generic and does not retry", async () => {
+    mockedGet.mockRejectedValue(new ApiError(410, "Gone", JSON.stringify({ detail: { current_project_id: NEW, retired_at: null } })));
+    const { result } = renderHook(() => useProject(OLD), { wrapper: createWrapper() });
+    await waitFor(() => expect(result.current.errorKind).toBe("generic"));
+    expect(result.current.isRetiredRedirecting).toBe(false);
+    expect(result.current.retiredRedirect).toBeNull();
+    expect(mockedGet).toHaveBeenCalledTimes(1);
   });
 });

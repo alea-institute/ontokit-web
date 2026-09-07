@@ -120,6 +120,7 @@ export default function ProjectSettingsPage() {
   const {
     project,
     isLoading: isProjectLoading,
+    isRetiredRedirecting,
     error: projectError,
   } = useProject(projectId, session?.accessToken);
   const { data: membersData } = useMembers(projectId, session?.accessToken);
@@ -852,7 +853,7 @@ export default function ProjectSettingsPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || isRetiredRedirecting) {
     return (
       <>
         <Header />

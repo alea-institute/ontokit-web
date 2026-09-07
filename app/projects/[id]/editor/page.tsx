@@ -21,6 +21,7 @@ import { BranchSelector, RevisionHistoryPanel, HistoryButton } from "@/component
 import { HealthCheckPanel } from "@/components/editor/HealthCheckPanel";
 import { useQueryClient } from "@tanstack/react-query";
 import { BranchProvider, branchQueryKeys } from "@/lib/context/BranchContext";
+import { useProject } from "@/lib/hooks/useProject";
 import { useProjectViewer } from "@/lib/hooks/useProjectViewer";
 import { useLLMGate } from "@/lib/hooks/useLLMGate";
 import { ConnectionStatus } from "@/components/ui/ConnectionStatus";
@@ -84,6 +85,7 @@ export default function EditorPage() {
   const router = useRouter();
   const pathname = usePathname();
   const projectId = params.id as string;
+  const { isRetiredRedirecting } = useProject(projectId, session?.accessToken);
   const resumeSessionParam = searchParams.get("resumeSession") || undefined;
   const resumeBranchParam = searchParams.get("branch") || undefined;
   // Memoize the parsed URL selection so its identity is stable across renders
@@ -1136,7 +1138,7 @@ export default function EditorPage() {
 
   // --- Render ---
 
-  if (isLoading || (status === "loading" && authMode === "required")) {
+  if (isLoading || isRetiredRedirecting || (status === "loading" && authMode === "required")) {
     return (
       <>
         <Header />
