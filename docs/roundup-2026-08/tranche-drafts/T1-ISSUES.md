@@ -1,6 +1,6 @@
 # Tranche 1 held issue package
 
-**Status:** Draft only; do not send until the final-batch gate in `UPSTREAM-DELIVERY-MAP.md` is satisfied.
+**Status:** Executed 2026-09-07 after gate B2 was answered yes for T1 only: new web owning issue [CatholicOS/ontokit-web#401](https://github.com/CatholicOS/ontokit-web/issues/401) was created, and existing API owning issue [CatholicOS/ontokit-api#83](https://github.com/CatholicOS/ontokit-api/issues/83) was updated by [acceptance-criteria comment](https://github.com/CatholicOS/ontokit-api/issues/83#issuecomment-5571978843) rather than duplicated.
 
 ## Known upstream records
 

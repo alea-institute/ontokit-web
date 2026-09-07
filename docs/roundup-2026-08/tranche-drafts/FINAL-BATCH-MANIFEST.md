@@ -39,7 +39,7 @@ Use these placeholders consistently until the pre-send refresh resolves them:
 
 | Order | Tranche | Required issue records | Proposed PR records | Current readiness | Send condition |
 |---:|---|---|---|---|---|
-| T1 | Optional auth, anonymous contribution, public viewing | web issue or refreshed equivalent; API #83 update | web replacement/refresh for #57; API replacement/refresh for #27 | Complete local synthesis pair is green | Final base refresh and clean replay |
+| T1 | Optional auth, anonymous contribution, public viewing | [web #401](https://github.com/CatholicOS/ontokit-web/issues/401) created; [API #83](https://github.com/CatholicOS/ontokit-api/issues/83) updated, not duplicated | [web PR #402](https://github.com/CatholicOS/ontokit-web/pull/402); [API PR #228](https://github.com/CatholicOS/ontokit-api/pull/228) | Executed 2026-09-07; replay and verification receipts recorded in `T1-PRS.md` | Gate B2 answered yes for T1 only; sent after replay; no self-merge |
 | T2 | DEV deploy and CI | API #211 update plus one deploy/CI owner if #211 is too narrow; web CI owner only if no current issue exists | API deploy/CI PR; web CI companion only if it carries code not already in T1 | Current-upstream candidates are green at API `56800cda` and web `256d2344` | Required-check design is documented; PROD activation remains visibly dormant |
 | T3 | LLM configuration and controlled generation | one web owner; one API umbrella plus one child owner for each independently mergeable API PR | web configuration/UI PR; API configuration/generation/hardening PRs sized for review | Paired current-upstream candidates are green at API `6692f0f4` and web `2c6a7813` | Hold for the issue-first final batch; split API configuration/generation/hardening only if reviewer capacity requires it |
 | T4 | Trust ladder, distinct decisions, and auto-accept | one web trust/UI owner and one API trust/lifecycle owner | linked web/API PR pair | Paired reviewed current-upstream candidates are green at API `1029cd26` and web `6890216b` | Authenticated quiet-period, halt/resume, and TRUSTED-gate UAT receipt |
@@ -56,8 +56,8 @@ This table is the crash-safe execution record. `planned` means no external mutat
 
 | Correlation marker | Repository | Issue state | Issue URL | PR state | PR URL |
 |---|---|---|---|---|---|
-| `ontokit-2026-08-t1-web` | `CatholicOS/ontokit-web` | planned | — | planned | — |
-| `ontokit-2026-08-t1-api` | `CatholicOS/ontokit-api` | planned update | — | planned | — |
+| `ontokit-2026-08-t1-web` | `CatholicOS/ontokit-web` | executed 2026-09-07; new owning issue | https://github.com/CatholicOS/ontokit-web/issues/401 | executed 2026-09-07; supersedes closed #57; no self-merge | https://github.com/CatholicOS/ontokit-web/pull/402 |
+| `ontokit-2026-08-t1-api` | `CatholicOS/ontokit-api` | executed 2026-09-07; #83 updated, not duplicated | https://github.com/CatholicOS/ontokit-api/issues/83 | executed 2026-09-07; supersedes closed #27; no self-merge | https://github.com/CatholicOS/ontokit-api/pull/228 |
 | `ontokit-2026-08-t2-api` | `CatholicOS/ontokit-api` | planned update/owner | — | planned | — |
 | `ontokit-2026-08-t2-web` | `CatholicOS/ontokit-web` | conditional | — | conditional | — |
 | `ontokit-2026-08-t3-web` | `CatholicOS/ontokit-web` | planned | — | planned | — |
@@ -90,7 +90,9 @@ This table is the crash-safe execution record. `planned` means no external mutat
 
 ### T1 — optional auth, anonymous contribution, and public viewing
 
-Use the complete drafts in `T1-ISSUES.md` and `T1-PRS.md`. The local candidates are web `4986135c` and API `d2c31aea`. Preserve optional mode with all Zitadel values absent; refuse partial configuration and required mode without a coherent provider.
+Use the complete sent-text records and executed receipts in `T1-ISSUES.md` and `T1-PRS.md`.
+
+Executed 2026-09-07 after gate B2 was answered yes for T1 only: [web issue #401](https://github.com/CatholicOS/ontokit-web/issues/401) and [web PR #402](https://github.com/CatholicOS/ontokit-web/pull/402) were created; existing [API issue #83](https://github.com/CatholicOS/ontokit-api/issues/83) was updated rather than duplicated, and [API PR #228](https://github.com/CatholicOS/ontokit-api/pull/228) was created. The replay heads are web `812eae656e0934e54dfe7e46f5154d63eb05c773` and API `de91234755fafefda6e709608021e48779e4c277`; both replay branches are backed up on the ALEA forks under the same names. Superseded PRs web #57 and API #27 were closed with pointer comments. The ALEA receipt is https://github.com/alea-institute/ontokit-web/issues/30#issuecomment-5571997509. No self-merge occurred.
 
 ### T2 — DEV deploy and CI
 
