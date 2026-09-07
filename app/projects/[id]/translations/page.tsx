@@ -26,7 +26,7 @@ interface TranslationPreviewState {
 function TranslationCoverageContent({ projectId, token }: { projectId: string; token?: string }) {
   const { currentBranch } = useBranch();
   const projectHomeHref = useProjectHomeHref(projectId);
-  const { project } = useProject(projectId, token);
+  const { project, isRetiredRedirecting } = useProject(projectId, token);
   const { canManage } = derivePermissions(project, token);
   const coverageState = useTranslationCoverage(projectId, currentBranch, token);
   const [language, setLanguage] = useState("");
@@ -89,6 +89,17 @@ function TranslationCoverageContent({ projectId, token }: { projectId: string; t
       // The mutation exposes the error used by the rendered message.
     }
   };
+
+  if (isRetiredRedirecting) {
+    return (
+      <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950">
+        <Header />
+        <main id="main-content" className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
+          <p role="status">Loading translation coverage…</p>
+        </main>
+      </div>
+    );
+  }
 
   const job = coverageState.job;
   const progress = job && job.total > 0 ? Math.round((job.completed / job.total) * 100) : 0;

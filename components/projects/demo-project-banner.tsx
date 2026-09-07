@@ -3,17 +3,13 @@
 import { FlaskConical, LogOut } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
-import type { ReactNode } from "react";
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import type { Project } from "@/lib/api/projects";
-import { useProject } from "@/lib/hooks/useProject";
-
-function useCurrentProject() {
-  const params = useParams<{ id: string }>();
-  const { data: session } = useSession();
-  return useProject(params.id, session?.accessToken).project;
-}
+import { getRetiredFrom, useProject } from "@/lib/hooks/useProject";
+import { isProjectUuid } from "@/lib/api/client";
+import { RetiredDemoNotice } from "@/components/projects/retired-demo-notice";
 
 function DemoProjectNotice({ project }: { project: Project }) {
   const sourceHref = project.demo_source_project_id
@@ -50,12 +46,52 @@ function DemoProjectNotice({ project }: { project: Project }) {
 }
 
 export function DemoProjectShell({ children }: { children: ReactNode }) {
-  const project = useCurrentProject();
+  const { id: projectId } = useParams<{ id: string }>();
+  const { data: session } = useSession();
+  const { project, retiredRedirect } = useProject(projectId, session?.accessToken);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const lastReplacement = useRef<string | null>(null);
+  const queryString = searchParams.toString();
+
+  useEffect(() => {
+    const params = new URLSearchParams(queryString);
+    const chain = getRetiredFrom(params, projectId);
+    const target = retiredRedirect?.current_project_id.toLowerCase();
+    if (target && target !== projectId.toLowerCase() && !chain.includes(target)) {
+      const nextParams = new URLSearchParams();
+      for (const key of ["classIri", "branch"]) {
+        const value = params.get(key);
+        if (value !== null) nextParams.set(key, value);
+      }
+      if (isProjectUuid(projectId)) chain.push(projectId.toLowerCase());
+      nextParams.set("retired_from", chain.join(","));
+      const subPath = pathname.slice(`/projects/${projectId}`.length);
+      const nextUrl = `/projects/${target}${subPath}?${nextParams}`;
+      if (lastReplacement.current !== nextUrl) {
+        lastReplacement.current = nextUrl;
+        router.replace(nextUrl);
+      }
+      return;
+    }
+    lastReplacement.current = null;
+
+    // Strip invalid flags without a route transition or a new project fetch.
+    const rawChain = params.getAll("retired_from");
+    if (rawChain.length && (!chain.length || rawChain.length !== 1 || rawChain[0] !== chain.join(","))) {
+      params.delete("retired_from");
+      if (chain.length) params.set("retired_from", chain.join(","));
+      const query = params.toString();
+      window.history.replaceState(null, "", `${pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+    }
+  }, [pathname, projectId, queryString, retiredRedirect, router]);
 
   if (!project?.is_demo) return children;
 
   return (
     <div className="flex h-dvh min-h-0 flex-col overflow-hidden">
+      <RetiredDemoNotice projectId={projectId} />
       <DemoProjectNotice project={project} />
       <div
         data-testid="project-route-scroll-region"

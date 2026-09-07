@@ -19,12 +19,12 @@ export default function PullRequestsPage() {
   const router = useRouter();
   const projectId = params.id as string;
 
-  const { project, isLoading, error } = useProject(projectId, session?.accessToken);
+  const { project, isRetiredRedirecting, isLoading, error } = useProject(projectId, session?.accessToken);
   const { canEdit: canCreatePR } = derivePermissions(project, session?.accessToken);
   const projectHomeHref = useProjectHomeHref(projectId);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  if (isLoading || status === "loading") {
+  if (isLoading || isRetiredRedirecting || status === "loading") {
     return (
       <>
         <Header />

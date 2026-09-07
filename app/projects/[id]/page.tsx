@@ -29,10 +29,10 @@ export default function ProjectViewerPage() {
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
 
   // Project data from shared React Query cache
-  const { project, isLoading, error, errorKind } = useProject(projectId, session?.accessToken);
+  const { project, isRetiredRedirecting, isLoading, error, errorKind } = useProject(projectId, session?.accessToken);
   const { canManage, hasOntology } = derivePermissions(project, session?.accessToken);
 
-  if (isLoading || (status === "loading" && authMode === "required")) {
+  if (isLoading || isRetiredRedirecting || (status === "loading" && authMode === "required")) {
     return (
       <>
         <Header />

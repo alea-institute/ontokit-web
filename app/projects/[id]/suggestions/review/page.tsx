@@ -150,7 +150,7 @@ export default function SuggestionReviewPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  const { project, isLoading: isProjectLoading, error: projectError } = useProject(projectId, session?.accessToken);
+  const { project, isRetiredRedirecting, isLoading: isProjectLoading, error: projectError } = useProject(projectId, session?.accessToken);
   const { canEdit: canReview } = derivePermissions(project, session?.accessToken);
   const projectHomeHref = useProjectHomeHref(projectId);
 
@@ -416,7 +416,7 @@ export default function SuggestionReviewPage() {
     }
   };
 
-  if (isLoading || status === "loading") {
+  if (isLoading || isRetiredRedirecting || status === "loading") {
     return (
       <>
         <Header />

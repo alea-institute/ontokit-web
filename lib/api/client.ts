@@ -79,6 +79,35 @@ export function getSourceRevisionConflict(
 
   return detail as SourceRevisionConflictDetail;
 }
+
+export interface DemoGenerationRetiredDetail {
+  code: "demo_generation_retired";
+  current_project_id: string;
+  retired_at: string | null;
+}
+
+export function isProjectUuid(value: string): boolean {
+  return value.length === 36 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+}
+
+/** Return retirement details only when the complete 410 contract matches. */
+export function getDemoGenerationRetired(error: unknown): DemoGenerationRetiredDetail | null {
+  if (!(error instanceof ApiError) || error.status !== 410) return null;
+  if (!error.detail || typeof error.detail !== "object") return null;
+
+  const detail = error.detail as Partial<DemoGenerationRetiredDetail>;
+  if (
+    detail.code !== "demo_generation_retired"
+    || typeof detail.current_project_id !== "string"
+    || !isProjectUuid(detail.current_project_id)
+    || (detail.retired_at !== null && typeof detail.retired_at !== "string")
+  ) {
+    return null;
+  }
+
+  return detail as DemoGenerationRetiredDetail;
+}
+
 export interface RequestOptions extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
   /**

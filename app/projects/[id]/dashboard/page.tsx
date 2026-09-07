@@ -36,7 +36,7 @@ export default function ProjectDashboardPage() {
   const projectId = params.id as string;
 
   // Project data from shared React Query cache
-  const { project, isLoading, error } = useProject(projectId, session?.accessToken);
+  const { project, isRetiredRedirecting, isLoading, error } = useProject(projectId, session?.accessToken);
   const { canEdit, canSuggest, canManage } = derivePermissions(project, session?.accessToken);
 
   // Join request state
@@ -134,7 +134,7 @@ export default function ProjectDashboardPage() {
     }
   };
 
-  if (isLoading || status === "loading") {
+  if (isLoading || isRetiredRedirecting || status === "loading") {
     return (
       <>
         <Header />

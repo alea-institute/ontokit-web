@@ -2,7 +2,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { projectState } = vi.hoisted(() => ({
+const { projectState, navigation } = vi.hoisted(() => ({
+  navigation: { search: "", replace: vi.fn() },
   projectState: {
     is_demo: false,
     name: "FOLIO Demo",
@@ -11,14 +12,20 @@ const { projectState } = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("next/navigation", () => ({ useParams: () => ({ id: "project-1" }) }));
+vi.mock("next/navigation", () => ({
+  useParams: () => ({ id: "22222222-2222-4222-8222-222222222222" }),
+  useSearchParams: () => new URLSearchParams(navigation.search),
+  usePathname: () => "/projects/22222222-2222-4222-8222-222222222222/editor",
+  useRouter: () => ({ replace: navigation.replace }),
+}));
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: null }) }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...props}>{children}</a>
   ),
 }));
-vi.mock("@/lib/hooks/useProject", () => ({
+vi.mock("@/lib/hooks/useProject", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/hooks/useProject")>(),
   useProject: () => ({ project: projectState }),
 }));
 
@@ -26,6 +33,8 @@ import { DemoProjectShell } from "@/components/projects/demo-project-banner";
 
 describe("DemoProjectBanner", () => {
   beforeEach(() => {
+    navigation.search = "";
+    navigation.replace.mockClear();
     projectState.is_demo = false;
     projectState.demo_source_project_id = "folio-live";
     projectState.demo_repository_full_name = "alea-institute/ontokit-demo-folio";
@@ -116,4 +125,21 @@ describe("DemoProjectBanner", () => {
     expect(screen.getByRole("link", { name: /Return to source/ }).getAttribute("href"))
       .toBe("/");
   });
+  it("places the retirement status above the demo workspace banner", () => {
+    projectState.is_demo = true;
+    navigation.search = "retired_from=11111111-1111-4111-8111-111111111111";
+    render(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
+    const retired = screen.getByRole("status", { name: "Retired demo notice" });
+    expect(retired.nextElementSibling).toBe(screen.getByLabelText("Demo workspace notice"));
+  });
+
+  it.each(["", "invalid", "11111111-1111-4111-8111-111111111111%0A", "22222222-2222-4222-8222-222222222222"])("strips invalid retirement flag %s without navigation", (value) => {
+    projectState.is_demo = true;
+    navigation.search = `retired_from=${value}&branch=main`;
+    render(<DemoProjectShell><main>Project route</main></DemoProjectShell>);
+    expect(screen.queryByRole("status")).toBeNull();
+    expect(window.location.search).toBe("?branch=main");
+    expect(navigation.replace).not.toHaveBeenCalled();
+  });
+
 });

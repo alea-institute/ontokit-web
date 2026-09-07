@@ -74,7 +74,7 @@ export default function SuggestionsPage() {
   const params = useParams();
   const projectId = params.id as string;
 
-  const { project, isLoading: isProjectLoading, error: projectError } = useProject(projectId, session?.accessToken);
+  const { project, isRetiredRedirecting, isLoading: isProjectLoading, error: projectError } = useProject(projectId, session?.accessToken);
   const projectHomeHref = useProjectHomeHref(projectId);
   const [sessions, setSessions] = useState<SuggestionSessionSummary[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
@@ -96,7 +96,7 @@ export default function SuggestionsPage() {
   const isLoading = isProjectLoading || isLoadingSessions;
   const error = projectError || sessionsError;
 
-  if (isLoading || status === "loading") {
+  if (isLoading || isRetiredRedirecting || status === "loading") {
     return (
       <>
         <Header />
