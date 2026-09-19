@@ -1,10 +1,11 @@
+import { StrictMode } from 'react';
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAnonymousSuggestion } from '@/lib/hooks/useAnonymousSuggestion';
-import { useAnonymousTokenStore } from '@/lib/stores/anonymousCreditStore';
+import { ANONYMOUS_TOKEN_TTL_MS, useAnonymousTokenStore } from '@/lib/stores/anonymousCreditStore';
 import { jsonResponse } from '../../fixtures/llm-hook-harness';
 
-function setup() {
+function setup(options: { createdAt?: string; strict?: boolean } = {}) {
   let failure = '';
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
@@ -13,16 +14,49 @@ function setup() {
     if (path.endsWith('/submit')) return jsonResponse({ pr_number: 12, pr_url: null, status: 'submitted' });
     if (path.endsWith('/discard')) return new Response(null, { status: 204 });
     expect(init?.method).toBe('POST');
-    return jsonResponse({ session_id: 'session', branch: 'anonymous/one', created_at: new Date().toISOString(), anonymous_token: 'synthetic-anonymous-token' });
+    return jsonResponse({ session_id: 'session', branch: 'anonymous/one', created_at: options.createdAt ?? new Date().toISOString(), anonymous_token: 'synthetic-anonymous-token' });
   });
   vi.stubGlobal('fetch', fetcher);
   const onSubmitted = vi.fn(); const onError = vi.fn();
-  return { fetcher, onSubmitted, onError, fail: (suffix: string) => { failure = suffix; }, ...renderHook(() => useAnonymousSuggestion({ projectId: 'project', onSubmitted, onError })) };
+  return { fetcher, onSubmitted, onError, fail: (suffix: string) => { failure = suffix; }, ...renderHook(() => useAnonymousSuggestion({ projectId: 'project', onSubmitted, onError }), options.strict ? { wrapper: StrictMode } : undefined) };
 }
 beforeEach(() => { useAnonymousTokenStore.setState({ tokens: {} }); sessionStorage.clear(); });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); useAnonymousTokenStore.setState({ tokens: {} }); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); useAnonymousTokenStore.setState({ tokens: {} }); });
 
 describe('anonymous suggestion API and persisted session integration', () => {
+  it('uses the local clock for an invalid server timestamp and expires the persisted token after 24 hours', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-19T12:00:00Z'));
+    const { result } = setup({ createdAt: 'invalid timestamp' });
+    await act(() => result.current.startSession());
+    expect(useAnonymousTokenStore.getState().getToken('project')).toMatchObject({ issuedAt: Date.now(), expiresAt: Date.now() + ANONYMOUS_TOKEN_TTL_MS });
+    vi.setSystemTime(Date.now() + ANONYMOUS_TOKEN_TTL_MS);
+    act(() => { expect(useAnonymousTokenStore.getState().getToken('project')).toBeNull(); });
+    expect(useAnonymousTokenStore.getState().tokens).toEqual({});
+  });
+
+  it('preserves the authoritative server issue time instead of extending a token on receipt', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-19T12:00:00Z'));
+    const issuedAt = Date.now() - 60 * 60 * 1000;
+    const { result } = setup({ createdAt: new Date(issuedAt).toISOString() });
+    await act(() => result.current.startSession());
+    expect(useAnonymousTokenStore.getState().getToken('project')).toMatchObject({ issuedAt, expiresAt: issuedAt + ANONYMOUS_TOKEN_TTL_MS });
+  });
+
+  it('restores a persisted session under Strict Mode and saves with its existing credential', async () => {
+    useAnonymousTokenStore.getState().setToken('project', 'restored-fixture-token', 'restored-session', 'anonymous/restored', Date.now());
+    const { result, fetcher } = setup({ strict: true });
+    expect(result.current.branch).toBe('anonymous/restored');
+    await act(() => result.current.startSession());
+    expect(fetcher).not.toHaveBeenCalled();
+    await act(() => result.current.saveToSession('content', 'iri', 'Entity'));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, init] = fetcher.mock.calls[0];
+    expect(String(url)).toContain('/restored-session/save');
+    expect(new Headers(init?.headers).get('X-Anonymous-Token')).toBe('restored-fixture-token');
+  });
+
   it('starts, saves and submits using anonymous headers and clears the persisted session', async () => {
     const { result, fetcher, onSubmitted } = setup();
     await act(async () => { expect(await result.current.startSession()).toBe('anonymous/one'); });
