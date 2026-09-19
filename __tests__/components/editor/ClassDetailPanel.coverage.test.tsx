@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { ClassDetailPanel } from "@/components/editor/ClassDetailPanel";
@@ -16,6 +16,7 @@ import { llmHookHarness, jsonResponse } from "@/__tests__/fixtures/llm-hook-harn
 const iri = "https://example.test/Person";
 const scope = { projectId: "class-panel-coverage", branch: "main" };
 const key = draftKey(scope.projectId, scope.branch, iri);
+const scrollDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
 const definition = "http://www.w3.org/2004/02/skos/core#definition";
 const seeAlso = "http://www.w3.org/2000/01/rdf-schema#seeAlso";
 const source = `@prefix : <https://example.test/> .
@@ -54,13 +55,31 @@ beforeEach(() => {
     return jsonResponse({ items: [], results: [], total: 0 });
   }); vi.stubGlobal("fetch", fetcher);
 });
-afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear()); vi.unstubAllGlobals(); vi.restoreAllMocks(); useDraftStore.setState({ drafts: {} }); useSuggestionStore.getState().clearAllSuggestions(); });
+afterEach(() => { if (scrollDescriptor) Object.defineProperty(Element.prototype, "scrollIntoView", scrollDescriptor); else Reflect.deleteProperty(Element.prototype, "scrollIntoView"); cleanup(); clients.splice(0).forEach(client => client.clear()); vi.unstubAllGlobals(); vi.restoreAllMocks(); useDraftStore.setState({ drafts: {} }); useSuggestionStore.getState().clearAllSuggestions(); });
 async function savePanel() {
   await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
   await screen.findByText("Saved");
 }
 describe("class detail real editing and suggestion chains", () => {
+  it("saves a definition language and blurred comment through the draft and Turtle writer", async () => {
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+    mount();
+    const field = await screen.findByDisplayValue("Existing definition");
+    fireEvent.click(within(field.parentElement!).getByRole("button", { name: "Language tag" }));
+    fireEvent.click(screen.getByRole("option", { name: /French\s*Français\s*fr$/ }));
+    fireEvent.blur(field);
+    const comment = screen.getByPlaceholderText("Add another Comment — or translation.");
+    fireEvent.change(comment, { target: { value: "A useful comment" } });
+    fireEvent.blur(comment);
+    await waitFor(() => expect(useDraftStore.getState().getDraft(key)?.comments).toContainEqual({ value: "A useful comment", lang: "en" }));
+    await savePanel();
+    const triples = parseBlockTriples(output, iri);
+    expect(triples).toContainEqual({ predicate: definition, object: { type: "literal", value: "Existing definition", lang: "fr" } });
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#comment", object: { type: "literal", value: "A useful comment", lang: "en" } });
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Person", lang: "en" } });
+  });
   it("edits through the fetched panel, durable draft and Turtle writer then parses the result", async () => {
     const { save } = mount();
     const input = await screen.findByPlaceholderText("Label text");
