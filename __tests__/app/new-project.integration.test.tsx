@@ -8,8 +8,18 @@ import { jsonResponse, llmHookHarness } from '../fixtures/llm-hook-harness';
 const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => navigation, usePathname: () => '/projects/new' }));
 const session: Session = { user: { name: 'Fixture User', email: 'fixture@example.invalid' }, accessToken: 'token', expires: '2099-01-01T00:00:00Z' };
+class Upload extends EventTarget {
+  static requests: Upload[] = [];
+  upload = new EventTarget(); status = 200; statusText = 'OK'; responseText = ''; timeout = 0;
+  body: FormData | null = null;
+  open = vi.fn(); setRequestHeader = vi.fn();
+  send(body: FormData) { this.body = body; Upload.requests.push(this); }
+  finish(status: number, body: unknown) { this.status = status; this.responseText = JSON.stringify(body); this.dispatchEvent(new Event('load')); }
+}
+
 function mount(auth: Session | null = session) {
   let fail = false;
+  let cloneGate: Promise<void> | undefined;
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
     if (path.endsWith('/pr-party/me')) return jsonResponse({ is_reviewer: false });
@@ -17,15 +27,15 @@ function mount(auth: Session | null = session) {
     if (path.endsWith('/github-token')) return jsonResponse({ has_token: true });
     if (path.endsWith('/github-repos')) return jsonResponse({ items: [{ owner: 'fixture', name: 'ontology', full_name: 'fixture/ontology', private: false, default_branch: 'develop' }] });
     if (path.endsWith('/github/scan-files')) return jsonResponse({ items: [{ path: 'source/model.owl', name: 'model.owl', size: 512 }], total: 1 });
-    if (path.endsWith('/from-github')) return fail ? jsonResponse({ detail: 'Repository unavailable' }, 403) : jsonResponse({ id: 'cloned-project' });
+    if (path.endsWith('/from-github')) { await cloneGate; return fail ? jsonResponse({ detail: 'Repository unavailable' }, 403) : jsonResponse({ id: 'cloned-project' }); }
     if (path === '/api/v1/projects' && init?.method === 'POST') return fail ? new Response('Creation denied', { status: 403 }) : jsonResponse({ id: 'created-project' });
     throw new Error(`Unexpected request: ${path}`);
   });
   vi.stubGlobal('fetch', fetcher);
   const { wrapper: QueryWrapper } = llmHookHarness();
-  return { fetcher, reject: (next: boolean) => { fail = next; }, ...render(<SessionProvider session={auth} refetchOnWindowFocus={false}><QueryWrapper><NewProjectPage /></QueryWrapper></SessionProvider>) };
+  return { fetcher, delayClone: (gate: Promise<void>) => { cloneGate = gate; }, reject: (next: boolean) => { fail = next; }, ...render(<SessionProvider session={auth} refetchOnWindowFocus={false}><QueryWrapper><NewProjectPage /></QueryWrapper></SessionProvider>) };
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); navigation.push.mockClear(); });
+afterEach(() => { cleanup(); Upload.requests.length = 0; vi.useRealTimers(); vi.unstubAllGlobals(); navigation.push.mockClear(); });
 const form = () => within(screen.getByRole('main'));
 
 describe('new project route through the real form and HTTP client', () => {
@@ -80,14 +90,6 @@ describe('new project route through the real form and HTTP client', () => {
 
 
   it.each([{ retry: false, description: '' }, { retry: true, description: '' }, { retry: false, description: 'A multilingual ontology: café' }, { retry: true, description: 'A multilingual ontology: café' }])('imports a selected file through real multipart construction (retry: $retry, description: $description)', async ({ retry, description }) => {
-    class Upload extends EventTarget {
-      static requests: Upload[] = [];
-      upload = new EventTarget(); status = 200; statusText = 'OK'; responseText = ''; timeout = 0;
-      body: FormData | null = null;
-      open = vi.fn(); setRequestHeader = vi.fn();
-      send(body: FormData) { this.body = body; Upload.requests.push(this); }
-      finish(status: number, body: unknown) { this.status = status; this.responseText = JSON.stringify(body); this.dispatchEvent(new Event('load')); }
-    }
     vi.stubGlobal('XMLHttpRequest', Upload);
     mount(); fireEvent.click(form().getByRole('button', { name: 'Import from File' }));
     const file = new File(['@prefix : <http://example.org/> .'], 'ontology.ttl', { type: 'text/turtle' });
@@ -135,6 +137,86 @@ describe('new project route through the real form and HTTP client', () => {
     await waitFor(() => expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/cloned-project'));
     const request = fetcher.mock.calls.filter(([input]) => String(input).endsWith('/from-github')).at(-1)!;
     expect(JSON.parse(String(request[1]?.body))).toEqual({ repo_owner: 'fixture', repo_name: 'ontology', ontology_file_path: 'source/model.owl', turtle_file_path: 'normalized/model.ttl', is_public: false, default_branch: 'develop' });
+  });
+
+  it('reports upload and processing progress through actual XHR events, then clears progress', async () => {
+    vi.stubGlobal('XMLHttpRequest', Upload); mount();
+    fireEvent.click(form().getByRole('button', { name: 'Import from File' }));
+    const file = new File(['@prefix : <https://example.test/> .'], 'progress.ttl', { type: 'text/turtle' });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    fireEvent.change(form().getByLabelText(/Project Name/), { target: { value: '  Imported name  ' } });
+    fireEvent.click(form().getByRole('button', { name: /Public Anyone/ }));
+    fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
+    const upload = Upload.requests[0];
+    expect(upload.body?.get('name')).toBe('Imported name'); expect(upload.body?.get('is_public')).toBe('true');
+    act(() => upload.upload.dispatchEvent(new ProgressEvent('progress', { lengthComputable: true, loaded: 25, total: 100 })));
+    expect(screen.getByText('Uploading file...')).toBeDefined(); expect(screen.getByText('25%')).toBeDefined();
+    act(() => upload.upload.dispatchEvent(new Event('load')));
+    expect(screen.getByText('Processing ontology...')).toBeDefined(); expect(screen.queryByText('25%')).toBeNull();
+    await act(async () => upload.finish(200, { id: 'progress-project' }));
+    expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/progress-project');
+    expect(screen.queryByText('Processing ontology...')).toBeNull();
+  });
+
+  it.each(['timeout', 'abort'] as const)('keeps the selected file after upload %s and permits retry', async event => {
+    vi.stubGlobal('XMLHttpRequest', Upload); mount();
+    fireEvent.click(form().getByRole('button', { name: 'Import from File' }));
+    const file = new File(['@prefix : <https://example.test/> .'], 'retry.ttl', { type: 'text/turtle' });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
+    await act(async () => Upload.requests[0].dispatchEvent(new Event(event)));
+    const error = await screen.findByRole('alert');
+    expect(error.textContent).toContain(event === 'timeout' ? 'upload timed out' : 'Upload was cancelled');
+    expect(navigation.push).not.toHaveBeenCalled();
+    fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
+    expect(Upload.requests).toHaveLength(2); expect(Upload.requests[1].body?.get('file')).toBe(file);
+    await act(async () => Upload.requests[1].finish(200, { id: 'retry-project' }));
+    expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/retry-project');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('refuses import when an authenticated session has no API token', async () => {
+    vi.stubGlobal('XMLHttpRequest', Upload); mount({ ...session, accessToken: undefined });
+    fireEvent.click(form().getByRole('button', { name: 'Import from File' }));
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(['data'], 'ontology.ttl')] } });
+    fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
+    await screen.findByText('You must be signed in to import a project');
+    expect(Upload.requests).toHaveLength(0); expect(navigation.push).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])('advances clone progress without navigating before HTTP completion (failure: %s)', async failure => {
+    const { fetcher, delayClone, reject } = mount();
+    fireEvent.click(form().getByRole('button', { name: 'Clone from GitHub' }));
+    fireEvent.click(await screen.findByRole('button', { name: /fixture\/ontology/ }));
+    await screen.findByDisplayValue('source/model.ttl');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Turtle output path' }));
+    fireEvent.change(form().getByLabelText(/Project Name/), { target: { value: '  Cloned name  ' } });
+    fireEvent.change(form().getByLabelText('Description'), { target: { value: '  Cloned description  ' } });
+    let finish!: () => void;
+    delayClone(new Promise<void>(resolve => { finish = resolve; }));
+    reject(failure); vi.useFakeTimers();
+    fireEvent.click(screen.getByRole('button', { name: 'Clone & Create Project' }));
+    expect(screen.getByText('Parsing ontology file...')).toBeDefined();
+    for (const [delay, label, percentage] of [
+      [1500, 'Normalizing to Turtle format...', '30%'],
+      [2000, 'Creating project...', '45%'],
+      [2000, 'Cloning repository...', '70%'],
+      [15000, 'Normalizing repository content...', '85%'],
+      [5000, 'Finalizing...', '95%'],
+    ] as const) {
+      await act(async () => vi.advanceTimersByTimeAsync(delay));
+      expect(screen.getByText(label)).toBeDefined(); expect(screen.getByText(percentage)).toBeDefined();
+      expect(navigation.push).not.toHaveBeenCalled();
+    }
+    await act(async () => finish()); vi.useRealTimers();
+    expect(screen.queryByText('Finalizing...')).toBeNull();
+    if (failure) {
+      await screen.findByText('Repository unavailable'); expect(navigation.push).not.toHaveBeenCalled();
+      reject(false); fireEvent.click(screen.getByRole('button', { name: 'Clone & Create Project' }));
+    }
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/cloned-project'));
+    const request = fetcher.mock.calls.filter(([input]) => String(input).endsWith('/from-github')).at(-1)!;
+    expect(JSON.parse(String(request[1]?.body))).toMatchObject({ name: 'Cloned name', description: 'Cloned description', turtle_file_path: 'source/model.ttl' });
   });
 
 });
