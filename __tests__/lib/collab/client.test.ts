@@ -66,6 +66,22 @@ function receiveMessage(ws: MockWebSocket, data: unknown): void {
 // --- tests -------------------------------------------------------------------
 
 describe("CollaborationClient", () => {
+  it("rejects a socket constructor failure and can reconnect to send a room join", async () => {
+    const client = new CollaborationClient(defaultOptions());
+    const failure = new DOMException("Connection blocked", "SecurityError");
+    vi.stubGlobal("WebSocket", class { constructor() { throw failure; } });
+    try {
+      await expect(client.connect()).rejects.toBe(failure);
+    } finally {
+      vi.stubGlobal("WebSocket", MockWebSocket);
+    }
+    const socket = await connectClient(client);
+    client.joinRoom("ontology");
+    expect(JSON.parse(socket.send.mock.calls[0][0])).toMatchObject({ type: "join", room: "ontology" });
+    client.disconnect();
+    expect(socket.close).toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     mockWsInstances.length = 0;
   });
