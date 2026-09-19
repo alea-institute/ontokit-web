@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PRPartyCard } from "@/components/pr-party/PRPartyCard";
 import { ScreenReaderAnnouncerProvider } from "@/components/ui/ScreenReaderAnnouncer";
@@ -194,6 +194,25 @@ describe("PRPartyCard real queue, controls, API and announcements", () => {
     expect(await screen.findByText("Not merged. Branch protection blocked merge")).toBeDefined();
     expect(screen.getByTestId("pr-party-card-merge-outcome").getAttribute("data-outcome")).toBe("failed");
     expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/actions"))).toHaveLength(1);
+  });
+
+  it.each([false, true])("waits for approval before offering a merge on an own PR (pending intent: %s)", async pending => {
+    row = { ...card, author_kind: "own", read_only: true, author_github_login: null, other_reviewer: { has_approved: false, has_pending_intent: pending } };
+    mount();
+    const banner = await screen.findByTestId("pr-party-own-strip");
+    expect(banner.textContent).toContain(pending ? "has a verdict in progress" : "waiting on your co-reviewer");
+    expect(screen.queryByRole("button", { name: "Merge pull request" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+    expect(screen.getByText("example/ontology#3").textContent).toBe("example/ontology#3");
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === "POST")).toBe(false);
+    row = { ...row, other_reviewer: { has_approved: true, has_pending_intent: false } };
+    await act(async () => { await client.invalidateQueries(); });
+    expect(await screen.findByRole("button", { name: "Merge pull request" })).toBeDefined();
+    expect(banner.textContent).toContain("your co-reviewer has approved it");
+    respond = () => json({ action: { merged: true, status: "merged" }, card: { ...detail, ...row } });
+    fireEvent.click(screen.getByRole("button", { name: "Merge pull request" }));
+    expect(await screen.findByText("Merged. Improve ontology is in.")).toBeDefined();
+    expect(fetchMock.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
 
   it("renders an empty queue without actionable cards", async () => {

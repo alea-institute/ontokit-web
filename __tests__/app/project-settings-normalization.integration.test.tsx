@@ -51,10 +51,10 @@ afterEach(() => {
   window.history.replaceState(null, '', originalUrl);
   if (scroll) Object.defineProperty(Element.prototype, 'scrollIntoView', scroll); else Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
 });
-async function mount() {
+async function mount(expectedStatus = 'Normalization recommended') {
   const { wrapper: QueryWrapper } = llmHookHarness();
   const view = render(<SessionProvider session={session} refetchOnWindowFocus={false}><QueryWrapper><ToastProvider><ProjectSettingsPage /></ToastProvider></QueryWrapper></SessionProvider>);
-  await screen.findByText('Normalization recommended');
+  await screen.findByText(expectedStatus);
   return view;
 }
 function section() { return within(screen.getByRole('heading', { name: 'Ontology Normalization' }).closest('section')!); }
@@ -66,6 +66,42 @@ async function queue() {
 const jobCalls = () => fetcher.mock.calls.filter(([input]) => String(input).includes('/normalization/jobs/'));
 
 describe('settings normalization through the real page, query hooks and HTTP client', () => {
+  it.each([
+    { removed: ['old', 'unused'], added: ['owl', 'rdfs'], converted: true, notes: ['Converted RDF/XML', 'Sorted triples'] },
+    { removed: [], added: ['owl'], converted: false, notes: [] },
+    { removed: ['unused'], added: [], converted: false, notes: ['Removed unused prefix'] },
+    { removed: [], added: [], converted: false, notes: [] },
+  ])('renders the persisted import report with prefixes $removed → $added', async ({ removed, added, converted, notes }) => {
+    const savedReport = { ...report, original_format: converted ? 'rdfxml' : 'turtle', format_converted: converted, prefixes_removed: removed, prefixes_added: added, notes };
+    route = url => url.pathname === '/api/v1/projects/project' ? jsonResponse({ ...project, normalization_report: savedReport }) : undefined;
+    await mount();
+    const ui = within(screen.getByRole('heading', { name: 'Import Normalization Report' }).closest('section')!);
+    expect(ui.getByText(savedReport.original_format)).toBeDefined();
+    expect(ui.getByText('12')).toBeDefined();
+    expect(ui.getByText(`${report.original_size_bytes.toLocaleString()} → ${report.normalized_size_bytes.toLocaleString()} bytes`)).toBeDefined();
+    expect(ui.queryByText('→ Turtle') !== null).toBe(converted);
+    expect(ui.queryByRole('heading', { name: 'Prefix Changes' }) !== null).toBe(removed.length + added.length > 0);
+    expect(ui.queryByText('Removed:') !== null).toBe(removed.length > 0);
+    expect(ui.queryByText('Added:') !== null).toBe(added.length > 0);
+    if (removed.length) expect(ui.getByText(removed.join(', '))).toBeDefined();
+    if (added.length) expect(ui.getByText(added.join(', '))).toBeDefined();
+    expect(ui.queryByRole('heading', { name: 'Changes Made' }) !== null).toBe(notes.length > 0);
+    expect(ui.queryAllByRole('listitem').map(item => item.textContent)).toEqual(notes);
+    expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
+  });
+
+  it('shows a reported status error and replaces it after an explicit successful check', async () => {
+    status = { ...status, error: 'Parser service unavailable' };
+    await mount('Error checking status: Parser service unavailable');
+    expect(section().queryByText('Normalization recommended')).toBeNull();
+    status = { ...status, error: null };
+    fireEvent.click(section().getByRole('button', { name: 'Check Status' }));
+    expect(await section().findByText('Normalization recommended')).toBeDefined();
+    expect(section().queryByText('Error checking status: Parser service unavailable')).toBeNull();
+    // Initial query, explicit check, then the real query invalidation refresh.
+    await waitFor(() => expect(fetcher.mock.calls.filter(([url]) => String(url).includes('/normalization/status'))).toHaveLength(3));
+  });
+
   it('scrolls an editor deep link to the normalization section after project loading', async () => {
     window.history.replaceState(null, '', '#normalization');
     await mount();
