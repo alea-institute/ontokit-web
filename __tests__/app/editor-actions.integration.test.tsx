@@ -15,6 +15,7 @@ const boundary = vi.hoisted(() => ({
   session: { data: null as null | { accessToken: string; user: { email: string } }, status: "unauthenticated" },
   replace: vi.fn(), push: vi.fn(), signIn: vi.fn(),
   search: new URLSearchParams(),
+  monacoProps: {} as Record<string, unknown>,
 }));
 vi.mock("next-auth/react", () => ({ useSession: () => boundary.session, signIn: boundary.signIn, signOut: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -24,11 +25,16 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: boundary.replace, push: boundary.push }),
 }));
 
+// Match Next App Router's compiler alias; the default Node entry uses Pages
+// Router loadable refs and does not expose the source editor imperative handle.
+vi.mock("next/dynamic", async () => ({ default: (await import("next/dist/shared/lib/app-dynamic")).default }));
+
 vi.mock("@monaco-editor/react", () => ({
   loader: { config: vi.fn() },
-  default: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
-    <textarea aria-label="Turtle source boundary" value={value} onChange={(event) => onChange(event.target.value)} />
-  ),
+  default: (props: { value: string; onChange: (value: string) => void }) => {
+    boundary.monacoProps = props;
+    return <textarea aria-label="Turtle source boundary" value={props.value} onChange={(event) => props.onChange(event.target.value)} />;
+  },
 }));
 import EditorPage from "@/app/projects/[id]/editor/page";
 
@@ -37,6 +43,7 @@ import EditorPage from "@/app/projects/[id]/editor/page";
 // replaced at their boundaries; application orchestration stays real.
 const iri = "https://example.test/Person";
 const initialEditorMode = useEditorModeStore.getState();
+const initialSendBeacon = Object.getOwnPropertyDescriptor(navigator, "sendBeacon");
 let llmConfigured: boolean;
 let generationBodies: unknown[];
 let extraTreeNodes: object[];
@@ -60,6 +67,8 @@ let sourceRevision: string;
 let entityResults: object[];
 let suggestionFailure: "create" | "save" | null;
 let suggestionSubmitStatus: number;
+let resumableSessions: object[];
+let sessionListStatus: number;
 let suggestionSubmissions: unknown[];
 let suggestionBodies: { content: string; entity_iri: string; entity_label: string }[];
 let anonymousFailure: "create" | "save" | "discard" | null;
@@ -137,6 +146,7 @@ function installTreeGeometry(positions: Record<string, number>, rootY?: number) 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  boundary.monacoProps = {};
   boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; lintIssues = []; extraBranches = [];
   sessionStorage.removeItem("ontokit:branch:route-project");
   llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
@@ -153,7 +163,7 @@ beforeEach(() => {
   projectResponse = { id: "route-project", name: "Route ontology", source_file_path: "ontology.ttl", user_role: "owner", is_public: false };
   projectStatus = 200; deleted = false; deleteFailure = false;
   saveStatus = 200; sourceStatus = 200; sourceContent = originalSource; sourceRevision = "base-commit"; entityResults = [];
-  savedBodies = []; suggestionBodies = []; suggestionFailure = null; suggestionSubmitStatus = 200; suggestionSubmissions = [];
+  savedBodies = []; suggestionBodies = []; suggestionFailure = null; suggestionSubmitStatus = 200; suggestionSubmissions = []; resumableSessions = []; sessionListStatus = 200;
   useEditorModeStore.getState().setEditorMode("developer");
   unexpected = [];
   requests.length = 0;
@@ -176,8 +186,9 @@ beforeEach(() => {
       if (action === "discard") return new Response(null, { status: 204 });
       return json({ changes_count: suggestionBodies.length, commit_hash: "anonymous-commit" });
     }
+    if (path.endsWith("/suggestions/sessions") && (!init?.method || init.method === "GET")) return sessionListStatus === 200 ? json({ items: resumableSessions }) : json({ detail: "Session list refused" }, sessionListStatus);
     if (path.endsWith("/suggestions/sessions")) return suggestionFailure === "create" ? json({ detail: "Session refused" }, 403) : json({ session_id: "suggestion-session", branch: "suggestion/draft", created_at: "2026-09-19T12:00:00Z", beacon_token: "fixture-beacon" });
-    if (path.endsWith("/suggestions/sessions/suggestion-session/submit")) {
+    if (path.endsWith("/suggestions/sessions/suggestion-session/submit") || path.endsWith("/suggestions/sessions/suggestion-session/resubmit")) {
       suggestionSubmissions.push(JSON.parse(String(init?.body)));
       return suggestionSubmitStatus === 200 ? json({ pr_number: 23, pr_url: "https://example.test/pull/23" }) : json({ detail: "Submission refused" }, suggestionSubmitStatus);
     }
@@ -235,6 +246,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  if (initialSendBeacon) Object.defineProperty(navigator, "sendBeacon", initialSendBeacon);
+  else Reflect.deleteProperty(navigator, "sendBeacon");
   sessionStorage.removeItem("ontokit:branch:route-project");
   useSuggestionStore.getState().clearAllSuggestions();
   useAnonymousTokenStore.setState({ tokens: {} });
@@ -938,6 +951,136 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(boundary.signIn).toHaveBeenCalledExactlyOnceWith("zitadel", { callbackUrl: window.location.href });
     expect(anonymousSubmissions).toHaveLength(1);
     expect(useAnonymousTokenStore.getState().getToken("route-project")).toBeNull();
+  });
+
+  it.each([200, 403])("resumes a changed session URL after branch initialization and resubmits (HTTP %i)", async status => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    boundary.search = new URLSearchParams({ branch: "suggestion/draft" });
+    extraBranches = [{ name: "suggestion/draft", is_current: false }];
+    resumableSessions = [{ session_id: "suggestion-session", status: "changes-requested" }];
+    const view = mount();
+    await screen.findByRole("button", { name: "suggestion/draft" });
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && new URLSearchParams(r.search).get("branch") === "suggestion/draft")).toBe(true));
+    boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft" });
+    view.rerender(<EditorPage />);
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/suggestions/sessions"))).toBe(true));
+    fireEvent.click(await screen.findByText("Person"));
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await waitFor(() => expect(label.value).toBe("Person"));
+    await editAndSave(label, "Revised label");
+    await screen.findByText('Suggested update to "Revised label"');
+    fireEvent.click(screen.getByRole("button", { name: /Resubmit Suggestions/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+    fireEvent.change(within(dialog).getByLabelText("Describe your changes (optional)"), { target: { value: "Address feedback" } });
+    suggestionSubmitStatus = status;
+    fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
+    if (status === 403) {
+      await screen.findByText(/Submission refused/);
+      expect(screen.queryByText("Suggestions submitted as PR #23")).toBeNull();
+      suggestionSubmitStatus = 200;
+      fireEvent.click(screen.getByRole("button", { name: /Resubmit Suggestions/ }));
+      const retryDialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+      fireEvent.change(within(retryDialog).getByLabelText("Describe your changes (optional)"), { target: { value: "Address feedback" } });
+      fireEvent.click(within(retryDialog).getByRole("button", { name: "Submit for Review" }));
+    }
+    await screen.findByText("Suggestions submitted as PR #23");
+    expect(screen.queryByRole("button", { name: /Resubmit Suggestions/ })).toBeNull();
+    expect(requests.filter(r => r.path.endsWith("/suggestions/sessions") && r.method === "POST")).toEqual([]);
+    expect(requests.find(r => r.path.endsWith("/suggestion-session/resubmit"))).toMatchObject({ method: "POST", authorization: "Bearer route-fixture-token" });
+    expect(suggestionSubmissions).toEqual(Array.from({ length: status === 403 ? 2 : 1 }, () => ({ summary: "Address feedback" })));
+    expect(savedBodies).toEqual([]);
+  });
+
+  it.each(["submitted", "missing", "forbidden"])("reports an unavailable resumed session (%s) without changing source", async state => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft" });
+    extraBranches = [{ name: "suggestion/draft", is_current: false }];
+    resumableSessions = state === "submitted" ? [{ session_id: "suggestion-session", status: "submitted" }] : [];
+    sessionListStatus = state === "forbidden" ? 403 : 200;
+    mount();
+    await screen.findByText(state === "forbidden" ? "Failed to verify suggestion session status." : "This suggestion session is no longer available for editing.");
+    expect(requests.filter(r => r.path.endsWith("/suggestions/sessions"))).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /Resubmit Suggestions/ })).toBeNull();
+    expect(savedBodies).toEqual([]); expect(suggestionBodies).toEqual([]);
+  });
+
+  it.each(["beforeunload", "visibilitychange"])("flushes the latest suggestion source through the real beacon API on %s", async event => {
+    const sendBeacon = vi.fn((_url: string, _body: Blob) => true);
+    Object.defineProperty(navigator, "sendBeacon", { value: sendBeacon, configurable: true });
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    const label = await openSuggestionForm("class");
+    await editAndSave(label, "Beacon label");
+    await screen.findByText('Suggested update to "Beacon label"');
+    if (event === "visibilitychange") {
+      vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+      fireEvent(document, new Event(event));
+    } else fireEvent(window, new Event(event));
+    expect(sendBeacon).toHaveBeenCalledTimes(1);
+    const [url, blob] = sendBeacon.mock.calls[0];
+    expect(new URL(url).pathname).toBe("/api/v1/projects/route-project/suggestions/beacon");
+    expect(new URL(url).searchParams.get("token")).toBe("fixture-beacon");
+    expect(blob.type).toBe("application/json");
+    const payload = JSON.parse(await blob.text());
+    expect(payload).toEqual({ session_id: "suggestion-session", content: suggestionBodies[0].content });
+    expect(parseBlockTriples(payload.content, iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Beacon label", lang: "en" } });
+    cleanup();
+    fireEvent(window, new Event("beforeunload"));
+    fireEvent(document, new Event("visibilitychange"));
+    expect(sendBeacon).toHaveBeenCalledTimes(1);
+    expect(savedBodies).toEqual([]);
+  });
+
+  it("does not beacon an editor draft before an authenticated suggestion session exists", async () => {
+    const sendBeacon = vi.fn();
+    Object.defineProperty(navigator, "sendBeacon", { value: sendBeacon, configurable: true });
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    await openSuggestionForm("class");
+    fireEvent(window, new Event("beforeunload"));
+    expect(sendBeacon).not.toHaveBeenCalled();
+    expect(suggestionBodies).toEqual([]); expect(savedBodies).toEqual([]);
+  });
+
+  it.each([
+    ["class", false], ["objectProperty", false], ["individual", false], ["class", true],
+  ] as const)("inserts a %s into a mounted source editor through its real imperative chain (empty: %s)", async (entityType, empty) => {
+    if (empty) sourceContent = "";
+    mount(); await screen.findByText("Person");
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    const source = await screen.findByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement;
+    let text = source.value;
+    const model = {
+      getValue: () => text,
+      getLineCount: () => text.split("\n").length,
+      getLineMaxColumn: (line: number) => text.split("\n")[line - 1].length + 1,
+      isDisposed: () => false,
+    };
+    const editor = {
+      getModel: () => model, onMouseDown: vi.fn(), revealLineInCenter: vi.fn(), setPosition: vi.fn(), focus: vi.fn(),
+      executeEdits: vi.fn((_origin: string, edits: { text: string; range: { startLineNumber: number; startColumn: number } }[]) => {
+        for (const edit of edits) {
+          expect(edit.range).toMatchObject({ startLineNumber: model.getLineCount(), startColumn: model.getLineMaxColumn(model.getLineCount()) });
+          text += edit.text;
+        }
+        return true;
+      }),
+    };
+    const monaco = { editor: { setModelMarkers: vi.fn() } };
+    act(() => (boundary.monacoProps.onMount as (editor: unknown, monaco: unknown) => void)(editor, monaco));
+    fireEvent.keyDown(document, { key: "n", ctrlKey: true });
+    const dialog = await screen.findByRole("dialog", { name: "Add Entity" });
+    fireEvent.change(within(dialog).getByLabelText("Label"), { target: { value: "Inserted entity" } });
+    fireEvent.change(within(dialog).getByLabelText("Type"), { target: { value: entityType } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Advanced" }));
+    fireEvent.change(within(dialog).getByLabelText("IRI"), { target: { value: "https://example.test/NewEntity" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+    expect(editor.executeEdits).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(source.value).toContain('"Inserted entity"'));
+    expect(editor.executeEdits.mock.calls[0][0]).toBe("add-entity");
+    expect(source.value).toBe(model.getValue());
+    if (!empty) expect(parseBlockTriples(source.value, iri)).toEqual(parseBlockTriples(originalSource, iri));
+    expect(editor.revealLineInCenter).toHaveBeenCalledWith(model.getLineCount());
+    expect(editor.focus).toHaveBeenCalled();
+    expect(savedBodies).toEqual([]);
   });
 
 });
