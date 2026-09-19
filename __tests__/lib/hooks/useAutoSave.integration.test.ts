@@ -34,6 +34,65 @@ beforeEach(() => {
 afterEach(() => { cleanup(); useDraftStore.setState({ drafts: {} }); localStorage.clear(); });
 
 describe("class auto-save with real persistent drafts and Turtle writes", () => {
+  it("rejects a second flush while the first write is pending and permits the next edit afterward", async () => {
+    const writer = sourceWriter();
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    let writes = 0;
+    const { result } = renderHook(() => useAutoSave({
+      ...options,
+      onUpdateClass: async (target, payload) => {
+        writes++;
+        await pending;
+        await writer.save(target, payload);
+      },
+    }));
+    act(() => { result.current.editStateRef.current = draft("First write"); result.current.triggerSave(); });
+    let first!: Promise<boolean>;
+    act(() => { first = result.current.flushToGit("manual"); });
+    expect(result.current.saveStatus).toBe("saving");
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(false); });
+    expect(writes).toBe(1);
+    expect(useDraftStore.getState().hasDraft(key)).toBe(true);
+    await act(async () => { release(); expect(await first).toBe(true); });
+    expect(writer.source).toContain('rdfs:label "First write"@en');
+    act(() => { result.current.editStateRef.current = draft("Second write"); result.current.triggerSave(); });
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(true); });
+    expect(writes).toBe(2);
+    expect(writer.source).toContain('rdfs:label "Second write"@en');
+    expect(useDraftStore.getState().hasDraft(key)).toBe(false);
+  });
+
+  it("ignores an individual draft sharing the selected IRI without deleting its persisted data", async () => {
+    const writer = sourceWriter();
+    const individualDraft = {
+      ...draft(), entityType: "individual" as const, definitions: [], typeIris: [],
+      sameAsIris: [], differentFromIris: [], objectPropertyAssertions: [],
+      dataPropertyAssertions: [], deprecated: false,
+    };
+    useDraftStore.getState().setDraft(key, individualDraft);
+    const { result } = renderHook(() => useAutoSave({ ...options, onUpdateClass: writer.save }));
+    expect(result.current.restoredDraft).toBeNull();
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(false); });
+    expect(writer.source).toBe(TURTLE_FIXTURE);
+    expect(useDraftStore.getState().getDraft(key)).toEqual(individualDraft);
+    expect(JSON.parse(localStorage.getItem("ontokit-drafts")!).state.drafts[key].entityType).toBe("individual");
+  });
+
+  it("keeps a persisted draft until its save handler becomes available", async () => {
+    const writer = sourceWriter();
+    useDraftStore.getState().setDraft(key, { ...draft("Recovered edit"), entityType: "class" });
+    const { result, rerender } = renderHook(({ ready }) => useAutoSave({
+      ...options, onUpdateClass: ready ? writer.save : undefined,
+    }), { initialProps: { ready: false } });
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(false); });
+    expect(useDraftStore.getState().hasDraft(key)).toBe(true);
+    rerender({ ready: true });
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(true); });
+    expect(writer.source).toContain('rdfs:label "Recovered edit"@en');
+    expect(useDraftStore.getState().hasDraft(key)).toBe(false);
+  });
+
   it("persists edits locally, writes clean source, then removes only the saved draft", async () => {
     const writer = sourceWriter();
     const otherKey = draftKey("project", "review", iri);

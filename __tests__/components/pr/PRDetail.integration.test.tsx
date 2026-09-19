@@ -36,6 +36,32 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 const mount = () => render(<PRDetail projectId="project" prNumber={7} accessToken="test-token" currentUserId="author" />);
 
 describe("PRDetail real API and child integration", () => {
+  it("renders renamed, added and deleted files and preserves patch content across collapse and expand", async () => {
+    handler = path => path.endsWith("/diff") ? json({
+      files: [
+        { path: "renamed.ttl", old_path: "original.ttl", change_type: "renamed", additions: 1, deletions: 1,
+          patch: "--- a/original.ttl\n+++ b/renamed.ttl\n@@ -1,2 +1,2 @@\n-Old axiom\n+New axiom\n unchanged\n" },
+        { path: "added.ttl", change_type: "added", additions: 1, deletions: 0, patch: "+Added axiom" },
+        { path: "removed.ttl", change_type: "deleted", additions: 0, deletions: 1, patch: "-Removed axiom" },
+        { path: "asset.bin", change_type: "modified", additions: 0, deletions: 0, patch: null },
+      ], total_additions: 2, total_deletions: 2, files_changed: 4,
+    }) : undefined;
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Files Changed" }));
+    expect(await screen.findByText("renamed from original.ttl")).toBeDefined();
+    for (const line of ["--- a/original.ttl", "+++ b/renamed.ttl", "@@ -1,2 +1,2 @@", "-Old axiom", "+New axiom", "unchanged", "+Added axiom", "-Removed axiom"]) {
+      expect(screen.getByText(line)).toBeDefined();
+    }
+    fireEvent.click(screen.getByRole("button", { name: /renamed.ttl/ }));
+    expect(screen.queryByText("+New axiom")).toBeNull();
+    expect(screen.getByText("+Added axiom")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: /renamed.ttl/ }));
+    expect(screen.getByText("+New axiom")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: /asset.bin/ }));
+    expect(screen.getByText("asset.bin")).toBeDefined();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/diff"))).toHaveLength(1);
+  });
+
   it("edits a real comment thread and refreshes the parent through the API", async () => {
     comments = [{ ...comment }];
     handler = (path, init) => {
