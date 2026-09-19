@@ -52,8 +52,8 @@ describe("source editor integration through real TurtleEditor and lint API", () 
     render(<OntologySourceEditor {...props} onNavigateToClass={navigate} />);
     const mounted = mountEditor();
     await screen.findByText(issue.message);
+    await waitFor(() => expect(IndexWorker.instances.at(-1)?.postMessage).toHaveBeenCalledWith(expect.objectContaining({ content, issues: [expect.objectContaining({ id: issue.id })] })));
     const worker = IndexWorker.instances.at(-1)!;
-    expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ content, issues: [expect.objectContaining({ id: issue.id })] }));
     act(() => worker.onmessage?.({ data: result() } as MessageEvent<IndexWorkerResult>));
     fireEvent.click(screen.getByText(issue.message));
     expect(mounted.editor.setPosition).toHaveBeenCalledWith({ lineNumber: 2, column: 1 });
@@ -69,6 +69,7 @@ describe("source editor integration through real TurtleEditor and lint API", () 
     render(<OntologySourceEditor {...props} ref={ref} />);
     const { editor } = mountEditor();
     await screen.findByText(issue.message);
+    await waitFor(() => expect(IndexWorker.instances.at(-1)?.postMessage).toHaveBeenCalledWith(expect.objectContaining({ issues: [expect.objectContaining({ id: issue.id })] })));
     expect(ref.current!.scrollToIri(issue.subject_iri)).toBe(true);
     expect(editor.setPosition).not.toHaveBeenCalled();
     act(() => IndexWorker.instances.at(-1)!.onmessage?.({ data: result() } as MessageEvent<IndexWorkerResult>));

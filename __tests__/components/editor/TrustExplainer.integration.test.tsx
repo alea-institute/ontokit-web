@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { SessionProvider } from 'next-auth/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { TrustExplainer } from '@/components/editor/TrustExplainer';
@@ -19,16 +19,17 @@ function mount(overrides: Partial<SuggestionCapabilities> = {}, initialFailure =
   const { wrapper: QueryWrapper } = llmHookHarness();
   return { fetcher, onSignIn, recover: () => { failure = false; }, ...render(<SessionProvider session={{ user: { name: 'Test Contributor', email: 'test@example.invalid' }, accessToken: 'synthetic-token', expires: '2099-01-01T00:00:00Z' }} refetchOnWindowFocus={false}><QueryWrapper><Consumer /></QueryWrapper></SessionProvider>) };
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 async function open() { fireEvent.click(screen.getByRole('button', { name: "Why can't I add entries?" })); return screen.getByRole('dialog'); }
 
 describe('trust explanations driven by real capabilities', () => {
   it('shows earned progress, ignores inside clicks and dismisses outside without stealing focus', async () => {
+    const addedListener = vi.spyOn(document, 'addEventListener');
     mount(); const panel = await open();
     expect(await screen.findByText('2 of 3 accepted')).toBeDefined();
     expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('2');
     expect(screen.getByText('1 more accepted suggestion to go.')).toBeDefined();
-    await act(() => new Promise(resolve => setTimeout(resolve, 1)));
+    await waitFor(() => expect(addedListener).toHaveBeenCalledWith('mousedown', expect.any(Function)));
     fireEvent.mouseDown(panel);
     expect(screen.getByRole('dialog')).toBeDefined();
     fireEvent.mouseDown(document.body);

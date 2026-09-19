@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemberTrustControl } from '@/components/projects/MemberTrustControl';
 import type { MemberTrust, TrustOverride } from '@/lib/api/trust';
@@ -20,7 +20,7 @@ function mount(trust: MemberTrust = initial) {
   }
   return { fetcher, fail: (value: boolean) => { failure = value; }, ...render(<Parent />) };
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const open = () => fireEvent.click(screen.getByRole('button', { name: /Trust status/ }));
 
 describe('member trust HTTP and controlled parent integration', () => {
@@ -59,12 +59,13 @@ describe('member trust HTTP and controlled parent integration', () => {
   });
 
   it('closes by Escape with focus restored and by outside click without issuing mutations', async () => {
+    const addedListener = vi.spyOn(document, 'addEventListener');
     const { fetcher } = mount(); open();
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('menu')).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /Trust status/ }));
     open();
-    await act(() => new Promise(resolve => setTimeout(resolve, 1)));
+    await waitFor(() => expect(addedListener).toHaveBeenCalledWith('mousedown', expect.any(Function)));
     fireEvent.mouseDown(document.body);
     expect(screen.queryByRole('menu')).toBeNull();
     expect(fetcher).not.toHaveBeenCalled();
