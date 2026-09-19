@@ -19,6 +19,7 @@ class Upload extends EventTarget {
 
 function mount(auth: Session | null = session, sessionGate?: Promise<Session | null>) {
   let fail = false;
+  let cloneError: unknown = { detail: 'Repository unavailable' };
   let cloneGate: Promise<void> | undefined;
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input), window.location.origin).pathname;
@@ -28,13 +29,13 @@ function mount(auth: Session | null = session, sessionGate?: Promise<Session | n
     if (path.endsWith('/github-token')) return jsonResponse({ has_token: true });
     if (path.endsWith('/github-repos')) return jsonResponse({ items: [{ owner: 'fixture', name: 'ontology', full_name: 'fixture/ontology', private: false, default_branch: 'develop' }] });
     if (path.endsWith('/github/scan-files')) return jsonResponse({ items: [{ path: 'source/model.owl', name: 'model.owl', size: 512 }], total: 1 });
-    if (path.endsWith('/from-github')) { await cloneGate; return fail ? jsonResponse({ detail: 'Repository unavailable' }, 403) : jsonResponse({ id: 'cloned-project' }); }
+    if (path.endsWith('/from-github')) { await cloneGate; return fail ? jsonResponse(cloneError, 403) : jsonResponse({ id: 'cloned-project' }); }
     if (path === '/api/v1/projects' && init?.method === 'POST') return fail ? new Response('Creation denied', { status: 403 }) : jsonResponse({ id: 'created-project' });
     throw new Error(`Unexpected request: ${path}`);
   });
   vi.stubGlobal('fetch', fetcher);
   const { wrapper: QueryWrapper } = llmHookHarness();
-  return { fetcher, delayClone: (gate: Promise<void>) => { cloneGate = gate; }, reject: (next: boolean) => { fail = next; }, ...render(<SessionProvider session={sessionGate ? undefined : auth} refetchOnWindowFocus={false}><QueryWrapper><NewProjectPage /></QueryWrapper></SessionProvider>) };
+  return { fetcher, setCloneError: (body: unknown) => { cloneError = body; }, delayClone: (gate: Promise<void>) => { cloneGate = gate; }, reject: (next: boolean) => { fail = next; }, ...render(<SessionProvider session={sessionGate ? undefined : auth} refetchOnWindowFocus={false}><QueryWrapper><NewProjectPage /></QueryWrapper></SessionProvider>) };
 }
 afterEach(() => { cleanup(); Upload.requests.length = 0; vi.useRealTimers(); vi.unstubAllGlobals(); navigation.push.mockClear(); });
 const form = () => within(screen.getByRole('main'));
@@ -168,6 +169,48 @@ describe('new project route through the real form and HTTP client', () => {
     await waitFor(() => expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/cloned-project'));
     const request = fetcher.mock.calls.filter(([input]) => String(input).endsWith('/from-github')).at(-1)!;
     expect(JSON.parse(String(request[1]?.body))).toEqual({ repo_owner: 'fixture', repo_name: 'ontology', ontology_file_path: 'source/model.owl', turtle_file_path: 'normalized/model.ttl', is_public: false, default_branch: 'develop' });
+  });
+
+  it('retains the import file and metadata after a structured rejection without detail', async () => {
+    vi.stubGlobal('XMLHttpRequest', Upload);
+    mount();
+    fireEvent.click(form().getByRole('button', { name: 'Import from File' }));
+    const file = new File(['@prefix : <https://example.org/> .'], 'ontology.ttl', { type: 'text/turtle' });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    fireEvent.change(form().getByLabelText(/Description/), { target: { value: 'Preserved import description' } });
+    fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
+    const error = { message: 'Import permission expired', code: 'expired' };
+    await act(async () => Upload.requests[0].finish(403, error));
+    expect((await screen.findByRole('alert')).textContent).toContain(JSON.stringify(error));
+    expect(navigation.push).not.toHaveBeenCalled();
+    fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
+    expect(Upload.requests).toHaveLength(2);
+    expect(Upload.requests[1].body?.get('file')).toBe(file);
+    expect(Upload.requests[1].body?.get('description')).toBe('Preserved import description');
+    await act(async () => Upload.requests[1].finish(200, { id: 'recovered-import' }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/recovered-import'));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('retains the selected repository after a structured clone rejection without detail', async () => {
+    const { fetcher, reject, setCloneError } = mount();
+    const error = { message: 'Repository permission expired', code: 'expired' };
+    setCloneError(error); reject(true);
+    fireEvent.click(form().getByRole('button', { name: 'Clone from GitHub' }));
+    fireEvent.click(await screen.findByRole('button', { name: /fixture\/ontology/ }));
+    await screen.findByDisplayValue('source/model.ttl');
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Turtle output path' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Clone & Create Project' }));
+    expect((await screen.findAllByText(JSON.stringify(error))).length).toBeGreaterThan(0);
+    expect(navigation.push).not.toHaveBeenCalled();
+    reject(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Clone & Create Project' }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/cloned-project'));
+    const attempts = fetcher.mock.calls.filter(([input]) => String(input).endsWith('/from-github'));
+    expect(attempts).toHaveLength(2);
+    expect(attempts[1][1]?.body).toBe(attempts[0][1]?.body);
+    expect(new Headers(attempts[1][1]?.headers).get('Authorization')).toBe('Bearer token');
+    expect(screen.queryByText(JSON.stringify(error))).toBeNull();
   });
 
   it('reports upload and processing progress through actual XHR events, then clears progress', async () => {

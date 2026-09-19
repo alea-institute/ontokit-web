@@ -49,6 +49,28 @@ beforeEach(() => {
 afterEach(() => { cleanup(); useSuggestionStore.getState().clearAllSuggestions(); useDraftStore.setState({ drafts: {} }); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("property suggestion persistence", () => {
+  it("accepts the remaining annotation after rejecting an earlier suggestion without shifting its identity", async () => {
+    useSuggestionStore.getState().setSuggestions(scope, iri, "annotations", [
+      suggestion("annotations", { iri: ns + "rejected", property_iri: rdfs + "comment", value: "Rejected comment", lang: "en" }),
+      suggestion("annotations", { iri: ns + "retained", property_iri: example, value: "Retained example", lang: "fr" }),
+    ]);
+    const panel = mount();
+    fireEvent.click(screen.getAllByRole("button", { name: "Reject suggestion" })[0]);
+    expect(screen.queryByText("Rejected comment")).toBeNull();
+    expect(state("annotations").status).toBe("rejected");
+    expect(panel.save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole("button", { name: "Accept suggestion" })[0]);
+    await waitFor(() => expect(useSuggestionStore.getState().suggestions[storeKey(scope, iri, "annotations")].map(item => item.status)).toEqual(["rejected", "accepted"]));
+    await saveDraft();
+    const detail = extractPropertyDetail(panel.output(), iri)!;
+    expect(detail.comments).toEqual([]);
+    expect(detail.annotations.find(annotation => annotation.property_iri === example)?.values).toEqual([
+      { value: "Existing example", lang: "en" }, { value: "Retained example", lang: "fr" },
+    ]);
+    expect(detail.domainIris).toEqual([ns + "Person"]);
+    expect(panel.save).toHaveBeenCalledTimes(1);
+  });
+
   it("removes one characteristic while preserving another through Turtle persistence", async () => {
     const panel = mount();
     const functional = await screen.findByRole("checkbox", { name: "Functional" });

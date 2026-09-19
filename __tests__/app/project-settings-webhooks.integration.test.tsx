@@ -11,13 +11,14 @@ const session: Session = { user: { id: 'owner', name: 'Owner' }, accessToken: 'f
 function mount(enabled = false, hookId: number | null = null) {
   let integration = { id: 'github', repo_owner: 'example', repo_name: 'ontology', repo_url: 'https://github.com/example/ontology', default_branch: 'main', ontology_file_path: 'source.ttl', sync_enabled: true, sync_status: 'idle', webhooks_enabled: enabled, github_hook_id: hookId };
   let errorBody = 'Setup refused';
-  let failure: 'update' | 'setup' | 'secret' | null = null;
+  let failure: 'update' | 'setup' | 'secret' | 'network' | null = null;
   let setup = { status: 'created', github_hook_id: 42 as number | null, message: 'Webhook created' };
   class Socket extends EventTarget { static OPEN = 1; static CONNECTING = 0; readyState = 1; close = vi.fn(); }
   vi.stubGlobal('WebSocket', Socket);
   const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
     if (path.includes('/github-integration')) expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer fixture-token');
+    if (path.endsWith('/webhook-setup') && failure === 'network') throw new TypeError('Failed to fetch');
     if (path.endsWith('/webhook-setup')) return failure === 'setup' ? new Response(errorBody, { status: 403 }) : jsonResponse(setup);
     if (path.endsWith('/webhook-secret')) return failure === 'secret' ? new Response('Details refused', { status: 403 }) : jsonResponse({ webhook_secret: 'synthetic-webhook-value', webhook_url: '/api/v1/webhooks/project' });
     if (path.endsWith('/github-integration') && init?.method === 'PATCH') {
@@ -66,6 +67,21 @@ describe('webhook settings through the real settings route and GitHub HTTP clien
     await ui.findByText('Webhook configured on GitHub');
     expect(ui.queryByText(message)).toBeNull();
     expect(setups(h)).toHaveLength(3);
+    expect(h.fetcher.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(1);
+  });
+
+  it('recovers webhook setup after a transport failure without enabling it twice', async () => {
+    const h = mount(); h.fail('network');
+    const ui = await section();
+    fireEvent.click(ui.getByRole('checkbox'));
+    await ui.findByText('Failed to fetch');
+    expect((ui.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    expect(setups(h)).toHaveLength(1);
+    h.fail(null);
+    fireEvent.click(ui.getByRole('button', { name: 'Retry auto-setup' }));
+    await ui.findByText('Webhook configured on GitHub');
+    expect(ui.queryByText('Failed to fetch')).toBeNull();
+    expect(setups(h)).toHaveLength(2);
     expect(h.fetcher.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(1);
   });
 
