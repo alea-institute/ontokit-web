@@ -124,3 +124,41 @@ describe("validateClientEnv", () => {
     expect(() => validateClientEnv()).toThrow("Invalid client environment variables");
   });
 });
+
+describe("lazy environment exports with real validation and auth mode", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("AUTH_MODE", "disabled");
+    for (const name of ["ZITADEL_ISSUER", "ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "NEXTAUTH_SECRET", "NEXTAUTH_URL", "NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_WS_URL"]) {
+      vi.stubEnv(name, undefined);
+    }
+  });
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it("validates the server export on access and follows the real authentication gate", async () => {
+    const { serverEnv } = await import("@/lib/env");
+    expect(serverEnv.ZITADEL_ISSUER).toBeUndefined();
+    vi.stubEnv("AUTH_MODE", "optional");
+    vi.stubEnv("ZITADEL_ISSUER", "https://identity.example.test");
+    vi.stubEnv("ZITADEL_CLIENT_ID", "fixture-client");
+    expect(() => serverEnv.ZITADEL_ISSUER).toThrow("NEXTAUTH_SECRET");
+    vi.stubEnv("ZITADEL_CLIENT_SECRET", "fixture-provider-secret");
+    vi.stubEnv("NEXTAUTH_SECRET", "fixture-session-secret");
+    expect(serverEnv.ZITADEL_ISSUER).toBe("https://identity.example.test");
+    expect(serverEnv.ZITADEL_CLIENT_ID).toBe("fixture-client");
+  });
+
+  it("revalidates client values after an invalid URL is corrected", async () => {
+    const { clientEnv } = await import("@/lib/env");
+    expect(clientEnv.NEXT_PUBLIC_API_URL).toBe("http://localhost:8000");
+    expect(clientEnv.NEXT_PUBLIC_WS_URL).toBeUndefined();
+    vi.stubEnv("NEXT_PUBLIC_WS_URL", "invalid websocket address");
+    expect(() => clientEnv.NEXT_PUBLIC_API_URL).toThrow("NEXT_PUBLIC_WS_URL");
+    vi.stubEnv("NEXT_PUBLIC_WS_URL", "wss://api.example.test/events");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.example.test");
+    expect(clientEnv.NEXT_PUBLIC_API_URL).toBe("https://api.example.test");
+    expect(clientEnv.NEXT_PUBLIC_WS_URL).toBe("wss://api.example.test/events");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    expect(clientEnv.NEXT_PUBLIC_API_URL).toBe("http://localhost:8000");
+  });
+});
