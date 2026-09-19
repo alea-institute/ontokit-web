@@ -7,6 +7,7 @@ import { ToastProvider } from "@/lib/context/ToastContext";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useDraftStore } from "@/lib/stores/draftStore";
 import { parseBlockTriples } from "@/lib/ontology/turtleBlockParser";
+import { useAnonymousTokenStore, useAnonymousCreditStore } from "@/lib/stores/anonymousCreditStore";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 
 const boundary = vi.hoisted(() => ({
@@ -48,9 +49,11 @@ let sourceRevision: string;
 let entityResults: object[];
 let suggestionFailure: "create" | "save" | null;
 let suggestionBodies: { content: string; entity_iri: string; entity_label: string }[];
+let anonymousFailure: "create" | "save" | "discard" | null;
+let anonymousSubmissions: unknown[];
 let savedBodies: unknown[];
 let unexpected: string[];
-const requests: { path: string; method: string; search: string; authorization: string | null }[] = [];
+const requests: { path: string; method: string; search: string; authorization: string | null; anonymousToken: string | null }[] = [];
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 function mount() {
@@ -74,14 +77,36 @@ async function openEntityForm(entityType: EditableType) {
   const inputs = await screen.findAllByPlaceholderText("Label text");
   return inputs.find(input => (input as HTMLInputElement).value === "Original entity") as HTMLInputElement;
 }
+async function openSuggestionForm(entityType: "class" | "property") {
+  if (entityType === "property") return openEntityForm("property");
+  mount(); fireEvent.click(await screen.findByText("Person"));
+  const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+  await waitFor(() => expect(label.value).toBe("Person"));
+  return label;
+}
 async function editAndSave(label: HTMLInputElement, value: string) {
   fireEvent.change(label, { target: { value } }); fireEvent.blur(label);
   await waitFor(() => expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(false));
   fireEvent.click(screen.getByRole("button", { name: "Save" }));
 }
 
+async function saveAnonymousProposal() {
+  vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
+  boundary.session = { data: null, status: "unauthenticated" };
+  projectResponse = { ...projectResponse, user_role: "viewer", is_public: true };
+  mount(); fireEvent.click(await screen.findByText("Person"));
+  fireEvent.click(await screen.findByRole("button", { name: "Propose Edit" }));
+  const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+  await waitFor(() => expect(label.value).toBe("Person"));
+  await editAndSave(label, "Anonymous label");
+  await screen.findByText('Proposed update to "Anonymous label"');
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  useAnonymousTokenStore.setState({ tokens: {} });
+  useAnonymousCreditStore.getState().clearCredit();
+  anonymousFailure = null; anonymousSubmissions = [];
   useDraftStore.setState({ drafts: {} });
   useEditorModeStore.setState({ showManualSaveButton: true });
   useSelectionStore.getState().clear();
@@ -102,8 +127,18 @@ beforeEach(() => {
   vi.stubGlobal("Worker", class { postMessage() {} terminate() {} });
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
-    requests.push({ path, method: init?.method ?? "GET", search: new URL(String(input)).search, authorization: new Headers(init?.headers).get("Authorization") });
+    requests.push({ path, method: init?.method ?? "GET", search: new URL(String(input)).search, authorization: new Headers(init?.headers).get("Authorization"), anonymousToken: new Headers(init?.headers).get("X-Anonymous-Token") });
     if (path === "/api/v1/projects/route-project") return json(projectResponse, projectStatus);
+    if (path.endsWith("/suggestions/anonymous/sessions")) return anonymousFailure === "create" ? json({ detail: "Anonymous start refused" }, 403) : json({ session_id: "anonymous-session", branch: "suggestion/anonymous", anonymous_token: "fixture-anonymous-token", created_at: new Date().toISOString() });
+    if (path.includes("/suggestions/anonymous/sessions/anonymous-session/")) {
+      const action = path.split("/").at(-1);
+      if (action === "save") suggestionBodies.push(JSON.parse(String(init?.body)));
+      if (action === "submit") anonymousSubmissions.push(JSON.parse(String(init?.body)));
+      if (action === anonymousFailure) return json({ detail: "Anonymous " + action + " refused" }, 403);
+      if (action === "submit") return json({ pr_number: 42, pr_url: "https://example.test/proposals/42" });
+      if (action === "discard") return new Response(null, { status: 204 });
+      return json({ changes_count: suggestionBodies.length, commit_hash: "anonymous-commit" });
+    }
     if (path.endsWith("/suggestions/sessions")) return suggestionFailure === "create" ? json({ detail: "Session refused" }, 403) : json({ session_id: "suggestion-session", branch: "suggestion/draft", created_at: "2026-09-19T12:00:00Z", beacon_token: "fixture-beacon" });
     if (path.endsWith("/suggestions/sessions/suggestion-session/save")) {
       suggestionBodies.push(JSON.parse(String(init?.body)));
@@ -147,6 +182,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  useAnonymousTokenStore.setState({ tokens: {} });
+  useAnonymousCreditStore.getState().clearCredit();
   useDraftStore.setState({ drafts: {} });
   useEditorModeStore.setState(initialEditorMode);
   useSelectionStore.getState().clear();
@@ -343,13 +380,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
   ] as const)("persists a %s suggestion through the real session workflow (failure: %s)", async (entityType, failure) => {
     projectResponse = { ...projectResponse, user_role: "suggester" };
     suggestionFailure = failure;
-    let label: HTMLInputElement;
-    if (entityType === "property") label = await openEntityForm("property");
-    else {
-      mount(); fireEvent.click(await screen.findByText("Person"));
-      label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
-      await waitFor(() => expect(label.value).toBe("Person"));
-    }
+    const label = await openSuggestionForm(entityType);
     await editAndSave(label, "Suggested entity");
     if (failure) {
       await screen.findAllByText(failure === "create" ? "The suggestion session could not start. Please retry." : "The suggested update was not saved. Please retry.");
@@ -383,13 +414,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
 
   it.each(["class", "property"] as const)("reuses an active suggestion session for a second %s save", async entityType => {
     projectResponse = { ...projectResponse, user_role: "suggester" };
-    let label: HTMLInputElement;
-    if (entityType === "property") label = await openEntityForm("property");
-    else {
-      mount(); fireEvent.click(await screen.findByText("Person"));
-      label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
-      await waitFor(() => expect(label.value).toBe("Person"));
-    }
+    const label = await openSuggestionForm(entityType);
     await editAndSave(label, "First suggestion");
     await screen.findByText('Suggested update to "First suggestion"');
     await editAndSave(label, "Second suggestion");
@@ -411,6 +436,77 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     await screen.findByText('Updated "Corrected entity"');
     expect(screen.queryByText("At least one label is required")).toBeNull();
     expect(savedBodies).toHaveLength(1);
+  });
+
+  it.each([null, "create", "save"] as const)("runs an anonymous proposal through real session and class editing (failure: %s)", async failure => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
+    boundary.session = { data: null, status: "unauthenticated" };
+    projectResponse = { ...projectResponse, user_role: "viewer", is_public: true };
+    anonymousFailure = failure;
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    fireEvent.click(await screen.findByRole("button", { name: "Propose Edit" }));
+    if (failure === "create") {
+      await screen.findByText(/Anonymous start refused/);
+      expect(useAnonymousTokenStore.getState().getToken("route-project")).toBeNull();
+      anonymousFailure = null;
+      fireEvent.click(screen.getByRole("button", { name: "Propose Edit" }));
+    }
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await waitFor(() => expect(label.value).toBe("Person"));
+    await editAndSave(label, "Anonymous label");
+    if (failure === "save") {
+      await screen.findByText("Change not saved");
+      expect(screen.queryByText('Proposed update to "Anonymous label"')).toBeNull();
+    } else {
+      await screen.findByText('Proposed update to "Anonymous label"');
+      expect(screen.getByRole("button", { name: /Submit Proposal/ })).toBeDefined();
+    }
+    expect(savedBodies).toEqual([]);
+    expect(suggestionBodies).toHaveLength(1);
+    expect(parseBlockTriples(suggestionBodies[0].content, iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Anonymous label", lang: "en" } });
+    expect(requests.find(r => r.path.endsWith("/anonymous-session/save"))).toMatchObject({ method: "PUT", authorization: null, anonymousToken: "fixture-anonymous-token" });
+  });
+
+  it.each(["credit", "skip", "dismiss"] as const)("submits an anonymous proposal through the credit dialog (%s)", async exit => {
+    await saveAnonymousProposal();
+    fireEvent.click(screen.getByRole("button", { name: /Submit Proposal/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Want credit for your suggestions?" });
+    if (exit === "credit") {
+      fireEvent.change(within(dialog).getByPlaceholderText("Your name"), { target: { value: "  Test Contributor  " } });
+      fireEvent.change(within(dialog).getByPlaceholderText("your@email.com"), { target: { value: "test@example.test" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save" }));
+    } else if (exit === "dismiss") fireEvent.keyDown(dialog, { key: "Escape" });
+    else fireEvent.click(within(dialog).getByRole("button", { name: "Skip" }));
+    await waitFor(() => expect(anonymousSubmissions).toHaveLength(1));
+    expect(anonymousSubmissions[0]).toEqual(exit === "credit"
+      ? { submitter_name: "Test Contributor", submitter_email: "test@example.test", website: "" }
+      : { website: "" });
+    expect(requests.find(r => r.path.endsWith("/anonymous-session/submit"))).toMatchObject({ method: "POST", authorization: null, anonymousToken: "fixture-anonymous-token" });
+    const success = await screen.findByRole("dialog", { name: "Thank you — your proposal is in" });
+    expect(within(success).getByText(/proposal #42/)).toBeDefined();
+    expect(within(success).getByRole("link", { name: "View proposal" }).getAttribute("href")).toBe("https://example.test/proposals/42");
+    expect(useAnonymousTokenStore.getState().getToken("route-project")).toBeNull();
+    expect(savedBodies).toEqual([]);
+    fireEvent.click(within(success).getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(anonymousSubmissions).toHaveLength(1);
+  });
+
+  it.each([false, true])("cancels then confirms anonymous discard, clearing its token (HTTP failure: %s)", async failure => {
+    await saveAnonymousProposal();
+    anonymousFailure = failure ? "discard" : null;
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    let dialog = await screen.findByRole("dialog", { name: "Discard proposal?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(requests.some(r => r.path.endsWith("/discard"))).toBe(false);
+    expect(useAnonymousTokenStore.getState().getToken("route-project")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+    dialog = await screen.findByRole("dialog", { name: "Discard proposal?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Discard" }));
+    await waitFor(() => expect(useAnonymousTokenStore.getState().getToken("route-project")).toBeNull());
+    expect(requests.filter(r => r.path.endsWith("/discard"))).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: /Submit Proposal/ })).toBeNull();
+    expect(savedBodies).toEqual([]);
   });
 
 });
