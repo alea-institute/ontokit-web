@@ -47,8 +47,8 @@ describe("property panel real editing chain", () => {
     expect(useDraftStore.getState().getDraft(key)?.labels[0].value).toBe("Revised relation");
     fireEvent.change(screen.getByDisplayValue("Original example"), { target: { value: "Revised example" } });
     fireEvent.click(screen.getByLabelText("Functional"));
-    await waitFor(() => expect((screen.getByRole("button", { name: "Save", exact: true }) as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole("button", { name: "Save", exact: true }));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText("Saved");
     const detail = extractPropertyDetail(output, iri)!;
     expect(detail.labels).toEqual([{ value: "Revised relation", lang: "en" }]);
@@ -73,7 +73,7 @@ describe("property panel real editing chain", () => {
   it("retains a failed save for retry and flushes the latest draft successfully", async () => {
     const save = vi.fn<(iri: string, data: TurtlePropertyUpdateData) => Promise<void>>().mockRejectedValueOnce(new Error("Commit unavailable")).mockResolvedValue(undefined);
     mount(save); editLabel("Retry relation");
-    fireEvent.click(screen.getByRole("button", { name: "Save", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText("Commit unavailable");
     expect(useDraftStore.getState().getDraft(key)?.labels[0].value).toBe("Retry relation");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
@@ -92,12 +92,12 @@ describe("property panel real editing chain", () => {
     const existingButton = screen.getByTitle(ns + existing);
     fireEvent.click(within(existingButton.parentElement!).getByTitle("Remove"));
     const input = screen.getByPlaceholderText(placeholder);
-    vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "newTarget", label: "New target", entity_type: "class" }], total: 1 });
+    vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "newTarget", label: "New target", entity_type: "class", deprecated: false }], total: 1 });
     fireEvent.focus(input); fireEvent.change(input, { target: { value: "  new  " } });
     fireEvent.click(await screen.findByText("New target"));
     expect(projectOntologyApi.searchEntities).toHaveBeenCalledWith("coverage-property", "new", undefined, undefined, filter);
     await waitFor(() => expect(useDraftStore.getState().getDraft(key)).toBeDefined());
-    fireEvent.click(screen.getByRole("button", { name: "Save", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText("Saved");
     expect(onUpdateProperty.mock.calls[0][1][field as keyof TurtlePropertyUpdateData]).toEqual(field === "inverseOf" ? ns + "newTarget" : [ns + "newTarget"]);
     if (field === "inverseOf") expect(screen.queryByPlaceholderText(placeholder)).toBeNull();
@@ -112,7 +112,7 @@ describe("property panel real editing chain", () => {
     await screen.findByText("No results found");
     fireEvent.mouseDown(document.body);
     expect(screen.queryByText("No results found")).toBeNull();
-    vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "Person", label: "Duplicate result", entity_type: "class" }], total: 1 });
+    vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "Person", label: "Duplicate result", entity_type: "class", deprecated: false }], total: 1 });
     fireEvent.focus(input); fireEvent.change(input, { target: { value: "person" } });
     await screen.findByText("No results found");
     expect(screen.queryByText("Duplicate result")).toBeNull();

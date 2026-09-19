@@ -48,8 +48,8 @@ describe("individual panel real editing chain", () => {
     editLabel("Revised relation");
     expect(useDraftStore.getState().getDraft(key)?.labels[0].value).toBe("Revised relation");
     fireEvent.change(screen.getByDisplayValue("Original example"), { target: { value: "Revised example" } });
-    await waitFor(() => expect((screen.getByRole("button", { name: "Save", exact: true }) as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole("button", { name: "Save", exact: true }));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText("Saved");
     const detail = extractIndividualDetail(output, iri)!;
     expect(detail.labels).toEqual([{ value: "Revised relation", lang: "en" }]);
@@ -77,7 +77,7 @@ describe("individual panel real editing chain", () => {
   it("retains a failed save for retry and flushes the latest draft successfully", async () => {
     const save = vi.fn<(iri: string, data: TurtleIndividualUpdateData) => Promise<void>>().mockRejectedValueOnce(new Error("Commit unavailable")).mockResolvedValue(undefined);
     mount(save); editLabel("Retry relation");
-    fireEvent.click(screen.getByRole("button", { name: "Save", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText("Commit unavailable");
     expect(useDraftStore.getState().getDraft(key)?.labels[0].value).toBe("Retry relation");
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
@@ -94,12 +94,12 @@ describe("individual panel real editing chain", () => {
     const { onUpdateIndividual } = mount();
     fireEvent.click(within(screen.getByTitle(ns + existing).parentElement!).getByTitle("Remove"));
     const input = screen.getAllByPlaceholderText(placeholder)[index];
-    vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "newTarget", label: "New target", entity_type: "class" }], total: 1 });
+    vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "newTarget", label: "New target", entity_type: "class", deprecated: false }], total: 1 });
     fireEvent.focus(input); fireEvent.change(input, { target: { value: "  new  " } });
     fireEvent.click(await screen.findByText("New target"));
     expect(projectOntologyApi.searchEntities).toHaveBeenCalledWith("coverage-individual", "new", undefined, undefined, filter);
     await waitFor(() => expect(useDraftStore.getState().getDraft(key)).toBeDefined());
-    fireEvent.click(screen.getByRole("button", { name: "Save", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText("Saved");
     expect(onUpdateIndividual.mock.calls[0][1][field]).toEqual([ns + "newTarget"]);
     expect((input as HTMLInputElement).value).toBe("");
@@ -113,7 +113,7 @@ describe("individual panel real editing chain", () => {
     await screen.findByText("No results");
     fireEvent.mouseDown(document.body);
     expect(screen.queryByText("No results")).toBeNull();
-    vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "Person", label: "Duplicate result", entity_type: "class" }], total: 1 });
+    vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "Person", label: "Duplicate result", entity_type: "class", deprecated: false }], total: 1 });
     fireEvent.focus(input); fireEvent.change(input, { target: { value: "person" } });
     await screen.findByText("No results");
     expect(screen.queryByText("Duplicate result")).toBeNull();
@@ -126,14 +126,12 @@ describe("individual panel real editing chain", () => {
     for (const target of ["reference", "ontology", "friend"]) {
       fireEvent.click(within(screen.getByTitle(ns + target).parentElement!).getByTitle("Remove"));
     }
-    fireEvent.click(within(screen.getByText("42").parentElement!).getByTitle("Remove"));
     // The panel schedules draft capture after child state changes.
     await waitFor(() => {
       const draft = useDraftStore.getState().getDraft(key);
       expect(draft?.entityType).toBe("individual");
       if (draft?.entityType === "individual") {
         expect(draft.objectPropertyAssertions).toEqual([]);
-        expect(draft.dataPropertyAssertions).toEqual([]);
       }
     });
     unmount();
@@ -142,6 +140,29 @@ describe("individual panel real editing chain", () => {
     expect(detail.seeAlsoIris).toEqual([]);
     expect(detail.isDefinedByIris).toEqual([]);
     expect(detail.objectPropertyAssertions).toEqual([]);
-    expect(detail.dataPropertyAssertions).toEqual([]);
   });
+  it("adds and removes a data assertion through the real child form and preserves its language in the save payload", async () => {
+    const { onUpdateIndividual } = mount();
+    vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "nickname", label: "Nickname", entity_type: "property", deprecated: false }], total: 1 });
+    const property = screen.getAllByPlaceholderText("Select property...")[1];
+    fireEvent.focus(property); fireEvent.change(property, { target: { value: "nick" } });
+    fireEvent.click(await screen.findByText("Nickname"));
+    fireEvent.change(screen.getByPlaceholderText("lang"), { target: { value: "fr" } });
+    const input = screen.getByPlaceholderText("Enter value...");
+    fireEvent.change(input, { target: { value: "  Ami  " } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      const draft = useDraftStore.getState().getDraft(key);
+      expect(draft?.entityType === "individual" && draft.dataPropertyAssertions).toEqual([{ propertyIri: ns + "nickname", value: "Ami", lang: "fr" }]);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved");
+    expect(onUpdateIndividual.mock.calls[0][1].dataPropertyAssertions).toEqual([{ propertyIri: ns + "nickname", value: "Ami", lang: "fr" }]);
+    fireEvent.click(within(screen.getByText("Ami").parentElement!).getByTitle("Remove"));
+    await screen.findByText("Draft saved");
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved");
+    expect(onUpdateIndividual.mock.calls[1][1].dataPropertyAssertions).toEqual([]);
+  });
+
 });

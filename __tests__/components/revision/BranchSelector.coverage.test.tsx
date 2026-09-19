@@ -75,7 +75,7 @@ describe("BranchSelector real context and API integration", () => {
     mutationFailure = "Branch already exists"; mount(); await open(); create("feature/new");
     expect(await screen.findByText("Branch already exists")).toBeDefined();
     expect(screen.getByPlaceholderText("feature/my-changes").getAttribute("value")).toBe("feature/new");
-    mutationFailure = null; fireEvent.click(screen.getByRole("button", { name: "Create", exact: true }));
+    mutationFailure = null; fireEvent.click(screen.getByRole("button", { name: "Create" }));
     await waitFor(() => expect(screen.queryByRole("option")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "feature/new" }));
     expect(screen.queryByText("Branch already exists")).toBeNull();

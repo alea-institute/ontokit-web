@@ -16,7 +16,7 @@ function setup() {
   const expandNode = vi.fn();
   const onReparent = vi.fn<Parameters<typeof useTreeDragDrop>[0]["onReparent"]>().mockResolvedValue();
   const onAnnounce = vi.fn();
-  return { expandNode, onReparent, onAnnounce, ...renderHook(({ canEdit, editingIri }: { canEdit: boolean; editingIri: string | null }) => useTreeDragDrop({ nodes: tree, canEdit, editingIri, expandNode, onReparent, onAnnounce }), { initialProps: { canEdit: true, editingIri: null } }) };
+  return { expandNode, onReparent, onAnnounce, ...renderHook(({ canEdit, editingIri }: { canEdit: boolean; editingIri: string | null }) => useTreeDragDrop({ nodes: tree, canEdit, editingIri, expandNode, onReparent, onAnnounce }), { initialProps: { canEdit: true, editingIri: null as string | null } }) };
 }
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
