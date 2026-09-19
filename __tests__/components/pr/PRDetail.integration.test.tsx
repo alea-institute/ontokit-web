@@ -136,6 +136,36 @@ describe("PRDetail real API and child integration", () => {
     expect(screen.queryByText("Integration offline")).toBeNull();
   });
 
+  it("recovers a pending mirror with no attempt timestamp without starting background polls", async () => {
+    current = { ...pr, github_sync_status: "pending", github_sync_last_attempted_at: undefined };
+    handler = path => path.endsWith("/github-sync/retry")
+      ? json({ ...pr, github_sync_status: "synced" }) : undefined;
+    mount();
+    expect(await screen.findByText(/last sync attempt did not finish/i)).toBeDefined();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/7"))).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Retry GitHub sync" }));
+    expect(await screen.findByText("Synced with GitHub")).toBeDefined();
+    const retries = fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/github-sync/retry"));
+    expect(retries).toHaveLength(1);
+    expect(retries[0][1]?.method).toBe("POST");
+    expect(new Headers(retries[0][1]?.headers).get("Authorization")).toBe("Bearer test-token");
+    expect(screen.queryByRole("button", { name: "Retry GitHub sync" })).toBeNull();
+  });
+
+  it.each([undefined, { id: "reviewer-without-name" }])("attributes a review to its ID when the reviewer profile has no name (%j)", async reviewer => {
+    handler = path => path.endsWith("/reviews") ? json({ items: [{
+      id: "review", pull_request_id: "pr", reviewer_id: "reviewer-without-name", reviewer,
+      status: "changes_requested", body: "Please clarify the axiom", created_at: pr.created_at,
+    }], total: 1 }) : undefined;
+    mount();
+    expect(await screen.findByText("reviewer-without-name")).toBeDefined();
+    expect(screen.getByText("requested changes")).toBeDefined();
+    expect(screen.getByText("Please clarify the axiom")).toBeDefined();
+    expect(screen.queryByText("No reviews yet")).toBeNull();
+    const request = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/reviews"));
+    expect(new Headers(request?.[1]?.headers).get("Authorization")).toBe("Bearer test-token");
+  });
+
   it("polls past a failed status request, then stops after synchronization", async () => {
     current = { ...pr, github_sync_status: "pending", github_sync_last_attempted_at: new Date().toISOString() };
     mount();
