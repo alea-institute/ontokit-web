@@ -62,6 +62,29 @@ async function savePanel() {
   await screen.findByText("Saved");
 }
 describe("class detail real editing and suggestion chains", () => {
+  it.each(["Definition", "Example"])("retries a failed %s status check and renders the provisional result", async (field) => {
+    const predicate = field === "Definition" ? "skos:definition" : "skos:example";
+    if (field === "Example") currentDetail.annotations.push({ property_iri: "http://www.w3.org/2004/02/skos/core#example", property_label: "Example", values: [{ value: "Existing example", lang: "en" }] });
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    let requested = 0;
+    const original = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("translate-field")) { requested++; return jsonResponse({ job_id: "job" }); }
+      if (url.includes("entity-state") && requested === 1) return jsonResponse({ detail: "Status unavailable" }, 403);
+      if (url.includes("entity-state") && requested === 2) return jsonResponse({ entity_iri: iri, branch: "main", items: [{ predicate, language: "fr", state: "provisional", value: "Texte traduit", record_id: "record" }] });
+      return original(input);
+    });
+    mount({ accessToken: "token", canEdit: false });
+    fireEvent.click(await screen.findByRole("button", { name: `Translate ${field}` }));
+    await screen.findByText(/Translation status could not be checked/);
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Texte traduit")).toBeDefined();
+    expect(requested).toBe(2);
+    expect(screen.queryByText(/Translation status could not be checked/)).toBeNull();
+    expect(screen.getByText(field === "Definition" ? "Existing definition" : "Existing example")).toBeDefined();
+  });
+
   it("saves a definition language and blurred comment through the draft and Turtle writer", async () => {
     vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
     Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
