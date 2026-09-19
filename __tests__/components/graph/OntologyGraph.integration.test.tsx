@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OntologyGraph } from "@/components/graph/OntologyGraph";
 
@@ -35,6 +35,31 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const props = { focusIri: iri("Focus"), projectId: "graph", branch: "review", accessToken: "fixture-token" };
 
 describe("graph with real React Flow, ELK layout, nodes and API loading", () => {
+  it("expands an unexplored node through the real loader and preserves the existing graph", async () => {
+    const names = ["Focus", "First", "Second", "Third", "Fourth", "Fifth"];
+    fetchBoundary.mockImplementation(async input => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/ancestors")) return json({ nodes: [] });
+      const target = decodeURIComponent(url.pathname.split("/classes/")[1]);
+      const index = names.findIndex(name => iri(name) === target);
+      if (index < 0) throw new Error(`Unexpected graph request: ${url.pathname}`);
+      return json({ iri: target, labels: [{ value: names[index], lang: "en" }], comments: [], parent_iris: [], annotations: [], deprecated: false, equivalent_iris: index < names.length - 1 ? [iri(names[index + 1])] : [], disjoint_iris: [] });
+    });
+    const navigate = vi.fn();
+    render(<OntologyGraph {...props} onNavigateToClass={navigate} />);
+    const unexplored = await screen.findByRole("button", { name: "Fourth (click to expand)" });
+    expect(screen.getByText("5 nodes, 4 edges (4 resolved)")).toBeDefined();
+    expect(fetchBoundary.mock.calls.some(([input]) => String(input).includes(encodeURIComponent(iri("Fourth"))))).toBe(false);
+    fireEvent.doubleClick(unexplored);
+    await screen.findByRole("button", { name: "Fifth" });
+    await waitFor(() => expect(screen.getByText("6 nodes, 5 edges (6 resolved)")).toBeDefined());
+    expect(screen.getByRole("button", { name: "Focus" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Fourth" })).toBeDefined();
+    expect(navigate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Fourth" }));
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(iri("Fourth"));
+  });
+
   it("loads a relationship graph and navigates a rendered node", async () => {
     const navigate = vi.fn();
     render(<OntologyGraph {...props} onNavigateToClass={navigate} />);

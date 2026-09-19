@@ -44,6 +44,28 @@ afterEach(() => {
 });
 
 describe("property panel real editing chain", () => {
+  it.each(["edit", "remove"])("can %s one annotation value without losing sibling values or other predicates", async action => {
+    const inputSource = source.replace('skos:example "Original example"@en', 'skos:example "Original example"@en, "Sibling example"@en ; skos:note "Retained note"@en');
+    let output = inputSource;
+    mount(vi.fn(async (target, data) => { output = updatePropertyInTurtle(output, target, data); }), inputSource);
+    const input = screen.getByDisplayValue("Original example");
+    if (action === "edit") {
+      fireEvent.change(input, { target: { value: "Edited example" } });
+      fireEvent.blur(input);
+    } else {
+      fireEvent.click(within(input.parentElement!).getByRole("button", { name: /Remove .* annotation/ }));
+    }
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved");
+    const detail = extractPropertyDetail(output, iri)!;
+    const examples = detail.annotations.find(annotation => annotation.property_iri.endsWith("#example"))!.values;
+    expect(examples).toEqual(action === "edit" ? [{ value: "Edited example", lang: "en" }, { value: "Sibling example", lang: "en" }] : [{ value: "Sibling example", lang: "en" }]);
+    expect(detail.annotations.find(annotation => annotation.property_iri.endsWith("#note"))?.values).toEqual([{ value: "Retained note", lang: "en" }]);
+    expect(detail.labels).toEqual([{ value: "Relation", lang: "en" }]);
+    expect(detail.domainIris).toEqual([ns + "Person"]);
+  });
+
   it.each([
     ["labels", "rdfs:label", "Relation"],
     ["comments", "rdfs:comment", "Original comment"],
