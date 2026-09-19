@@ -112,6 +112,23 @@ describe('settings membership and join decisions through real UI and HTTP', () =
     expect(ui.queryByText('Add a new member')).toBeNull(); expect(ui.getByText('Target Admin')).toBeDefined();
   });
 
+  it.each(['clear button', 'edit query'])('clears a selected member with %s before a new selection', async action => {
+    const h = mount(); const ui = await selectMember();
+    const search = ui.getByPlaceholderText('Search by name, username, or email...') as HTMLInputElement;
+    expect((ui.getByRole('button', { name: 'Add' }) as HTMLButtonElement).disabled).toBe(false);
+    if (action === 'clear button') fireEvent.click(within(search.parentElement!).getByRole('button'));
+    else fireEvent.change(search, { target: { value: 'Someone else' } });
+    expect((ui.getByRole('button', { name: 'Add' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(ui.getByRole('button', { name: 'Add' }));
+    expect(writes(h, '/members')).toHaveLength(0);
+    fireEvent.change(search, { target: { value: 'Target' } });
+    fireEvent.mouseDown(await ui.findByRole('option', { name: /Target Admin/ }));
+    fireEvent.click(ui.getByRole('button', { name: 'Add' }));
+    await screen.findByText('Member added successfully');
+    expect(writes(h, '/members')).toHaveLength(1);
+    expect(JSON.parse(String(writes(h, '/members')[0][1]?.body)).user_id).toBe('admin');
+  });
+
   it('retains a rejected member draft and clears it on successful retry', async () => {
     const h = mount(); h.fail('add'); const ui = await selectMember(); fireEvent.click(ui.getByRole('button', { name: 'Add' }));
     await ui.findByText('Add refused'); expect(h.client.getQueryData(projectQueryKeys.detail('project', true))).toMatchObject({ member_count: 0 });

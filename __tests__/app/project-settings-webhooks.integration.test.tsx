@@ -10,6 +10,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePar
 const session: Session = { user: { id: 'owner', name: 'Owner' }, accessToken: 'fixture-token', expires: '2099-01-01T00:00:00Z' };
 function mount(enabled = false, hookId: number | null = null) {
   let integration = { id: 'github', repo_owner: 'example', repo_name: 'ontology', repo_url: 'https://github.com/example/ontology', default_branch: 'main', ontology_file_path: 'source.ttl', sync_enabled: true, sync_status: 'idle', webhooks_enabled: enabled, github_hook_id: hookId };
+  let errorBody = 'Setup refused';
   let failure: 'update' | 'setup' | 'secret' | null = null;
   let setup = { status: 'created', github_hook_id: 42 as number | null, message: 'Webhook created' };
   class Socket extends EventTarget { static OPEN = 1; static CONNECTING = 0; readyState = 1; close = vi.fn(); }
@@ -17,7 +18,7 @@ function mount(enabled = false, hookId: number | null = null) {
   const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
     if (path.includes('/github-integration')) expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer fixture-token');
-    if (path.endsWith('/webhook-setup')) return failure === 'setup' ? new Response('Setup refused', { status: 403 }) : jsonResponse(setup);
+    if (path.endsWith('/webhook-setup')) return failure === 'setup' ? new Response(errorBody, { status: 403 }) : jsonResponse(setup);
     if (path.endsWith('/webhook-secret')) return failure === 'secret' ? new Response('Details refused', { status: 403 }) : jsonResponse({ webhook_secret: 'synthetic-webhook-value', webhook_url: '/api/v1/webhooks/project' });
     if (path.endsWith('/github-integration') && init?.method === 'PATCH') {
       if (failure === 'update') return new Response('Update refused', { status: 403 });
@@ -36,7 +37,7 @@ function mount(enabled = false, hookId: number | null = null) {
   vi.stubGlobal('fetch', fetcher);
   const { wrapper: QueryWrapper } = llmHookHarness();
   const view = render(<SessionProvider session={session} refetchOnWindowFocus={false}><QueryWrapper><ToastProvider><ProjectSettingsPage /></ToastProvider></QueryWrapper></SessionProvider>);
-  return { ...view, fetcher, fail: (value: typeof failure) => { failure = value; }, setup: (value: typeof setup) => { setup = value; } };
+  return { ...view, fetcher, errorBody: (value: string) => { errorBody = value; }, fail: (value: typeof failure) => { failure = value; }, setup: (value: typeof setup) => { setup = value; } };
 }
 async function section() {
   const heading = await screen.findByRole('heading', { name: 'GitHub Integration' });
@@ -47,6 +48,27 @@ const setups = (h: ReturnType<typeof mount>) => h.fetcher.mock.calls.filter(([ur
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe('webhook settings through the real settings route and GitHub HTTP client', () => {
+  it.each([
+    { body: '{"detail":"Repository permission is missing"}', message: 'Repository permission is missing' },
+    { body: '{"message":"Hook policy rejected"}', message: '{"message":"Hook policy rejected"}' },
+  ])('shows a structured setup failure and recovers through manual retry: $body', async ({ body, message }) => {
+    const h = mount(); h.fail('setup'); h.errorBody(body);
+    const ui = await section();
+    fireEvent.click(ui.getByRole('checkbox'));
+    await ui.findByText(message);
+    expect((ui.getByRole('checkbox') as HTMLInputElement).checked).toBe(true);
+    expect(setups(h)).toHaveLength(1);
+    fireEvent.click(ui.getByRole('button', { name: 'Retry auto-setup' }));
+    await waitFor(() => expect(setups(h)).toHaveLength(2));
+    await ui.findByText(message);
+    h.fail(null);
+    fireEvent.click(ui.getByRole('button', { name: 'Retry auto-setup' }));
+    await ui.findByText('Webhook configured on GitHub');
+    expect(ui.queryByText(message)).toBeNull();
+    expect(setups(h)).toHaveLength(3);
+    expect(h.fetcher.mock.calls.filter(([, init]) => init?.method === 'PATCH')).toHaveLength(1);
+  });
+
   it('renders an existing configured hook without creating another hook', async () => {
     const h = mount(true, 42); const ui = await section();
     expect(await ui.findByText('Webhook configured on GitHub')).toBeDefined();

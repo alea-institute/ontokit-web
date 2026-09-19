@@ -70,6 +70,18 @@ describe('review settings route with real capability, settings and credential ch
     await waitFor(() => expect((screen.getByLabelText('ntfy topic') as HTMLInputElement).value).toBe('existing-topic'));
   });
 
+  it('keeps credential controls usable when health timestamps cannot be parsed', async () => {
+    const { fetcher } = mount({ me: { credential: { ...healthy, expires_soon: true, expires_at: 'invalid-expiry', last_validated_at: 'invalid-validation' } } });
+    await ready();
+    expect((await screen.findByTestId('credential-banner-expiring')).textContent).toContain('expires on unknown');
+    expect(screen.getByTestId('credential-expires').textContent).toBe('unknown');
+    const checked = screen.getByText('Last checked');
+    expect(checked.nextElementSibling?.textContent).toBe('unknown');
+    expect(screen.queryByText(/Invalid Date/)).toBeNull();
+    expect((screen.getByLabelText('Replace your token') as HTMLInputElement).disabled).toBe(false);
+    expect(fetcher.mock.calls.every(([, init]) => init?.method === 'GET')).toBe(true);
+  });
+
   it('saves a trimmed synthetic credential, refreshes health and clears the form', async () => {
     const { fetcher, queryClient } = mount(); await ready();
     const input = screen.getByLabelText('GitHub personal access token') as HTMLInputElement;
