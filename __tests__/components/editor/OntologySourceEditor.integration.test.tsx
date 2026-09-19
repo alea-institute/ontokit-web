@@ -1,8 +1,12 @@
 import { createRef } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { OntologySourceEditor, type OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
-import type { IndexWorkerResult } from "@/lib/editor/indexWorker";
+import type { IndexWorkerMessage, IndexWorkerResult } from "@/lib/editor/indexWorker";
+import { loadIndexWorker } from "../../fixtures/index-worker-harness";
+
+let processMessage: Awaited<ReturnType<typeof loadIndexWorker>>;
+beforeAll(async () => { processMessage = await loadIndexWorker(); });
 
 const bridge = vi.hoisted(() => ({ props: {} as Record<string, unknown> }));
 vi.mock("@monaco-editor/react", () => ({
@@ -47,6 +51,39 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const props = { projectId: "source-project", accessToken: "source-token", initialValue: content };
 
 describe("source editor integration through real TurtleEditor and lint API", () => {
+  it("orders lint issues by real indexed source lines and navigates the selected issue", async () => {
+    vi.stubGlobal("Worker", class {
+      onmessage: ((event: MessageEvent<IndexWorkerResult>) => void) | null = null;
+      private stopped = false;
+      postMessage(message: IndexWorkerMessage) {
+        queueMicrotask(() => {
+          if (!this.stopped) this.onmessage?.({ data: processMessage(message) } as MessageEvent<IndexWorkerResult>);
+        });
+      }
+      terminate() { this.stopped = true; }
+    });
+    const issues = [
+      { ...issue, id: "later", message: "Later definition", subject_iri: "https://example.org/Later" },
+      { ...issue, id: "earlier", message: "Earlier definition" },
+      { ...issue, id: "unmatched", message: "Missing definition", subject_iri: "https://example.org/Absent" },
+    ];
+    fetcher.mockResolvedValue(json({ items: issues }));
+    render(<OntologySourceEditor {...props} initialValue={`${content}\n\nex:Later a <http://www.w3.org/2002/07/owl#Class> .`} />);
+    const { editor, monaco } = mountEditor();
+    await screen.findByText("Ln 4");
+    const buttons = screen.getAllByRole("button").filter(button => /definition/.test(button.textContent ?? ""));
+    expect(buttons.map(button => button.textContent)).toEqual([
+      expect.stringContaining("Earlier definition"), expect.stringContaining("Later definition"), expect.stringContaining("Missing definition"),
+    ]);
+    fireEvent.click(screen.getByText("Later definition"));
+    expect(editor.setPosition).toHaveBeenLastCalledWith({ lineNumber: 4, column: 1 });
+    expect(editor.revealLineInCenter).toHaveBeenLastCalledWith(4);
+    await waitFor(() => expect(monaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), "turtle-linter", expect.arrayContaining([
+      expect.objectContaining({ startLineNumber: 4, message: "[missing-label] Later definition" }),
+      expect.objectContaining({ startLineNumber: 2, message: "[missing-label] Earlier definition" }),
+    ])));
+  });
+
   it("navigates an indexed duplicate without also jumping to the issue subject", async () => {
     const duplicateIri = "https://example.org/Other";
     const duplicate = { line: 3, col: 2, len: 8 };
