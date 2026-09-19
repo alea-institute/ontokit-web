@@ -11,6 +11,20 @@ const refs = { merge: ["main"], "feature-tip": ["feature/topic"] };
 afterEach(cleanup);
 
 describe("GitGraph with real commit layout", () => {
+  it.each([true, false])("keeps a disconnected history separate when the default branch ref is present: %s", hasDefaultRef => {
+    const commits = [commit("head", ["base"]), commit("archive-root"), commit("base")];
+    const historyRefs = { head: [hasDefaultRef ? "main" : "feature"], "archive-root": ["archive"] };
+    const { container } = render(<GitGraph commits={commits} refs={historyRefs} defaultBranch="main" />);
+    const nodes = Array.from(container.querySelectorAll(".commit-node"));
+    expect(nodes).toHaveLength(3);
+    const centers = nodes.map(node => { const circle = node.querySelector("circle")!; return [circle.getAttribute("cx"), circle.getAttribute("cy")]; });
+    expect(centers).toEqual([["10", "25"], ["30", "75"], ["10", "125"]]);
+    const paths = container.querySelectorAll("path");
+    expect(paths).toHaveLength(1);
+    expect(paths[0].getAttribute("d")).toBe("M 10 25 L 10 125");
+    expect(paths[0].getAttribute("stroke-dasharray")).toBeNull();
+  });
+
   it("draws the merge and branch-back arcs between real commit coordinates", () => {
     const selected = vi.fn();
     const { container } = render(<GitGraph commits={diamond} refs={refs} defaultBranch="main" onSelectCommit={selected} config={{ cellWidth: 40, cellHeight: 60, colors: ["red", "blue"] }} />);

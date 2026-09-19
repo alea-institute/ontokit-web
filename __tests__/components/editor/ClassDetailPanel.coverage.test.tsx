@@ -62,6 +62,25 @@ async function savePanel() {
   await screen.findByText("Saved");
 }
 describe("class detail real editing and suggestion chains", () => {
+  it.each([true, false])("offers sign-in without creating an editable draft when proposals are enabled: %s", async canPropose => {
+    const signIn = vi.fn();
+    const propose = vi.fn();
+    const { save } = mount({ canEdit: false, canUseLLM: false, canPropose, showSignInToEdit: true, onSignInToEdit: signIn, onProposeEdit: propose });
+    await screen.findByRole("heading", { name: "Person" });
+    fireEvent.click(screen.getByRole("button", { name: canPropose ? "Sign in for full editing" : "Sign in to edit" }));
+    expect(signIn).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    expect(useDraftStore.getState().getDraft(key)).toBeUndefined();
+    expect(save).not.toHaveBeenCalled();
+    if (canPropose) {
+      fireEvent.click(screen.getByRole("button", { name: "Propose Edit" }));
+      expect(propose).toHaveBeenCalledOnce();
+    } else {
+      expect(screen.queryByRole("button", { name: "Propose Edit" })).toBeNull();
+      expect(propose).not.toHaveBeenCalled();
+    }
+  });
+
   it("adds a searched relationship target without losing either existing group", async () => {
     const definedBy = "http://www.w3.org/2000/01/rdf-schema#isDefinedBy";
     const retained = "https://example.test/Retained";
