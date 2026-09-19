@@ -56,6 +56,23 @@ const qualityCases = [
 ];
 
 describe("health panel filters and asynchronous branch boundaries", () => {
+  it.each(["/lint/config", "/lint/levels"])("keeps results usable when the hint request %s fails, then recovers on reopen", async (path) => {
+    const logged = vi.spyOn(console, "error");
+    route = url => url.pathname.endsWith(path) ? json({ detail: "Hint unavailable" }, 403) : undefined;
+    const view = render(<HealthCheckPanel {...props} />);
+    await screen.findByText("error finding");
+    await waitFor(() => expect(logged).toHaveBeenCalledWith("Failed to fetch lint config hint:", expect.any(Error)));
+    expect(screen.queryByText("All rules (0)")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "1 Warnings" }));
+    await waitFor(() => expect(screen.queryByText("error finding")).toBeNull());
+    expect(screen.getByText("warning finding")).toBeTruthy();
+    view.rerender(<HealthCheckPanel {...props} isOpen={false} />);
+    route = () => undefined;
+    view.rerender(<HealthCheckPanel {...props} />);
+    expect(await screen.findByText("All rules (0)")).toBeTruthy();
+    expect(screen.getByText("warning finding")).toBeTruthy();
+  });
+
   it.each([{ type: "error", label: "Errors" }, { type: "warning", label: "Warnings" }, { type: "info", label: "Info" }])("toggles $type filtering through the server and restores all severities", async ({ type, label }) => {
     render(<HealthCheckPanel {...props} />);
     await screen.findByText("error finding");

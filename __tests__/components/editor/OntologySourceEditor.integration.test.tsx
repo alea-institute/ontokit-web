@@ -47,6 +47,24 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const props = { projectId: "source-project", accessToken: "source-token", initialValue: content };
 
 describe("source editor integration through real TurtleEditor and lint API", () => {
+  it("navigates an indexed duplicate without also jumping to the issue subject", async () => {
+    const duplicateIri = "https://example.org/Other";
+    const duplicate = { line: 3, col: 2, len: 8 };
+    fetcher.mockResolvedValue(json({ items: [{ ...issue, details: { duplicate_iris: [duplicateIri, "https://example.org/Absent"] } }] }));
+    render(<OntologySourceEditor {...props} initialValue={`${content}\n ex:Other a <http://www.w3.org/2002/07/owl#Class> .`} />);
+    const { editor } = mountEditor();
+    await screen.findByText(issue.message);
+    await waitFor(() => expect(IndexWorker.instances.at(-1)?.postMessage).toHaveBeenCalledWith(expect.objectContaining({ issues: [expect.objectContaining({ id: issue.id })] })));
+    const indexed = result();
+    indexed.iriIndex.push([duplicateIri, duplicate]);
+    act(() => IndexWorker.instances.at(-1)!.onmessage?.({ data: indexed } as MessageEvent<IndexWorkerResult>));
+    editor.setPosition.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Other" }));
+    expect(editor.setPosition).toHaveBeenCalledExactlyOnceWith({ lineNumber: 3, column: 2 });
+    expect(editor.revealLineInCenter).toHaveBeenLastCalledWith(3);
+    expect(screen.getByTitle("https://example.org/Absent").tagName).toBe("SPAN");
+  });
+
   it("loads authenticated lint, maps worker results to navigation and Monaco diagnostics", async () => {
     const navigate = vi.fn();
     render(<OntologySourceEditor {...props} onNavigateToClass={navigate} />);

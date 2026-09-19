@@ -45,6 +45,25 @@ const options = { projectId: "graph-project", accessToken: "test-token", branch:
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("graph loading with the real API client, graph builder and layout engine", () => {
+  it("resolves a root discovered only by ancestry beyond the initial detail passes", async () => {
+    const calls = serveGraph([
+      detail("Focus", { parent_iris: [iri("Parent")] }),
+      detail("Parent", { parent_iris: [iri("Grandparent")] }),
+      detail("Grandparent", { parent_iris: [iri("Root")] }),
+      detail("Root"),
+    ], { ancestors: { [iri("Focus")]: [iri("Parent"), iri("Grandparent"), iri("Root")] } });
+    const { result } = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus"), initialDepth: 1 }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.resolvedCount).toBe(4);
+    expect(result.current.graphData?.nodes).toContainEqual(expect.objectContaining({ id: iri("Root"), label: "Root", nodeType: "root" }));
+    expect(result.current.graphData?.edges).toContainEqual(expect.objectContaining({ source: iri("Grandparent"), target: iri("Root"), edgeType: "subClassOf" }));
+    const rootRequest = calls.findIndex(url => url.pathname.endsWith(`/classes/${encodeURIComponent(iri("Root"))}`));
+    const ancestryRequest = calls.findIndex(url => url.pathname.endsWith("/ancestors"));
+    expect(ancestryRequest).toBeGreaterThan(-1);
+    expect(rootRequest).toBeGreaterThan(ancestryRequest);
+    expect(calls.filter(url => url.pathname.endsWith(`/classes/${encodeURIComponent(iri("Root"))}`))).toHaveLength(1);
+  });
+
   it("loads ancestry and all relationship types, then produces an actual ELK layout", async () => {
     serveGraph([
       detail("Focus", { parent_iris: [iri("Parent")], equivalent_iris: [iri("Equivalent")], disjoint_iris: [iri("Disjoint")], annotations: [{ property_iri: "http://www.w3.org/2000/01/rdf-schema#seeAlso", property_label: "see also", values: [{ value: iri("Reference"), lang: "" }] }] }),
