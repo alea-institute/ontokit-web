@@ -22,6 +22,32 @@ function setup(resumeStatus?: string, initialFailure = '') {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('authenticated suggestion session persistence chain', () => {
+  it('coalesces simultaneous starts through the real API into one authenticated session', async () => {
+    const { result, fetcher } = setup();
+    await act(async () => {
+      const first = result.current.startSession();
+      const second = result.current.startSession();
+      expect(first).toBe(second);
+      expect(await Promise.all([first, second])).toEqual(['suggestions/one', 'suggestions/one']);
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(new Headers(fetcher.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer token');
+    expect(result.current.sessionId).toBe('session');
+    await act(() => result.current.startSession());
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not create a session without credentials and starts after authentication returns', async () => {
+    const { result, fetcher, rerender } = setup();
+    rerender({ token: undefined });
+    await act(async () => { expect(await result.current.startSession()).toBeNull(); });
+    expect(fetcher).not.toHaveBeenCalled();
+    rerender({ token: 'renewed' });
+    await act(() => result.current.startSession());
+    expect(new Headers(fetcher.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer renewed');
+    expect(result.current.isActive).toBe(true);
+  });
+
   it('reports verification failure without restoring or writing the unverified session', async () => {
     const { result, onError, fetcher, rerender, fail } = setup('changes-requested', '/sessions');
     await waitFor(() => expect(onError).toHaveBeenCalledExactlyOnceWith('Failed to verify suggestion session status.'));

@@ -142,6 +142,33 @@ describe("expanded review card with real queries, mutations and question drafts"
     expect(attempts).toBe(2);
   });
 
+  it("uses the submitted question when a degraded response omits compose text", async () => {
+    mutate = () => json({ posted: false, degraded: true, deep_link: null, card: detail });
+    const copy = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: copy } });
+    mount();
+    const input = await ask("  Keep this question  ");
+    await screen.findByText("Not posted — GitHub would not take it.");
+    fireEvent.click(screen.getByRole("button", { name: "Copy the question" }));
+    await screen.findByRole("button", { name: "Copied" });
+    expect(copy).toHaveBeenCalledExactlyOnceWith("Keep this question");
+    expect(input.value).toBe("  Keep this question  ");
+    expect(screen.getByRole("link", { name: "Post it yourself on GitHub" }).getAttribute("href")).toBe(initial.pr_url);
+  });
+
+  it("renders an answered thread with absent and invalid timestamps without losing either message", async () => {
+    detail = { ...detail, qa_thread: [{ question_comment_id: "question", question_body: "Why this change?", question_author: "Reviewer", question_url: initial.pr_url,
+      asked_at: "invalid timestamp", answer_comment_id: "answer", answer_body: "It fixes the definition.", answer_author: "Author", answer_url: initial.pr_url, answered_at: null }] };
+    mount();
+    await screen.findByText("It fixes the definition.");
+    expect(screen.getByText("Why this change?")).toBeDefined();
+    const entry = screen.getByTestId("pr-party-qa-entry");
+    expect(entry.getAttribute("data-answered")).toBe("true");
+    expect(entry.textContent).not.toContain("Invalid Date");
+    expect(entry.textContent).toContain("Reviewer asked");
+    expect(entry.textContent).toContain("Author answered");
+  });
+
   it("retains a degraded draft and retries clipboard failure with the exact returned body", async () => {
     mutate = () => json({ posted: false, degraded: true, body: "Exact server compose text", deep_link: "javascript:alert(1)", card: detail });
     const copy = vi.fn().mockRejectedValueOnce(new Error("Clipboard denied")).mockResolvedValueOnce(undefined);

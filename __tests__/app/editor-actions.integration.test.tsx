@@ -904,6 +904,19 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(savedBodies).toEqual([]);
   });
 
+  it("navigates an unclassified health finding into the real source editor", async () => {
+    lintStatus = { total_issues: 1, error_count: 0, warning_count: 1, info_count: 0, last_run: null };
+    lintIssues = [{ id: "health-other", rule_id: "label-required", issue_type: "warning", message: "Inspect source subject", subject_iri: iri, subject_type: "other", details: {} }];
+    mount(); await screen.findByText("Person");
+    await act(async () => { fireEvent.mouseEnter(screen.getByRole("button", { name: "Source" })); });
+    fireEvent.click(screen.getByRole("button", { name: /^Health/ }));
+    await screen.findByText("Inspect source subject");
+    fireEvent.click(screen.getByTitle(iri));
+    const source = await screen.findByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement;
+    expect(source.value).toBe(originalSource);
+    expect(savedBodies).toEqual([]);
+  });
+
   it.each(["class", "property", "individual"] as const)("navigates a health finding into the real %s detail panel", async type => {
     const target = type === "class" ? iri : editableIri;
     const label = type === "class" ? "Person" : "Health entity";

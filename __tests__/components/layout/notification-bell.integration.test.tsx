@@ -21,7 +21,7 @@ async function open() {
   fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
   await screen.findByText("Review update");
 }
-beforeEach(() => { vi.clearAllMocks(); vi.stubGlobal("fetch", fetchMock); });
+beforeEach(() => { boundary.token = "notification-token"; vi.clearAllMocks(); vi.stubGlobal("fetch", fetchMock); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("NotificationBell through notification API", () => {
@@ -48,6 +48,26 @@ describe("NotificationBell through notification API", () => {
     const [url, options] = fetchMock.mock.calls[0];
     expect(String(url)).toContain("/api/v1/notifications");
     expect(new Headers(options?.headers).get("Authorization")).toBe("Bearer notification-token");
+  });
+
+  it("does not mark notifications read after credentials disappear and retries after reauthentication", async () => {
+    fetchMock.mockResolvedValueOnce(listing(item({ is_read: false })))
+      .mockResolvedValueOnce(listing(item({ is_read: false })))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const view = render(<NotificationBell />);
+    await open();
+    boundary.token = "";
+    view.rerender(<NotificationBell />);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Mark all as read" })));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("1")).toBeDefined();
+    boundary.token = "renewed-notification-token";
+    view.rerender(<NotificationBell />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Mark all as read" })));
+    await waitFor(() => expect(screen.queryByText("1")).toBeNull());
+    expect(new Headers(fetchMock.mock.calls[2][1]?.headers).get("Authorization")).toBe("Bearer renewed-notification-token");
+    expect(String(fetchMock.mock.calls[2][0])).toContain("/notifications/read-all");
   });
 
   it("waits for mark-read before navigating and updates the unread badge", async () => {
