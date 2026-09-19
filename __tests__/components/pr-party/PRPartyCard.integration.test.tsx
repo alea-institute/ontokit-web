@@ -47,6 +47,35 @@ beforeEach(() => {
 afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("PRPartyCard real queue, controls, API and announcements", () => {
+  it("cancels a stale approval without posting and still permits discussing the card", async () => {
+    row = { ...card, stale: true };
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    expect(screen.getByRole("button", { name: "Confirm and accept anyway" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("button", { name: "Confirm and accept anyway" })).toBeNull();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/actions"))).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Discuss live" }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/actions"))).toHaveLength(1));
+    const request = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/actions"));
+    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({ verdict: "discuss_live", head_sha: "abc123" });
+  });
+
+  it("cancels notes without submitting and retains the draft when reopened", async () => {
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Accept with suggestions" }));
+    fireEvent.change(screen.getByLabelText("Your notes"), { target: { value: "  Add an example  " } });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByLabelText("Your notes")).toBeNull();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/actions"))).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Accept with suggestions" }));
+    expect((screen.getByLabelText("Your notes") as HTMLTextAreaElement).value).toBe("  Add an example  ");
+    fireEvent.click(screen.getByRole("button", { name: "Send accept with suggestions" }));
+    await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/actions"))).toHaveLength(1));
+    const request = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/actions"));
+    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({ verdict: "approve", body: "Add an example" });
+  });
+
   it("opens a trusted degraded receipt and exposes the fallback link", async () => {
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     respond = () => json({ action: { status: "recorded" }, card: detail, degraded: true, deep_link: card.pr_url });

@@ -69,6 +69,28 @@ describe("translation settings through query and HTTP clients", () => {
     expect(requests.filter(r => r.path.endsWith("/config") && r.method === "GET").length).toBe(2);
     expect((screen.getByRole("button", { name: "Save translation settings" }) as HTMLButtonElement).disabled).toBe(true);
   });
+  it("validates a verifier provider, persists its model and clears both back to project defaults", async () => {
+    mount(); await screen.findByLabelText("Verifier provider");
+    fireEvent.change(screen.getByLabelText("Verifier provider"), { target: { value: "verifier-provider" } });
+    expect(screen.getByRole("alert").textContent).toBe("Verifier model is required when a provider is set.");
+    expect((screen.getByRole("button", { name: "Save translation settings" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(requests.filter(r => r.method === "PUT")).toHaveLength(0);
+    fireEvent.change(screen.getByLabelText("Verifier model"), { target: { value: "verifier-model" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save translation settings" }));
+    await screen.findByText("Translation settings saved.");
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save translation settings" }) as HTMLButtonElement).disabled).toBe(true));
+    expect(config).toMatchObject({ verifier_provider: "verifier-provider", verifier_model: "verifier-model" });
+    fireEvent.change(screen.getByLabelText("Verifier provider"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Verifier model"), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save translation settings" }));
+    await waitFor(() => expect(requests.filter(r => r.method === "PUT")).toHaveLength(2));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save translation settings" }) as HTMLButtonElement).disabled).toBe(true));
+    expect(requests.filter(r => r.method === "PUT").map(r => ({ provider: r.body?.verifier_provider, model: r.body?.verifier_model }))).toEqual([
+      { provider: "verifier-provider", model: "verifier-model" }, { provider: null, model: null },
+    ]);
+    expect((screen.getByLabelText("Verifier provider") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Verifier model") as HTMLInputElement).value).toBe("");
+  });
   it("retains edited values after a server rejection and retries the same configuration", async () => {
     failSave = true; mount(); await screen.findByLabelText("Primary model");
     fireEvent.change(screen.getByLabelText("Primary model"), { target: { value: "new-model" } });

@@ -74,6 +74,20 @@ describe("LLM settings through the real hook, API client, and BYO store", () => 
     expect(fetchMock.mock.calls.filter(([input, init]) => String(input).endsWith("/config") && init?.method === "GET")).toHaveLength(2);
   });
 
+  it("persists a switch from cheap to quality without replacing the stored API key", async () => {
+    const { updates, validations } = setup({ config: { ...initialConfig, model_tier: "cheap" } });
+    await ready();
+    expect((screen.getByLabelText("Cheap") as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByLabelText("Quality"));
+    save();
+    await screen.findByText("AI settings saved.");
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({ model_tier: "quality", model: "test-model" });
+    expect(updates[0]).not.toHaveProperty("api_key");
+    expect(validations).toHaveLength(0);
+    expect((screen.getByLabelText("Quality") as HTMLInputElement).checked).toBe(true);
+  });
+
   it("restores a session BYO key, validates it in the header, and never saves it in the config body", async () => {
     useByoKeyStore.getState().setKey("settings-coverage", "openai", "synthetic-session");
     const { updates, validations } = setup();

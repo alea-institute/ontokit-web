@@ -62,6 +62,17 @@ async function savePanel() {
   await screen.findByText("Saved");
 }
 describe("class detail real editing and suggestion chains", () => {
+  it("closes the real parent picker without creating a draft or changing Turtle", async () => {
+    const { save } = mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Add parent" }));
+    fireEvent.keyDown(screen.getByPlaceholderText("Search for a class..."), { key: "Escape" });
+    expect(screen.queryByPlaceholderText("Search for a class...")).toBeNull();
+    expect(screen.getByRole("button", { name: "Add parent" })).toBeDefined();
+    expect(useDraftStore.getState().drafts[key]).toBeUndefined();
+    expect(save).not.toHaveBeenCalled();
+    expect(output).toBe(source);
+  });
+
   it.each(["Definition", "Example"])("retries a failed %s status check and renders the provisional result", async (field) => {
     const predicate = field === "Definition" ? "skos:definition" : "skos:example";
     if (field === "Example") currentDetail.annotations.push({ property_iri: "http://www.w3.org/2004/02/skos/core#example", property_label: "Example", values: [{ value: "Existing example", lang: "en" }] });
