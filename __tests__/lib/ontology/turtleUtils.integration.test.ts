@@ -40,8 +40,11 @@ describe("Turtle block preservation through source edits", () => {
     expect(() => parseExistingTurtleBlock(source)).toThrow("Could not parse the subject");
   });
 
-  it("preserves an unedited long annotation through a real property update", () => {
-    const annotation = 'ex:note """first ; .\nsecond"""';
+  it.each([
+    { name: "multiline", annotation: 'ex:note """first ; .\nsecond"""', value: "first ; .\nsecond" },
+    { name: "escaped double quote", annotation: String.raw`ex:note "quoted \" ; . punctuation"`, value: 'quoted " ; . punctuation' },
+    { name: "escaped single quote", annotation: String.raw`ex:note 'quoted \' ; . punctuation'`, value: "quoted ' ; . punctuation" },
+  ])("preserves an unedited $name annotation through a real property update", ({ annotation, value }) => {
     const source = TURTLE_FIXTURE.replace('rdfs:label "has part"@en ;', `rdfs:label "has part"@en ;\n    ${annotation} ;`);
     const detail = extractPropertyDetail(source, iri)!;
     const updated = updatePropertyInTurtle(source, iri, {
@@ -56,7 +59,7 @@ describe("Turtle block preservation through source edits", () => {
     const triples = parseBlockTriples(updated, iri)!;
     expect(triples).toContainEqual({
       predicate: "http://example.org/ont#note",
-      object: { type: "literal", value: "first ; .\nsecond" },
+      object: { type: "literal", value },
     });
     expect(extractPropertyDetail(updated, iri)?.labels).toEqual([{ value: "new label", lang: "en" }]);
     expect(updated).toContain('ex:hasAge a owl:DatatypeProperty ;');

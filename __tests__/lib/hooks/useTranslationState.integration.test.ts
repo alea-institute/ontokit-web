@@ -19,9 +19,30 @@ function setup() {
   const hook = renderHook(({ entity, branch, token }: { entity: string | null; branch: string; token?: string }) => useTranslationState('project', entity, branch, token), { wrapper, initialProps: { entity: iri, branch: 'main', token: 'token' } });
   return { ...hook, client, fetcher, setItems: (next: TranslationEntityStateItem[]) => { items = next; }, failPost: () => { postStatus = 403; } };
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('translation state through the HTTP client and query cache', () => {
+  it.each(['verified', 'provisional', 'empty'] as const)('stops server-initiated polling and cancels its timeout when the result becomes %s', async state => {
+    const { result, fetcher, setItems } = setup();
+    await waitFor(() => expect(result.current.state?.items).toEqual([]));
+    vi.useFakeTimers();
+    setItems([item('pending', null)]);
+    await act(() => result.current.refetch());
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(result.current.state?.items[0].state).toBe('pending');
+    const before = fetcher.mock.calls.length;
+    setItems(state === 'empty' ? [] : [item(state, 'Une personne')]);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(result.current.state?.items).toEqual(state === 'empty' ? [] : [item(state, 'Une personne')]);
+    expect(fetcher).toHaveBeenCalledTimes(before + 1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5 * 60_000); });
+    expect(fetcher).toHaveBeenCalledTimes(before + 1);
+    expect(fetcher.mock.calls.every(([, init]) => init?.method === 'GET')).toBe(true);
+    expect(result.current.pendingNotice).toBeNull();
+    expect(result.current.isTranslationPending).toBe(false);
+  });
+
   it('encodes the entity and branch and completes a request from a real refetch', async () => {
     const { result, fetcher, setItems } = setup();
     await waitFor(() => expect(result.current.state?.items).toEqual([]));

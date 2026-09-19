@@ -4,8 +4,8 @@ import { useSuggestionSession } from '@/lib/hooks/useSuggestionSession';
 import { saveSuggestionUpdate } from '@/lib/editor/suggestionSessionPersistence';
 import { jsonResponse } from '../../fixtures/llm-hook-harness';
 
-function setup(resumeStatus?: string) {
-  let failure = '';
+function setup(resumeStatus?: string, initialFailure = '') {
+  let failure = initialFailure;
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
     if (failure && path.endsWith(failure)) return new Response('Session unavailable', { status: 403 });
@@ -22,6 +22,20 @@ function setup(resumeStatus?: string) {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('authenticated suggestion session persistence chain', () => {
+  it('reports verification failure without restoring or writing the unverified session', async () => {
+    const { result, onError, fetcher, rerender, fail } = setup('changes-requested', '/sessions');
+    await waitFor(() => expect(onError).toHaveBeenCalledExactlyOnceWith('Failed to verify suggestion session status.'));
+    expect(result.current).toMatchObject({ sessionId: null, branch: null, isResumed: false, status: 'idle' });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls[0][1]?.method).toBe('GET');
+    expect(new Headers(fetcher.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer token');
+    fail('');
+    rerender({ token: 'token' });
+    await act(async () => {});
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(result.current.sessionId).toBeNull();
+  });
+
   it('starts and saves through the real editor persistence helper before reporting success', async () => {
     const { result, fetcher, onSubmitted } = setup(); const onSaved = vi.fn();
     await act(() => saveSuggestionUpdate({ isSessionActive: false, session: result.current, content: 'draft source', entityIri: 'http://example.org/Person', entityLabel: 'Person', onSaved }));

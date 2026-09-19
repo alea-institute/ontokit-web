@@ -31,13 +31,13 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {})
   return respond(path, init);
 });
 let client: QueryClient;
-function Harness() {
+function Harness({ highlighted = false }: { highlighted?: boolean }) {
   const queue = usePRPartyQueue();
-  return <>{queue.cards.map(item => <PRPartyCard key={item.card_id} card={item} detail={detail}
+  return <>{queue.cards.map(item => <PRPartyCard key={item.card_id} card={item} detail={detail} highlighted={highlighted}
     onSubmitAction={queue.submitAction} onUnpark={queue.unparkCard} onRerunReview={queue.rerunReview} />)}</>;
 }
-function mount() {
-  return render(<QueryClientProvider client={client}><ScreenReaderAnnouncerProvider><Harness /></ScreenReaderAnnouncerProvider></QueryClientProvider>);
+function mount(highlighted = false) {
+  return render(<QueryClientProvider client={client}><ScreenReaderAnnouncerProvider><Harness highlighted={highlighted} /></ScreenReaderAnnouncerProvider></QueryClientProvider>);
 }
 beforeEach(() => {
   row = { ...card }; client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -47,6 +47,42 @@ beforeEach(() => {
 afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("PRPartyCard real queue, controls, API and announcements", () => {
+  it.each(["plain", "structured"])("announces a %s verdict rejection and clears it after an explicit retry", async format => {
+    let attempts = 0;
+    respond = (path, init) => {
+      expect(path.endsWith("/actions")).toBe(true);
+      expect(init.method).toBe("POST");
+      if (++attempts === 1) return format === "plain"
+        ? new Response("Review permission denied", { status: 403 })
+        : json({ detail: { message: "Review permission denied" } }, 403);
+      return json({ action: { status: "submitted" }, card: detail });
+    };
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await screen.findByText("Review permission denied");
+    await waitFor(() => expect(screen.getAllByRole("alert").map(node => node.textContent)).toContain("Verdict failed for Improve ontology: Review permission denied"));
+    expect(attempts).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Approving review submitted"));
+    expect(screen.queryByText("Review permission denied")).toBeNull();
+    expect(attempts).toBe(2);
+  });
+
+  it("scrolls the highlighted API-loaded card into view", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
+    const scroll = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, "scrollIntoView", { configurable: true, value: scroll });
+    try {
+      mount(true);
+      const article = await screen.findByRole("article", { name: "Improve ontology" });
+      await waitFor(() => expect(scroll).toHaveBeenCalledExactlyOnceWith({ behavior: "smooth", block: "center" }));
+      expect(scroll.mock.contexts[0]).toBe(article);
+    } finally {
+      if (descriptor) Object.defineProperty(HTMLElement.prototype, "scrollIntoView", descriptor);
+      else Reflect.deleteProperty(HTMLElement.prototype, "scrollIntoView");
+    }
+  });
+
   it("cancels a stale approval without posting and still permits discussing the card", async () => {
     row = { ...card, stale: true };
     mount();

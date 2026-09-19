@@ -149,6 +149,25 @@ describe("Suggestion review page through real project hook, API client and revie
     expect(JSON.parse(posted()[0][1].body)).toEqual({ [field]: "Please revise the label" });
   });
 
+  it.each([["Reject", "Reason for rejection"], ["Request Changes", "Feedback"]])("dismisses %s with Escape without posting and clears its draft when reopened", async (action, label) => {
+    mount(); await ready();
+    fireEvent.click(screen.getByRole("button", { name: /Ada.*Update Ada/ }));
+    fireEvent.click(screen.getByRole("button", { name: action }));
+    const dialog = screen.getByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText(label), { target: { value: "Unsubmitted feedback" } });
+    fireEvent.keyDown(dialog, { key: "Escape", code: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(posted()).toHaveLength(0);
+    expect(screen.getByRole("checkbox", { name: "Select suggestion from Ada" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: action }));
+    const reopened = within(screen.getByRole("dialog"));
+    expect((reopened.getByLabelText(label) as HTMLTextAreaElement).value).toBe("");
+    expect((reopened.getByRole("button", { name: action }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(reopened.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(posted()).toHaveLength(0);
+  });
+
   it("reports failed bulk review without silently clearing it as successful", async () => {
     bulk = () => json({ detail: "Batch conflict" }, 409); mount(); await ready();
     fireEvent.click(screen.getByRole("checkbox", { name: "Select suggestion from Ada" }));
