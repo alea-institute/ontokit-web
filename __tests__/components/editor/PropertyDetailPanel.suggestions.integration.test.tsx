@@ -49,6 +49,23 @@ beforeEach(() => {
 afterEach(() => { cleanup(); useSuggestionStore.getState().clearAllSuggestions(); useDraftStore.setState({ drafts: {} }); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("property suggestion persistence", () => {
+  it("removes one characteristic while preserving another through Turtle persistence", async () => {
+    const panel = mount();
+    const functional = await screen.findByRole("checkbox", { name: "Functional" });
+    const symmetric = screen.getByRole("checkbox", { name: "Symmetric" });
+    fireEvent.click(functional);
+    fireEvent.click(symmetric);
+    fireEvent.click(functional);
+    expect((functional as HTMLInputElement).checked).toBe(false);
+    expect((symmetric as HTMLInputElement).checked).toBe(true);
+    await saveDraft();
+    const detail = extractPropertyDetail(panel.output(), iri)!;
+    expect(detail.characteristics).toEqual(["http://www.w3.org/2002/07/owl#SymmetricProperty"]);
+    expect(detail.propertyType).toBe("object");
+    expect(detail.domainIris).toEqual([ns + "Person"]);
+    expect(detail.rangeIris).toEqual([ns + "Place"]);
+  });
+
   it.each([
     ["label", rdfs + "label", "Suggested label"],
     ["comment", rdfs + "comment", "Suggested comment"],

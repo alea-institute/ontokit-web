@@ -66,6 +66,21 @@ afterEach(() => {
 });
 
 describe("expanded review card with real queries, mutations and question drafts", () => {
+  it("renders trusted brief links and excludes lookalike hosts and executable URLs", async () => {
+    const trusted = "https://github.com/example/ontology/issues/12";
+    const lookalike = "https://github.com.attacker.test/example/ontology/issues/12";
+    const executable = "javascript:alert(1)";
+    detail = { ...detail, brief_links: [trusted, lookalike, executable] };
+    mount();
+    const link = await screen.findByRole("link", { name: trusted });
+    expect(link.getAttribute("href")).toBe(trusted);
+    expect(link.getAttribute("target")).toBe("_blank");
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(screen.queryByRole("link", { name: lookalike })).toBeNull();
+    expect(screen.queryByRole("link", { name: executable })).toBeNull();
+    expect(fetchBoundary.mock.calls.filter(([, init]) => init?.method === "POST")).toEqual([]);
+  });
+
   it.each([true, false])("honors manual merge settings with a trusted PR URL: %s", async trusted => {
     mergePlacement = "manual";
     if (!trusted) detail = { ...detail, pr_url: "https://github.com.attacker.test/example/ontology/pull/7" };

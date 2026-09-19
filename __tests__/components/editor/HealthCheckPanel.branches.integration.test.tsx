@@ -136,9 +136,11 @@ describe("health panel filters and asynchronous branch boundaries", () => {
 
 
   it.each([
-    { tab: "Consistency", run: "Run Check", jobPath: "/quality/jobs/job-1", trigger: "/quality/check" },
-    { tab: "Duplicates", run: "Find Duplicates", jobPath: "/quality/duplicates/jobs/job-1", trigger: "/quality/duplicates" },
-  ])("stops $tab polling after closing while a result request is pending", async ({ tab, run, jobPath, trigger }) => {
+    { tab: "Consistency", run: "Run Check", jobPath: "/quality/jobs/job-1", trigger: "/quality/check", status: 202 },
+    { tab: "Duplicates", run: "Find Duplicates", jobPath: "/quality/duplicates/jobs/job-1", trigger: "/quality/duplicates", status: 202 },
+    { tab: "Consistency", run: "Run Check", jobPath: "/quality/jobs/job-1", trigger: "/quality/check", status: 403 },
+    { tab: "Duplicates", run: "Find Duplicates", jobPath: "/quality/duplicates/jobs/job-1", trigger: "/quality/duplicates", status: 403 },
+  ])("stops $tab polling after closing while a result request returns $status", async ({ tab, run, jobPath, trigger, status }) => {
     const pending = deferred();
     route = url => url.pathname.endsWith(jobPath) ? pending.promise : undefined;
     const view = render(<HealthCheckPanel {...props} />);
@@ -152,7 +154,7 @@ describe("health panel filters and asynchronous branch boundaries", () => {
     expect(request.mock.calls.filter(([url]) => new URL(url).pathname.endsWith(jobPath))).toHaveLength(1);
     view.unmount();
     await act(async () => {
-      pending.resolve(json({ status: "pending" }, 202));
+      pending.resolve(status === 202 ? json({ status: "pending" }, 202) : json({ detail: "Obsolete job denied" }, 403));
       await vi.advanceTimersByTimeAsync(60_000);
     });
     expect(request.mock.calls.filter(([url]) => new URL(url).pathname.endsWith(jobPath))).toHaveLength(1);

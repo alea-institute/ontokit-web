@@ -41,6 +41,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); useDraftStore.setState({ drafts: {} }); });
 
 describe("individual panel real editing chain", () => {
+  it("removes one definition while preserving a second language and other annotations", async () => {
+    let output = source.replace('skos:definition "Original definition"@en', 'skos:definition "Original definition"@en, "Définition conservée"@fr');
+    const save = async (entity: string, data: TurtleIndividualUpdateData) => { output = updateIndividualInTurtle(output, entity, data); };
+    render(<TooltipProvider><ToastProvider><IndividualDetailPanel projectId="coverage-individual" individualIri={iri} sourceContent={output} canEdit onUpdateIndividual={save} labelHints={hints} /></ToastProvider></TooltipProvider>);
+    const row = screen.getByDisplayValue("Original definition").parentElement!;
+    fireEvent.click(within(row).getByRole("button", { name: /Remove .* annotation/ }));
+    await waitFor(() => expect(useDraftStore.getState().getDraft(key)).toMatchObject({ definitions: [{ value: "Définition conservée", lang: "fr" }, { value: "", lang: "en" }] }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved");
+    const detail = extractIndividualDetail(output, iri)!;
+    expect(detail.definitions).toEqual([{ value: "Définition conservée", lang: "fr" }]);
+    expect(detail.comments).toEqual([{ value: "Original comment", lang: "en" }]);
+    expect(detail.labels).toEqual([{ value: "Relation", lang: "en" }]);
+    expect(screen.queryByDisplayValue("Original definition")).toBeNull();
+  });
+
   it.each(["Person", "alias", "other"])("navigates the parsed %s reference from edit mode without creating a draft", (target) => {
     const navigate = vi.fn();
     render(<TooltipProvider><ToastProvider><IndividualDetailPanel projectId="coverage-individual" individualIri={iri} sourceContent={source} canEdit onUpdateIndividual={vi.fn()} labelHints={hints} onNavigateToEntity={navigate} /></ToastProvider></TooltipProvider>);
