@@ -27,7 +27,8 @@ vi.mock("@monaco-editor/react", () => ({
 import EditorPage from "@/app/projects/[id]/editor/page";
 
 // The page, its hooks, API client, stores, header and providers are real.
-// Network and framework session/router are the only replaced boundaries.
+// HTTP, socket/worker/browser APIs, Monaco, and framework session/router are
+// replaced at their boundaries; application orchestration stays real.
 let projectResponse: object;
 let projectStatus: number;
 let client: QueryClient;
@@ -35,7 +36,7 @@ const originalSource = '@prefix ex: <https://example.test/> .\nex:Person a <http
 let saveStatus: number;
 let savedBodies: unknown[];
 let unexpected: string[];
-const requests: { path: string; authorization: string | null }[] = [];
+const requests: { path: string; method: string; search: string; authorization: string | null }[] = [];
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 function mount() {
@@ -62,10 +63,11 @@ beforeEach(() => {
   // No socket opens against a live service. The production hook still creates
   // and closes its connection when authenticated session state enables it.
   vi.stubGlobal("WebSocket", class { close() {} });
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
   vi.stubGlobal("Worker", class { postMessage() {} terminate() {} });
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
-    requests.push({ path, authorization: new Headers(init?.headers).get("Authorization") });
+    requests.push({ path, method: init?.method ?? "GET", search: new URL(String(input)).search, authorization: new Headers(init?.headers).get("Authorization") });
     if (path === "/api/v1/projects/route-project") return json(projectResponse, projectStatus);
     if (path.endsWith("/suggestions/capabilities")) return json({ tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 });
     if (path.endsWith("/ontology/tree")) return json({ nodes: [], total_classes: 0 });
@@ -77,12 +79,16 @@ beforeEach(() => {
     if (path.endsWith("/branches")) return json({ items: [{ name: "main", is_current: true }], current_branch: "main", default_branch: "main" });
     if (path.endsWith("/normalization/status")) return json({ needs_normalization: false });
     if (path.endsWith("/revisions/file")) return json({ content: originalSource, revision: "base-commit", filename: "ontology.ttl" });
-    if (path.endsWith("/ontology/source")) {
+    if (path.endsWith("/source")) {
       savedBodies.push(JSON.parse(String(init?.body)));
       return saveStatus === 409
         ? json({ detail: { code: "SOURCE_REVISION_CONFLICT", message: "Source changed", base_revision: "base-commit", current_revision: "other-commit", branch: "main" } }, 409)
         : json({ commit_hash: "saved-commit" });
     }
+    if (path.endsWith("/remote-sync")) return json({ enabled: false });
+    if (path.endsWith("/translation/config")) return json({ enabled: false, source_language: "en", language_tags: [] });
+    if (path.endsWith("/translation/palette")) return json({ languages: [] });
+    if (path.endsWith("/lint/issues")) return json({ items: [], total: 0 });
     unexpected.push(path);
     return json({ detail: "Unexpected test request" }, 404);
   }));
@@ -90,6 +96,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   useSelectionStore.getState().clear();
+  useEditorModeStore.getState().setEditorMode("standard");
   client?.clear();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
@@ -189,8 +196,53 @@ describe("Editor page real access and empty-state chains", () => {
     fireEvent.change(within(dialog).getByPlaceholderText("Describe your changes..."), { target: { value: "Review ontology source" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Save & Commit" }));
     await waitFor(() => expect(savedBodies).toHaveLength(1));
+    expect(requests.find((request) => request.path.endsWith("/source"))).toEqual(expect.objectContaining({ method: "PUT", search: "?branch=main", authorization: "Bearer route-fixture-token" }));
     expect(savedBodies[0]).toEqual(expect.objectContaining({ content: originalSource + "\n# reviewed", commit_message: "Review ontology source", base_revision: "base-commit" }));
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Save Changes" })).toBeNull());
+  });
+
+  it("preserves the edited draft on a source revision conflict and reconciles only after confirmation", async () => {
+    authenticate();
+    saveStatus = 409;
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl" };
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Source" }));
+    const input = await screen.findByRole("textbox", { name: "Turtle source boundary" });
+    await waitFor(() => expect((input as HTMLTextAreaElement).value).toBe(originalSource));
+    const draft = originalSource + "\n# local draft";
+    fireEvent.change(input, { target: { value: draft } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const dialog = await screen.findByRole("dialog", { name: "Save Changes" });
+    fireEvent.change(within(dialog).getByPlaceholderText("Describe your changes..."), { target: { value: "Conflicting edit" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save & Commit" }));
+    expect(await screen.findByText("A newer source revision is available.")).toBeTruthy();
+    expect((input as HTMLTextAreaElement).value).toBe(draft);
+    expect(screen.queryByRole("dialog", { name: "Save Changes" })).toBeNull();
+    expect(savedBodies).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Load latest" }));
+    const confirmation = await screen.findByRole("dialog", { name: "Discard your draft and load the latest source?" });
+    expect((input as HTMLTextAreaElement).value).toBe(draft);
+    fireEvent.click(within(confirmation).getByRole("button", { name: "Discard draft and load latest" }));
+    await waitFor(() => expect((screen.getByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement).value).toBe(originalSource));
+    expect(screen.queryByText("A newer source revision is available.")).toBeNull();
+    expect(savedBodies).toHaveLength(1);
+  });
+  it("cancels a commit without submitting or losing the editable source draft", async () => {
+    authenticate();
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl" };
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Source" }));
+    const input = await screen.findByRole("textbox", { name: "Turtle source boundary" });
+    await waitFor(() => expect((input as HTMLTextAreaElement).value).toBe(originalSource));
+    const draft = originalSource + "\n# not committed";
+    fireEvent.change(input, { target: { value: draft } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const dialog = await screen.findByRole("dialog", { name: "Save Changes" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(await screen.findByText("Save cancelled")).toBeTruthy();
+    expect((input as HTMLTextAreaElement).value).toBe(draft);
+    expect(savedBodies).toEqual([]);
+    expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
 });
