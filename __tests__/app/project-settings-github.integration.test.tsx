@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SessionProvider } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -36,25 +36,31 @@ function mount(options: { token?: boolean; connected?: boolean; syncStatus?: str
     return new Response('Ancillary setting unavailable', { status: 403 });
   });
   vi.stubGlobal('fetch', fetcher);
-  const { wrapper: QueryWrapper } = llmHookHarness();
+  const { wrapper: QueryWrapper, client } = llmHookHarness();
   const view = render(<SessionProvider session={session} refetchOnWindowFocus={false}><QueryWrapper><ToastProvider><ProjectSettingsPage /></ToastProvider></QueryWrapper></SessionProvider>);
-  return { ...view, fetcher, confirm, fail: (value: typeof failure) => { failure = value; }, repos: (value: typeof repos) => { repos = value; } };
+  return { ...view, client, fetcher, confirm, fail: (value: typeof failure) => { failure = value; }, repos: (value: typeof repos) => { repos = value; } };
 }
 async function section() { const heading = await screen.findByRole('heading', { name: 'GitHub Integration' }); return within(heading.closest('section')!); }
-async function setup() { const ui = await section(); fireEvent.click(ui.getByRole('button', { name: 'Connect to GitHub' })); return ui; }
+async function setup(harness: ReturnType<typeof mount>) {
+  const ui = await section();
+  // The section mounts before the independent credential query has settled.
+  await waitFor(() => expect(harness.client.getQueryState(['githubTokenStatus', 'owner'])?.status).toBe('success'));
+  fireEvent.click(ui.getByRole('button', { name: 'Connect to GitHub' }));
+  return ui;
+}
 const connections = (h: ReturnType<typeof mount>) => h.fetcher.mock.calls.filter(([url, init]) => String(url).endsWith('/github-integration') && init?.method === 'POST');
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('repository connections through settings, the actual output picker and HTTP clients', () => {
   it('routes users without a token to review settings without listing repositories', async () => {
-    const h = mount({ token: false }); const ui = await setup();
+    const h = mount({ token: false }); const ui = await setup(h);
     expect(await ui.findByRole('link', { name: 'review settings' })).toBeDefined();
     expect(ui.getByRole('link', { name: 'review settings' }).getAttribute('href')).toBe('/pr-party/settings');
     expect(h.fetcher.mock.calls.some(([url]) => String(url).includes('/github-repos'))).toBe(false);
   });
 
   it('selects a repository, scans its real output picker and connects with an exact payload', async () => {
-    const h = mount(); const ui = await setup();
+    const h = mount(); const ui = await setup(h);
     expect(ui.getByRole('button', { name: 'Connect Repository' }).hasAttribute('disabled')).toBe(true);
     fireEvent.click(await ui.findByRole('button', { name: /example\/ontology/ }));
     await ui.findByText('source.ttl'); fireEvent.click(ui.getByRole('button', { name: 'Connect Repository' }));
@@ -66,7 +72,7 @@ describe('repository connections through settings, the actual output picker and 
   });
 
   it('preserves selected repository and output path when connection fails, then retries', async () => {
-    const h = mount(); h.fail('connect'); const ui = await setup();
+    const h = mount(); h.fail('connect'); const ui = await setup(h);
     fireEvent.click(await ui.findByRole('button', { name: /example\/ontology/ })); await ui.findByText('source.ttl');
     fireEvent.click(ui.getByRole('button', { name: 'Connect Repository' })); await screen.findByText('Connect refused');
     expect(ui.getByText('source.ttl')).toBeDefined();
@@ -76,7 +82,7 @@ describe('repository connections through settings, the actual output picker and 
   });
 
   it('recovers an initial repository load error through debounced search and clears stale selection', async () => {
-    const h = mount(); h.fail('repos'); const ui = await setup(); await ui.findByText('No repositories available');
+    const h = mount(); h.fail('repos'); const ui = await setup(h); await ui.findByText('No repositories available');
     h.fail(null); fireEvent.change(ui.getByPlaceholderText('Search by name...'), { target: { value: 'ontology' } });
     fireEvent.click(await ui.findByRole('button', { name: /example\/ontology/ })); await ui.findByText('source.ttl');
     h.repos([]); fireEvent.change(ui.getByPlaceholderText('Search by name...'), { target: { value: 'absent' } });
@@ -87,7 +93,7 @@ describe('repository connections through settings, the actual output picker and 
   });
 
   it('displays a search error as an empty result and reloads after cancel and reopen', async () => {
-    const h = mount(); const ui = await setup(); await ui.findByRole('button', { name: /example\/ontology/ });
+    const h = mount(); const ui = await setup(h); await ui.findByRole('button', { name: /example\/ontology/ });
     h.fail('repos'); fireEvent.change(ui.getByPlaceholderText('Search by name...'), { target: { value: 'query' } }); await ui.findByText('No repositories found');
     fireEvent.click(ui.getByRole('button', { name: 'Cancel' })); h.fail(null);
     fireEvent.click(ui.getByRole('button', { name: 'Connect to GitHub' })); await ui.findByRole('button', { name: /example\/ontology/ });
@@ -96,7 +102,7 @@ describe('repository connections through settings, the actual output picker and 
   });
 
   it('prevents connecting when the repository scan fails', async () => {
-    const h = mount(); h.fail('scan'); const ui = await setup();
+    const h = mount(); h.fail('scan'); const ui = await setup(h);
     fireEvent.click(await ui.findByRole('button', { name: /example\/ontology/ })); await ui.findByText('Scan refused');
     expect(ui.getByRole('button', { name: 'Connect Repository' }).hasAttribute('disabled')).toBe(true); expect(connections(h)).toHaveLength(0);
   });

@@ -16,7 +16,9 @@ function mount(canManage = true, accessToken: string | undefined = "fixture-toke
   return { client, ...render(<LintConfigSection projectId="p" accessToken={accessToken} canManage={canManage} />, { wrapper }) };
 }
 const rule = (rule_id: string, severity: string) => ({ rule_id, name: rule_id, severity, description: `${rule_id} description`, scope: ["class"] });
+let ruleCatalog: ReturnType<typeof rule>[];
 beforeEach(() => {
+  ruleCatalog = [rule("Descriptions", "info"), rule("Labels", "error")];
   config = { project_id: "p", lint_level: 2, enabled_rules: null, effective_rules: ["Labels"], updated_at: null };
   summary = { project_id: "p", last_run: null, error_count: 0, warning_count: 0, info_count: 0, total_issues: 0 };
   failPath = undefined; failMutation = false; emptyRules = false; requests = [];
@@ -25,7 +27,7 @@ beforeEach(() => {
     const body = init?.body ? JSON.parse(String(init.body)) : undefined;
     requests.push({ path, method, body, authorization: new Headers(init?.headers).get("Authorization") });
     if (path === failPath || (method !== "GET" && failMutation)) return jsonResponse({ detail: "Lint request rejected" }, 403);
-    if (path.endsWith("/rules")) return jsonResponse({ rules: emptyRules ? [] : [rule("Descriptions", "info"), rule("Labels", "error")] });
+    if (path.endsWith("/rules")) return jsonResponse({ rules: emptyRules ? [] : ruleCatalog });
     if (path.endsWith("/levels")) return jsonResponse({ levels: [{ level: 1, name: "Basic", description: "Basic checks", rule_ids: [] }, { level: 2, name: "Standard", description: "Standard checks", rule_ids: ["Labels"] }] });
     if (path.endsWith("/config")) {
       if (body) config = { ...config, ...body, enabled_rules: body.lint_level === null ? body.enabled_rules : null };
@@ -41,6 +43,44 @@ afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear())
 async function ready() { await screen.findByRole("switch", { name: "Toggle Labels" }); }
 
 describe("lint configuration HTTP integration", () => {
+  it("places unfamiliar server severities after known rules without losing their selectable controls", async () => {
+    ruleCatalog = [rule("Experimental", "experimental"), rule("Labels", "error"), rule("Descriptions", "info"), rule("Future", "future")];
+    config = { ...config, lint_level: null, enabled_rules: [] };
+    mount(); await ready();
+    expect(screen.getAllByRole("switch").map(toggle => toggle.getAttribute("aria-label"))).toEqual(["Toggle Labels", "Toggle Descriptions", "Toggle Experimental", "Toggle Future"]);
+    expect(screen.getByText("experimental").className).toContain("bg-slate-100");
+    fireEvent.click(screen.getByRole("switch", { name: "Toggle Experimental" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Lint Configuration" }));
+    await screen.findByText("Lint configuration saved");
+    expect(requests.find(request => request.method === "PUT")?.body).toEqual({ lint_level: null, enabled_rules: ["Experimental"] });
+  });
+
+  it("treats a null custom rule list as empty and persists the first selected rule", async () => {
+    config = { ...config, lint_level: null, enabled_rules: null, effective_rules: [] };
+    mount(); await ready();
+    await waitFor(() => expect(screen.getByRole("button", { name: /Custom/ }).getAttribute("aria-pressed")).toBe("true"));
+    expect(screen.getByText("Rules (0 of 2 enabled)")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Save Lint Configuration" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("switch", { name: "Toggle Labels" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save Lint Configuration" }));
+    await screen.findByText("Lint configuration saved");
+    expect(requests.find(request => request.method === "PUT")?.body).toEqual({ lint_level: null, enabled_rules: ["Labels"] });
+    expect(screen.getByRole("switch", { name: "Toggle Labels" }).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("allows recovery from a saved preset missing from the current level catalog", async () => {
+    config = { ...config, lint_level: 3, effective_rules: [] };
+    mount(); await ready();
+    await waitFor(() => expect(screen.getByText("Rules (0 of 2 enabled)")).toBeDefined());
+    expect(screen.queryByRole("button", { name: /Level 3/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Save Lint Configuration" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("button", { name: /Level 2/ }));
+    expect(screen.getByRole("switch", { name: "Toggle Labels" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Save Lint Configuration" }));
+    await screen.findByText("Lint configuration saved");
+    expect(requests.find(request => request.method === "PUT")?.body).toEqual({ lint_level: 2 });
+  });
+
   it("preserves unsaved custom rules during a background configuration refresh", async () => {
     const { client } = mount(); await ready();
     fireEvent.click(screen.getByRole("button", { name: /Custom/ }));

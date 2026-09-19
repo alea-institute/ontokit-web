@@ -35,6 +35,29 @@ describe('keyboard shortcuts with real focus and dialog components', () => {
     expect(action).not.toHaveBeenCalled(); expect(event.defaultPrevented).toBe(false);
   });
 
+  it('leaves rich-text keystrokes untouched unless the shortcut explicitly opts into editable content', () => {
+    function Consumer({ allow }: { allow: boolean }) {
+      const [saves, setSaves] = useState(0);
+      useKeyboardShortcuts([shortcut(() => setSaves(value => value + 1), { global: allow })]);
+      return <><div contentEditable suppressContentEditableWarning tabIndex={0} aria-label="Rich text">Editable text</div><output aria-label="Saves">{saves}</output></>;
+    }
+    const { rerender } = render(<Consumer allow={false} />);
+    const editor = screen.getByLabelText('Rich text');
+    // jsdom omits the browser's computed isContentEditable property.
+    Object.defineProperty(editor, 'isContentEditable', { configurable: true, value: true });
+    editor.focus();
+    expect(document.activeElement).toBe(editor);
+    const local = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true });
+    fireEvent(editor, local);
+    expect(local.defaultPrevented).toBe(false);
+    expect(screen.getByLabelText('Saves').textContent).toBe('0');
+    rerender(<Consumer allow />);
+    const global = new KeyboardEvent('keydown', { key: 's', ctrlKey: true, bubbles: true, cancelable: true });
+    fireEvent(editor, global);
+    expect(global.defaultPrevented).toBe(true);
+    expect(screen.getByLabelText('Saves').textContent).toBe('1');
+  });
+
   it('honors the Monaco focus opt-in separately from the global input opt-in', () => {
     const action = vi.fn();
     function Consumer({ allow }: { allow: boolean }) { useKeyboardShortcuts([shortcut(action, { global: true, ignoreWhenEditorFocused: !allow })]); return <div className="monaco-editor"><textarea aria-label="Source" /></div>; }

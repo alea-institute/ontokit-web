@@ -25,6 +25,22 @@ function setup() {
   }, { initialProps: { token: 'token' as string | undefined, branch: 'main' as string | undefined, revision: 'r1' as string | null } });
   return { ...hook, fetcher, onLoadLatest, respond: (next: number) => { status = next; } };
 }
+function deferredResponse() {
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>(finish => { resolve = finish; });
+  return { promise, resolve };
+}
+function scopedSetup() {
+  const fetcher = vi.fn<typeof fetch>();
+  vi.stubGlobal('fetch', fetcher);
+  const setSourceSnapshot = vi.fn();
+  const onLoadLatest = vi.fn();
+  const hook = renderHook(({ projectId, branch }) => useSourceRevisionGuard({
+    projectId, activeBranch: branch, accessToken: 'token', sourceRevision: 'r1', setSourceSnapshot, onLoadLatest,
+    reloadSourceContent: () => revisionsApi.getFileAtVersion(projectId, branch, 'token'),
+  }), { initialProps: { projectId: 'project', branch: 'main' } });
+  return { ...hook, fetcher, setSourceSnapshot, onLoadLatest };
+}
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('source revision guard HTTP reconciliation', () => {
@@ -44,6 +60,64 @@ describe('source revision guard HTTP reconciliation', () => {
     const finalCall = fetcher.mock.calls.at(-1)!;
     expect(JSON.parse(String(finalCall[1]?.body))).toMatchObject({ content: 'rebased draft', base_revision: 'r2' });
     expect(result.current.snapshot).toEqual({ content: 'rebased draft', revision: 'r3' });
+  });
+
+  it.each(['branch', 'project'] as const)('does not install an old save conflict after switching %s', async scope => {
+    const { result, rerender, fetcher, setSourceSnapshot } = scopedSetup();
+    const old = deferredResponse();
+    fetcher.mockReturnValueOnce(old.promise);
+    let observed!: Promise<unknown>;
+    act(() => { observed = result.current.saveSource('old draft', 'Old edit').catch(error => error); });
+    const current = { projectId: scope === 'project' ? 'other-project' : 'project', branch: scope === 'branch' ? 'feature' : 'main' };
+    rerender(current);
+    fetcher.mockResolvedValueOnce(jsonResponse({ success: true, commit_hash: 'fresh-commit', commit_message: 'New edit', branch: current.branch }));
+    await act(() => result.current.saveSource('current draft', 'New edit', 'fresh-base'));
+    await act(async () => {
+      old.resolve(jsonResponse({ detail: { code: 'SOURCE_REVISION_CONFLICT', message: 'Old branch advanced', base_revision: 'r1', current_revision: 'r2', branch: 'main' } }, 409));
+      expect(await observed).toBeInstanceOf(SourceRevisionConflictError);
+    });
+    expect(result.current.conflict).toBeNull();
+    expect(setSourceSnapshot).toHaveBeenCalledExactlyOnceWith('current draft', 'fresh-commit');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const [url, init] = fetcher.mock.calls[1];
+    expect(new URL(String(url)).pathname).toBe(`/api/v1/projects/${current.projectId}/source`);
+    expect(new URL(String(url)).searchParams.get('branch')).toBe(current.branch);
+    expect(JSON.parse(String(init?.body))).toMatchObject({ content: 'current draft', base_revision: 'fresh-base' });
+  });
+
+  it.each(['branch', 'project', 'newer request'].flatMap(change => [200, 403].map(status => ({ change, status }))))('keeps the latest reload pending after an obsolete HTTP $status response and $change change', async ({ change, status }) => {
+    const { result, rerender, fetcher, onLoadLatest } = scopedSetup();
+    const old = deferredResponse();
+    const latest = deferredResponse();
+    fetcher.mockReturnValueOnce(old.promise).mockReturnValueOnce(latest.promise);
+    let first!: Promise<unknown>;
+    let second!: ReturnType<typeof result.current.loadLatest>;
+    act(() => { first = result.current.loadLatest().catch(error => error); });
+    const current = { projectId: change === 'project' ? 'other-project' : 'project', branch: change === 'branch' ? 'feature' : 'main' };
+    rerender(current);
+    act(() => { second = result.current.loadLatest(); });
+    expect(result.current.isLoadingLatest).toBe(true);
+    await act(async () => {
+      old.resolve(status === 200
+        ? jsonResponse({ project_id: 'project', content: 'obsolete content', revision: 'old-revision', filename: 'ontology.ttl', version: 'main' })
+        : jsonResponse({ detail: 'Obsolete read denied' }, status));
+      const outcome = await first;
+      if (status === 403) expect(outcome).toBeInstanceOf(ApiError);
+      else expect(outcome).toMatchObject({ content: 'obsolete content' });
+    });
+    expect(result.current.isLoadingLatest).toBe(true);
+    expect(onLoadLatest).not.toHaveBeenCalled();
+    await act(async () => {
+      latest.resolve(jsonResponse({ project_id: current.projectId, content: 'current content', revision: 'new-revision', filename: 'ontology.ttl', version: current.branch }));
+      await second;
+    });
+    expect(result.current.isLoadingLatest).toBe(false);
+    expect(onLoadLatest).toHaveBeenCalledExactlyOnceWith('current content');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const [url, init] = fetcher.mock.calls[1];
+    expect(new URL(String(url)).pathname).toBe(`/api/v1/projects/${current.projectId}/revisions/file`);
+    expect(new URL(String(url)).searchParams.get('version')).toBe(current.branch);
+    expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer token');
   });
 
   it('uses an explicit immutable base revision override', async () => {

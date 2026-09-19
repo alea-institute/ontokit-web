@@ -83,6 +83,28 @@ describe("graph loading with the real API client, graph builder and layout engin
     expect(positions.get(iri("Root"))!.y).toBeLessThan(positions.get(iri("Focus"))!.y);
   });
 
+  it("reuses already resolved targets across reciprocal and overlapping relationships", async () => {
+    const reference = [{ property_iri: "http://www.w3.org/2000/01/rdf-schema#seeAlso", property_label: "see also", values: [{ value: iri("Reference"), lang: "" }] }];
+    const calls = serveGraph([
+      detail("Focus", { parent_iris: [iri("Parent")], equivalent_iris: [iri("Equivalent")], disjoint_iris: [iri("Disjoint")], annotations: reference }),
+      detail("Equivalent", { parent_iris: [iri("Parent")], equivalent_iris: [iri("Focus")], disjoint_iris: [iri("Disjoint")], annotations: reference }),
+      detail("Parent"), detail("Disjoint"), detail("Reference"),
+    ]);
+    const { result } = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.resolvedCount).toBe(5);
+    expect(result.current.graphData?.nodes.map(node => node.id).sort()).toEqual(["Focus", "Equivalent", "Parent", "Disjoint", "Reference"].map(iri).sort());
+    expect(result.current.graphData?.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ source: iri("Equivalent"), target: iri("Parent"), edgeType: "subClassOf" }),
+      expect.objectContaining({ source: iri("Equivalent"), target: iri("Reference"), edgeType: "seeAlso" }),
+    ]));
+    await act(async () => { await result.current.expandNode(iri("Equivalent")); });
+    const detailRequests = calls.filter(url => url.pathname.includes("/classes/"));
+    expect(detailRequests).toHaveLength(5);
+    expect(new Set(detailRequests.map(url => url.pathname)).size).toBe(5);
+    expect(result.current.graphData?.nodes).toHaveLength(5);
+  });
+
   it("resolves non-class targets by exact IRI and keeps caller label hints", async () => {
     const hints = new Map([[iri("Property"), "Preferred label"]]);
     serveGraph([detail("Focus", { equivalent_iris: [iri("Property"), iri("Individual")] })], {

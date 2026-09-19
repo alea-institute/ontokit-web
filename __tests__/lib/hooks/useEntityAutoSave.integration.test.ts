@@ -43,6 +43,42 @@ describe("entity auto-save persistent draft integration", () => {
     expect(useDraftStore.getState().hasDraft(key)).toBe(false);
   });
 
+  it.each(["property", "individual"] as const)("rejects duplicate pending %s flushes and permits a later completed edit", async kind => {
+    const entityIri = ns + (kind === "property" ? "hasPart" : "fido");
+    const key = draftKey("project", "main", entityIri);
+    let entry = kind === "property" ? propertyDraft() : individualDraft();
+    let source = TURTLE_FIXTURE;
+    let writes = 0;
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => { release = resolve; });
+    const { result } = renderHook(() => useEntityAutoSave({ projectId: "project", branch: "main", entityIri, canEdit: true, buildDraftEntry: () => entry,
+      onFlush: async target => {
+        writes++;
+        const submitted = entry;
+        await pending;
+        source = submitted.entityType === "property" ? updatePropertyInTurtle(source, target, submitted) : updateIndividualInTurtle(source, target, submitted);
+      },
+    }));
+    act(() => result.current.triggerSave());
+    let first!: Promise<boolean>;
+    act(() => { first = result.current.flushToGit("manual"); });
+    expect(result.current.saveStatus).toBe("saving");
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(false); });
+    expect(writes).toBe(1);
+    expect(source).toBe(TURTLE_FIXTURE);
+    expect(useDraftStore.getState().hasDraft(key)).toBe(true);
+    await act(async () => { release(); expect(await first).toBe(true); });
+    expect(source).toContain(`rdfs:label "Changed ${kind}"@en`);
+    expect(useDraftStore.getState().hasDraft(key)).toBe(false);
+    entry = { ...entry, labels: [{ value: "Second edit", lang: "en" }] };
+    act(() => result.current.triggerSave());
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(true); });
+    expect(writes).toBe(2);
+    expect(source).toContain('rdfs:label "Second edit"@en');
+    expect(result.current.saveStatus).toBe("saved");
+    expect(useDraftStore.getState().hasDraft(key)).toBe(false);
+  });
+
   it("keeps the serialized draft recoverable when the source writer fails", async () => {
     const entityIri = ns + "hasPart";
     const key = draftKey("project", "main", entityIri);

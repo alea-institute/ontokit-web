@@ -57,6 +57,23 @@ describe("ontology tree through the real API client", () => {
     }
   });
 
+  it("navigates a public tree without attaching an authorization header", async () => {
+    const { result } = renderHook(() => useOntologyTree({ projectId: "public-project", branchKey: "published" }));
+    await waitFor(() => expect(result.current.nodes).toHaveLength(2));
+    await act(async () => { await result.current.navigateToNode(leaf); });
+    expect(result.current.nodes[0].children[0].children[0].iri).toBe(leaf);
+    expect(result.current.selectedIri).toBe(leaf);
+    expect(result.current.error).toBeNull();
+    expect(transport).toHaveBeenCalledTimes(4);
+    for (const [input, init] of transport.mock.calls) {
+      const url = new URL(String(input));
+      expect(url.pathname).toContain("/projects/public-project/ontology/tree");
+      expect(url.searchParams.get("branch")).toBe("published");
+      expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+      expect(init?.method).toBe("GET");
+    }
+  });
+
   it("expands only the visible frontier at each level and stops at leaves", async () => {
     const { result } = await loadedTree();
     await act(async () => { await result.current.expandOneLevel(); });
