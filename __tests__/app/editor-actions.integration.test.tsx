@@ -42,6 +42,10 @@ let generationBodies: unknown[];
 let extraTreeNodes: object[];
 let nestPerson: boolean;
 let classParents: string[];
+let ancestorStatus: number;
+let revisionStatus: number;
+let lintStatus: object | null;
+let extraBranches: object[];
 let projectResponse: object;
 let deleted: boolean;
 let deleteFailure: boolean;
@@ -54,6 +58,8 @@ let sourceContent: string;
 let sourceRevision: string;
 let entityResults: object[];
 let suggestionFailure: "create" | "save" | null;
+let suggestionSubmitStatus: number;
+let suggestionSubmissions: unknown[];
 let suggestionBodies: { content: string; entity_iri: string; entity_label: string }[];
 let anonymousFailure: "create" | "save" | "discard" | null;
 let anonymousSubmissions: unknown[];
@@ -64,7 +70,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 function mount() {
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return render(<QueryClientProvider client={client}><TooltipProvider><ToastProvider><EditorPage /><ToastContainer /></ToastProvider></TooltipProvider></QueryClientProvider>);
+  return render(<EditorPage />, { wrapper: ({ children }) => <QueryClientProvider client={client}><TooltipProvider><ToastProvider>{children}<ToastContainer /></ToastProvider></TooltipProvider></QueryClientProvider> });
 }
 function authenticate() {
   boundary.session = { data: { accessToken: "route-fixture-token", user: { email: "reader@example.test" } }, status: "authenticated" };
@@ -109,6 +115,13 @@ async function saveAnonymousProposal() {
   await screen.findByText('Proposed update to "Anonymous label"');
 }
 
+async function requestGeneratedChild() {
+  llmConfigured = true; mount(); fireEvent.click(await screen.findByText("Person"));
+  fireEvent.click(within(await screen.findByTitle("Suggest child classes")).getByRole("button", { name: "Get LLM suggestions for this section" }));
+  const accept = await screen.findByRole("button", { name: "Accept suggestion" });
+  return accept.closest('[role="listitem"]') as HTMLElement;
+}
+
 // jsdom has no layout; only element geometry is replaced. The drag sensor,
 // tree hook, page callbacks and persistence chain remain real.
 function installTreeGeometry(positions: Record<string, number>, rootY?: number) {
@@ -123,6 +136,8 @@ function installTreeGeometry(positions: Record<string, number>, rootY?: number) 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; extraBranches = [];
+  sessionStorage.removeItem("ontokit:branch:route-project");
   llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
   useSuggestionStore.getState().clearAllSuggestions();
   useAnonymousTokenStore.setState({ tokens: {} });
@@ -137,7 +152,7 @@ beforeEach(() => {
   projectResponse = { id: "route-project", name: "Route ontology", source_file_path: "ontology.ttl", user_role: "owner", is_public: false };
   projectStatus = 200; deleted = false; deleteFailure = false;
   saveStatus = 200; sourceStatus = 200; sourceContent = originalSource; sourceRevision = "base-commit"; entityResults = [];
-  savedBodies = []; suggestionBodies = []; suggestionFailure = null;
+  savedBodies = []; suggestionBodies = []; suggestionFailure = null; suggestionSubmitStatus = 200; suggestionSubmissions = [];
   useEditorModeStore.getState().setEditorMode("developer");
   unexpected = [];
   requests.length = 0;
@@ -161,12 +176,17 @@ beforeEach(() => {
       return json({ changes_count: suggestionBodies.length, commit_hash: "anonymous-commit" });
     }
     if (path.endsWith("/suggestions/sessions")) return suggestionFailure === "create" ? json({ detail: "Session refused" }, 403) : json({ session_id: "suggestion-session", branch: "suggestion/draft", created_at: "2026-09-19T12:00:00Z", beacon_token: "fixture-beacon" });
+    if (path.endsWith("/suggestions/sessions/suggestion-session/submit")) {
+      suggestionSubmissions.push(JSON.parse(String(init?.body)));
+      return suggestionSubmitStatus === 200 ? json({ pr_number: 23, pr_url: "https://example.test/pull/23" }) : json({ detail: "Submission refused" }, suggestionSubmitStatus);
+    }
     if (path.endsWith("/suggestions/sessions/suggestion-session/save")) {
       suggestionBodies.push(JSON.parse(String(init?.body)));
       return suggestionFailure === "save" ? json({ detail: "Suggestion refused" }, 403) : json({ commit_hash: "suggestion-commit", branch: "suggestion/draft", changes_count: suggestionBodies.length });
     }
     if (path.endsWith("/suggestions/capabilities")) return json({ tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 });
     if (path.endsWith("/ontology/search")) return json({ results: entityResults, total: entityResults.length });
+    if (path.endsWith("/ancestors")) return ancestorStatus === 200 ? json({ nodes: [] }) : json({ detail: "Ancestors unavailable" }, ancestorStatus);
     if (path.endsWith("/ontology/tree/" + encodeURIComponent("https://example.test/OldParent") + "/children")) return json({ nodes: [{ iri, label: "Person", child_count: 0 }], total_classes: 1 });
     if (path.endsWith("/ontology/tree")) return json({ nodes: deleted ? [] : [nestPerson ? { iri: "https://example.test/OldParent", label: "Old parent", child_count: 1 } : { iri, label: "Person", child_count: 0 }, ...extraTreeNodes], total_classes: deleted ? 0 : 1 });
     if (path.endsWith('/ontology/classes/' + encodeURIComponent(iri))) {
@@ -179,7 +199,11 @@ beforeEach(() => {
     if (path.endsWith("/similar")) return json([]);
     if (path.endsWith('/references')) return json({ groups: [], total: 1 });
     if (path.endsWith("/pull-requests")) return json({ items: [], total: 0 });
-    if (path.endsWith("/lint/status")) return json(null);
+    if (path.endsWith("/revisions")) return revisionStatus === 200 ? json({ commits: [], refs: {} }) : json({ detail: "History unavailable" }, revisionStatus);
+    if (path.endsWith("/lint/config")) return json({ effective_rules: [], enabled_rules: null, lint_level: null });
+    if (path.endsWith("/lint/levels")) return json({ levels: [] });
+    if (path.endsWith("/branch-preference") || path.endsWith("/suggestion-session/discard")) return new Response(null, { status: 204 });
+    if (path.endsWith("/lint/status")) return json(lintStatus);
     if (path.endsWith("/llm/generate-suggestions")) {
       generationBodies.push(JSON.parse(String(init?.body)));
       return json({ suggestions: [{ iri: "https://example.test/Generated", label: "Generated child", suggestion_type: "children", provenance: "llm-proposed", model: "fixture-model", prompt_template: "children", validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }], input_tokens: 10, output_tokens: 20 });
@@ -187,7 +211,7 @@ beforeEach(() => {
     if (path.endsWith("/llm/status")) return json({ configured: llmConfigured });
     if (path === "/api/v1/pr-party/me") return json({ is_reviewer: false });
     if (path.endsWith("/suggestions/pending")) return json({ items: [] });
-    if (path.endsWith("/branches")) return json({ items: [{ name: "main", is_current: true }], current_branch: "main", default_branch: "main" });
+    if (path.endsWith("/branches")) return json({ items: [{ name: "main", is_current: true }, ...extraBranches], current_branch: "main", default_branch: "main" });
     if (path.endsWith("/normalization/status")) return json({ needs_normalization: false });
     if (path.endsWith("/revisions/file")) return sourceStatus === 200 ? json({ content: sourceContent, revision: sourceRevision, filename: "ontology.ttl" }) : json({ detail: "Source unavailable" }, sourceStatus);
     if (path.endsWith("/source")) {
@@ -209,6 +233,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  sessionStorage.removeItem("ontokit:branch:route-project");
   useSuggestionStore.getState().clearAllSuggestions();
   useAnonymousTokenStore.setState({ tokens: {} });
   useAnonymousCreditStore.getState().clearCredit();
@@ -673,6 +698,172 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(parents?.sort()).toEqual((mode === "root" ? [] : mode.startsWith("add") ? [oldParent, otherParent, destination] : [otherParent, destination]).sort());
     await screen.findByText('Moved "Person"');
     expect(savedBodies[0]).toMatchObject({ base_revision: "base-commit", commit_message: "Update class Person" });
+  });
+
+  it.each([200, 403])("restores a changed class URL after branch initialization (ancestor HTTP %i)", async status => {
+    ancestorStatus = status;
+    const view = mount();
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && r.search === "?branch=main")).toBe(true));
+    await screen.findByText("Person");
+    boundary.search = new URLSearchParams({ classIri: iri }); view.rerender(<EditorPage />);
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await waitFor(() => expect(label.value).toBe("Person"));
+    expect(useSelectionStore.getState()).toMatchObject({ iri, type: "class", mode: "editor" });
+    expect(requests.filter(r => r.path.endsWith("/ancestors"))).toHaveLength(1);
+    view.rerender(<EditorPage />);
+    await waitFor(() => expect(label.value).toBe("Person"));
+    expect(requests.filter(r => r.path.endsWith("/ancestors"))).toHaveLength(1);
+    expect(savedBodies).toEqual([]);
+  });
+
+  it("keeps an already selected class when its URL is synchronized", async () => {
+    const view = mount(); fireEvent.click(await screen.findByText("Person"));
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await waitFor(() => expect(label.value).toBe("Person"));
+    boundary.search = new URLSearchParams({ classIri: iri }); view.rerender(<EditorPage />);
+    expect(label.value).toBe("Person");
+    expect(requests.some(r => r.path.endsWith("/ancestors"))).toBe(false);
+    expect(savedBodies).toEqual([]);
+  });
+
+  it("waits for tree data before restoring a class URL into an empty ontology", async () => {
+    deleted = true; boundary.search = new URLSearchParams({ classIri: iri }); mount();
+    await screen.findByText("No classes found in this ontology");
+    expect(requests.some(r => r.path.endsWith("/ancestors") || r.path.includes("/ontology/classes/"))).toBe(false);
+    expect(savedBodies).toEqual([]);
+  });
+
+  it.each([["property", "ObjectProperty", "propertyIri"], ["individual", "NamedIndividual", "individualIri"]] as const)("restores a changed %s URL into its real editable detail", async (type, owlType, param) => {
+    sourceContent = originalSource + '\nex:Editable a owl:' + owlType + ' ; rdfs:label "Linked entity"@en .';
+    entityResults = [{ iri: editableIri, label: "Linked entity", entity_type: type, property_kind: "object" }];
+    const view = mount();
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && r.search === "?branch=main")).toBe(true));
+    await act(async () => { fireEvent.mouseEnter(screen.getByRole("button", { name: "Source" })); });
+    boundary.search = new URLSearchParams({ [param]: editableIri }); view.rerender(<EditorPage />);
+    await screen.findByDisplayValue("Linked entity");
+    expect(useSelectionStore.getState()).toMatchObject({ iri: editableIri, type, mode: "editor" });
+    expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(true);
+    expect(requests.some(r => r.path.endsWith("/ontology/search") && new URLSearchParams(r.search).get("entity_types") === type)).toBe(true);
+    expect(savedBodies).toEqual([]);
+  });
+
+  it.each(["Enter", "Delete", "e"])("curates a focused generated suggestion with the %s shortcut", async key => {
+    const card = await requestGeneratedChild(); card.focus();
+    fireEvent.keyDown(card, { key });
+    if (key === "e") {
+      const input = await screen.findByDisplayValue("Generated child"); input.focus();
+      fireEvent.change(input, { target: { value: "Keyboard child" } });
+      fireEvent.keyDown(input, { key: "Enter" });
+    }
+    const storeId = storeKey({ projectId: "route-project", branch: "main" }, iri, "children");
+    await waitFor(() => expect(useSuggestionStore.getState().suggestions[storeId][0].status).toBe(key === "Delete" ? "rejected" : "accepted"));
+    if (key === "Delete") {
+      expect(savedBodies).toEqual([]); expect(screen.queryByRole("button", { name: "Accept suggestion" })).toBeNull();
+    } else {
+      expect(savedBodies).toHaveLength(1);
+      expect(parseBlockTriples((savedBodies[0] as { content: string }).content, "https://example.test/Generated")).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: key === "e" ? "Keyboard child" : "Generated child", lang: "en" } });
+    }
+  });
+
+  it.each([
+    ["button", "Enter"], ["button", "Delete"], ["button", "e"],
+    ["input", "Enter"], ["input", "Delete"], ["input", "e"],
+  ] as const)("leaves %s keyboard input %s unconsumed outside a suggestion card", async (target, key) => {
+    await requestGeneratedChild();
+    const focused = target === "button" ? screen.getByRole("button", { name: "Properties" }) : screen.getByPlaceholderText("Label text");
+    focused.focus();
+    const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+    fireEvent(focused, event);
+    expect(event.defaultPrevented).toBe(false);
+    expect(savedBodies).toEqual([]);
+    const storeId = storeKey({ projectId: "route-project", branch: "main" }, iri, "children");
+    expect(useSuggestionStore.getState().suggestions[storeId][0].status).toBe("pending");
+    expect(screen.queryByDisplayValue("Generated child")).toBeNull();
+  });
+
+  it.each([[false, ""], [false, "  Clarify terms  "], [true, "  Clarify terms  "]] as const)("submits the real suggestion session (retry: %s, summary: %s)", async (retry, summary) => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    const label = await openSuggestionForm("class"); await editAndSave(label, "Suggested label");
+    await screen.findByText('Suggested update to "Suggested label"');
+    fireEvent.click(screen.getByRole("button", { name: /Submit Suggestions/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+    expect(within(dialog).getByText("Suggested label")).toBeDefined();
+    expect(within(dialog).getByText("Modified items (1 change)")).toBeDefined();
+    fireEvent.change(within(dialog).getByLabelText("Describe your changes (optional)"), { target: { value: summary } });
+    if (retry) suggestionSubmitStatus = 403;
+    fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
+    if (retry) {
+      await screen.findByText(/Submission refused/);
+      expect(screen.queryByText("Suggestions submitted as PR #23")).toBeNull();
+      suggestionSubmitStatus = 200;
+      fireEvent.click(screen.getByRole("button", { name: /Submit Suggestions/ }));
+      const retryDialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+      fireEvent.change(within(retryDialog).getByLabelText("Describe your changes (optional)"), { target: { value: summary } });
+      fireEvent.click(within(retryDialog).getByRole("button", { name: "Submit for Review" }));
+    }
+    await screen.findByText("Suggestions submitted as PR #23");
+    expect(suggestionSubmissions).toEqual(Array.from({ length: retry ? 2 : 1 }, () => summary.trim() ? { summary: summary.trim() } : {}));
+    expect(requests.find(r => r.path.endsWith("/suggestion-session/submit"))).toMatchObject({ method: "POST", authorization: "Bearer route-fixture-token" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Submit Suggestions/ })).toBeNull();
+    expect(savedBodies).toEqual([]);
+  });
+
+  it("cancels suggestion submission without losing its saved changes", async () => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    const label = await openSuggestionForm("class"); await editAndSave(label, "Suggested label");
+    await screen.findByText('Suggested update to "Suggested label"');
+    fireEvent.click(screen.getByRole("button", { name: /Submit Suggestions/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(suggestionSubmissions).toEqual([]);
+    expect(screen.getByRole("button", { name: /Submit Suggestions/ })).toBeDefined();
+    expect(suggestionBodies).toHaveLength(1); expect(savedBodies).toEqual([]);
+  });
+
+  it.each(["button", "Escape"])("loads revision history and closes it with %s", async close => {
+    mount(); await screen.findByText("Person");
+    fireEvent.click(screen.getByRole("button", { name: "History" }));
+    await screen.findByText("No revision history yet");
+    expect(requests.find(r => r.path.endsWith("/revisions"))).toMatchObject({ method: "GET", authorization: "Bearer route-fixture-token" });
+    if (close === "Escape") fireEvent.keyDown(document, { key: "Escape" });
+    else fireEvent.click(within(screen.getByRole("heading", { name: "Revision History" }).parentElement!.parentElement!).getByRole("button"));
+    expect(screen.queryByRole("heading", { name: "Revision History" })).toBeNull();
+    expect(savedBodies).toEqual([]);
+  });
+
+  it("recovers revision-history loading after closing and reopening its panel", async () => {
+    revisionStatus = 403; mount(); await screen.findByText("Person");
+    fireEvent.click(screen.getByRole("button", { name: "History" })); await screen.findByText(/History unavailable/);
+    fireEvent.click(screen.getByRole("button", { name: "History" })); revisionStatus = 200;
+    fireEvent.click(screen.getByRole("button", { name: "History" })); await screen.findByText("No revision history yet");
+    expect(requests.filter(r => r.path.endsWith("/revisions"))).toHaveLength(2);
+    expect(screen.queryByText(/History unavailable/)).toBeNull();
+  });
+
+  it("opens the real health panel and returns to the editor after closing it", async () => {
+    lintStatus = { total_issues: 0, error_count: 0, warning_count: 0, info_count: 0, last_run: null };
+    mount(); await screen.findByText("Person");
+    fireEvent.click(screen.getByRole("button", { name: "Health" }));
+    await screen.findByText("No lint run yet"); await screen.findByText("All rules (0)");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.queryByRole("heading", { name: "Health Check" })).toBeNull();
+    expect(screen.getByText("Person")).toBeDefined(); expect(savedBodies).toEqual([]);
+  });
+
+  it("discards an active suggestion session when switching the editor branch", async () => {
+    extraBranches = [{ name: "feature", is_current: false }];
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    const label = await openSuggestionForm("class"); await editAndSave(label, "Suggested label");
+    await screen.findByText('Suggested update to "Suggested label"');
+    fireEvent.click(screen.getByRole("button", { name: "main" }));
+    fireEvent.click(await screen.findByRole("option", { name: "feature" }));
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/suggestion-session/discard"))).toBe(true));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Submit Suggestions/ })).toBeNull());
+    expect(requests.find(r => r.path.endsWith("/branch-preference"))).toMatchObject({ method: "PUT", search: "?branch=feature", authorization: "Bearer route-fixture-token" });
+    expect(boundary.replace).toHaveBeenLastCalledWith("/projects/route-project/editor?branch=feature");
+    expect(sessionStorage.getItem("ontokit:branch:route-project")).toBe("feature");
+    expect(savedBodies).toEqual([]);
   });
 
 });
