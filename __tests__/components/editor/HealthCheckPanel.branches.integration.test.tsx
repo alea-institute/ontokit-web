@@ -127,7 +127,7 @@ describe("health panel filters and asynchronous branch boundaries", () => {
     act(() => ws.emit({ type: event, project_id: props.projectId, branch: "review" }));
     await waitFor(() => expect(request.mock.calls.filter(([url]) => new URL(url).pathname.endsWith(path))).toHaveLength(2));
     view.rerender(<HealthCheckPanel {...props} branch="new-branch" />);
-    await act(async () => { pending.resolve(fails ? json({ detail: "Obsolete response error" }, 500) : json(result)); });
+    await act(async () => { pending.resolve(fails ? json({ detail: "Obsolete response error" }, 403) : json(result)); });
     expect(screen.queryByText("Obsolete response error")).toBeNull();
     expect(screen.queryByText("Obsolete branch finding")).toBeNull();
     expect(screen.getByText(empty)).toBeTruthy();

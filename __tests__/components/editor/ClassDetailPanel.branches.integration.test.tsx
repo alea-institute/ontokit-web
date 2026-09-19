@@ -61,6 +61,29 @@ async function savePanel() {
   await screen.findByText("Saved");
 }
 describe("class panel remaining real acceptance and request boundaries", () => {
+  it.each(["success", "failure"] as const)("keeps the newly selected class visible after a late previous-class %s", async outcome => {
+    const nextIri = "https://example.test/Next";
+    let complete!: (response: Response) => void;
+    const original = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation((input, init) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith(encodeURIComponent(iri))) return new Promise(resolve => { complete = resolve; });
+      if (path.endsWith(encodeURIComponent(nextIri))) return Promise.resolve(jsonResponse({ ...detail(), iri: nextIri, labels: [{ value: "Next class", lang: "en" }] }));
+      return original(input, init);
+    });
+    const { client, wrapper } = llmHookHarness(); clients.push(client);
+    const panel = (classIri: string) => <TooltipProvider><ToastProvider><ClassDetailPanel {...scope} classIri={classIri} canEdit={false} canUseLLM={false} /></ToastProvider></TooltipProvider>;
+    const view = render(panel(iri), { wrapper });
+    await waitFor(() => expect(complete).toBeTypeOf("function"));
+    view.rerender(panel(nextIri));
+    await screen.findByRole("heading", { name: "Next class" });
+    await act(async () => complete(outcome === "success" ? jsonResponse(detail()) : jsonResponse({ detail: "Late error" }, 403)));
+    expect(screen.getByRole("heading", { name: "Next class" })).toBeDefined();
+    expect(screen.queryByRole("heading", { name: "Person" })).toBeNull();
+    expect(screen.queryByText("Late error")).toBeNull();
+    expect(useDraftStore.getState().getDraft(key)).toBeUndefined();
+  });
+
   it.each(["children", "siblings"] as const)("persists an edited %s suggestion through authoritative source and the API", async type => {
     const parent = "https://example.test/Ancestor";
     currentDetail.parent_iris = [parent]; currentDetail.parent_labels = { [parent]: "Ancestor" };
@@ -107,7 +130,7 @@ describe("class panel remaining real acceptance and request boundaries", () => {
     const { unmount, save } = mount();
     await waitFor(() => expect(complete).toBeTypeOf("function"));
     unmount();
-    await act(async () => complete(outcome === "success" ? jsonResponse(currentDetail) : jsonResponse({ detail: "Late error" }, 500)));
+    await act(async () => complete(outcome === "success" ? jsonResponse(currentDetail) : jsonResponse({ detail: "Late error" }, 403)));
     expect(screen.queryByText("Late error")).toBeNull();
     expect(useDraftStore.getState().getDraft(key)).toBeUndefined();
     expect(save).not.toHaveBeenCalled();
