@@ -10,7 +10,9 @@ class Socket {
   onerror: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
   closed = false;
-  close = vi.fn(() => { if (!this.closed) { this.closed = true; this.onclose?.(); } });
+  close = vi.fn();
+  // Browser close events arrive separately from the request to close.
+  deliverClose() { if (!this.closed) { this.closed = true; this.onclose?.(); } }
   constructor(public url: string) { Socket.instances.push(this); }
 }
 const latest = () => Socket.instances.at(-1)!;
@@ -29,7 +31,7 @@ describe('collaboration socket lifecycle', () => {
     expect(screen.getByText('Connecting')).toBeDefined();
     act(() => latest().onopen?.());
     expect(screen.getByText('Connected')).toBeDefined();
-    act(() => latest().close());
+    act(() => latest().deliverClose());
     fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }));
     act(() => latest().onopen?.());
     expect(screen.getByText('Connected')).toBeDefined();
@@ -48,14 +50,14 @@ describe('collaboration socket lifecycle', () => {
     const { result } = renderHook(() => useCollaborationStatus({ projectId: 'project' }));
     act(() => vi.advanceTimersByTime(100));
     for (const [index, delay] of [1000, 2000, 4000, 8000, 16000].entries()) {
-      act(() => latest().close());
+      act(() => latest().deliverClose());
       expect(result.current.status).toBe('disconnected');
       act(() => vi.advanceTimersByTime(delay - 1));
       expect(Socket.instances).toHaveLength(index + 1);
       act(() => vi.advanceTimersByTime(1));
       expect(Socket.instances).toHaveLength(index + 2);
     }
-    act(() => latest().close());
+    act(() => latest().deliverClose());
     act(() => vi.advanceTimersByTime(60000));
     expect(Socket.instances).toHaveLength(6);
   });
@@ -63,10 +65,10 @@ describe('collaboration socket lifecycle', () => {
   it('resets retry delay after a successful connection', () => {
     renderHook(() => useCollaborationStatus({ projectId: 'project' }));
     act(() => vi.advanceTimersByTime(100));
-    act(() => latest().close());
+    act(() => latest().deliverClose());
     act(() => vi.advanceTimersByTime(1000));
     act(() => latest().onopen?.());
-    act(() => latest().close());
+    act(() => latest().deliverClose());
     act(() => vi.advanceTimersByTime(1000));
     expect(Socket.instances).toHaveLength(3);
   });
@@ -74,7 +76,7 @@ describe('collaboration socket lifecycle', () => {
   it('cancels pending reconnect on disable and uses fresh credentials when re-enabled', () => {
     const { result, rerender } = renderHook(({ enabled, token }) => useCollaborationStatus({ projectId: 'project', enabled, token }), { initialProps: { enabled: true, token: 'first' } });
     act(() => vi.advanceTimersByTime(100));
-    act(() => latest().close());
+    act(() => latest().deliverClose());
     rerender({ enabled: false, token: 'first' });
     act(() => vi.advanceTimersByTime(5000));
     expect(Socket.instances).toHaveLength(1);
@@ -82,6 +84,42 @@ describe('collaboration socket lifecycle', () => {
     rerender({ enabled: true, token: 'second' });
     act(() => vi.advanceTimersByTime(100));
     expect(latest().url).toContain('token=second');
+  });
+
+  it('closes an active socket on disable and permits fresh credentials after delayed closure', () => {
+    const { result, rerender } = renderHook(({ enabled, token }) => useCollaborationStatus({ projectId: 'project', enabled, token }), { initialProps: { enabled: true, token: 'first' } });
+    act(() => vi.advanceTimersByTime(100));
+    const previous = latest();
+    act(() => previous.onopen?.());
+    expect(result.current.isConnected).toBe(true);
+
+    rerender({ enabled: false, token: 'first' });
+    expect(previous.close).toHaveBeenCalledOnce();
+    expect(previous.closed).toBe(false);
+    expect(result.current.status).toBe('disconnected');
+    act(() => previous.deliverClose());
+    act(() => vi.advanceTimersByTime(60000));
+    expect(Socket.instances).toHaveLength(1);
+
+    rerender({ enabled: true, token: 'second' });
+    act(() => vi.advanceTimersByTime(100));
+    expect(Socket.instances).toHaveLength(2);
+    expect(latest().url).toContain('token=second');
+    act(() => latest().onopen?.());
+    expect(result.current.isConnected).toBe(true);
+  });
+
+  it('does not reconnect when an active socket closes after consumer unmount', () => {
+    const { unmount } = renderHook(() => useCollaborationStatus({ projectId: 'project' }));
+    act(() => vi.advanceTimersByTime(100));
+    const previous = latest();
+    act(() => previous.onopen?.());
+    unmount();
+    expect(previous.close).toHaveBeenCalledOnce();
+    expect(previous.closed).toBe(false);
+    act(() => previous.deliverClose());
+    act(() => vi.advanceTimersByTime(60000));
+    expect(Socket.instances).toHaveLength(1);
   });
 
   it('ignores malformed messages and transport error callbacks without corrupting connected state', () => {
@@ -109,7 +147,7 @@ describe('collaboration socket lifecycle', () => {
   it('cancels pending reconnect when the consumer unmounts', () => {
     const { unmount } = renderHook(() => useCollaborationStatus({ projectId: 'project' }));
     act(() => vi.advanceTimersByTime(100));
-    act(() => latest().close());
+    act(() => latest().deliverClose());
     unmount();
     act(() => vi.advanceTimersByTime(60000));
     expect(Socket.instances).toHaveLength(1);
