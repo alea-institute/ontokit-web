@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EntityTreeToolbar } from '@/components/editor/shared/EntityTreeToolbar';
 import { EntityTree } from '@/components/editor/shared/EntityTree';
 import { useOntologyTree } from '@/lib/hooks/useOntologyTree';
 
@@ -8,12 +9,12 @@ let childFailure: boolean;
 let empty: boolean;
 let calls: string[];
 const originalScrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
-function Harness({ keyboard = true }: { keyboard?: boolean }) {
+function Harness({ keyboard = true, toolbar = false }: { keyboard?: boolean; toolbar?: boolean }) {
   const tree = useOntologyTree({ projectId: 'tree-project', accessToken: 'tree-token', branchKey: 'main' });
-  return <><output aria-label="Selected entity">{tree.selectedIri ?? 'None'}</output><EntityTree nodes={tree.nodes} selectedIri={tree.selectedIri} onSelect={tree.selectNode} onExpand={tree.expandNode} onCollapse={tree.collapseNode} enableKeyboardNav={keyboard} /></>;
+  return <>{toolbar && <EntityTreeToolbar showSearch={false} searchQuery="" onToggleSearch={() => {}} onSearchChange={() => {}} onCloseSearch={() => {}} onExpandOneLevel={tree.expandOneLevel} onExpandAllFully={tree.expandAllFully} onCollapseAll={tree.collapseAll} onCollapseOneLevel={tree.collapseOneLevel} hasExpandableNodes={tree.hasExpandableNodes} hasExpandedNodes={tree.hasExpandedNodes} isExpandingAll={tree.isExpandingAll} />}<output aria-label="Selected entity">{tree.selectedIri ?? 'None'}</output><EntityTree nodes={tree.nodes} selectedIri={tree.selectedIri} onSelect={tree.selectNode} onExpand={tree.expandNode} onCollapse={tree.collapseNode} enableKeyboardNav={keyboard} /></>;
 }
 beforeEach(() => {
-  childFailure = false; empty = false; calls = [];
+  childFailure = false; empty = false; calls = []; localStorage.removeItem('ontokit:expand-tip-dismissed');
   vi.stubGlobal('CSS', { escape: (value: string) => value });
   Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: vi.fn() });
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -28,12 +29,31 @@ beforeEach(() => {
     throw new Error(`Unexpected request: ${url}`);
   }));
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); if (originalScrollIntoView) Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoView);
+afterEach(() => { cleanup(); localStorage.removeItem('ontokit:expand-tip-dismissed'); vi.unstubAllGlobals(); if (originalScrollIntoView) Object.defineProperty(Element.prototype, 'scrollIntoView', originalScrollIntoView);
   else Reflect.deleteProperty(Element.prototype, 'scrollIntoView'); });
 const key = (value: string) => fireEvent.keyDown(screen.getByRole('tree'), { key: value });
 const selected = () => screen.getByLabelText('Selected entity').textContent;
 
 describe('entity tree keyboard interactions through lazy ontology state and HTTP', () => {
+  it('expands through the toolbar and remembers the dismissed teaching tip across remounts', async () => {
+    const view = render(<Harness toolbar />);
+    await screen.findByText('Root');
+    expect(screen.getByText('Tip: click Expand to expand one level at a time')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand one level' }));
+    await screen.findByText('Child');
+    expect(calls.filter(path => path.endsWith('/children'))).toHaveLength(1);
+    expect(localStorage.getItem('ontokit:expand-tip-dismissed')).toBe('1');
+    expect(screen.queryByText('Tip: click Expand to expand one level at a time')).toBeNull();
+    expect((screen.getByRole('button', { name: 'Expand one level' }) as HTMLButtonElement).disabled).toBe(true);
+    view.unmount();
+    render(<Harness toolbar />);
+    await screen.findByText('Root');
+    expect(screen.queryByText('Tip: click Expand to expand one level at a time')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Expand one level' }));
+    await screen.findByText('Child');
+    expect(calls.filter(path => path.endsWith('/children'))).toHaveLength(2);
+  });
+
   it('keeps empty trees stable under every navigation and selection key', async () => {
     empty = true; render(<Harness />); await waitFor(() => expect(calls).toHaveLength(1));
     for (const value of ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Enter', ' ']) key(value);

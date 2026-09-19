@@ -79,7 +79,7 @@ describe('new project route through the real form and HTTP client', () => {
   });
 
 
-  it.each([false, true])('imports a selected file through real multipart construction (retry: %s)', async retry => {
+  it.each([{ retry: false, description: '' }, { retry: true, description: '' }, { retry: false, description: 'A multilingual ontology: café' }, { retry: true, description: 'A multilingual ontology: café' }])('imports a selected file through real multipart construction (retry: $retry, description: $description)', async ({ retry, description }) => {
     class Upload extends EventTarget {
       static requests: Upload[] = [];
       upload = new EventTarget(); status = 200; statusText = 'OK'; responseText = ''; timeout = 0;
@@ -92,6 +92,7 @@ describe('new project route through the real form and HTTP client', () => {
     mount(); fireEvent.click(form().getByRole('button', { name: 'Import from File' }));
     const file = new File(['@prefix : <http://example.org/> .'], 'ontology.ttl', { type: 'text/turtle' });
     fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    if (description) fireEvent.change(form().getByLabelText(/Description/), { target: { value: description } });
     fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
     expect(Upload.requests).toHaveLength(1);
     const first = Upload.requests[0];
@@ -100,6 +101,7 @@ describe('new project route through the real form and HTTP client', () => {
     expect(first.body?.get('file')).toBe(file);
     expect(first.body?.get('is_public')).toBe('false');
     expect(first.body?.has('name')).toBe(false);
+    expect(first.body?.get('description')).toBe(description || null);
     expect(screen.getByRole('button', { name: 'Saving...' }).hasAttribute('disabled')).toBe(true);
     if (retry) {
       await act(async () => first.finish(400, { detail: 'Malformed ontology' }));
@@ -107,6 +109,8 @@ describe('new project route through the real form and HTTP client', () => {
       expect(navigation.push).not.toHaveBeenCalled();
       fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
       expect(Upload.requests).toHaveLength(2);
+      expect(Upload.requests[1].body?.get('description')).toBe(description || null);
+      expect(Upload.requests[1].body?.get('file')).toBe(file);
     }
     await act(async () => Upload.requests.at(-1)!.finish(200, { id: 'imported-project' }));
     await waitFor(() => expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/imported-project'));

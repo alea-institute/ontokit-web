@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { BranchProvider, useBranch } from '@/lib/context/BranchContext';
 import { jsonResponse, llmHookHarness } from '../../fixtures/llm-hook-harness';
@@ -17,6 +17,25 @@ function setup(initialBranch?: string) {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); sessionStorage.clear(); });
 
 describe('branch provider storage and API integration', () => {
+  it('restores the requested feature branch when authentication arrives after the public branch response', async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(new URL(String(input)).pathname).toBe('/api/v1/projects/storage-project/branches');
+      expect(init?.method).toBe('GET');
+      return jsonResponse({ items: [{ name: 'main' }, { name: 'review' }], current_branch: 'main', default_branch: 'main', preferred_branch: null, has_github_remote: false, last_sync_at: null, sync_status: 'idle' });
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const { wrapper: QueryWrapper } = llmHookHarness();
+    function Selection() { return <output aria-label="Current branch">{useBranch().currentBranch}</output>; }
+    const tree = (token?: string) => <QueryWrapper><BranchProvider projectId="storage-project" accessToken={token} initialBranch="review"><Selection /></BranchProvider></QueryWrapper>;
+    const view = render(tree());
+    await waitFor(() => expect(screen.getByLabelText('Current branch').textContent).toBe('main'));
+    view.rerender(tree('token'));
+    await waitFor(() => expect(screen.getByLabelText('Current branch').textContent).toBe('review'));
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('Authorization')).toBe(false);
+    expect(new Headers(fetcher.mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer token');
+  });
+
   it('keeps branch selection functional when session storage reads and writes are denied', async () => {
     vi.spyOn(sessionStorage, 'getItem').mockImplementation(() => { throw new DOMException('Blocked', 'SecurityError'); });
     vi.spyOn(sessionStorage, 'setItem').mockImplementation(() => { throw new DOMException('Blocked', 'SecurityError'); });
