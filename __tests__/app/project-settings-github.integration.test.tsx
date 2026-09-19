@@ -10,7 +10,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePar
 const session: Session = { user: { id: 'owner', name: 'Owner' }, accessToken: 'fixture-token', expires: '2099-01-01T00:00:00Z' };
 const repo = { owner: 'example', name: 'ontology', full_name: 'example/ontology', default_branch: 'develop', private: true, description: 'Test vocabulary', html_url: 'https://github.com/example/ontology' };
 const integration = { id: 'github', repo_owner: repo.owner, repo_name: repo.name, repo_url: repo.html_url, default_branch: repo.default_branch, ontology_file_path: 'source.ttl', turtle_file_path: 'output.ttl', sync_enabled: true, sync_status: 'idle', webhooks_enabled: false, github_hook_id: null, connected_by_user_id: 'owner', last_sync_at: '2026-09-01T12:00:00Z' };
-function mount(options: { token?: boolean; connected?: boolean; syncStatus?: string } = {}) {
+function mount(options: { token?: boolean; connected?: boolean; syncStatus?: string; legacy?: boolean } = {}) {
   let failure: 'repos' | 'scan' | 'connect' | 'remove' | null = null;
   let repos = [repo];
   class Socket extends EventTarget { static OPEN = 1; static CONNECTING = 0; readyState = 1; close = vi.fn(); }
@@ -30,7 +30,7 @@ function mount(options: { token?: boolean; connected?: boolean; syncStatus?: str
     if (path.endsWith('/notifications')) return jsonResponse({ items: [], unread_count: 0 });
     if (path.endsWith('/trust/members')) return jsonResponse([]);
     if (path.endsWith('/members')) return jsonResponse({ items: [], total: 0 });
-    if (path.endsWith('/pr-settings')) return jsonResponse({ pr_approval_required: 0, github_integration: options.connected ? { ...integration, sync_status: options.syncStatus ?? 'idle', sync_error: 'Remote requires attention' } : null });
+    if (path.endsWith('/pr-settings')) return jsonResponse({ pr_approval_required: 0, github_integration: options.connected ? { ...integration, sync_enabled: !options.legacy, connected_by_user_id: options.legacy ? undefined : integration.connected_by_user_id, sync_status: options.syncStatus ?? 'idle', sync_error: 'Remote requires attention' } : null });
     if (path.endsWith('/github-token')) return jsonResponse({ has_token: options.token ?? true });
     if (init?.method && init.method !== 'GET') throw new Error(`Unexpected mutation: ${init.method} ${path}`);
     return new Response('Ancillary setting unavailable', { status: 403 });
@@ -111,6 +111,25 @@ describe('repository connections through settings, the actual output picker and 
     const h = mount(); h.fail('scan'); const ui = await setup(h);
     fireEvent.click(await ui.findByRole('button', { name: /example\/ontology/ })); await ui.findByText('Scan refused');
     expect(ui.getByRole('button', { name: 'Connect Repository' }).hasAttribute('disabled')).toBe(true); expect(connections(h)).toHaveLength(0);
+  });
+
+  it('replaces a disabled legacy connection through the real remove and reconnect flow', async () => {
+    const h = mount({ connected: true, legacy: true });
+    const ui = await section();
+    expect(await ui.findByText('Legacy — reconnect to enable sync')).toBeDefined();
+    expect(ui.getByText('Sync disabled')).toBeDefined();
+    fireEvent.click(ui.getByRole('button', { name: '' }));
+    await screen.findByText('GitHub integration removed');
+    await setup(h);
+    fireEvent.click(await ui.findByRole('button', { name: /example\/ontology/ }));
+    await ui.findByText('source.ttl');
+    fireEvent.click(ui.getByRole('button', { name: 'Connect Repository' }));
+    await screen.findByText('GitHub repository connected successfully');
+    expect(ui.getByText('Sync enabled')).toBeDefined();
+    expect(ui.queryByText('Legacy — reconnect to enable sync')).toBeNull();
+    expect(h.fetcher.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1);
+    expect(connections(h)).toHaveLength(1);
+    expect(JSON.parse(String(connections(h)[0][1]?.body))).toMatchObject({ repo_owner: 'example', repo_name: 'ontology', ontology_file_path: 'source.ttl' });
   });
 
   it('honors removal cancellation and retains the connection on error before retrying', async () => {

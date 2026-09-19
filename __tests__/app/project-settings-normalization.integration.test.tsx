@@ -72,7 +72,7 @@ describe('settings normalization through the real page, query hooks and HTTP cli
     { removed: ['unused'], added: [], converted: false, notes: ['Removed unused prefix'] },
     { removed: [], added: [], converted: false, notes: [] },
   ])('renders the persisted import report with prefixes $removed → $added', async ({ removed, added, converted, notes }) => {
-    const savedReport = { ...report, original_format: converted ? 'rdfxml' : 'turtle', format_converted: converted, prefixes_removed: removed, prefixes_added: added, notes };
+    const savedReport = { ...report, original_format: converted ? 'rdfxml' : 'turtle', format_converted: converted, prefixes_before: ['ex', ...removed], prefixes_after: ['ex', ...added], prefixes_removed: removed, prefixes_added: added, notes };
     route = url => url.pathname === '/api/v1/projects/project' ? jsonResponse({ ...project, normalization_report: savedReport }) : undefined;
     await mount();
     const ui = within(screen.getByRole('heading', { name: 'Import Normalization Report' }).closest('section')!);

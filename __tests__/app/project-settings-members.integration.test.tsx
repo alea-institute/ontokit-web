@@ -14,12 +14,12 @@ const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => navigation, useParams: () => ({ id: 'project' }), usePathname: () => '/projects/project/settings', useSearchParams: () => new URLSearchParams() }));
 const session: Session = { user: { id: 'owner', name: 'Owner' }, accessToken: 'fixture-token', expires: '2099-01-01T00:00:00Z' };
 const admin = { id: 'membership', user_id: 'admin', role: 'admin', user: { name: 'Target Admin', email: 'admin@example.invalid' } };
-function mount(options: { member?: boolean; conflict?: boolean; public?: boolean; self?: boolean; suggester?: boolean } = {}) {
+function mount(options: { member?: boolean; conflict?: boolean; public?: boolean; self?: boolean; suggester?: boolean; requestProfile?: 'email' | 'missing' } = {}) {
   let failure: 'add' | 'remove' | 'transfer' | 'forced' | 'approve' | 'decline' | 'trust' | null = null;
   let members = options.suggester ? [{ ...admin, role: 'suggester' }] : options.self ? [{ ...admin, user_id: 'owner' }] : options.member ? [admin] : [];
   let project = { id: 'project', name: 'Ontology', user_role: options.self ? 'admin' : 'owner', owner_id: options.self ? 'original-owner' : 'owner', member_count: members.length, label_preferences: [], source_file_path: null, is_public: options.public ?? false };
   let trust: MemberTrust = { user_id: 'admin', role: 'suggester', tier: 'untrusted', is_trusted: false, trust_override: 'none', accepted_count: 3 };
-  let requests = [{ id: 'request', user_id: 'applicant', user: { name: 'Applicant', email: 'applicant@example.invalid' }, message: 'Please let me contribute', created_at: '2026-09-01T12:00:00Z' }];
+  let requests = [{ id: 'request', user_id: 'applicant', user: options.requestProfile === 'missing' ? undefined : options.requestProfile === 'email' ? { email: 'applicant@example.invalid' } : { name: 'Applicant', email: 'applicant@example.invalid' }, message: 'Please let me contribute', created_at: '2026-09-01T12:00:00Z' }];
   class Socket extends EventTarget { static OPEN = 1; static CONNECTING = 0; readyState = 1; close = vi.fn(); }
   vi.stubGlobal('WebSocket', Socket);
   const confirm = vi.fn().mockReturnValue(true); vi.stubGlobal('confirm', confirm);
@@ -183,6 +183,18 @@ describe('settings membership and join decisions through real UI and HTTP', () =
     fireEvent.click(ui.getByRole('button', { name: 'Transfer Ownership' })); await screen.findByText('Transfer refused');
     expect(h.client.getQueryData(projectQueryKeys.detail('project', true))).toMatchObject({ owner_id: 'owner' });
     expect(screen.getByRole('heading', { name: 'Pull Request Settings' })).toBeDefined();
+  });
+
+  it.each(['email', 'missing'] as const)('identifies a join request with a %s profile and declines the correct request', async requestProfile => {
+    const h = mount({ public: true, requestProfile });
+    const ui = await section('Join Requests');
+    expect(await ui.findByText(requestProfile === 'email' ? 'applicant@example.invalid' : 'applicant')).toBeDefined();
+    expect(ui.getByText(/Please let me contribute/)).toBeDefined();
+    fireEvent.click(ui.getByRole('button', { name: 'Decline' }));
+    await ui.findByText('No pending join requests.');
+    expect(writes(h, '/join-requests/request/decline')).toHaveLength(1);
+    expect(writes(h, '/join-requests/request/approve')).toHaveLength(0);
+    expect((await section()).queryByText('Applicant')).toBeNull();
   });
 
   it.each(['approve', 'decline'] as const)('retries a rejected %s decision and refreshes the pending list', async decision => {

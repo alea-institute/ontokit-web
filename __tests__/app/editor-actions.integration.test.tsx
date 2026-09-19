@@ -904,6 +904,21 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(savedBodies).toEqual([]);
   });
 
+  it.each([['error', 'bg-red-100'], ['info', 'bg-blue-100']] as const)("summarizes %s findings and opens their real health details", async (severity, color) => {
+    lintStatus = { total_issues: 1, error_count: severity === "error" ? 1 : 0, warning_count: 0, info_count: severity === "info" ? 1 : 0, last_run: null };
+    lintIssues = [{ id: "severity-fixture", rule_id: "label-required", issue_type: severity, message: "Review severity finding", subject_iri: iri, subject_type: "class", details: {} }];
+    mount(); await screen.findByText("Person");
+    const health = await screen.findByRole("button", { name: /^Health/ });
+    expect((await within(health).findByText("1")).classList.contains(color)).toBe(true);
+    await act(async () => { fireEvent.mouseEnter(screen.getByRole("button", { name: "Source" })); });
+    fireEvent.click(health);
+    expect(await screen.findByText("Review severity finding")).toBeDefined();
+    fireEvent.click(screen.getByTitle(iri));
+    await screen.findByDisplayValue("Person");
+    expect(useSelectionStore.getState()).toMatchObject({ iri, type: "class", mode: "editor" });
+    expect(savedBodies).toEqual([]);
+  });
+
   it("navigates an unclassified health finding into the real source editor", async () => {
     lintStatus = { total_issues: 1, error_count: 0, warning_count: 1, info_count: 0, last_run: null };
     lintIssues = [{ id: "health-other", rule_id: "label-required", issue_type: "warning", message: "Inspect source subject", subject_iri: iri, subject_type: "other", details: {} }];
