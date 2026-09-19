@@ -36,7 +36,7 @@ beforeEach(() => {
   });
   vi.stubGlobal("fetch", request);
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 async function socket(kind: string) {
   await waitFor(() => expect(Socket.instances.some(s => s.url.includes(`/${kind}/ws`))).toBe(true));
   return Socket.instances.find(s => s.url.includes(`/${kind}/ws`))!;
@@ -97,6 +97,35 @@ describe("health panel real API and socket integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Duplicates" }));
     act(() => ws.send({ type: "duplicates_failed", project_id: props.projectId, branch: "review" }));
     expect(screen.getByText("Duplicate detection failed")).toBeTruthy();
+  });
+
+  it.each(["error", "close"] as const)("polls authenticated consistency results after the quality socket %s", async (event) => {
+    let polls = 0;
+    route = url => {
+      if (!url.pathname.endsWith("/quality/jobs/job-1")) return undefined;
+      polls++;
+      return polls === 1 ? response({ status: "pending" }, 202) : response({ issues: [{ rule_id: "cycle", message: "Cycle from polling", severity: "warning", entity_iri: "https://example.org/Thing", entity_type: "class" }] });
+    };
+    render(<HealthCheckPanel {...props} />);
+    const ws = await socket("quality");
+    act(() => ws.onopen?.());
+    fireEvent.click(screen.getByRole("button", { name: "Consistency" }));
+    await screen.findByText("No consistency issues");
+    act(() => event === "error" ? ws.onerror?.(new Event("error")) : ws.onclose?.({ code: 1006 } as CloseEvent));
+    vi.useFakeTimers();
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Run Check" })); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(polls).toBe(1);
+    expect(screen.queryByText("Cycle from polling")).toBeNull();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(screen.getByText("Cycle from polling")).toBeDefined();
+    expect((screen.getByRole("button", { name: "Run Check" }) as HTMLButtonElement).disabled).toBe(false);
+    const jobCalls = request.mock.calls.filter(([url]) => String(url).includes("/quality/jobs/job-1"));
+    expect(jobCalls).toHaveLength(2);
+    for (const [, init] of jobCalls) expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer health-token");
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(polls).toBe(2);
+    expect(screen.queryByText(/Consistency check timed out/)).toBeNull();
   });
 
   it("observes schema drift without losing navigation to unknown entity types", async () => {

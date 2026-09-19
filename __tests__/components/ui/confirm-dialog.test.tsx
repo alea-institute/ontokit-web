@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, act } from "@testing-library/react";
+import { render, screen, act, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import userEvent from "@testing-library/user-event";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
@@ -113,11 +114,35 @@ describe("ConfirmDialog", () => {
     await act(async () => {
       await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
     });
-    // Wait for "Processing..." to appear
-    await screen.findByText("Processing...");
+    const processing = await screen.findByRole("button", { name: "Processing..." });
+    expect((processing as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.click(processing);
+    await userEvent.keyboard("{Escape}");
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(defaultProps.onOpenChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog")).toBeDefined();
     // Resolve the promise
     await act(async () => {
       resolveConfirm!();
     });
+    expect(defaultProps.onOpenChange).toHaveBeenCalledExactlyOnceWith(false);
   });
+  it("keeps a failed confirmation open, then closes after a successful retry", async () => {
+    const confirm = vi.fn().mockRejectedValueOnce(new Error("Please retry")).mockResolvedValueOnce(undefined);
+    function Harness() {
+      const [open, setOpen] = useState(true);
+      return <ConfirmDialog {...defaultProps} open={open} onOpenChange={setOpen} onConfirm={confirm} />;
+    }
+    render(<Harness />);
+    await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await screen.findByText("Please retry");
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect((screen.getByRole("button", { name: "Confirm" }) as HTMLButtonElement).disabled).toBe(false);
+    await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText("Please retry")).toBeNull();
+  });
+
 });
