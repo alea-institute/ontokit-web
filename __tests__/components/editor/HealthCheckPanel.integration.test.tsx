@@ -110,6 +110,8 @@ describe("health panel real API and socket integration", () => {
     const ws = await socket("quality");
     act(() => ws.onopen?.());
     fireEvent.click(screen.getByRole("button", { name: "Consistency" }));
+    // Finish the animation-frame cache load before advancing the polling clock.
+    await waitFor(() => expect(request.mock.calls.some(([url]) => new URL(String(url)).pathname.endsWith("/quality/issues"))).toBe(true));
     await screen.findByText("No consistency issues");
     act(() => event === "error" ? ws.onerror?.(new Event("error")) : ws.onclose?.({ code: 1006 } as CloseEvent));
     vi.useFakeTimers();

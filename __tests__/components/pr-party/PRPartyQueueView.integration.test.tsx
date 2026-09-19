@@ -170,6 +170,16 @@ describe("PRPartyQueueView with capabilities, queue, settings and mutations", ()
     expect(requests).toBe(3);
   });
 
+  it.each(["https://github.com.evil.test/example/ontology/pull/3", "javascript:alert(1)"])("keeps manual merging unavailable for an untrusted server URL %s", async pr_url => {
+    rows = [makeCard({ author_kind: "own", read_only: true, pr_url })];
+    mount();
+    expect(await screen.findByText("The GitHub merge link is unavailable.")).toBeDefined();
+    expect(screen.queryByRole("link", { name: /Merge it on GitHub/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Merge pull request" })).toBeNull();
+    expect([...document.querySelectorAll("a")].some(link => link.getAttribute("href") === pr_url)).toBe(false);
+    expect(fetchMock.mock.calls.every(([, init]) => init?.method === "GET")).toBe(true);
+  });
+
   it("uses loaded manual merge preferences for an approved own pull request", async () => {
     rows = [makeCard({ author_kind: "own", read_only: true })];
     mount();

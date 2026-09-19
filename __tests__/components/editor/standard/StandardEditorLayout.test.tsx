@@ -856,13 +856,14 @@ describe("StandardEditorLayout", () => {
       mode: string,
     ) => Promise<void>;
 
-    // Should not throw
-    await capturedOnReparent(
+    await expect(capturedOnReparent(
       "http://example.org/ClassA",
       ["http://example.org/OldParent"],
       ["http://example.org/NewParent"],
       "move",
-    );
+    )).resolves.toBeUndefined();
+    expect(_toastErrorFn).not.toHaveBeenCalled();
+    expect(screen.getByTestId("class-tree")).toBeDefined();
   });
 
   it("calls reparentOptimistic with null when parentIris arrays are empty", async () => {

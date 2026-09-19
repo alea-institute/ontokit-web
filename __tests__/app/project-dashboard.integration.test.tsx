@@ -166,7 +166,7 @@ describe('dashboard through project queries, permissions and join-request HTTP c
     await screen.findByRole('heading', { name: 'Connected ontology' });
     expect(screen.getByText('A shared vocabulary')).toBeDefined();
     expect(screen.getByText(`${memberCount} members`)).toBeDefined();
-    expect(screen.getByText(/^Updated /).textContent).not.toContain('Invalid');
+    expect(screen.getByText(/^Updated /).textContent).toContain('2026');
     if (memberCount === 0) expect(main().queryByRole('link', { name: /Team Members/ })).toBeNull();
     else expect(main().getByRole('link', { name: /Team Members/ }).getAttribute('href')).toBe('/projects/dashboard-project/settings#members');
     expect(main().queryByRole('link', { name: 'Settings' })).toBeNull();
