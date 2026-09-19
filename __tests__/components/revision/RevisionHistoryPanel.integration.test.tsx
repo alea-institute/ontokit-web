@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RevisionHistoryPanel, HistoryButton } from "@/components/revision/RevisionHistoryPanel";
 import { BranchProvider } from "@/lib/context/BranchContext";
@@ -40,6 +40,32 @@ beforeEach(() => { vi.clearAllMocks(); sessionStorage.clear(); vi.stubGlobal("fe
 afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear()); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe("Revision history through real graph, detail and API", () => {
+  it("copies the selected commit hash and resets its success indicator for another copy", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    try {
+      configure(); mount();
+      fireEvent.click(await screen.findByText("Create ontology"));
+      const button = screen.getByTitle("Copy full hash");
+      vi.useFakeTimers();
+      await act(async () => { fireEvent.click(button); });
+      expect(writeText).toHaveBeenCalledExactlyOnceWith(root.hash);
+      expect(button.querySelector(".lucide-check")).not.toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
+      expect(button.querySelector(".lucide-check")).not.toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+      expect(button.querySelector(".lucide-check")).toBeNull();
+      expect(button.querySelector(".lucide-copy")).not.toBeNull();
+      await act(async () => { fireEvent.click(button); });
+      expect(writeText.mock.calls).toEqual([[root.hash], [root.hash]]);
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, "clipboard", descriptor);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
+
   it("selects a graph node, loads its diff and returns to the selected list row", async () => {
     configure();
     const select = vi.fn();
