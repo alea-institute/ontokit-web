@@ -45,6 +45,7 @@ let classParents: string[];
 let ancestorStatus: number;
 let revisionStatus: number;
 let lintStatus: object | null;
+let lintIssues: object[];
 let extraBranches: object[];
 let projectResponse: object;
 let deleted: boolean;
@@ -136,7 +137,7 @@ function installTreeGeometry(positions: Record<string, number>, rootY?: number) 
 
 beforeEach(() => {
   vi.clearAllMocks();
-  boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; extraBranches = [];
+  boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; lintIssues = []; extraBranches = [];
   sessionStorage.removeItem("ontokit:branch:route-project");
   llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
   useSuggestionStore.getState().clearAllSuggestions();
@@ -194,6 +195,7 @@ beforeEach(() => {
       return json({ iri, labels: [{ value: 'Person', lang: 'en' }], comments: [], parent_iris: classParents, parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     }
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Generated"))) return json({ iri: "https://example.test/Generated", labels: [{ value: "Generated child", lang: "en" }], comments: [], parent_iris: [iri], parent_labels: { [iri]: "Person" }, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
+    if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Child"))) return json({ detail: "Not persisted yet" }, 404);
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/NewEntity"))) return json({ detail: "Not persisted yet" }, 404);
     if (path.endsWith("/history")) return json({ entity_iri: iri, events: [], total: 0 });
     if (path.endsWith("/similar")) return json([]);
@@ -226,7 +228,7 @@ beforeEach(() => {
     if (path.endsWith("/translation/config")) return json({ enabled: false, source_language: "en", language_tags: [] });
     if (path.endsWith("/translation/entity-state")) return json({ items: [] });
     if (path.endsWith("/translation/palette")) return json({ languages: [] });
-    if (path.endsWith("/lint/issues")) return json({ items: [], total: 0 });
+    if (path.endsWith("/lint/issues")) return json({ items: lintIssues, total: lintIssues.length });
     unexpected.push(path);
     return json({ detail: "Unexpected test request" }, 404);
   }));
@@ -864,6 +866,78 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(boundary.replace).toHaveBeenLastCalledWith("/projects/route-project/editor?branch=feature");
     expect(sessionStorage.getItem("ontokit:branch:route-project")).toBe("feature");
     expect(savedBodies).toEqual([]);
+  });
+
+  it.each([false, true])("creates a subclass under its selected tree parent (nested: %s)", async nested => {
+    nestPerson = nested;
+    mount();
+    if (nested) fireEvent.doubleClick(await screen.findByRole("treeitem", { name: /Old parent/ }));
+    const parent = await screen.findByRole("treeitem", { name: /^Person/ });
+    fireEvent.click(within(parent).getByRole("button", { name: "Add subclass" }));
+    const dialog = await screen.findByRole("dialog", { name: "Add Entity" });
+    expect(within(dialog).getByText("Person")).toBeDefined();
+    expect(within(dialog).getByLabelText("Type").hasAttribute("disabled")).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText("Label"), { target: { value: "Child person" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Advanced" }));
+    fireEvent.change(within(dialog).getByLabelText("IRI"), { target: { value: "https://example.test/Child" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+    await screen.findByText("Child person");
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    const source = await screen.findByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement;
+    await waitFor(() => expect(source.value).toContain('"Child person"'));
+    const triples = parseBlockTriples(source.value, "https://example.test/Child");
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: iri } });
+    expect(parseBlockTriples(source.value, iri)).toEqual(parseBlockTriples(originalSource, iri));
+    expect(savedBodies).toEqual([]);
+  });
+
+  it.each(["class", "property", "individual"] as const)("navigates a health finding into the real %s detail panel", async type => {
+    const target = type === "class" ? iri : editableIri;
+    const label = type === "class" ? "Person" : "Health entity";
+    const owlType = type === "property" ? "ObjectProperty" : "NamedIndividual";
+    if (type !== "class") {
+      sourceContent = originalSource + '\nex:Editable a owl:' + owlType + ' ; rdfs:label "Health entity"@en .';
+      entityResults = [{ iri: target, label, entity_type: type, property_kind: "object" }];
+    }
+    lintStatus = { total_issues: 1, error_count: 0, warning_count: 1, info_count: 0, last_run: null };
+    lintIssues = [{ id: "health-fixture", rule_id: "label-required", issue_type: "warning", message: "Review entity label", subject_iri: target, subject_type: type, details: {} }];
+    mount(); await screen.findByText("Person");
+    await act(async () => { fireEvent.mouseEnter(screen.getByRole("button", { name: "Source" })); });
+    fireEvent.click(screen.getByRole("button", { name: /^Health/ }));
+    await screen.findByText("Review entity label");
+    fireEvent.click(screen.getByTitle(target));
+    await screen.findByDisplayValue(label);
+    expect(useSelectionStore.getState()).toMatchObject({ iri: target, type, mode: "editor" });
+    expect(savedBodies).toEqual([]);
+  });
+
+  it.each([false, true])("offers the editor sign-in action only with an identity provider (configured: %s)", async configured => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", String(configured));
+    boundary.session = { data: null, status: "unauthenticated" };
+    projectResponse = { ...projectResponse, user_role: "viewer", is_public: true };
+    mount(); await screen.findByText("Person");
+    if (configured) {
+      fireEvent.click(screen.getByRole("button", { name: "Sign in to edit" }));
+      expect(boundary.signIn).toHaveBeenCalledExactlyOnceWith("zitadel", { callbackUrl: window.location.href });
+    } else {
+      expect(screen.queryByRole("button", { name: "Sign in to edit" })).toBeNull();
+      expect(boundary.signIn).not.toHaveBeenCalled();
+    }
+    expect(savedBodies).toEqual([]);
+  });
+
+  it("offers account sign-in after a successful anonymous proposal without submitting twice", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
+    await saveAnonymousProposal();
+    fireEvent.click(screen.getByRole("button", { name: /Submit Proposal/ }));
+    const credit = await screen.findByRole("dialog", { name: "Want credit for your suggestions?" });
+    fireEvent.click(within(credit).getByRole("button", { name: "Skip" }));
+    const success = await screen.findByRole("dialog", { name: "Thank you — your proposal is in" });
+    fireEvent.click(within(success).getByRole("button", { name: "Create an account or sign in" }));
+    expect(boundary.signIn).toHaveBeenCalledExactlyOnceWith("zitadel", { callbackUrl: window.location.href });
+    expect(anonymousSubmissions).toHaveLength(1);
+    expect(useAnonymousTokenStore.getState().getToken("route-project")).toBeNull();
   });
 
 });
