@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { LintConfigSection } from "@/components/projects/LintConfigSection";
 import type { LintConfigResponse, LintSummary } from "@/lib/api/lint";
 import { jsonResponse, llmHookHarness } from "../../fixtures/llm-hook-harness";
@@ -41,6 +41,33 @@ afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear())
 async function ready() { await screen.findByRole("switch", { name: "Toggle Labels" }); }
 
 describe("lint configuration HTTP integration", () => {
+  it("preserves unsaved custom rules during a background configuration refresh", async () => {
+    const { client } = mount(); await ready();
+    fireEvent.click(screen.getByRole("button", { name: /Custom/ }));
+    fireEvent.click(screen.getByRole("switch", { name: "Toggle Descriptions" }));
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save Lint Configuration" }) as HTMLButtonElement).disabled).toBe(false));
+    config = { ...config, lint_level: 1, effective_rules: [] };
+    await act(async () => { await client.invalidateQueries({ queryKey: ["lintConfig", "p"] }); });
+    expect(client.getQueryData<LintConfigResponse>(["lintConfig", "p"])?.lint_level).toBe(1);
+    expect(screen.getByRole("button", { name: /Custom/ }).getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByRole("switch", { name: "Toggle Labels" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByRole("switch", { name: "Toggle Descriptions" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Save Lint Configuration" }));
+    await screen.findByText("Lint configuration saved");
+    expect(requests.find(r => r.method === "PUT")?.body).toEqual({ lint_level: null, enabled_rules: ["Labels", "Descriptions"] });
+  });
+
+  it("adopts a background configuration refresh when there are no local edits", async () => {
+    const { client } = mount(); await ready();
+    config = { ...config, lint_level: null, enabled_rules: ["Descriptions"], effective_rules: ["Descriptions"] };
+    await act(async () => { await client.invalidateQueries({ queryKey: ["lintConfig", "p"] }); });
+    await waitFor(() => expect(screen.getByRole("button", { name: /Custom/ }).getAttribute("aria-pressed")).toBe("true"));
+    expect(screen.getByRole("switch", { name: "Toggle Labels" }).getAttribute("aria-checked")).toBe("false");
+    expect(screen.getByRole("switch", { name: "Toggle Descriptions" }).getAttribute("aria-checked")).toBe("true");
+    expect((screen.getByRole("button", { name: "Save Lint Configuration" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(requests.every(r => r.method === "GET")).toBe(true);
+  });
+
   it("loads preset rules, edits custom rules and persists the exact mutually exclusive payload", async () => {
     mount(); await ready();
     fireEvent.click(screen.getByRole("button", { name: /Custom/ }));

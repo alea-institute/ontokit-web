@@ -24,8 +24,8 @@ const source = `@prefix : <${ns}> .
 const hints = Object.fromEntries(["Person", "Place", "parent", "inverse", "reference", "ontology"].map(s => [ns + s, s]));
 const key = draftKey("coverage-property", "main", iri);
 const scrollDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
-function mount(onUpdateProperty = vi.fn<(iri: string, data: TurtlePropertyUpdateData) => Promise<void>>().mockResolvedValue(undefined)) {
-  return { ...render(<TooltipProvider><ToastProvider><PropertyDetailPanel projectId="coverage-property" propertyIri={iri} sourceContent={source} canEdit onUpdateProperty={onUpdateProperty} labelHints={hints} /></ToastProvider></TooltipProvider>), onUpdateProperty };
+function mount(onUpdateProperty = vi.fn<(iri: string, data: TurtlePropertyUpdateData) => Promise<void>>().mockResolvedValue(undefined), sourceContent = source) {
+  return { ...render(<TooltipProvider><ToastProvider><PropertyDetailPanel projectId="coverage-property" propertyIri={iri} sourceContent={sourceContent} canEdit onUpdateProperty={onUpdateProperty} labelHints={hints} /></ToastProvider></TooltipProvider>), onUpdateProperty };
 }
 function editLabel(value: string) {
   const input = screen.getByPlaceholderText("Label text");
@@ -44,6 +44,28 @@ afterEach(() => {
 });
 
 describe("property panel real editing chain", () => {
+  it.each([
+    ["labels", "rdfs:label", "Relation"],
+    ["comments", "rdfs:comment", "Original comment"],
+    ["definitions", "skos:definition", "Original definition"],
+  ] as const)("edits one of several %s while preserving the other language and property constraints", async (field, predicate, original) => {
+    const inputSource = source.replace(`${predicate} "${original}"@en`, `${predicate} "${original}"@en, "Valeur française"@fr`);
+    let output = inputSource;
+    mount(vi.fn(async (target, data) => { output = updatePropertyInTurtle(output, target, data); }), inputSource);
+    const input = screen.getByDisplayValue("Valeur française");
+    fireEvent.change(input, { target: { value: "Valeur modifiée" } });
+    fireEvent.blur(input);
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved");
+    const detail = extractPropertyDetail(output, iri)!;
+    expect(detail[field]).toEqual(expect.arrayContaining([{ value: original, lang: "en" }, { value: "Valeur modifiée", lang: "fr" }]));
+    expect(detail[field]).toHaveLength(2);
+    expect(detail.domainIris).toEqual([ns + "Person"]);
+    expect(detail.rangeIris).toEqual([ns + "Place"]);
+    expect(detail.parentIris).toEqual([ns + "parent"]);
+  });
+
   it.each(["Person", "Place", "parent", "inverse"])("navigates the parsed %s reference from edit mode without creating a draft", (target) => {
     const navigate = vi.fn();
     render(<TooltipProvider><ToastProvider><PropertyDetailPanel projectId="coverage-property" propertyIri={iri} sourceContent={source} canEdit onUpdateProperty={vi.fn()} labelHints={hints} onNavigateToEntity={navigate} /></ToastProvider></TooltipProvider>);
