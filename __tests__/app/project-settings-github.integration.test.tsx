@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SessionProvider } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -45,11 +45,11 @@ async function setup(harness: ReturnType<typeof mount>) {
   const ui = await section();
   // The section mounts before the independent credential query has settled.
   await waitFor(() => expect(harness.client.getQueryState(['githubTokenStatus', 'owner'])?.status).toBe('success'));
-  fireEvent.click(ui.getByRole('button', { name: 'Connect to GitHub' }));
+  await act(async () => { fireEvent.click(ui.getByRole('button', { name: 'Connect to GitHub' })); });
   return ui;
 }
 const connections = (h: ReturnType<typeof mount>) => h.fetcher.mock.calls.filter(([url, init]) => String(url).endsWith('/github-integration') && init?.method === 'POST');
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('repository connections through settings, the actual output picker and HTTP clients', () => {
   it('routes users without a token to review settings without listing repositories', async () => {
@@ -83,10 +83,16 @@ describe('repository connections through settings, the actual output picker and 
 
   it('recovers an initial repository load error through debounced search and clears stale selection', async () => {
     const h = mount(); h.fail('repos'); const ui = await setup(h); await ui.findByText('No repositories available');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     h.fail(null); fireEvent.change(ui.getByPlaceholderText('Search by name...'), { target: { value: 'ontology' } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    vi.useRealTimers();
     fireEvent.click(await ui.findByRole('button', { name: /example\/ontology/ })); await ui.findByText('source.ttl');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     h.repos([]); fireEvent.change(ui.getByPlaceholderText('Search by name...'), { target: { value: 'absent' } });
     expect(ui.getByRole('button', { name: 'Connect Repository' }).hasAttribute('disabled')).toBe(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    vi.useRealTimers();
     await ui.findByText('No repositories found');
     const calls = h.fetcher.mock.calls.filter(([url]) => String(url).includes('/github-repos'));
     expect(new URL(String(calls.at(-1)![0])).searchParams.get('q')).toBe('absent');

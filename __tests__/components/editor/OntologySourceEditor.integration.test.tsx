@@ -132,6 +132,30 @@ describe("source editor integration through real TurtleEditor and lint API", () 
     expect(worker.terminate).toHaveBeenCalled();
   });
 
+  it("falls back after a worker crash and restores indexed diagnostics after editing", async () => {
+    const logged = vi.spyOn(console, "error");
+    render(<OntologySourceEditor {...props} />);
+    const { editor, monaco } = mountEditor();
+    await screen.findByText(issue.message);
+    await waitFor(() => expect(IndexWorker.instances.at(-1)?.postMessage).toHaveBeenCalledWith(expect.objectContaining({ issues: [expect.objectContaining({ id: issue.id })] })));
+    const crashed = IndexWorker.instances.at(-1)!;
+    const error = new ErrorEvent("error", { message: "Worker stopped unexpectedly" });
+    act(() => crashed.onerror?.(error));
+    expect(logged).toHaveBeenCalledWith("Index worker error:", error);
+    expect(crashed.terminate).toHaveBeenCalled();
+    await waitFor(() => expect(monaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), "turtle-linter", [expect.objectContaining({ startLineNumber: 1, severity: 4, message: "[missing-label] A label is needed" })]));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(content);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: `# edited\n${content}` } });
+    const recovered = IndexWorker.instances.at(-1)!;
+    expect(recovered).not.toBe(crashed);
+    const message = recovered.postMessage.mock.calls.at(-1)![0] as IndexWorkerMessage;
+    act(() => recovered.onmessage?.({ data: processMessage(message) } as MessageEvent<IndexWorkerResult>));
+    await waitFor(() => expect(monaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), "turtle-linter", [expect.objectContaining({ startLineNumber: 3, severity: 4 })]));
+    fireEvent.click(screen.getByText(issue.message));
+    expect(editor.setPosition).toHaveBeenLastCalledWith({ lineNumber: 3, column: 1 });
+    expect(recovered.terminate).toHaveBeenCalled();
+  });
+
   it("fulfills an imperative scroll queued before the local worker index arrives", async () => {
     const ref = createRef<OntologySourceEditorRef>();
     render(<OntologySourceEditor {...props} ref={ref} />);
