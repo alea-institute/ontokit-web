@@ -55,6 +55,8 @@ let lintStatus: object | null;
 let lintIssues: object[];
 let extraBranches: object[];
 let projectResponse: object;
+let trustStatus: number;
+let trustCapabilities: { tier: string; can_mint_entities: boolean; accepted_count: number; promotion_threshold: number };
 let deleted: boolean;
 let deleteFailure: boolean;
 let projectStatus: number;
@@ -161,6 +163,8 @@ beforeEach(() => {
   vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "false");
   authenticate();
   projectResponse = { id: "route-project", name: "Route ontology", source_file_path: "ontology.ttl", user_role: "owner", is_public: false };
+  trustStatus = 200;
+  trustCapabilities = { tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 };
   projectStatus = 200; deleted = false; deleteFailure = false;
   saveStatus = 200; sourceStatus = 200; sourceContent = originalSource; sourceRevision = "base-commit"; entityResults = [];
   savedBodies = []; suggestionBodies = []; suggestionFailure = null; suggestionSubmitStatus = 200; suggestionSubmissions = []; resumableSessions = []; sessionListStatus = 200;
@@ -196,7 +200,7 @@ beforeEach(() => {
       suggestionBodies.push(JSON.parse(String(init?.body)));
       return suggestionFailure === "save" ? json({ detail: "Suggestion refused" }, 403) : json({ commit_hash: "suggestion-commit", branch: "suggestion/draft", changes_count: suggestionBodies.length });
     }
-    if (path.endsWith("/suggestions/capabilities")) return json({ tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 });
+    if (path.endsWith("/suggestions/capabilities")) return trustStatus === 200 ? json(trustCapabilities) : json({ detail: "Contributor status unavailable" }, trustStatus);
     if (path.endsWith("/ontology/search")) return json({ results: entityResults, total: entityResults.length });
     if (path.endsWith("/ancestors")) return ancestorStatus === 200 ? json({ nodes: [] }) : json({ detail: "Ancestors unavailable" }, ancestorStatus);
     if (path.endsWith("/ontology/tree/" + encodeURIComponent("https://example.test/OldParent") + "/children")) return json({ nodes: [{ iri, label: "Person", child_count: 0 }], total_classes: 1 });
@@ -661,6 +665,29 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(savedBodies).toHaveLength(1);
   });
 
+  it.each(["standard", "developer"] as const)("reparents through a suggestion session and undoes it in the %s editor", async mode => {
+    useEditorModeStore.getState().setEditorMode(mode);
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    const destination = "https://example.test/Destination";
+    extraTreeNodes = [{ iri: destination, label: "Destination", child_count: 0 }];
+    installTreeGeometry({ [iri]: 100, [destination]: 125 });
+    mount();
+    const row = await screen.findByRole("treeitem", { name: /Person/ });
+    row.focus();
+    fireEvent.keyDown(row, { key: " ", code: "Space" });
+    await screen.findByText("Drop here to make root class");
+    await act(async () => { fireEvent.keyDown(document, { key: "ArrowDown", code: "ArrowDown" }); });
+    fireEvent.keyDown(document, { key: " ", code: "Space" });
+    await waitFor(() => expect(suggestionBodies).toHaveLength(1));
+    expect(parseBlockTriples(suggestionBodies[0].content, iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: destination } });
+    await screen.findByText('Moved "Person"');
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(suggestionBodies).toHaveLength(2));
+    expect(parseBlockTriples(suggestionBodies[1].content, iri)?.filter(triple => triple.predicate === "http://www.w3.org/2000/01/rdf-schema#subClassOf")).toEqual([]);
+    expect(savedBodies).toEqual([]);
+    expect(screen.getByRole("button", { name: /Submit Suggestions/ })).toBeDefined();
+  });
+
   it.each([200, 403, 409])("reparents or rolls back through the real keyboard drag sensor (HTTP %i)", async status => {
     saveStatus = status;
     const destination = "https://example.test/Destination";
@@ -991,6 +1018,43 @@ describe('editor route real tree actions and keyboard orchestration', () => {
       expect(boundary.signIn).not.toHaveBeenCalled();
     }
     expect(savedBodies).toEqual([]);
+  });
+
+  it("keeps entry creation locked after a capability error and unlocks after an authenticated retry", async () => {
+    trustStatus = 403;
+    mount(); await screen.findByText("Person");
+    fireEvent.click(await screen.findByRole("button", { name: "Why can't I add entries?" }));
+    const explainer = await screen.findByRole("dialog", { name: "How trust is earned" });
+    expect(within(explainer).getByText(/couldn't check your contributor status/)).toBeDefined();
+    fireEvent.keyDown(document, { key: "n", ctrlKey: true });
+    const addDialog = await screen.findByRole("dialog", { name: "Add Entity" });
+    expect((within(addDialog).getByRole("button", { name: "Create" }) as HTMLButtonElement).disabled).toBe(true);
+    trustStatus = 200;
+    fireEvent.click(within(addDialog).getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(within(addDialog).queryByText(/couldn't check your contributor status/)).toBeNull());
+    fireEvent.change(within(addDialog).getByLabelText("Label"), { target: { value: "Recovered class" } });
+    expect((within(addDialog).getByRole("button", { name: "Create" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(requests.filter(request => request.path.endsWith("/suggestions/capabilities"))).toEqual([
+      expect.objectContaining({ method: "GET", authorization: "Bearer route-fixture-token" }),
+      expect.objectContaining({ method: "GET", authorization: "Bearer route-fixture-token" }),
+    ]);
+    expect(savedBodies).toEqual([]);
+  });
+
+  it.each(["standard", "developer"] as const)("explains anonymous minting restrictions and signs in from the %s proposal editor", async mode => {
+    useEditorModeStore.getState().setEditorMode(mode);
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
+    trustCapabilities = { tier: "anonymous", can_mint_entities: false, accepted_count: 0, promotion_threshold: 3 };
+    await saveAnonymousProposal();
+    fireEvent.click(await screen.findByRole("button", { name: "Why can't I add entries?" }));
+    fireEvent.click(within(await screen.findByRole("dialog", { name: "How trust is earned" })).getByRole("button", { name: "Sign in" }));
+    expect(boundary.signIn).toHaveBeenCalledExactlyOnceWith("zitadel", { callbackUrl: window.location.href });
+    expect(anonymousSubmissions).toEqual([]);
+    expect(savedBodies).toEqual([]);
+    expect(requests.filter(request => request.path.endsWith("/suggestions/capabilities"))).toEqual([
+      expect.objectContaining({ method: "GET", authorization: null }),
+    ]);
+    expect(useAnonymousTokenStore.getState().getToken("route-project")).toBeTruthy();
   });
 
   it("offers account sign-in after a successful anonymous proposal without submitting twice", async () => {
