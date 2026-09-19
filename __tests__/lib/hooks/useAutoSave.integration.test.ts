@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { draftKey, useDraftStore, type DraftEntry } from "@/lib/stores/draftStore";
@@ -31,9 +31,37 @@ beforeEach(() => {
   useDraftStore.setState({ drafts: {} });
   useEditorModeStore.setState({ theme: "light", hasSeenAutoSaveToast: false });
 });
-afterEach(() => { cleanup(); useDraftStore.setState({ drafts: {} }); localStorage.clear(); });
+afterEach(() => { cleanup(); useDraftStore.setState({ drafts: {} }); localStorage.clear(); vi.useRealTimers(); });
 
 describe("class auto-save with real persistent drafts and Turtle writes", () => {
+  it("clears the saved indicator after two seconds without changing the persisted ontology", async () => {
+    vi.useFakeTimers();
+    const writer = sourceWriter();
+    const { result } = renderHook(() => useAutoSave({ ...options, onUpdateClass: writer.save }));
+    act(() => { result.current.editStateRef.current = draft("Timer dog"); result.current.triggerSave(); });
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(true); });
+    expect(result.current.saveStatus).toBe("saved");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
+    expect(result.current.saveStatus).toBe("saved");
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(result.current.saveStatus).toBe("idle");
+    expect(useDraftStore.getState().hasDraft(key)).toBe(false);
+    expect(parseBlockTriples(writer.source, iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Timer dog", lang: "en" } });
+  });
+
+  it("cancels saved feedback on unmount while preserving the completed Turtle write", async () => {
+    vi.useFakeTimers();
+    const writer = sourceWriter();
+    const view = renderHook(() => useAutoSave({ ...options, onUpdateClass: writer.save }));
+    act(() => { view.result.current.editStateRef.current = draft("Unmounted dog"); view.result.current.triggerSave(); });
+    await act(async () => { expect(await view.result.current.flushToGit("manual")).toBe(true); });
+    expect(vi.getTimerCount()).toBe(1);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(writer.source).toContain('rdfs:label "Unmounted dog"@en');
+    expect(useDraftStore.getState().hasDraft(key)).toBe(false);
+  });
+
   it("rejects a second flush while the first write is pending and permits the next edit afterward", async () => {
     const writer = sourceWriter();
     let release!: () => void;
