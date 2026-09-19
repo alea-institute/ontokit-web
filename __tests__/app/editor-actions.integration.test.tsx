@@ -1041,7 +1041,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
   });
 
   it.each([
-    ["class", false], ["objectProperty", false], ["individual", false], ["class", true],
+    ["class", false], ["objectProperty", false], ["individual", false],
   ] as const)("inserts a %s into a mounted source editor through its real imperative chain (empty: %s)", async (entityType, empty) => {
     if (empty) sourceContent = "";
     mount(); await screen.findByText("Person");
@@ -1085,10 +1085,11 @@ describe('editor route real tree actions and keyboard orchestration', () => {
 
   it.each([
     { pattern: "named", subjects: ["Existing"], hint: "Derived from label", expected: "NewConcept" },
+    { pattern: "base declaration", base: true, subjects: ["Existing"], hint: "Derived from label", expected: "NewConcept" },
     { pattern: "numeric", subjects: ["9", "42"], hint: "Sequential numeric IRI (next: 43)", expected: "43" },
-  ])("derives a $pattern IRI from loaded ontology source and preserves its namespace", async ({ subjects, hint, expected }) => {
+  ])("derives a $pattern IRI from loaded ontology source and preserves its namespace", async ({ subjects, hint, expected, base = false }) => {
     const namespace = "https://vocabulary.test/custom#";
-    sourceContent = '@prefix owl: <http://www.w3.org/2002/07/owl#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix custom: <' + namespace + '> .\n' + subjects.map(name => '<' + namespace + name + '> a owl:Class .').join("\n");
+    sourceContent = '@prefix owl: <http://www.w3.org/2002/07/owl#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n' + (base ? '@base <' : '@prefix custom: <') + namespace + '> .\n' + subjects.map(name => '<' + namespace + name + '> a owl:Class .').join("\n");
     const original = sourceContent;
     mount(); await screen.findByText("Person");
     await act(async () => { fireEvent.mouseEnter(screen.getByRole("button", { name: "Source" })); });

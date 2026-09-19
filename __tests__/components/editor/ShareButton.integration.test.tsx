@@ -21,6 +21,31 @@ function mount(iri: string | null = "https://example.test/ontology#Person & Plac
 }
 
 describe("share links through the real toast provider and clipboard boundary", () => {
+  it("keeps the menu open for inside clicks and non-dismissal keys, then closes on Escape", () => {
+    mount();
+    fireEvent.click(screen.getByRole("button", { name: "More share options" }));
+    fireEvent.mouseDown(screen.getByRole("menu"));
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+    expect(screen.getByRole("menu")).toBeDefined();
+    expect(writeText).not.toHaveBeenCalled();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "More share options" }));
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
+    expect(writeText).not.toHaveBeenCalled();
+  });
+
+  it.each([false, true])("copies a selected namespace IRI without a local-name label (dropdown: %s)", async dropdown => {
+    const iri = "https://example.test/ontology#";
+    mount(iri);
+    if (dropdown) fireEvent.click(screen.getByRole("button", { name: "More share options" }));
+    await act(async () => fireEvent.click(screen.getByRole(dropdown ? "menuitem" : "button", { name: /^Copy link to/ })));
+    expect(writeText).toHaveBeenCalledExactlyOnceWith(`${window.location.origin}/projects/sharing?classIri=${encodeURIComponent(iri)}`);
+    expect(screen.getByRole("alert")).toBeDefined();
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
   it("copies the dropdown entity link with encoded IRI and dismisses its success toast", async () => {
     const iri = "https://example.test/ontology#Person & Place";
     mount(iri);
