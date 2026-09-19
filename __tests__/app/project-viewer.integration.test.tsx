@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ToastContainer } from "@/components/ui/toast-container";
 import { ToastProvider } from "@/lib/context/ToastContext";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
@@ -37,6 +38,9 @@ let sourceStatus: number;
 let sourceContent: string;
 let sourceGate: Promise<void> | undefined;
 let treeStatus: number;
+let ancestorStatus: number;
+let emptyTree: boolean;
+let searchResults: object[];
 
 let unexpected: string[];
 const requests: { path: string; method: string; search: string; authorization: string | null }[] = [];
@@ -44,7 +48,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 function mount() {
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  return render(<QueryClientProvider client={client}><ToastProvider><ViewerPage /></ToastProvider></QueryClientProvider>);
+  return render(<ViewerPage />, { wrapper: ({ children }) => <QueryClientProvider client={client}><ToastProvider>{children}<ToastContainer /></ToastProvider></QueryClientProvider> });
 }
 function authenticate() {
   boundary.session = { data: { accessToken: "route-fixture-token", user: { email: "reader@example.test" } }, status: "authenticated" };
@@ -61,7 +65,7 @@ beforeEach(() => {
   sourceStatus = 200;
   sourceContent = originalSource;
   sourceGate = undefined;
-  treeStatus = 200;
+  treeStatus = 200; ancestorStatus = 200; emptyTree = false; searchResults = [];
   boundary.search = new URLSearchParams();
   useEditorModeStore.getState().setEditorMode("developer");
   unexpected = [];
@@ -75,13 +79,14 @@ beforeEach(() => {
     const path = new URL(String(input)).pathname;
     requests.push({ path, method: init?.method ?? "GET", search: new URL(String(input)).search, authorization: new Headers(init?.headers).get("Authorization") });
     if (path === "/api/v1/projects") return json({ items: [], total: 0 });
+    if (path.endsWith("/ontology/search")) return json({ results: searchResults, total: searchResults.length });
     if (path.endsWith("/references")) return json({ target_iri: "https://example.test/Person", total: 0, groups: [] });
     if (path.endsWith("/history")) return json({ entity_iri: "https://example.test/Person", total: 0, events: [] });
     if (path.endsWith("/similar")) return json([]);
-    if (path.endsWith("/ancestors")) return json({ nodes: [] });
+    if (path.endsWith("/ancestors")) return ancestorStatus === 200 ? json({ nodes: [] }) : json({ detail: "Ancestors unavailable" }, ancestorStatus);
     if (path === "/api/v1/projects/route-project") return json(projectResponse, projectStatus);
     if (path.endsWith("/suggestions/capabilities")) return json({ tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 });
-    if (path.endsWith("/ontology/tree")) return treeStatus === 200 ? json({ nodes: [{ iri: "https://example.test/Person", label: "Person", has_children: false, children_count: 0 }], total_classes: 1 }) : json({ detail: "Tree unavailable" }, treeStatus);
+    if (path.endsWith("/ontology/tree")) return treeStatus === 200 ? json({ nodes: emptyTree ? [] : [{ iri: "https://example.test/Person", label: "Person", has_children: false, children_count: 0 }], total_classes: emptyTree ? 0 : 1 }) : json({ detail: "Tree unavailable" }, treeStatus);
     if (path.includes("/ontology/classes/")) return json({ iri: "https://example.test/Person", labels: [{ value: "Person", lang: "en" }], comments: [{ value: "A human being", lang: "en" }], parent_iris: [], parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     if (path.endsWith("/pull-requests")) return json({ items: [], total: 0 });
     if (path.endsWith("/lint/status")) return json(null);
@@ -198,4 +203,78 @@ describe("Project viewer route through real providers and API", () => {
     await screen.findByText(/Tree unavailable/);
     expect(screen.getByTitle("Project dashboard")).toBeTruthy();
   });
+  it.each([200, 403])("restores a changed URL after branch loading with ancestor status %i", async status => {
+    ancestorStatus = status;
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    const view = mount();
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && r.search === "?branch=main")).toBe(true));
+    await screen.findByText("Person");
+    boundary.search = new URLSearchParams({ classIri: "https://example.test/Person" });
+    view.rerender(<ViewerPage />);
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ancestors")), JSON.stringify(requests)).toBe(true));
+    await screen.findByText("A human being");
+    expect(requests.filter(r => r.path.endsWith("/ancestors"))).toHaveLength(1);
+    expect(requests.find(r => r.path.endsWith("/ancestors"))?.search).toBe("?branch=main");
+    expect(useSelectionStore.getState().iri).toBe("https://example.test/Person");
+    // A parent rerender must not consume the unchanged URL again.
+    view.rerender(<ViewerPage />);
+    await screen.findByText("A human being");
+    expect(requests.filter(r => r.path.endsWith("/ancestors"))).toHaveLength(1);
+  });
+
+  it("waits for a nonempty tree before attempting URL selection", async () => {
+    emptyTree = true;
+    boundary.search = new URLSearchParams({ classIri: "https://example.test/Missing" });
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    mount();
+    await screen.findByText("No classes found in this ontology");
+    expect(requests.some(r => r.path.endsWith("/ancestors"))).toBe(false);
+    expect(requests.some(r => r.path.includes("/ontology/classes/"))).toBe(false);
+  });
+
+  it.each([false, true])("reports clipboard completion from the read-only class detail (failure: %s)", async failure => {
+    const original = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    const writeText = failure ? vi.fn().mockRejectedValue(new Error("Clipboard denied")) : vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    try {
+      projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+      mount(); fireEvent.click(await screen.findByText("Person"));
+      await screen.findByText("A human being");
+      fireEvent.click(screen.getByTitle("Copy IRI"));
+      await screen.findByText(failure ? "Failed to copy IRI" : "IRI copied to clipboard");
+      expect(writeText).toHaveBeenCalledWith("https://example.test/Person");
+      expect(requests.every(r => r.method === "GET")).toBe(true);
+    } finally {
+      if (original) Object.defineProperty(navigator, "clipboard", original);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
+
+  it("offers authentication from a public ontology without leaving the viewer first", async () => {
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    mount(); await screen.findByText("Person");
+    fireEvent.click(await screen.findByRole("button", { name: "Sign in to edit" }));
+    expect(boundary.signIn).toHaveBeenCalledWith("zitadel");
+    expect(requests.every(r => r.method === "GET")).toBe(true);
+  });
+
+  it.each([
+    ["property", "propertyIri", "ObjectProperty"],
+    ["individual", "individualIri", "NamedIndividual"],
+  ])("restores a %s URL into its real tab and source-derived detail", async (entityType, param, owlType) => {
+    const target = "https://example.test/Linked";
+    sourceContent = originalSource + '\n<https://example.test/Linked> a <http://www.w3.org/2002/07/owl#' + owlType + '> ;\n<http://www.w3.org/2000/01/rdf-schema#label> "Linked entity"@en ;\n<http://www.w3.org/2000/01/rdf-schema#comment> "Linked entity description"@en .';
+    searchResults = [{ iri: target, label: "Linked entity", entity_type: entityType, property_kind: "object" }];
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    const view = mount();
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && r.search === "?branch=main")).toBe(true));
+    await act(async () => { fireEvent.mouseEnter(screen.getByRole("button", { name: "Source" })); });
+    boundary.search = new URLSearchParams({ [param]: target });
+    view.rerender(<ViewerPage />);
+    await screen.findByText("Linked entity description");
+    expect(useSelectionStore.getState()).toMatchObject({ iri: target, type: entityType, mode: "viewer" });
+    expect(requests.some(r => r.path.endsWith("/ontology/search") && new URLSearchParams(r.search).get("entity_types") === entityType)).toBe(true);
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+  });
+
 });
