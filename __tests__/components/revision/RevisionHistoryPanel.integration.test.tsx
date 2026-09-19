@@ -92,6 +92,21 @@ describe("Revision history through real graph, detail and API", () => {
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/revisions/diff"))).toHaveLength(1);
   });
 
+  it("keeps an unfamiliar file-change status visible when a revision has no text patch", async () => {
+    configure(undefined, () => json({ project_id: "history-project", from_version: root.hash, to_version: head.hash, files_changed: 1,
+      changes: [{ path: "ontology.ttl", change_type: "T", additions: 0, deletions: 0, patch: null }],
+    }));
+    mount();
+    fireEvent.click(await screen.findByText(/Clarify terminology/));
+    const file = await screen.findByRole("button", { name: /ontology.ttl/ });
+    expect(file.textContent).toContain("T");
+    expect(screen.getByText("1 file changed")).toBeDefined();
+    fireEvent.click(file);
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.getByText("Create ontology")).toBeDefined();
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/revisions/diff"))).toHaveLength(1);
+  });
+
   it("opens the initial commit without a selection callback or a diff request", async () => {
     configure(); mount();
     fireEvent.click(await screen.findByText("Create ontology"));
