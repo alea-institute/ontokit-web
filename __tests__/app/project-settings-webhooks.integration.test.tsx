@@ -91,7 +91,12 @@ describe('webhook settings through the real settings route and GitHub HTTP clien
 
   it.each(['no_scope', 'no_token', 'manual_required', 'error'])('offers manual setup after %s and retries successfully', async status => {
     const h = mount(); h.setup({ status, github_hook_id: null, message: 'Manual action needed' }); const ui = await section();
-    fireEvent.click(ui.getByRole('checkbox')); await ui.findByText('Manual action needed');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    await act(async () => { fireEvent.click(ui.getByRole('checkbox')); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(100); });
+    vi.useRealTimers();
+    expect(setups(h)).toHaveLength(1);
+    await ui.findByText('Manual action needed');
     expect(ui.getByRole('button', { name: 'Show manual setup details' })).toBeDefined();
     h.setup({ status: 'configured', github_hook_id: 55, message: 'Ready' });
     fireEvent.click(ui.getByRole('button', { name: 'Retry auto-setup' }));
@@ -145,10 +150,22 @@ describe('webhook settings through the real settings route and GitHub HTTP clien
       fireEvent.click(ui.getByRole('button', { name: 'Show manual setup details' }));
       const value = await ui.findByText('synthetic-webhook-value');
       const url = ui.getByText(/http.*\/api\/v1\/webhooks\/project/);
-      await act(async () => { fireEvent.click(within(url.parentElement!).getByRole('button')); });
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      const copyUrl = within(url.parentElement!).getByRole('button');
+      await act(async () => { fireEvent.click(copyUrl); });
       expect(writeText).toHaveBeenLastCalledWith(url.textContent);
-      await act(async () => { fireEvent.click(within(value.parentElement!).getAllByRole('button')[1]); });
+      expect(copyUrl.querySelector('.lucide-check')).not.toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(copyUrl.querySelector('.lucide-check')).toBeNull();
+      expect(copyUrl.querySelector('.lucide-copy')).not.toBeNull();
+      const copyValue = within(value.parentElement!).getAllByRole('button')[1];
+      await act(async () => { fireEvent.click(copyValue); });
       expect(writeText).toHaveBeenLastCalledWith('synthetic-webhook-value');
+      expect(copyValue.querySelector('.lucide-check')).not.toBeNull();
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+      expect(copyValue.querySelector('.lucide-check')).toBeNull();
+      expect(copyValue.querySelector('.lucide-copy')).not.toBeNull();
+      expect(writeText).toHaveBeenCalledTimes(2);
       expect(h.fetcher.mock.calls.filter(([input]) => String(input).endsWith('/webhook-secret'))).toHaveLength(1);
     } finally {
       if (original) Object.defineProperty(navigator, 'clipboard', original); else Reflect.deleteProperty(navigator, 'clipboard');

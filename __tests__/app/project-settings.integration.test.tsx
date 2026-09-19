@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SessionProvider } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -45,7 +45,7 @@ function mount(options: { role?: string; exemplar?: boolean; superadmin?: boolea
   const view = render(<SessionProvider session={options.auth === undefined ? session : options.auth} refetchOnWindowFocus={false}><QueryWrapper><ToastProvider><ProjectSettingsPage /></ToastProvider></QueryWrapper></SessionProvider>);
   return { ...view, fetcher, client, fail: (value: boolean) => { mutationFailure = value; } };
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); navigation.push.mockClear(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); navigation.push.mockClear(); });
 const main = () => within(screen.getByRole('main'));
 
 describe('settings route through real project query, form and HTTP client', () => {
@@ -54,13 +54,20 @@ describe('settings route through real project query, form and HTTP client', () =
     const name = await screen.findByLabelText(/Project Name/);
     fireEvent.change(name, { target: { value: '  Renamed ontology  ' } });
     fireEvent.change(screen.getByLabelText('Description'), { target: { value: '  Updated description  ' } });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
-    expect(await screen.findByText('Project settings saved successfully')).toBeDefined();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText('Project settings saved successfully')).toBeDefined();
     const request = fetcher.mock.calls.find(([, init]) => init?.method === 'PATCH')!;
     expect(JSON.parse(String(request[1]?.body))).toEqual({ name: 'Renamed ontology', description: 'Updated description', is_public: false });
     expect(new Headers(request[1]?.headers).get('Authorization')).toBe('Bearer fixture-token');
     expect(client.getQueryData(projectQueryKeys.detail('project', true))).toMatchObject({ name: 'Renamed ontology', description: 'Updated description' });
     expect(navigation.push).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2999); });
+    expect(screen.getByText('Project settings saved successfully')).toBeDefined();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(screen.queryByText('Project settings saved successfully')).toBeNull();
+    expect(client.getQueryData(projectQueryKeys.detail('project', true))).toMatchObject({ name: 'Renamed ontology' });
   });
 
   it.each(['https://example.org/ontology.ttl', 'javascript:alert(1)'])('displays exemplar provenance safely for %s', async source => {

@@ -50,23 +50,29 @@ beforeEach(() => {
   localStorage.clear();
   useEditorModeStore.setState({ editorMode: 'standard', theme: 'system', preferEditMode: false, showManualSaveButton: true, hasSeenAutoSaveToast: false });
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/'); document.documentElement.classList.remove('dark'); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); window.history.replaceState({}, '', '/'); document.documentElement.classList.remove('dark'); });
 
 describe('user settings through real cards, preferences store, and HTTP client', () => {
   it('loads private attribution and opts into and out of a verified public address', async () => {
     const { fetcher } = mount();
     expect(await screen.findByText('Fixture Contributor')).toBeDefined();
     expect(screen.getByTestId('effective-email').textContent).toBe(initialIdentity.noreply_alias);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     fireEvent.click(creditToggle());
-    await waitFor(() => expect(screen.getByTestId('effective-email').textContent).toBe(initialIdentity.commit_email));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByTestId('effective-email').textContent).toBe(initialIdentity.commit_email);
     expect(creditToggle().checked).toBe(true);
     expect(screen.getByText('Credit settings updated')).toBeDefined();
     fireEvent.click(creditToggle());
-    await waitFor(() => expect(creditToggle().checked).toBe(false));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(creditToggle().checked).toBe(false);
     expect(screen.getByTestId('effective-email').textContent).toBe(initialIdentity.noreply_alias);
     const updates = fetcher.mock.calls.filter(([, init]) => init?.method === 'PATCH');
     expect(updates.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([{ use_verified_email: true }, { use_verified_email: false }]);
     for (const [, init] of updates) expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer fixture-token');
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+    expect(screen.queryByText('Credit settings updated')).toBeNull();
+    expect(screen.getByTestId('effective-email').textContent).toBe(initialIdentity.noreply_alias);
   });
 
   it('prevents another opt-in while saving and applies the response after completion', async () => {
@@ -149,9 +155,16 @@ describe('user settings through real cards, preferences store, and HTTP client',
     const scroll = vi.fn();
     const previous = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
     Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scroll });
-    mount(); await screen.findByText('Fixture Contributor');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    mount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText('Fixture Contributor')).toBeDefined();
     expect(scroll).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' });
     expect(document.getElementById('save-button')?.className).toContain('bg-amber-100');
+    await act(async () => { await vi.advanceTimersByTimeAsync(1999); });
+    expect(document.getElementById('save-button')?.className).toContain('bg-amber-100');
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(document.getElementById('save-button')?.className).not.toContain('bg-amber-100');
     expect(useEditorModeStore.getState().showManualSaveButton).toBe(true);
     if (previous) Object.defineProperty(Element.prototype, 'scrollIntoView', previous);
     else Reflect.deleteProperty(Element.prototype, 'scrollIntoView');

@@ -9,8 +9,9 @@ import { jsonResponse, llmHookHarness } from '../fixtures/llm-hook-harness';
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'dashboard-project' }), usePathname: () => '/projects/dashboard-project/dashboard' }));
 const session: Session = { accessToken: 'dashboard-token', user: { name: 'Fixture' }, expires: '2099-01-01T00:00:00Z' };
 const request = { id: 'join-1', project_id: 'dashboard-project', user_id: 'fixture', message: 'I can contribute', status: 'pending', created_at: '2026-01-01T00:00:00Z' };
-function mount(options: { role?: string; public?: boolean; anonymous?: boolean; projectStatus?: number; pending?: boolean; declined?: boolean; count?: number; languages?: string[]; metadataError?: boolean; memberCount?: number; description?: string; updatedAt?: string } = {}) {
+function mount(options: { role?: string; public?: boolean; anonymous?: boolean; projectStatus?: number; pending?: boolean; declined?: boolean; count?: number; languages?: string[]; metadataError?: boolean; memberCount?: number; description?: string; updatedAt?: string; mineError?: boolean } = {}) {
   let pending = options.pending ?? false;
+  let failMine = options.mineError ?? false;
   let failMutation = false;
   let languageReply: (() => Response | Promise<Response>) | undefined;
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -19,7 +20,10 @@ function mount(options: { role?: string; public?: boolean; anonymous?: boolean; 
     if (path.endsWith('/notifications')) return jsonResponse({ items: [], unread_count: 0 });
     if (path === '/api/v1/projects/dashboard-project') return options.projectStatus ? jsonResponse({ detail: 'Unavailable' }, options.projectStatus) : jsonResponse({ id: 'dashboard-project', name: 'Connected ontology', is_public: options.public ?? true, user_role: options.role, member_count: options.memberCount ?? 1, description: options.description, updated_at: options.updatedAt, created_at: '2026-01-01T00:00:00Z' });
     if (path.endsWith('/my-reviewer-languages')) return languageReply ? languageReply() : options.metadataError ? new Response('Language lookup failed', { status: 503 }) : jsonResponse({ languages: options.languages ?? [] });
-    if (path.endsWith('/join-requests/mine')) return jsonResponse({ has_pending_request: pending, request: pending ? request : options.declined ? { ...request, status: 'declined' } : undefined });
+    if (path.endsWith('/join-requests/mine')) {
+      if (failMine) { failMine = false; return jsonResponse({ detail: 'Status unavailable' }, 403); }
+      return jsonResponse({ has_pending_request: pending, request: pending ? request : options.declined ? { ...request, status: 'declined' } : undefined });
+    }
     if (path.endsWith('/join-requests/join-1') && init?.method === 'DELETE') {
       if (failMutation) return new Response('Withdrawal unavailable', { status: 503 });
       pending = false; return new Response(null, { status: 204 });
@@ -47,6 +51,22 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const main = () => within(screen.getByRole('main'));
 
 describe('dashboard through project queries, permissions and join-request HTTP client', () => {
+  it('keeps public navigation usable after a request-status error and refreshes status after submission', async () => {
+    const { fetcher } = mount({ mineError: true });
+    const join = await screen.findByRole('button', { name: 'Request to Join' });
+    await waitFor(() => expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/join-requests/mine'))).toHaveLength(1));
+    await act(async () => {});
+    expect(main().getByRole('link', { name: /^View Ontology/ }).getAttribute('href')).toBe('/projects/dashboard-project');
+    expect(screen.queryByText('Request Pending')).toBeNull();
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+    fireEvent.click(join);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'I can contribute' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Submit Request' }));
+    expect(await screen.findByText('Request Pending')).toBeDefined();
+    expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/join-requests/mine'))).toHaveLength(2);
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+  });
+
   it('creates a request, refreshes its server status and withdraws using authenticated HTTP calls', async () => {
     const { fetcher } = mount();
     fireEvent.click(await screen.findByRole('button', { name: 'Request to Join' }));

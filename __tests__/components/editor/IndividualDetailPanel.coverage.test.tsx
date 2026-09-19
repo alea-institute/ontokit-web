@@ -78,6 +78,32 @@ describe("individual panel real editing chain", () => {
     expect(screen.queryByDisplayValue("Secondary")).toBeNull();
   });
 
+  it("persists a definition language selected in the real picker without changing its text", async () => {
+    const scroll = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+    try {
+      let output = source;
+      mount(vi.fn(async (entity, data) => { output = updateIndividualInTurtle(output, entity, data); }));
+      const definition = screen.getByDisplayValue("Original definition");
+      fireEvent.click(within(definition.parentElement!).getByRole("button", { name: "Language tag" }));
+      fireEvent.click(screen.getByRole("option", { name: /French\s*Français\s*fr$/ }));
+      fireEvent.blur(definition);
+      await waitFor(() => expect(useDraftStore.getState().getDraft(key)).toMatchObject({ definitions: [{ value: "Original definition", lang: "fr" }, { value: "", lang: "en" }] }));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await screen.findByText("Saved");
+      const detail = extractIndividualDetail(output, iri)!;
+      expect(detail.definitions).toEqual([{ value: "Original definition", lang: "fr" }]);
+      expect(detail.labels).toEqual([{ value: "Relation", lang: "en" }]);
+      expect(detail.comments).toEqual([{ value: "Original comment", lang: "en" }]);
+      expect(useDraftStore.getState().getDraft(key)).toBeUndefined();
+    } finally {
+      if (scroll) Object.defineProperty(Element.prototype, "scrollIntoView", scroll);
+      else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("persists definition and custom annotation changes on blur without changing the label", async () => {
     let output = source;
     mount(vi.fn(async (entity, data) => { output = updateIndividualInTurtle(output, entity, data); }));

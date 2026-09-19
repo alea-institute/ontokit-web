@@ -200,11 +200,12 @@ beforeEach(() => {
     if (path.endsWith("/ontology/search")) return json({ results: entityResults, total: entityResults.length });
     if (path.endsWith("/ancestors")) return ancestorStatus === 200 ? json({ nodes: [] }) : json({ detail: "Ancestors unavailable" }, ancestorStatus);
     if (path.endsWith("/ontology/tree/" + encodeURIComponent("https://example.test/OldParent") + "/children")) return json({ nodes: [{ iri, label: "Person", child_count: 0 }], total_classes: 1 });
-    if (path.endsWith("/ontology/tree")) return json({ nodes: deleted ? [] : [nestPerson ? { iri: "https://example.test/OldParent", label: "Old parent", child_count: 1 } : { iri, label: "Person", child_count: 0 }, ...extraTreeNodes], total_classes: deleted ? 0 : 1 });
+    if (path.endsWith("/ontology/tree")) return json({ nodes: deleted ? [] : [nestPerson ? { iri: "https://example.test/OldParent", label: "Old parent", child_count: 1 } : { iri, label: "Person", child_count: 0 }, ...extraTreeNodes], total_classes: deleted ? 0 : 1 + extraTreeNodes.length });
     if (path.endsWith('/ontology/classes/' + encodeURIComponent(iri))) {
       if (init?.method === 'DELETE') { if (deleteFailure) return json({ detail: 'Delete refused' }, 403); deleted = true; return new Response(null, { status: 204 }); }
       return json({ iri, labels: [{ value: 'Person', lang: 'en' }], comments: [], parent_iris: classParents, parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     }
+    if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Sibling"))) return json({ iri: "https://example.test/Sibling", labels: [{ value: "Sibling", lang: "en" }], comments: [], parent_iris: [], parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Generated"))) return json({ iri: "https://example.test/Generated", labels: [{ value: "Generated child", lang: "en" }], comments: [], parent_iris: [iri], parent_labels: { [iri]: "Person" }, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Child"))) return json({ detail: "Not persisted yet" }, 404);
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/NewEntity"))) return json({ detail: "Not persisted yet" }, 404);
@@ -915,6 +916,30 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(await screen.findByText("Review severity finding")).toBeDefined();
     fireEvent.click(screen.getByTitle(iri));
     await screen.findByDisplayValue("Person");
+    expect(useSelectionStore.getState()).toMatchObject({ iri, type: "class", mode: "editor" });
+    expect(savedBodies).toEqual([]);
+  });
+
+  it.each(["standard", "developer"] as const)("navigates class siblings through the real %s layout and detail client", async mode => {
+    useEditorModeStore.getState().setEditorMode(mode);
+    const siblingIri = "https://example.test/Sibling";
+    extraTreeNodes = [{ iri: siblingIri, label: "Sibling", child_count: 0 }];
+    sourceContent = originalSource + '\nex:Sibling a owl:Class ; rdfs:label "Sibling"@en .';
+    mount();
+    fireEvent.click(await screen.findByText("Person"));
+    await screen.findByDisplayValue("Person");
+    expect(screen.getByRole("button", { name: "Previous class in branch" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("button", { name: "Next class in branch" }));
+    await screen.findByDisplayValue("Sibling");
+    expect(screen.getByText("2 / 2")).toBeDefined();
+    expect(screen.getByRole("button", { name: "Next class in branch" })).toHaveProperty("disabled", true);
+    expect(useSelectionStore.getState()).toMatchObject({ iri: siblingIri, type: "class", mode: "editor" });
+    const detailRequests = requests.filter(request => request.path.endsWith('/ontology/classes/' + encodeURIComponent(siblingIri)));
+    expect(detailRequests.length).toBeGreaterThan(0);
+    expect(detailRequests.every(request => request.method === 'GET' && request.authorization === 'Bearer route-fixture-token')).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Previous class in branch" }));
+    await screen.findByDisplayValue("Person");
+    expect(screen.getByText("1 / 2")).toBeDefined();
     expect(useSelectionStore.getState()).toMatchObject({ iri, type: "class", mode: "editor" });
     expect(savedBodies).toEqual([]);
   });
