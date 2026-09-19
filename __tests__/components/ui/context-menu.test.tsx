@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import {
   ContextMenu,
@@ -40,7 +40,6 @@ describe("ContextMenu", () => {
   });
 
   it("renders ContextMenuItem with text", () => {
-    // Test the item component renders in isolation as part of an open menu
     render(
       <ContextMenu>
         <ContextMenuTrigger>Trigger</ContextMenuTrigger>
@@ -51,8 +50,7 @@ describe("ContextMenu", () => {
       </ContextMenu>
     );
     rightClick(screen.getByText("Trigger"));
-    // Radix portals content - items may or may not be visible based on jsdom support
-    // We test the component renders without errors
+    expect(screen.getAllByRole("menuitem").map(item => item.textContent)).toEqual(["Copy", "Paste"]);
   });
 
   it("renders ContextMenuLabel", () => {
@@ -65,8 +63,9 @@ describe("ContextMenu", () => {
         </ContextMenuContent>
       </ContextMenu>
     );
-    // Verify it renders without error
-    expect(screen.getByText("Trigger")).toBeDefined();
+    rightClick(screen.getByText("Trigger"));
+    expect(screen.getByText("Actions")).toBeDefined();
+    expect(screen.getByRole("menuitem", { name: "Do thing" })).toBeDefined();
   });
 
   it("renders ContextMenuSeparator without crashing", () => {
@@ -80,12 +79,13 @@ describe("ContextMenu", () => {
         </ContextMenuContent>
       </ContextMenu>
     );
-    expect(screen.getByText("Trigger")).toBeDefined();
+    rightClick(screen.getByText("Trigger"));
+    expect(screen.getByRole("separator")).toBeDefined();
+    expect(screen.getAllByRole("menuitem")).toHaveLength(2);
   });
 
   it("applies destructive styling class to destructive items", () => {
-    // We can test the component renders with the destructive prop
-    const { container } = render(
+    render(
       <ContextMenu>
         <ContextMenuTrigger>Trigger</ContextMenuTrigger>
         <ContextMenuContent>
@@ -93,7 +93,8 @@ describe("ContextMenu", () => {
         </ContextMenuContent>
       </ContextMenu>
     );
-    expect(container).toBeDefined();
+    rightClick(screen.getByText("Trigger"));
+    expect(screen.getByRole("menuitem", { name: "Delete" }).className).toContain("text-red-600");
   });
 
   it("renders multiple items without errors", () => {
@@ -109,6 +110,19 @@ describe("ContextMenu", () => {
         </ContextMenuContent>
       </ContextMenu>
     );
-    expect(screen.getByText("Trigger")).toBeDefined();
+    rightClick(screen.getByText("Trigger"));
+    expect(screen.getByText("File")).toBeDefined();
+    expect(screen.getAllByRole("menuitem").map(item => item.textContent)).toEqual(["Open", "Save", "Delete"]);
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("selects an enabled action once and closes the portal", () => {
+    const select = vi.fn();
+    render(<ContextMenu><ContextMenuTrigger>Trigger</ContextMenuTrigger><ContextMenuContent><ContextMenuItem onSelect={select}>Copy</ContextMenuItem></ContextMenuContent></ContextMenu>);
+    rightClick(screen.getByText("Trigger"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "Copy" }));
+    expect(select).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 });

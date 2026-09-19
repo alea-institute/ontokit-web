@@ -9,9 +9,9 @@ let childFailure: boolean;
 let empty: boolean;
 let calls: string[];
 const originalScrollIntoView = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
-function Harness({ keyboard = true, toolbar = false }: { keyboard?: boolean; toolbar?: boolean }) {
+function Harness({ keyboard = true, toolbar = false, menu }: { keyboard?: boolean; toolbar?: boolean; menu?: { onAddChild: (iri: string) => void; onCopyIri: (iri: string) => void; addChildLocked: boolean; addChildLockedReason?: string } }) {
   const tree = useOntologyTree({ projectId: 'tree-project', accessToken: 'tree-token', branchKey: 'main' });
-  return <>{toolbar && <EntityTreeToolbar showSearch={false} searchQuery="" onToggleSearch={() => {}} onSearchChange={() => {}} onCloseSearch={() => {}} onExpandOneLevel={tree.expandOneLevel} onExpandAllFully={tree.expandAllFully} onCollapseAll={tree.collapseAll} onCollapseOneLevel={tree.collapseOneLevel} hasExpandableNodes={tree.hasExpandableNodes} hasExpandedNodes={tree.hasExpandedNodes} isExpandingAll={tree.isExpandingAll} />}<output aria-label="Selected entity">{tree.selectedIri ?? 'None'}</output><EntityTree nodes={tree.nodes} selectedIri={tree.selectedIri} onSelect={tree.selectNode} onExpand={tree.expandNode} onCollapse={tree.collapseNode} enableKeyboardNav={keyboard} /></>;
+  return <>{toolbar && <EntityTreeToolbar showSearch={false} searchQuery="" onToggleSearch={() => {}} onSearchChange={() => {}} onCloseSearch={() => {}} onExpandOneLevel={tree.expandOneLevel} onExpandAllFully={tree.expandAllFully} onCollapseAll={tree.collapseAll} onCollapseOneLevel={tree.collapseOneLevel} hasExpandableNodes={tree.hasExpandableNodes} hasExpandedNodes={tree.hasExpandedNodes} isExpandingAll={tree.isExpandingAll} />}<output aria-label="Selected entity">{tree.selectedIri ?? 'None'}</output><EntityTree nodes={tree.nodes} selectedIri={tree.selectedIri} onSelect={tree.selectNode} onExpand={tree.expandNode} onCollapse={tree.collapseNode} enableKeyboardNav={keyboard} {...menu} /></>;
 }
 beforeEach(() => {
   childFailure = false; empty = false; calls = []; localStorage.removeItem('ontokit:expand-tip-dismissed');
@@ -35,6 +35,26 @@ const key = (value: string) => fireEvent.keyDown(screen.getByRole('tree'), { key
 const selected = () => screen.getByLabelText('Selected entity').textContent;
 
 describe('entity tree keyboard interactions through lazy ontology state and HTTP', () => {
+  it('explains a locked subclass action while allowing the loaded entity IRI to be copied', async () => {
+    const add = vi.fn(); const copy = vi.fn();
+    const view = render(<Harness menu={{ onAddChild: add, onCopyIri: copy, addChildLocked: true, addChildLockedReason: 'Creating classes requires a higher trust level.' }} />);
+    fireEvent.contextMenu(await screen.findByText('Root'));
+    expect(screen.getByText('Creating classes requires a higher trust level.')).toBeDefined();
+    const locked = screen.getByRole('menuitem', { name: 'Add Subclass' });
+    expect(locked.getAttribute('aria-disabled')).toBe('true');
+    fireEvent.click(locked);
+    expect(add).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy IRI' }));
+    expect(copy).toHaveBeenCalledExactlyOnceWith(iri('Root'));
+    expect(screen.queryByRole('menu')).toBeNull();
+    view.rerender(<Harness menu={{ onAddChild: add, onCopyIri: copy, addChildLocked: false }} />);
+    fireEvent.contextMenu(screen.getByText('Root'));
+    expect(screen.queryByText('Creating classes requires a higher trust level.')).toBeNull();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Add Subclass' }));
+    expect(add).toHaveBeenCalledExactlyOnceWith(iri('Root'));
+    expect(calls).toHaveLength(1);
+  });
+
   it('finds the correct parent after searching an unrelated expanded subtree', async () => {
     vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
       const path = new URL(String(input)).pathname;
