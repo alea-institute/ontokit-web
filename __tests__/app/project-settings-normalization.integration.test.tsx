@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SessionProvider } from 'next-auth/react';
 import type { Session } from 'next-auth';
+import type { NormalizationStatusResponse } from '@/lib/api/normalization';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ProjectSettingsPage from '@/app/projects/[id]/settings/page';
 import { ToastProvider } from '@/lib/context/ToastContext';
@@ -11,7 +12,7 @@ vi.mock('@monaco-editor/react', () => ({ loader: { config: vi.fn() }, DiffEditor
 const session: Session = { user: { id: 'owner', name: 'Owner' }, accessToken: 'fixture-token', expires: '2099-01-01T00:00:00Z' };
 const project = { id: 'project', name: 'Ontology', is_public: false, user_role: 'owner', owner_id: 'owner', member_count: 0, label_preferences: [], source_file_path: 'ontology.ttl', created_at: '2026-01-01T00:00:00Z' };
 const report = { original_format: 'turtle', original_filename: 'ontology.ttl', original_size_bytes: 2000, normalized_size_bytes: 1000, triple_count: 12, prefixes_before: ['ex'], prefixes_after: ['ex'], prefixes_removed: [], prefixes_added: [], format_converted: false, notes: ['Sorted triples'] };
-let status: { needs_normalization: boolean; last_run: string | null; last_run_id: string | null; last_check: string | null; preview_report: typeof report | null; checking: boolean; error: string | null };
+let status: NormalizationStatusResponse;
 let route: (url: URL, init?: RequestInit) => Response | Promise<Response> | undefined;
 let fetcher: ReturnType<typeof vi.fn>;
 const scroll = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
@@ -81,6 +82,30 @@ describe('settings normalization through the real page, query hooks and HTTP cli
     fireEvent.click(section().getByRole('button', { name: 'Preview Changes' }));
     await screen.findByText('Preview of Changes');
     expect(section().getByRole('button', { name: 'Run Normalization' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it.each([
+    { removed: [], added: [], expected: 'No changes' },
+    { removed: ['unused'], added: [], expected: '-1' },
+    { removed: [], added: ['rdf', 'rdfs'], expected: '+2' },
+    { removed: ['unused'], added: ['rdf', 'rdfs'], expected: '-1 / +2' },
+  ])('renders cached normalization prefix changes as $expected without starting a job', async ({ removed, added, expected }) => {
+    const notes = removed.length && added.length ? Array.from({ length: 7 }, (_, index) => `Normalization note ${index + 1}`) : [];
+    status = { ...status, preview_report: { ...report, prefixes_removed: removed, prefixes_added: added, notes } };
+    await mount();
+    const ui = section();
+    expect(ui.getByRole('heading', { name: 'Preview of Changes' })).toBeDefined();
+    expect(ui.getByText('Prefixes').nextElementSibling?.textContent).toBe(expected);
+    expect(ui.getByText('Triple Count').nextElementSibling?.textContent).toBe('12');
+    if (notes.length) {
+      expect(ui.getByText(/Normalization note 5/)).toBeDefined();
+      expect(ui.queryByText(/Normalization note 6/)).toBeNull();
+      expect(ui.getByText('... and 2 more')).toBeDefined();
+      expect(ui.getAllByRole('listitem')).toHaveLength(6);
+    } else {
+      expect(ui.queryByText('Changes')).toBeNull();
+    }
+    expect(fetcher.mock.calls.every(([, init]) => init?.method === 'GET')).toBe(true);
   });
 
   it('previews statistics without mutating the ontology and refreshes the normalized status', async () => {

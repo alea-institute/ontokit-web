@@ -121,6 +121,28 @@ describe("class auto-save with real persistent drafts and Turtle writes", () => 
     expect(useDraftStore.getState().hasDraft(key)).toBe(false);
   });
 
+  it.each([
+    { name: "details have not loaded", classDetail: null },
+    { name: "relationship lists are null", classDetail: { ...detail, equivalent_iris: null, disjoint_iris: null } },
+  ])("flushes a restored label draft when $name", async ({ classDetail }) => {
+    const writer = sourceWriter();
+    const payloads: ClassUpdatePayload[] = [];
+    useDraftStore.getState().setDraft(key, draft("Restored dog"));
+    const { result } = renderHook(() => useAutoSave({ ...options, classDetail,
+      onUpdateClass: async (target, payload) => { payloads.push(payload); await writer.save(target, payload); },
+    }));
+    expect(result.current.restoredDraft?.labels).toEqual([{ value: "Restored dog", lang: "en" }]);
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(true); });
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0].equivalent_iris).toBeUndefined();
+    expect(payloads[0].disjoint_iris).toBeUndefined();
+    const labels = parseBlockTriples(writer.source, iri)!.filter(triple => triple.predicate === "http://www.w3.org/2000/01/rdf-schema#label");
+    expect(labels.map(triple => triple.object)).toEqual([{ type: "literal", value: "Restored dog", lang: "en" }]);
+    expect(parseBlockTriples(writer.source, "http://example.org/ont#Animal")).toEqual(parseBlockTriples(TURTLE_FIXTURE, "http://example.org/ont#Animal"));
+    expect(useDraftStore.getState().hasDraft(key)).toBe(false);
+    expect(result.current.saveStatus).toBe("saved");
+  });
+
   it("persists edits locally, writes clean source, then removes only the saved draft", async () => {
     const writer = sourceWriter();
     const otherKey = draftKey("project", "review", iri);

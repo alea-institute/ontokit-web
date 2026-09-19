@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import SuggestionReviewPage from "@/app/projects/[id]/suggestions/review/page";
 import type { SuggestionSessionSummary } from "@/lib/api/suggestions";
@@ -20,6 +20,7 @@ let projectStatus: number;
 let pendingStatus: number;
 let bulk: (body: { session_ids: string[]; action: string }) => Response | Promise<Response>;
 let actionStatus: number;
+let actionGate: Promise<void> | undefined;
 let fetchMock: ReturnType<typeof vi.fn>;
 let client: QueryClient;
 
@@ -30,7 +31,7 @@ function mount() {
 async function ready() { await screen.findByRole("heading", { name: "Review Suggestions" }); }
 function posted() { return fetchMock.mock.calls.filter(([, init]) => init?.method === "POST"); }
 beforeEach(() => {
-  auth.token = "review-token";
+  auth.token = "review-token"; actionGate = undefined;
   items = [suggestion("Ada"), suggestion("Bea")]; role = "editor"; projectStatus = 200; pendingStatus = 200; actionStatus = 200;
   bulk = () => { items = []; return json({ succeeded: ["Ada", "Bea"], failed: [] }); };
   fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
@@ -39,6 +40,7 @@ beforeEach(() => {
     if (url.pathname.endsWith("/pending")) return json(pendingStatus === 200 ? { items } : { detail: "Queue unavailable" }, pendingStatus);
     if (url.pathname.endsWith("/bulk-review")) return bulk(JSON.parse(init?.body as string));
     if (/\/sessions\/[^/]+\/(approve|dismiss|reject|request-changes)$/.test(url.pathname)) {
+      if (actionGate) await actionGate;
       if (actionStatus !== 200) return json({ detail: "Review conflict" }, actionStatus);
       items = items.filter(item => !url.pathname.includes(`/sessions/${item.session_id}/`));
       return json({});
@@ -147,6 +149,46 @@ describe("Suggestion review page through real project hook, API client and revie
     await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Select suggestion from Ada" })).toBeNull());
     expect(posted()[0][0]).toContain(`/sessions/Ada/${endpoint}`);
     expect(JSON.parse(posted()[0][1].body)).toEqual({ [field]: "Please revise the label" });
+  });
+
+  it.each([["Reject", "Reason for rejection", "Rejecting..."], ["Request Changes", "Feedback", "Sending..."]])("keeps %s open and prevents another submission until the real request completes", async (action, label, busyLabel) => {
+    let release!: () => void;
+    actionGate = new Promise<void>(resolve => { release = resolve; });
+    mount(); await ready();
+    fireEvent.click(screen.getByRole("button", { name: /Ada.*Update Ada/ }));
+    fireEvent.click(screen.getByRole("button", { name: action }));
+    const dialog = screen.getByRole("dialog");
+    const ui = within(dialog);
+    fireEvent.change(ui.getByLabelText(label), { target: { value: "Please revise" } });
+    fireEvent.click(ui.getByRole("button", { name: action }));
+    const submitting = await ui.findByRole("button", { name: busyLabel });
+    expect(submitting).toHaveProperty("disabled", true);
+    expect(ui.getByLabelText(label)).toHaveProperty("disabled", true);
+    expect(ui.getByRole("button", { name: "Cancel" })).toHaveProperty("disabled", true);
+    fireEvent.keyDown(dialog, { key: "Escape", code: "Escape" });
+    fireEvent.click(submitting);
+    expect(screen.getByRole("dialog")).toBe(dialog);
+    expect(posted()).toHaveLength(1);
+    expect(items).toHaveLength(2);
+    await act(async () => { release(); });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Select suggestion from Ada" })).toBeNull());
+    expect(screen.getByRole("checkbox", { name: "Select suggestion from Bea" })).toBeDefined();
+    expect(posted()).toHaveLength(1);
+  });
+
+  it.each([["Reject", "Reason for rejection"], ["Request Changes", "Feedback"]])("surfaces the server rejection of %s without removing the suggestion", async (action, label) => {
+    actionStatus = 409;
+    mount(); await ready();
+    fireEvent.click(screen.getByRole("button", { name: /Ada.*Update Ada/ }));
+    fireEvent.click(screen.getByRole("button", { name: action }));
+    const ui = within(screen.getByRole("dialog"));
+    fireEvent.change(ui.getByLabelText(label), { target: { value: "Please revise" } });
+    fireEvent.click(ui.getByRole("button", { name: action }));
+    await screen.findByRole("heading", { name: /Review conflict/ });
+    expect(items.map(item => item.session_id)).toEqual(["Ada", "Bea"]);
+    expect(posted()).toHaveLength(1);
+    expect(screen.queryByText("No pending suggestions")).toBeNull();
   });
 
   it.each([["Reject", "Reason for rejection"], ["Request Changes", "Feedback"]])("dismisses %s with Escape without posting and clears its draft when reopened", async (action, label) => {
