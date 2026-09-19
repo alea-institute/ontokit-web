@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import ProjectSettingsPage from '@/app/projects/[id]/settings/page';
 import { ToastProvider } from '@/lib/context/ToastContext';
 import { projectQueryKeys } from '@/lib/hooks/useProject';
+import { memberTrustQueryKeys } from '@/lib/hooks/useMemberTrust';
+import type { MemberTrust } from '@/lib/api/trust';
 import { memberQueryKeys } from '@/lib/hooks/useMembers';
 import { jsonResponse, llmHookHarness } from '../fixtures/llm-hook-harness';
 
@@ -12,10 +14,11 @@ const navigation = vi.hoisted(() => ({ push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => navigation, useParams: () => ({ id: 'project' }), usePathname: () => '/projects/project/settings', useSearchParams: () => new URLSearchParams() }));
 const session: Session = { user: { id: 'owner', name: 'Owner' }, accessToken: 'fixture-token', expires: '2099-01-01T00:00:00Z' };
 const admin = { id: 'membership', user_id: 'admin', role: 'admin', user: { name: 'Target Admin', email: 'admin@example.invalid' } };
-function mount(options: { member?: boolean; conflict?: boolean; public?: boolean; self?: boolean } = {}) {
-  let failure: 'add' | 'remove' | 'transfer' | 'forced' | 'approve' | 'decline' | null = null;
-  let members = options.self ? [{ ...admin, user_id: 'owner' }] : options.member ? [admin] : [];
+function mount(options: { member?: boolean; conflict?: boolean; public?: boolean; self?: boolean; suggester?: boolean } = {}) {
+  let failure: 'add' | 'remove' | 'transfer' | 'forced' | 'approve' | 'decline' | 'trust' | null = null;
+  let members = options.suggester ? [{ ...admin, role: 'suggester' }] : options.self ? [{ ...admin, user_id: 'owner' }] : options.member ? [admin] : [];
   let project = { id: 'project', name: 'Ontology', user_role: options.self ? 'admin' : 'owner', owner_id: options.self ? 'original-owner' : 'owner', member_count: members.length, label_preferences: [], source_file_path: null, is_public: options.public ?? false };
+  let trust: MemberTrust = { user_id: 'admin', role: 'suggester', tier: 'untrusted', is_trusted: false, trust_override: 'none', accepted_count: 3 };
   let requests = [{ id: 'request', user_id: 'applicant', user: { name: 'Applicant', email: 'applicant@example.invalid' }, message: 'Please let me contribute', created_at: '2026-09-01T12:00:00Z' }];
   class Socket extends EventTarget { static OPEN = 1; static CONNECTING = 0; readyState = 1; close = vi.fn(); }
   vi.stubGlobal('WebSocket', Socket);
@@ -43,7 +46,13 @@ function mount(options: { member?: boolean; conflict?: boolean; public?: boolean
     if (path === '/api/v1/projects/project') return jsonResponse(project);
     if (path.endsWith('/pr-party/me')) return jsonResponse({ is_reviewer: false });
     if (path.endsWith('/notifications')) return jsonResponse({ items: [], unread_count: 0 });
-    if (path.endsWith('/trust/members')) return jsonResponse([]);
+    if (path.endsWith('/trust/members/admin') && init?.method === 'PATCH') {
+      if (failure === 'trust') return new Response('Trust decision refused', { status: 403 });
+      const { trust_override } = JSON.parse(String(init.body));
+      trust = { ...trust, trust_override, is_trusted: trust_override === 'granted', tier: trust_override === 'granted' ? 'trusted' : 'untrusted' };
+      return jsonResponse(trust);
+    }
+    if (path.endsWith('/trust/members')) return jsonResponse(options.suggester ? [trust] : []);
     if (path.endsWith('/members')) {
       if (init?.method === 'POST') {
         if (failure === 'add') return new Response('Add refused', { status: 403 });
@@ -72,6 +81,28 @@ const writes = (h: ReturnType<typeof mount>, suffix: string) => h.fetcher.mock.c
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); navigation.push.mockClear(); });
 
 describe('settings membership and join decisions through real UI and HTTP', () => {
+  it.each([false, true])('grants a suggester trust and refreshes the authoritative member cache (retry: %s)', async retry => {
+    const h = mount({ suggester: true });
+    const ui = await section();
+    if (retry) h.fail('trust');
+    fireEvent.click(await ui.findByRole('button', { name: /Trust status/ }));
+    fireEvent.click(ui.getByRole('menuitem', { name: /Grant trusted/ }));
+    if (retry) {
+      expect((await ui.findByRole('alert')).textContent).toBe('Trust decision refused');
+      expect(h.client.getQueryData(memberTrustQueryKeys.list('project'))).toMatchObject([{ trust_override: 'none' }]);
+      h.fail(null);
+      fireEvent.click(ui.getByRole('button', { name: /Trust status/ }));
+      fireEvent.click(ui.getByRole('menuitem', { name: /Grant trusted/ }));
+    }
+    await waitFor(() => expect(h.client.getQueryData(memberTrustQueryKeys.list('project'))).toMatchObject([{ user_id: 'admin', trust_override: 'granted', is_trusted: true }]));
+    expect(ui.getByText('Trusted (granted)')).toBeDefined();
+    expect(ui.queryByRole('alert')).toBeNull();
+    const writes = h.fetcher.mock.calls.filter(([url, init]) => String(url).endsWith('/trust/members/admin') && init?.method === 'PATCH');
+    expect(writes).toHaveLength(retry ? 2 : 1);
+    expect(JSON.parse(String(writes.at(-1)![1]?.body))).toEqual({ trust_override: 'granted' });
+    expect(h.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/trust/members'))).toHaveLength(2);
+  });
+
   it('searches users and adds an admin, updating shared member and project caches', async () => {
     const h = mount(); const ui = await selectMember(); fireEvent.change(ui.getByRole('combobox'), { target: { value: 'admin' } });
     fireEvent.click(ui.getByRole('button', { name: 'Add' })); await screen.findByText('Member added successfully');
