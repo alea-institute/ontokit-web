@@ -56,6 +56,30 @@ const qualityCases = [
 ];
 
 describe("health panel filters and asynchronous branch boundaries", () => {
+  it("navigates duplicate findings with missing labels using their actual entity types", async () => {
+    const entities = [
+      { iri: "https://example.org#Person", label: "Person class", entity_type: "class" },
+      { iri: "https://example.org/hasName", label: "", entity_type: "property" },
+      { iri: "https://example.org#Alice", entity_type: "individual" },
+    ];
+    route = url => url.pathname.endsWith("/quality/duplicates/latest")
+      ? json({ clusters: [{ similarity: 0.956, entities }] }) : undefined;
+    const navigate = vi.fn();
+    render(<HealthCheckPanel {...props} onNavigateToClass={navigate} />);
+    await screen.findByText("error finding");
+    fireEvent.click(screen.getByRole("button", { name: "Duplicates" }));
+    expect(await screen.findByText("96% similar")).toBeDefined();
+    for (const [index, label] of [/Person class/, /hasName/, /Alice/].entries()) {
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      expect(navigate).toHaveBeenNthCalledWith(index + 1, entities[index].iri, entities[index].entity_type);
+    }
+    expect(navigate).toHaveBeenCalledTimes(3);
+    const calls = request.mock.calls.filter(([url]) => new URL(url).pathname.endsWith("/quality/duplicates/latest"));
+    expect(calls).toHaveLength(1);
+    expect(new URL(calls[0][0]).searchParams.get("branch")).toBe("review");
+    expect(new Headers(calls[0][1]?.headers).get("Authorization")).toBe("Bearer test-token");
+  });
+
   it.each(["/lint/config", "/lint/levels"])("keeps results usable when the hint request %s fails, then recovers on reopen", async (path) => {
     const logged = vi.spyOn(console, "error");
     route = url => url.pathname.endsWith(path) ? json({ detail: "Hint unavailable" }, 403) : undefined;

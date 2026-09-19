@@ -18,7 +18,7 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 });
 let current: PullRequest;
 let comments: Comment[];
-let handler: (path: string, init: RequestInit) => Response | undefined;
+let handler: (path: string, init: RequestInit) => Response | Promise<Response> | undefined;
 const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const path = new URL(String(input)).pathname;
   const response = handler(path, init);
@@ -166,6 +166,39 @@ describe("PRDetail real API and child integration", () => {
     expect(new Headers(request?.[1]?.headers).get("Authorization")).toBe("Bearer test-token");
   });
 
+  it.each(["response", "rejection"])("stops polling when an in-flight request settles after unmount (%s)", async outcome => {
+    current = { ...pr, github_sync_status: "pending", github_sync_last_attempted_at: new Date().toISOString() };
+    mount();
+    await screen.findByText("Syncing with GitHub…");
+    cleanup();
+    vi.useFakeTimers();
+    const view = mount();
+    await act(async () => { await Promise.resolve(); });
+    let resolve!: (response: Response) => void;
+    let reject!: (error: Error) => void;
+    const pending = new Promise<Response>((done, fail) => { resolve = done; reject = fail; });
+    let signal: AbortSignal | undefined;
+    let polls = 0;
+    handler = (path, init) => {
+      if (!path.endsWith("/7")) return;
+      polls++;
+      signal = init.signal ?? undefined;
+      return pending;
+    };
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(polls).toBe(1);
+    expect(signal?.aborted).toBe(false);
+    view.unmount();
+    expect(signal?.aborted).toBe(true);
+    await act(async () => {
+      if (outcome === "response") resolve(json(current));
+      else reject(new DOMException("Transport cancelled", "AbortError"));
+    });
+    await act(async () => { await vi.advanceTimersByTimeAsync(60000); });
+    expect(polls).toBe(1);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("polls past a failed status request, then stops after synchronization", async () => {
     current = { ...pr, github_sync_status: "pending", github_sync_last_attempted_at: new Date().toISOString() };
     mount();
@@ -176,13 +209,16 @@ describe("PRDetail real API and child integration", () => {
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     let polls = 0;
     handler = path => path.endsWith("/7")
-      ? (++polls === 1 ? json({ detail: "Unavailable" }, 503) : json({ ...pr, github_sync_status: "synced" }))
+      ? (++polls === 1 ? json({ detail: "Unavailable" }, 503) : polls === 2 ? json(current) : json({ ...pr, github_sync_status: "synced" }))
       : undefined;
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
     expect(polls).toBe(1);
     await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+    expect(screen.getByText("Syncing with GitHub…")).toBeDefined();
+    expect(polls).toBe(2);
+    await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
     expect(screen.getByText("Synced with GitHub")).toBeDefined();
     await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
-    expect(polls).toBe(2);
+    expect(polls).toBe(3);
   });
 });

@@ -52,6 +52,31 @@ beforeEach(() => {
 afterEach(() => { cleanup(); client?.clear(); vi.unstubAllGlobals(); });
 
 describe("Suggestion review page through real project hook, API client and review controls", () => {
+  it.each([
+    { label: "reviewer@example.test", submitter: { id: "person", email: "reviewer@example.test" }, anonymous: false },
+    { label: "Anonymous", submitter: undefined, anonymous: true },
+    { label: "Unknown user", submitter: undefined, anonymous: false },
+  ])("keeps a resubmitted suggestion reviewable when its author is $label", async ({ label, submitter, anonymous }) => {
+    items = [{ ...suggestion("resubmitted"), submitter, is_anonymous: anonymous,
+      submitter_tier: null, revision: 2, changes_count: 2, entities_modified: [], summary: undefined,
+      pr_number: 19, github_pr_url: "https://github.com/example/ontology/pull/19",
+    }];
+    mount(); await ready();
+    expect(screen.getByRole("checkbox", { name: `Select suggestion from ${label}` })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: new RegExp(label.replaceAll(".", "\\.") + ".*v2.*2 changes") }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getAllByText(label).length).toBeGreaterThan(0);
+    expect(panel.getByText("Revision 2 (resubmitted after changes were requested)")).toBeDefined();
+    expect(panel.queryByText("Entities Modified")).toBeNull();
+    expect(panel.getByRole("link", { name: "PR #19" }).getAttribute("href")).toBe("/projects/project-review/pull-requests/19");
+    expect(panel.getByRole("link", { name: "GitHub" }).getAttribute("href")).toBe("https://github.com/example/ontology/pull/19");
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await screen.findByText("No pending suggestions");
+    expect(posted()).toHaveLength(1);
+    expect(new URL(posted()[0][0]).pathname).toContain("/sessions/resubmitted/approve");
+    expect(new Headers(posted()[0][1].headers).get("Authorization")).toBe("Bearer review-token");
+  });
+
   it("shares the real project query between page and home-link hook and authenticates queue requests", async () => {
     mount(); await ready();
     expect(fetchMock.mock.calls.filter(([url]) => new URL(url).pathname === "/api/v1/projects/project-review")).toHaveLength(1);
