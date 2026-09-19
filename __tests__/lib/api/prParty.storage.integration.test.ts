@@ -9,7 +9,7 @@ function transport() {
   vi.stubGlobal('fetch', fetcher);
   return fetcher;
 }
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); sessionStorage.clear(); vi.resetModules(); });
+afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); sessionStorage.clear(); vi.resetModules(); });
 
 describe('review attempt replay through real API, hashing and browser storage', () => {
   it('retains replay protection in memory when accessing sessionStorage is forbidden', async () => {
@@ -31,6 +31,40 @@ describe('review attempt replay through real API, hashing and browser storage', 
       expect(init.method).toBe('POST');
       expect(new Headers(init.headers).get('Authorization')).toBe('Bearer token');
     }
+  });
+
+  it('reuses a timed-out review attempt on explicit retry without automatically repeating the mutation', async () => {
+    vi.resetModules();
+    const { prPartyApi } = await import('@/lib/api/prParty');
+    vi.useFakeTimers();
+    const signals: AbortSignal[] = [];
+    const fetcher = vi.fn((_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const signal = init!.signal!;
+      signals.push(signal);
+      if (signals.length > 1) return Promise.resolve(jsonResponse({ action: { status: 'recorded' }, card: { card_id: 'timeout-card' } }));
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+    });
+    vi.stubGlobal('fetch', fetcher);
+    const persist = vi.spyOn(sessionStorage, 'setItem');
+    const request = prPartyApi.submitAction('timeout-card', input, 'token');
+    const rejected = expect(request).rejects.toHaveProperty('name', 'AbortError');
+    // Fingerprinting uses real asynchronous Web Crypto before starting the HTTP deadline.
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
+    const firstKey = JSON.parse(String(fetcher.mock.calls[0][1]?.body)).idempotency_key;
+    const pendingEntry = persist.mock.calls.find(([, value]) => value === firstKey)!;
+    await vi.advanceTimersByTimeAsync(30000);
+    await rejected;
+    expect(signals[0].aborted).toBe(true);
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(sessionStorage.getItem(pendingEntry[0])).toBe(firstKey);
+    await prPartyApi.submitAction('timeout-card', input, 'token');
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(fetcher.mock.calls[1][1]?.body)).idempotency_key).toBe(firstKey);
+    expect(signals[1].aborted).toBe(false);
+    expect(sessionStorage.getItem(pendingEntry[0])).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('restores an uncertain attempt after the API module reloads and clears it on success', async () => {

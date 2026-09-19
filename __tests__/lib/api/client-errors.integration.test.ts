@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api, ApiError, getApiErrorMessage, getSourceRevisionConflict, projectOntologyApi } from '@/lib/api/client';
 
-afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const conflict = { code: 'SOURCE_REVISION_CONFLICT', message: 'Reload before saving', base_revision: 'old', current_revision: 'new', branch: 'feature/topic' };
 const save = () => projectOntologyApi.saveSource('project', ':Person a owl:Class .', 'Edit Person', 'synthetic-token', 'feature/topic', 'old');
 
@@ -77,6 +77,47 @@ describe('HTTP error contracts through the real domain and transport client', ()
     expect(transportSignal?.aborted).toBe(true);
     expect(fetcher).toHaveBeenCalledOnce();
     expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+  });
+
+  it.each(['headers', 'body'] as const)('enforces the deadline while waiting for %s and leaves the next request usable', async phase => {
+    vi.useFakeTimers();
+    const caller = new AbortController();
+    const remove = vi.spyOn(caller.signal, 'removeEventListener');
+    const signals: AbortSignal[] = [];
+    const fetcher = vi.fn((_input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const signal = init!.signal!;
+      signals.push(signal);
+      if (signals.length > 1) return Promise.resolve(Response.json({ commit_hash: 'saved-after-timeout' }));
+      if (phase === 'headers') return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      });
+      const body = new ReadableStream({
+        start(stream) { signal.addEventListener('abort', () => stream.error(signal.reason), { once: true }); },
+      });
+      return Promise.resolve(new Response(body, { headers: { 'Content-Type': 'application/json' } }));
+    });
+    vi.stubGlobal('fetch', fetcher);
+    let settled = false;
+    const request = api.get('/api/v1/projects/project', { signal: caller.signal });
+    void request.then(() => { settled = true; }, () => { settled = true; });
+    const rejected = expect(request).rejects.toHaveProperty('name', 'AbortError');
+    await vi.advanceTimersByTimeAsync(29999);
+    expect(settled).toBe(false);
+    expect(signals[0].aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    await rejected;
+    expect(signals[0].aborted).toBe(true);
+    expect(caller.signal.aborted).toBe(false);
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(0);
+    await expect(save()).resolves.toMatchObject({ commit_hash: 'saved-after-timeout' });
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(signals[1]).not.toBe(signals[0]);
+    expect(new Headers(fetcher.mock.calls[1][1]?.headers).get('Authorization')).toBe('Bearer synthetic-token');
+    await vi.advanceTimersByTimeAsync(30000);
+    expect(signals[1].aborted).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('detaches cancellation after success so a later caller abort cannot reach the completed transport', async () => {
