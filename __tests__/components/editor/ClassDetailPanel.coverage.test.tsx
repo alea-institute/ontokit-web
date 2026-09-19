@@ -62,6 +62,68 @@ async function savePanel() {
   await screen.findByText("Saved");
 }
 describe("class detail real editing and suggestion chains", () => {
+  it("adds a searched relationship target without losing either existing group", async () => {
+    const definedBy = "http://www.w3.org/2000/01/rdf-schema#isDefinedBy";
+    const retained = "https://example.test/Retained";
+    const oldTarget = "https://example.test/Old";
+    const newTarget = "https://example.test/New";
+    currentDetail.annotations.push(
+      { property_iri: seeAlso, property_label: "See Also", values: [{ value: oldTarget, lang: "" }] },
+      { property_iri: definedBy, property_label: "Is Defined By", values: [{ value: retained, lang: "" }] },
+    );
+    output = source.replace('skos:definition "Existing definition"@en .', 'skos:definition "Existing definition"@en ; rdfs:seeAlso :Old ; rdfs:isDefinedBy :Retained .');
+    const original = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async input => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/search") && url.searchParams.get("q") === "New") return jsonResponse({ results: [{ iri: newTarget, label: "New target", entity_type: "class" }] });
+      return original(input);
+    });
+    mount();
+    await screen.findByPlaceholderText("Label text");
+    const search = screen.getAllByPlaceholderText("Search entities to add...")[0];
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "New" } });
+    fireEvent.click(await screen.findByText("New target"));
+    await waitFor(() => expect(useDraftStore.getState().getDraft(key)?.relationships.some(g => g.property_iri === seeAlso && g.targets.some(t => t.iri === newTarget))).toBe(true));
+    await savePanel();
+    const triples = parseBlockTriples(output, iri)!;
+    expect(triples).toContainEqual({ predicate: seeAlso, object: { type: "iri", value: newTarget } });
+    expect(triples).toContainEqual({ predicate: seeAlso, object: { type: "iri", value: oldTarget } });
+    expect(triples).toContainEqual({ predicate: definedBy, object: { type: "iri", value: retained } });
+  });
+
+  it("accepts another definition while preserving an unrelated annotation group", async () => {
+    const example = "http://www.w3.org/2004/02/skos/core#example";
+    currentDetail.annotations.push({ property_iri: example, property_label: "Example", values: [{ value: "An existing example", lang: "en" }] });
+    output = source.replace('skos:definition "Existing definition"@en .', 'skos:definition "Existing definition"@en ; skos:example "An existing example"@en .');
+    seed("annotations", { property_iri: definition, value: "Définition", lang: "fr" });
+    mount();
+    await screen.findByPlaceholderText("Label text");
+    fireEvent.click(screen.getAllByRole("button", { name: "Accept suggestion" })[0]);
+    await waitFor(() => expect(useDraftStore.getState().getDraft(key)?.annotations.some(a => a.property_iri === definition && a.values.some(v => v.value === "Définition"))).toBe(true));
+    await savePanel();
+    const triples = parseBlockTriples(output, iri)!;
+    expect(triples).toContainEqual({ predicate: definition, object: { type: "literal", value: "Définition", lang: "fr" } });
+    expect(triples).toContainEqual({ predicate: definition, object: { type: "literal", value: "Existing definition", lang: "en" } });
+    expect(triples).toContainEqual({ predicate: example, object: { type: "literal", value: "An existing example", lang: "en" } });
+  });
+
+  it("edits one label while preserving another language through the real writer", async () => {
+    currentDetail.labels.push({ value: "Personne", lang: "fr" });
+    output = source.replace('rdfs:label "Person"@en', 'rdfs:label "Person"@en, "Personne"@fr');
+    mount();
+    const french = await screen.findByDisplayValue("Personne");
+    fireEvent.change(french, { target: { value: "Personne modifiée" } });
+    fireEvent.blur(french);
+    await savePanel();
+    const labels = parseBlockTriples(output, iri)!.filter(t => t.predicate === "http://www.w3.org/2000/01/rdf-schema#label");
+    expect(labels.map(t => t.object)).toEqual(expect.arrayContaining([
+      { type: "literal", value: "Person", lang: "en" },
+      { type: "literal", value: "Personne modifiée", lang: "fr" },
+    ]));
+    expect(labels).toHaveLength(2);
+  });
+
   it("closes the real parent picker without creating a draft or changing Turtle", async () => {
     const { save } = mount();
     fireEvent.click(await screen.findByRole("button", { name: "Add parent" }));
