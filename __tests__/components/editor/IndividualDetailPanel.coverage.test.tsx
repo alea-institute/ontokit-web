@@ -41,6 +41,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); useDraftStore.setState({ drafts: {} }); });
 
 describe("individual panel real editing chain", () => {
+  it.each(["Person", "alias", "other"])("navigates the parsed %s reference from edit mode without creating a draft", (target) => {
+    const navigate = vi.fn();
+    render(<TooltipProvider><ToastProvider><IndividualDetailPanel projectId="coverage-individual" individualIri={iri} sourceContent={source} canEdit onUpdateIndividual={vi.fn()} labelHints={hints} onNavigateToEntity={navigate} /></ToastProvider></TooltipProvider>);
+    fireEvent.click(screen.getByTitle(ns + target));
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(ns + target);
+    expect(useDraftStore.getState().getDraft(key)).toBeUndefined();
+  });
+
   it("removes a secondary label through the live draft and Turtle save chain", async () => {
     let output = source.replace('rdfs:label "Relation"@en', 'rdfs:label "Relation"@en, "Secondary"@fr');
     const save = async (entity: string, data: TurtleIndividualUpdateData) => { output = updateIndividualInTurtle(output, entity, data); };

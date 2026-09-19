@@ -7,12 +7,29 @@ import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: null, status: "unauthenticated" }) }));
-vi.mock("next/dynamic", () => ({ default: () => () => <div>Browser graph boundary</div> }));
+vi.mock("next/dynamic", () => ({ default: () => (props: { onNavigateToClass: (iri: string) => void }) => <button onClick={() => props.onNavigateToClass("https://example.org/layout#Target")}>Graph target</button> }));
 beforeEach(() => { useSelectionStore.getState().clear(); useSuggestionStore.getState().clearAllSuggestions(); vi.stubGlobal("fetch", layoutFetch()); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 const mount = (props = layoutProps()) => render(<LayoutProviders><StandardEditorLayout {...props} /></LayoutProviders>);
 
 describe("standard layout integrated entity navigation", () => {
+  it("returns from graph navigation to the selected class panel", async () => {
+    const p = layoutProps({ selectedIri: layoutNs + "Root" });
+    const normal = layoutFetch();
+    vi.mocked(fetch).mockImplementation(async input => {
+      if (String(input).includes("/ontology/classes/")) return new Response(JSON.stringify({ iri: p.selectedIri, labels: [{ value: "Root class", lang: "en" }], comments: [], annotations: [], parent_iris: [], parent_labels: {}, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, deprecated: false, is_defined: true }), { status: 200 });
+      if (String(input).includes("/lint/")) return new Response(JSON.stringify({ items: [] }), { status: 200 });
+      return normal(input);
+    });
+    mount(p);
+    await screen.findByRole("heading", { name: "Root class" });
+    fireEvent.click(screen.getByRole("button", { name: "Show relationship graph" }));
+    fireEvent.click(screen.getByRole("button", { name: "Graph target" }));
+    expect(p.navigateToNode).toHaveBeenCalledExactlyOnceWith(layoutNs + "Target");
+    expect(screen.queryByRole("button", { name: "Graph target" })).toBeNull();
+    expect(await screen.findByRole("heading", { name: "Root class" })).toBeDefined();
+  });
+
   it("loads properties through the API and navigates parsed details and shared selection with the real branch navigator", async () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Properties" }));

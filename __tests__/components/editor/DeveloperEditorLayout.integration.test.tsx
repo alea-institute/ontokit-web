@@ -25,6 +25,18 @@ function props(overrides: Partial<DeveloperEditorLayoutProps> = {}): DeveloperEd
 const mount = (p = props()) => render(<LayoutProviders><DeveloperEditorLayout {...p} /></LayoutProviders>);
 
 describe("developer layout real tree/detail integration", () => {
+  it("scrolls to a pending card and updates the badge after acceptance", () => {
+    const scope = { projectId: "layout-project", branch: "work" };
+    useSuggestionStore.getState().setSuggestions(scope, layoutNs + "first", "children", [{ iri: layoutNs + "new", label: "New", suggestion_type: "children", provenance: "llm-proposed", validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }]);
+    const scroll = vi.fn();
+    render(<LayoutProviders><DeveloperEditorLayout {...props()} /><ul><li role="listitem" tabIndex={-1} ref={node => { if (node) node.scrollIntoView = scroll; }}>Pending target</li></ul></LayoutProviders>);
+    fireEvent.click(screen.getByTitle("1 pending suggestion — click to scroll to first"));
+    expect(scroll).toHaveBeenCalledExactlyOnceWith({ behavior: "smooth", block: "center" });
+    expect(document.activeElement).toBe(screen.getByRole("listitem"));
+    act(() => useSuggestionStore.getState().acceptSuggestion(scope, layoutNs + "first", "children", 0));
+    expect(screen.queryByTitle(/pending suggestion/)).toBeNull();
+  });
+
   it("navigates API properties through parsed panels, sibling controls and shared selection", async () => {
     mount();
     fireEvent.click(screen.getByRole("button", { name: "Properties" }));

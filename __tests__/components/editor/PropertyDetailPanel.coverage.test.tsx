@@ -44,6 +44,14 @@ afterEach(() => {
 });
 
 describe("property panel real editing chain", () => {
+  it.each(["Person", "Place", "parent", "inverse"])("navigates the parsed %s reference from edit mode without creating a draft", (target) => {
+    const navigate = vi.fn();
+    render(<TooltipProvider><ToastProvider><PropertyDetailPanel projectId="coverage-property" propertyIri={iri} sourceContent={source} canEdit onUpdateProperty={vi.fn()} labelHints={hints} onNavigateToEntity={navigate} /></ToastProvider></TooltipProvider>);
+    fireEvent.click(screen.getByTitle(ns + target));
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(ns + target);
+    expect(useDraftStore.getState().getDraft(key)).toBeUndefined();
+  });
+
   it("persists a definition language selected in the real picker and a blurred annotation value", async () => {
     vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
     Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
