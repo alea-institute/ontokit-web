@@ -203,6 +203,21 @@ describe("Project viewer route through real providers and API", () => {
     await screen.findByText(/Tree unavailable/);
     expect(screen.getByTitle("Project dashboard")).toBeTruthy();
   });
+  it("keeps the selected class when the URL catches up without fetching its ancestors again", async () => {
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    const view = mount();
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && r.search === "?branch=main")).toBe(true));
+    fireEvent.click(await screen.findByRole("treeitem", { name: "Person" }));
+    await screen.findByText("A human being");
+    expect(useSelectionStore.getState().iri).toBe("https://example.test/Person");
+    const ancestors = requests.filter(r => r.path.endsWith("/ancestors")).length;
+    boundary.search = new URLSearchParams({ classIri: "https://example.test/Person" });
+    view.rerender(<ViewerPage />);
+    await screen.findByText("A human being");
+    expect(requests.filter(r => r.path.endsWith("/ancestors"))).toHaveLength(ancestors);
+    expect(useSelectionStore.getState().iri).toBe("https://example.test/Person");
+  });
+
   it.each([200, 403])("restores a changed URL after branch loading with ancestor status %i", async status => {
     ancestorStatus = status;
     projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };

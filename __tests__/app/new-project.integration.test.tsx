@@ -17,11 +17,12 @@ class Upload extends EventTarget {
   finish(status: number, body: unknown) { this.status = status; this.responseText = JSON.stringify(body); this.dispatchEvent(new Event('load')); }
 }
 
-function mount(auth: Session | null = session) {
+function mount(auth: Session | null = session, sessionGate?: Promise<Session | null>) {
   let fail = false;
   let cloneGate: Promise<void> | undefined;
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    const path = new URL(String(input)).pathname;
+    const path = new URL(String(input), window.location.origin).pathname;
+    if (path === '/api/auth/session') return jsonResponse(await sessionGate);
     if (path.endsWith('/pr-party/me')) return jsonResponse({ is_reviewer: false });
     if (path.endsWith('/notifications')) return jsonResponse({ items: [], unread_count: 0 });
     if (path.endsWith('/github-token')) return jsonResponse({ has_token: true });
@@ -33,12 +34,42 @@ function mount(auth: Session | null = session) {
   });
   vi.stubGlobal('fetch', fetcher);
   const { wrapper: QueryWrapper } = llmHookHarness();
-  return { fetcher, delayClone: (gate: Promise<void>) => { cloneGate = gate; }, reject: (next: boolean) => { fail = next; }, ...render(<SessionProvider session={auth} refetchOnWindowFocus={false}><QueryWrapper><NewProjectPage /></QueryWrapper></SessionProvider>) };
+  return { fetcher, delayClone: (gate: Promise<void>) => { cloneGate = gate; }, reject: (next: boolean) => { fail = next; }, ...render(<SessionProvider session={sessionGate ? undefined : auth} refetchOnWindowFocus={false}><QueryWrapper><NewProjectPage /></QueryWrapper></SessionProvider>) };
 }
 afterEach(() => { cleanup(); Upload.requests.length = 0; vi.useRealTimers(); vi.unstubAllGlobals(); navigation.push.mockClear(); });
 const form = () => within(screen.getByRole('main'));
 
 describe('new project route through the real form and HTTP client', () => {
+  it('waits for the real session provider before exposing project creation', async () => {
+    let release!: (value: Session) => void;
+    const gate = new Promise<Session>(resolve => { release = resolve; });
+    const { container, fetcher } = mount(session, gate);
+    expect(form().queryByLabelText(/Project Name/)).toBeNull();
+    expect(container.querySelector('.animate-spin')).not.toBeNull();
+    expect(fetcher.mock.calls.every(([url]) => String(url).endsWith('/api/auth/session'))).toBe(true);
+    await act(async () => { release(session); });
+    expect(await screen.findByLabelText(/Project Name/)).toBeDefined();
+    expect(form().getByRole('button', { name: 'Create Project' })).toBeDefined();
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+  });
+
+  it('returns from file import to empty creation without uploading the selected file', async () => {
+    vi.stubGlobal('XMLHttpRequest', Upload);
+    const { fetcher } = mount();
+    fireEvent.click(form().getByRole('button', { name: 'Import from File' }));
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(['fixture'], 'ontology.ttl', { type: 'text/turtle' })] } });
+    expect(form().getByRole('button', { name: 'Import Project' })).toBeDefined();
+    fireEvent.click(form().getByRole('button', { name: 'Create Empty' }));
+    expect(form().queryByRole('button', { name: 'Import Project' })).toBeNull();
+    fireEvent.change(form().getByLabelText(/Project Name/), { target: { value: 'Empty ontology' } });
+    fireEvent.click(form().getByRole('button', { name: 'Create Project' }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/created-project'));
+    expect(Upload.requests).toHaveLength(0);
+    const posts = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect(JSON.parse(String(posts[0][1]?.body))).toEqual({ name: 'Empty ontology', is_public: false });
+  });
+
   it('creates a trimmed private project and navigates only after the server succeeds', async () => {
     const { fetcher } = mount();
     fireEvent.change(form().getByLabelText(/Project Name/), { target: { value: '  Ontology  ' } });

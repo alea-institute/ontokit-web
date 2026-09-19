@@ -51,6 +51,19 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 const props = { projectId: "source-project", accessToken: "source-token", initialValue: content };
 
 describe("source editor integration through real TurtleEditor and lint API", () => {
+  it("navigates indexed diagnostics when Monaco finishes loading after the lint results", async () => {
+    const navigate = vi.fn();
+    render(<OntologySourceEditor {...props} onNavigateToClass={navigate} />);
+    await screen.findByText(issue.message);
+    await waitFor(() => expect(IndexWorker.instances.at(-1)?.postMessage).toHaveBeenCalledWith(expect.objectContaining({ issues: [expect.objectContaining({ id: issue.id })] })));
+    const worker = IndexWorker.instances.at(-1)!;
+    const message = worker.postMessage.mock.calls.at(-1)![0] as IndexWorkerMessage;
+    act(() => worker.onmessage?.({ data: processMessage(message) } as MessageEvent<IndexWorkerResult>));
+    const mounted = mountEditor();
+    mounted.clickDiagnostic();
+    expect(navigate).toHaveBeenCalledExactlyOnceWith(issue.subject_iri);
+  });
+
   it("orders lint issues by real indexed source lines and navigates the selected issue", async () => {
     vi.stubGlobal("Worker", class {
       onmessage: ((event: MessageEvent<IndexWorkerResult>) => void) | null = null;
