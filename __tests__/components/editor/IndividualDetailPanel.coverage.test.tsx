@@ -41,6 +41,35 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); useDraftStore.setState({ drafts: {} }); });
 
 describe("individual panel real editing chain", () => {
+  it("removes a secondary label through the live draft and Turtle save chain", async () => {
+    let output = source.replace('rdfs:label "Relation"@en', 'rdfs:label "Relation"@en, "Secondary"@fr');
+    const save = async (entity: string, data: TurtleIndividualUpdateData) => { output = updateIndividualInTurtle(output, entity, data); };
+    render(<TooltipProvider><ToastProvider><IndividualDetailPanel projectId="coverage-individual" individualIri={iri} sourceContent={output} canEdit onUpdateIndividual={save} labelHints={hints} /></ToastProvider></TooltipProvider>);
+    const row = screen.getByDisplayValue("Secondary").parentElement!;
+    fireEvent.click(within(row).getByRole("button", { name: "" }));
+    await waitFor(() => expect(useDraftStore.getState().getDraft(key)?.labels).toEqual([{ value: "Relation", lang: "en" }, { value: "", lang: "en" }]));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved");
+    expect(extractIndividualDetail(output, iri)?.labels).toEqual([{ value: "Relation", lang: "en" }]);
+    expect(screen.queryByDisplayValue("Secondary")).toBeNull();
+  });
+
+  it("persists definition and custom annotation changes on blur without changing the label", async () => {
+    let output = source;
+    mount(vi.fn(async (entity, data) => { output = updateIndividualInTurtle(output, entity, data); }));
+    for (const [original, edited] of [["Original definition", "Edited definition"], ["Original example", "Edited example"]]) {
+      const input = screen.getByDisplayValue(original);
+      fireEvent.change(input, { target: { value: edited } }); fireEvent.blur(input);
+    }
+    await waitFor(() => expect(useDraftStore.getState().getDraft(key)).toMatchObject({ definitions: [{ value: "Edited definition", lang: "en" }, { value: "", lang: "en" }] }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved");
+    const detail = extractIndividualDetail(output, iri)!;
+    expect(detail.labels).toEqual([{ value: "Relation", lang: "en" }]);
+    expect(detail.definitions).toEqual([{ value: "Edited definition", lang: "en" }]);
+    expect(detail.annotations.find(item => item.property_iri.endsWith("#example"))?.values).toEqual([{ value: "Edited example", lang: "en" }]);
+  });
+
   it("saves parsed edits through the actual draft store and Turtle updater without blank placeholders", async () => {
     let output = source;
     const save = vi.fn(async (entity: string, data: TurtleIndividualUpdateData) => { output = updateIndividualInTurtle(output, entity, data); });

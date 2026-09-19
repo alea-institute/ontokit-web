@@ -23,6 +23,7 @@ const source = `@prefix : <${ns}> .
 `;
 const hints = Object.fromEntries(["Person", "Place", "parent", "inverse", "reference", "ontology"].map(s => [ns + s, s]));
 const key = draftKey("coverage-property", "main", iri);
+const scrollDescriptor = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
 function mount(onUpdateProperty = vi.fn<(iri: string, data: TurtlePropertyUpdateData) => Promise<void>>().mockResolvedValue(undefined)) {
   return { ...render(<TooltipProvider><ToastProvider><PropertyDetailPanel projectId="coverage-property" propertyIri={iri} sourceContent={source} canEdit onUpdateProperty={onUpdateProperty} labelHints={hints} /></ToastProvider></TooltipProvider>), onUpdateProperty };
 }
@@ -36,9 +37,32 @@ beforeEach(() => {
   useEditorModeStore.setState({ showManualSaveButton: true });
   vi.spyOn(projectOntologyApi, "searchEntities").mockResolvedValue({ results: [], total: 0 });
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); useDraftStore.setState({ drafts: {} }); });
+afterEach(() => {
+  cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); useDraftStore.setState({ drafts: {} });
+  if (scrollDescriptor) Object.defineProperty(Element.prototype, "scrollIntoView", scrollDescriptor);
+  else Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+});
 
 describe("property panel real editing chain", () => {
+  it("persists a definition language selected in the real picker and a blurred annotation value", async () => {
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
+    let output = source;
+    mount(vi.fn(async (entity, data) => { output = updatePropertyInTurtle(output, entity, data); }));
+    const definition = screen.getByDisplayValue("Original definition");
+    fireEvent.click(within(definition.parentElement!).getByRole("button", { name: "Language tag" }));
+    fireEvent.click(screen.getByRole("option", { name: /French\s*Français\s*fr$/ }));
+    fireEvent.blur(definition);
+    const example = screen.getByDisplayValue("Original example");
+    fireEvent.change(example, { target: { value: "An edited example" } }); fireEvent.blur(example);
+    await waitFor(() => expect(useDraftStore.getState().getDraft(key)).toMatchObject({ definitions: [{ value: "Original definition", lang: "fr" }, { value: "", lang: "en" }] }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved");
+    const detail = extractPropertyDetail(output, iri)!;
+    expect(detail.definitions).toEqual([{ value: "Original definition", lang: "fr" }]);
+    expect(detail.annotations.find(item => item.property_iri.endsWith("#example"))?.values).toEqual([{ value: "An edited example", lang: "en" }]);
+  });
+
   it("saves parsed edits through the actual draft store and Turtle updater without blank placeholders", async () => {
     let output = source;
     const save = vi.fn(async (entity: string, data: TurtlePropertyUpdateData) => { output = updatePropertyInTurtle(output, entity, data); });
