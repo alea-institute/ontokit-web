@@ -31,13 +31,14 @@ let detail: PRPartyCardDetail;
 let client: QueryClient;
 let mutate: (path: string, init: RequestInit) => Response;
 let failDetail: boolean;
+let mergePlacement: "manual" | "dashboard";
 const clipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
 const fetchBoundary = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
   const path = new URL(String(input)).pathname;
   if (init.method === "POST") return mutate(path, init);
   if (path.endsWith("/cards/card-1")) return failDetail ? json({ detail: "Forbidden" }, 403) : json(detail);
   if (path.endsWith("/queue")) return json({ cards: [detail] });
-  if (path.endsWith("/settings")) return json({ merge_default: "dashboard" });
+  if (path.endsWith("/settings")) return json({ merge_default: mergePlacement });
   throw new Error(`Unexpected request: ${init.method} ${path}`);
 });
 function mount() {
@@ -53,6 +54,7 @@ async function ask(value = "  Why this axiom?  ") {
 }
 beforeEach(() => {
   detail = { ...initial, qa_thread: [] }; failDetail = false;
+  mergePlacement = "dashboard";
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   mutate = path => { throw new Error(`Unexpected mutation: ${path}`); };
   localStorage.clear(); fetchBoundary.mockClear(); vi.stubGlobal("fetch", fetchBoundary);
@@ -64,6 +66,29 @@ afterEach(() => {
 });
 
 describe("expanded review card with real queries, mutations and question drafts", () => {
+  it.each([true, false])("honors manual merge settings with a trusted PR URL: %s", async trusted => {
+    mergePlacement = "manual";
+    if (!trusted) detail = { ...detail, pr_url: "https://github.com.attacker.test/example/ontology/pull/7" };
+    mount();
+    if (trusted) expect((await screen.findByRole("link", { name: "Merge it on GitHub" })).getAttribute("href")).toBe(initial.pr_url);
+    else {
+      expect(await screen.findByText("The GitHub merge link is unavailable.")).toBeDefined();
+      expect(screen.queryByRole("link", { name: "Merge it on GitHub" })).toBeNull();
+    }
+    expect(screen.queryByRole("button", { name: "Merge pull request" })).toBeNull();
+    expect(fetchBoundary.mock.calls.filter(([, init]) => init?.method === "POST")).toEqual([]);
+  });
+
+  it("reports an incomplete merge receipt as unknown and keeps the trusted fallback link", async () => {
+    mutate = () => json({ card: detail, deep_link: "https://github.com.attacker.test/merge" });
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Merge pull request" }));
+    const outcome = await screen.findByTestId("pr-party-merge-outcome");
+    expect(outcome.getAttribute("data-outcome")).toBe("skipped");
+    expect(outcome.textContent).toContain("(unknown) without merging");
+    expect(screen.getByRole("link", { name: "Open it on GitHub" }).getAttribute("href")).toBe(initial.pr_url);
+  });
+
   it("posts a trimmed question, refreshes the thread and clears the persisted draft", async () => {
     mutate = (path, init) => {
       expect(path).toBe("/api/v1/pr-party/cards/card-1/questions");
