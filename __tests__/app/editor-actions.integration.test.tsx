@@ -1083,4 +1083,29 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(savedBodies).toEqual([]);
   });
 
+  it.each([
+    { pattern: "named", subjects: ["Existing"], hint: "Derived from label", expected: "NewConcept" },
+    { pattern: "numeric", subjects: ["9", "42"], hint: "Sequential numeric IRI (next: 43)", expected: "43" },
+  ])("derives a $pattern IRI from loaded ontology source and preserves its namespace", async ({ subjects, hint, expected }) => {
+    const namespace = "https://vocabulary.test/custom#";
+    sourceContent = '@prefix owl: <http://www.w3.org/2002/07/owl#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix custom: <' + namespace + '> .\n' + subjects.map(name => '<' + namespace + name + '> a owl:Class .').join("\n");
+    const original = sourceContent;
+    mount(); await screen.findByText("Person");
+    await act(async () => { fireEvent.mouseEnter(screen.getByRole("button", { name: "Source" })); });
+    fireEvent.keyDown(document, { key: "n", ctrlKey: true });
+    const dialog = await screen.findByRole("dialog", { name: "Add Entity" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Advanced" }));
+    await within(dialog).findByText(hint);
+    fireEvent.change(within(dialog).getByLabelText("Label"), { target: { value: "New concept" } });
+    fireEvent.change(within(dialog).getByLabelText("Type"), { target: { value: "objectProperty" } });
+    expect((within(dialog).getByLabelText("IRI") as HTMLInputElement).value).toBe(namespace + expected);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    const source = await screen.findByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement;
+    await waitFor(() => expect(source.value).toContain('"New concept"'));
+    expect(source.value).toContain(original);
+    expect(parseBlockTriples(source.value, namespace + expected)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "New concept", lang: "en" } });
+    expect(savedBodies).toEqual([]);
+  });
+
 });
