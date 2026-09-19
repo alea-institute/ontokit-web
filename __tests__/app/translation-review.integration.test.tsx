@@ -123,6 +123,23 @@ const actions = () => requests.filter(({ init }) => init.method === "POST");
     expect(screen.getByRole("status").textContent).toContain(kind === "confirm" ? "confirmed" : "rejected");
   });
 
+  it("excludes a deselected translation from bulk confirmation and leaves it reviewable", async () => {
+    const user = userEvent.setup();
+    mount(); await screen.findByText("Objet");
+    await user.click(screen.getByLabelText("Select Objet"));
+    await user.click(screen.getByLabelText("Select Entité"));
+    await user.click(screen.getByLabelText("Select Entité"));
+    expect(screen.getByText("1 selected")).toBeDefined();
+    await user.click(screen.getByRole("button", { name: "Confirm selected" }));
+    await user.click(screen.getByRole("button", { name: "Confirm translations" }));
+    await waitFor(() => expect(screen.queryByText("Objet")).toBeNull());
+    expect(screen.getByText("Entité")).toBeDefined();
+    expect((screen.getByLabelText("Select Entité") as HTMLInputElement).checked).toBe(false);
+    expect(actions()).toHaveLength(1);
+    expect(JSON.parse(String(actions()[0].init.body))).toEqual({ branch: "release/fr", record_ids: ["fr-1"] });
+    expect(screen.getByRole("status").textContent).toBe("1 confirmed; 0 failed.");
+  });
+
   it("retains partial bulk failures, removes successes and retries only the remaining selection", async () => {
     bulkPartial = true;
     const user = userEvent.setup();

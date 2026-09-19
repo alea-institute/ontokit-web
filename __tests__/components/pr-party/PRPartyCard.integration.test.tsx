@@ -68,6 +68,25 @@ describe("PRPartyCard real queue, controls, API and announcements", () => {
     expect(attempts).toBe(2);
   });
 
+  it.each([null, { message: "Gateway rejected review" }])("keeps a verdict retryable when an HTTP error lacks the review schema (%j)", async body => {
+    let attempts = 0;
+    respond = () => ++attempts === 1 ? json(body, 403) : json({ action: { status: "submitted" }, card: detail });
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(screen.getAllByRole("alert").some(node => node.textContent?.includes("Verdict failed for Improve ontology"))).toBe(true));
+    expect(attempts).toBe(1);
+    expect(screen.getByRole("article", { name: "Improve ontology" })).toBeDefined();
+    expect(screen.getByRole("status").textContent).not.toContain("Approving review submitted");
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Approving review submitted"));
+    expect(attempts).toBe(2);
+    expect(screen.queryByText(JSON.stringify(body))).toBeNull();
+    const actions = fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/actions"));
+    expect(actions).toHaveLength(2);
+    expect(JSON.parse(String(actions[1][1]?.body))).toMatchObject({ head_sha: "abc123" });
+    expect(new Headers(actions[1][1]?.headers).get("Authorization")).toBe("Bearer test-token");
+  });
+
   it("scrolls the highlighted API-loaded card into view", async () => {
     const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "scrollIntoView");
     const scroll = vi.fn();

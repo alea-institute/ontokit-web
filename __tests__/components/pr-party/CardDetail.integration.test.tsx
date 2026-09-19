@@ -188,13 +188,16 @@ describe("expanded review card with real queries, mutations and question drafts"
   });
 
   it("can post when browser storage rejects draft reads and writes", async () => {
-    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("Storage denied"); });
-    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage denied"); });
-    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("Storage denied"); });
+    const getItem = vi.spyOn(localStorage, "getItem").mockImplementation(() => { throw new Error("Storage denied"); });
+    const setItem = vi.spyOn(localStorage, "setItem").mockImplementation(() => { throw new Error("Storage denied"); });
+    const removeItem = vi.spyOn(localStorage, "removeItem").mockImplementation(() => { throw new Error("Storage denied"); });
     mutate = () => json({ posted: true, degraded: false, card: detail });
     mount();
     const input = await ask();
     await waitFor(() => expect(input.value).toBe(""));
+    expect(getItem).toHaveBeenCalledWith(draftKey);
+    expect(setItem).toHaveBeenCalledWith(draftKey, "  Why this axiom?  ");
+    expect(removeItem).toHaveBeenCalledWith(draftKey);
     expect(fetchBoundary.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
   });
 

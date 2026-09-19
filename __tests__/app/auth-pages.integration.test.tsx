@@ -73,9 +73,11 @@ describe('authentication error route with real retry countdown and session stora
 
   it('tolerates denied browser storage during automatic retry', async () => {
     vi.useFakeTimers(); navigation.params.set('error', 'Configuration');
-    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new DOMException('Storage denied', 'SecurityError'); });
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new DOMException('Storage denied', 'SecurityError'); });
+    const getItem = vi.spyOn(sessionStorage, 'getItem').mockImplementation(() => { throw new DOMException('Storage denied', 'SecurityError'); });
+    const setItem = vi.spyOn(sessionStorage, 'setItem').mockImplementation(() => { throw new DOMException('Storage denied', 'SecurityError'); });
     render(<AuthErrorPage />); await tick(10);
+    expect(getItem).toHaveBeenCalledWith('auth-error-retry-count');
+    expect(setItem).toHaveBeenCalledWith('auth-error-retry-count', '1');
     expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/auth/signin');
   });
 

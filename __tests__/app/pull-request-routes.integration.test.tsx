@@ -82,6 +82,16 @@ describe('pull request list route through real providers, controls and HTTP', ()
     expect(await screen.findByText('No pull requests have been merged yet.')).toBeDefined();
     expect(fetcher.mock.calls.some(([input]) => new URL(String(input)).searchParams.get('status') === 'merged')).toBe(true);
   });
+  it('shows an unstructured project failure on the detail route without loading review actions', async () => {
+    const fetcher = mount({ detail: true, handler: url => url.pathname.endsWith('/projects/project')
+      ? new Response('Project temporarily unavailable', { status: 403 }) : undefined });
+    expect(await screen.findByText('Project temporarily unavailable')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Merge Pull Request' })).toBeNull();
+    expect(fetcher.mock.calls.some(([url]) => new URL(String(url)).pathname.includes('/pull-requests'))).toBe(false);
+    const request = fetcher.mock.calls.find(([url]) => new URL(String(url)).pathname.endsWith('/projects/project'));
+    expect(new Headers(request?.[1]?.headers).get('Authorization')).toBe('Bearer token');
+  });
+
   it('recovers a list failure by changing the status filter and preserves result links', async () => {
     mount({ handler: url => url.pathname.endsWith('/pull-requests') ? url.searchParams.get('status') === 'open' ? new Response('List unavailable', { status: 403 }) : jsonResponse({ items: [initialPR], total: 1 }) : undefined });
     expect(await screen.findByText('List unavailable')).toBeDefined(); fireEvent.click(screen.getByRole('button', { name: 'All' }));
