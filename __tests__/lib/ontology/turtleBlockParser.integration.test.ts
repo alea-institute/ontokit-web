@@ -65,4 +65,16 @@ describe("Turtle literal and declaration integration", () => {
       extractPropertyDetail(TURTLE_FIXTURE, `${namespace}hasAge`),
     );
   });
+
+  it.each([
+    '(ex:first (ex:second ex:third))',
+    '[ ex:nested [ ex:value "nested value" ] ]',
+    '()',
+  ])("keeps the following predicate aligned after nested object %s", (object) => {
+    const source = `${declarations}ex:item ex:complex ${object} ; ex:after "preserved" .`;
+    const triples = parseBlockTriples(source, `${namespace}item`)!;
+    expect(triples.map(triple => triple.predicate)).toEqual([`${namespace}complex`, `${namespace}after`]);
+    expect(triples[1].object).toEqual({ type: "literal", value: "preserved" });
+  });
+
 });
