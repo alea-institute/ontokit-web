@@ -40,6 +40,49 @@ describe("real index worker message processing", () => {
     expect(result.iriLabels).toEqual([["https://example.org/Thing", "Repeated"]]);
   });
 
+  it("keeps absolute subjects unchanged while resolving relative subjects against the base", () => {
+    const content = '@base <https://base.example/> .\n<https://other.example/Thing> a <urn:Class> .\n<Local> a <urn:Class> .';
+    const result = processMessage({ type: "index", content, issues: [issue("absolute", "https://other.example/Thing"), issue("relative", "https://base.example/Local")] });
+    expect(result.iriIndex).toEqual([
+      ["https://other.example/Thing", { line: 2, col: 1, len: 29 }],
+      ["https://base.example/Local", { line: 3, col: 1, len: 7 }],
+    ]);
+    expect(result.positions.map(([id]) => id)).toEqual(["absolute", "relative"]);
+    expect(result.stats.issuesMatched).toBe(2);
+  });
+
+  it("ignores an undeclared prefix without assigning its label to the preceding subject", () => {
+    const content = '@prefix ex: <https://example.org/> .\nex:First a ex:Class .\nmissing:Other rdfs:label "Not First" .\nex:Last rdfs:label "Last" .';
+    const result = processMessage({ type: "index", content, issues: [issue("missing", "missing:Other"), issue("last", "https://example.org/Last")] });
+    expect(result.iriIndex.map(([iri]) => iri)).toEqual(["https://example.org/First", "https://example.org/Last"]);
+    expect(result.iriLabels).toEqual([["https://example.org/Last", "Last"]]);
+    expect(result.positions.map(([id]) => id)).toEqual(["last"]);
+    expect(result.diagnostics.find(item => item.issueId === "missing")).toMatchObject({ startLineNumber: 1, endColumn: 1 });
+  });
+
+  it("keeps the first location and label when a prefixed subject is defined again", () => {
+    const content = '@prefix ex: <https://example.org/> .\nex:Thing rdfs:label "First" .\nex:Thing rdfs:label "Second" .';
+    const result = processMessage({ type: "index", content, issues: [issue("thing", "https://example.org/Thing")] });
+    expect(result.iriIndex).toEqual([["https://example.org/Thing", { line: 2, col: 1, len: 8 }]]);
+    expect(result.iriLabels).toEqual([["https://example.org/Thing", "First"]]);
+    expect(result.positions).toEqual([["thing", { line: 2, col: 1, len: 8 }]]);
+  });
+
+  it("leaves an unmatched issue at the document start when an indexed name only contains its local name", () => {
+    const result = processMessage({ type: "index", content: '<https://example.org/ThingExtra> a <urn:Class> .', issues: [issue("missing", "https://other.example/Thing")] });
+    expect(result.positions).toEqual([]);
+    expect(result.iriIndex.map(([iri]) => iri)).toEqual(["https://example.org/ThingExtra"]);
+    expect(result.diagnostics).toEqual([{ issueId: "missing", startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 1, message: "[label] Issue missing", severity: "warning" }]);
+    expect(result.stats.issuesMatched).toBe(0);
+  });
+
+  it.each(["#", "/"])("indexes a namespace ending %s exactly without making an empty local-name fallback", ending => {
+    const result = processMessage({ type: "index", content: `<https://example.org${ending}> a <urn:Ontology> .`, issues: [issue("exact", `https://example.org${ending}`), issue("other", `https://other.example${ending}`)] });
+    expect(result.positions.map(([id]) => id)).toEqual(["exact"]);
+    expect(result.stats).toMatchObject({ irisIndexed: 1, localNamesIndexed: 0, issuesMatched: 1 });
+    expect(result.diagnostics.find(item => item.issueId === "other")).toMatchObject({ startLineNumber: 1, endColumn: 1 });
+  });
+
   it("returns an empty index for empty content and does not retain prior message state", () => {
     processMessage({ type: "index", content: source, issues: [] });
     const result = processMessage({ type: "index", content: "", issues: [] });

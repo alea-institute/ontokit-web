@@ -82,6 +82,14 @@ describe("LSP client through its JSON WebSocket boundary", () => {
     expect(await pending).toEqual([]);
   });
 
+  it("keeps completions usable when the server sends an unsupported documentation primitive", async () => {
+    const { client, socket } = await connected();
+    const pending = client.getCompletions(uri, 0, 0);
+    socket.receive({ id: socket.sent.at(-1)!.id, result: [{ label: "Thing", kind: 7, documentation: 42, insertText: "ex:Thing" }] });
+    expect(await pending).toEqual([{ label: "Thing", kind: "class", detail: undefined, documentation: undefined, insertText: "ex:Thing" }]);
+    client.disconnect();
+  });
+
   it.each([true, false])("normalizes completion documentation and insertion text from a list wrapper: %s", async wrapped => {
     const { client, socket } = await connected();
     const pending = client.getCompletions(uri, 0, 0);
