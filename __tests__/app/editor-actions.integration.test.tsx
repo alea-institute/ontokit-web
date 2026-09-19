@@ -43,6 +43,11 @@ let client: QueryClient;
 const originalSource = '@prefix owl: <http://www.w3.org/2002/07/owl#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix ex: <https://example.test/> .\nex:Person a <http://www.w3.org/2002/07/owl#Class> .';
 let saveStatus: number;
 let sourceStatus: number;
+let sourceContent: string;
+let sourceRevision: string;
+let entityResults: object[];
+let suggestionFailure: "create" | "save" | null;
+let suggestionBodies: { content: string; entity_iri: string; entity_label: string }[];
 let savedBodies: unknown[];
 let unexpected: string[];
 const requests: { path: string; method: string; search: string; authorization: string | null }[] = [];
@@ -56,6 +61,25 @@ function authenticate() {
   boundary.session = { data: { accessToken: "route-fixture-token", user: { email: "reader@example.test" } }, status: "authenticated" };
 }
 
+type EditableType = "property" | "individual";
+const editableIri = "https://example.test/Editable";
+async function openEntityForm(entityType: EditableType) {
+  const owlType = entityType === "property" ? "ObjectProperty" : "NamedIndividual";
+  sourceContent = originalSource + '\nex:Editable a owl:' + owlType + ' ;\n  rdfs:label "Original entity"@en ;\n  rdfs:comment "Preserved comment"@en .';
+  entityResults = [{ iri: editableIri, label: "Original entity", entity_type: entityType, property_kind: "object" }];
+  mount(); await screen.findByText("Person");
+  await act(async () => { fireEvent.mouseEnter(screen.getByRole("button", { name: "Source" })); });
+  fireEvent.click(screen.getByRole("button", { name: entityType === "property" ? "Properties" : "Individuals" }));
+  fireEvent.click(await screen.findByText("Original entity"));
+  const inputs = await screen.findAllByPlaceholderText("Label text");
+  return inputs.find(input => (input as HTMLInputElement).value === "Original entity") as HTMLInputElement;
+}
+async function editAndSave(label: HTMLInputElement, value: string) {
+  fireEvent.change(label, { target: { value } }); fireEvent.blur(label);
+  await waitFor(() => expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(false));
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   useDraftStore.setState({ drafts: {} });
@@ -66,8 +90,8 @@ beforeEach(() => {
   authenticate();
   projectResponse = { id: "route-project", name: "Route ontology", source_file_path: "ontology.ttl", user_role: "owner", is_public: false };
   projectStatus = 200; deleted = false; deleteFailure = false;
-  saveStatus = 200; sourceStatus = 200;
-  savedBodies = [];
+  saveStatus = 200; sourceStatus = 200; sourceContent = originalSource; sourceRevision = "base-commit"; entityResults = [];
+  savedBodies = []; suggestionBodies = []; suggestionFailure = null;
   useEditorModeStore.getState().setEditorMode("developer");
   unexpected = [];
   requests.length = 0;
@@ -80,7 +104,13 @@ beforeEach(() => {
     const path = new URL(String(input)).pathname;
     requests.push({ path, method: init?.method ?? "GET", search: new URL(String(input)).search, authorization: new Headers(init?.headers).get("Authorization") });
     if (path === "/api/v1/projects/route-project") return json(projectResponse, projectStatus);
+    if (path.endsWith("/suggestions/sessions")) return suggestionFailure === "create" ? json({ detail: "Session refused" }, 403) : json({ session_id: "suggestion-session", branch: "suggestion/draft", created_at: "2026-09-19T12:00:00Z", beacon_token: "fixture-beacon" });
+    if (path.endsWith("/suggestions/sessions/suggestion-session/save")) {
+      suggestionBodies.push(JSON.parse(String(init?.body)));
+      return suggestionFailure === "save" ? json({ detail: "Suggestion refused" }, 403) : json({ commit_hash: "suggestion-commit", branch: "suggestion/draft", changes_count: suggestionBodies.length });
+    }
     if (path.endsWith("/suggestions/capabilities")) return json({ tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 });
+    if (path.endsWith("/ontology/search")) return json({ results: entityResults, total: entityResults.length });
     if (path.endsWith("/ontology/tree")) return json({ nodes: deleted ? [] : [{ iri, label: "Person", child_count: 0 }], total_classes: deleted ? 0 : 1 });
     if (path.endsWith('/ontology/classes/' + encodeURIComponent(iri))) {
       if (init?.method === 'DELETE') { if (deleteFailure) return json({ detail: 'Delete refused' }, 403); deleted = true; return new Response(null, { status: 204 }); }
@@ -97,10 +127,11 @@ beforeEach(() => {
     if (path.endsWith("/suggestions/pending")) return json({ items: [] });
     if (path.endsWith("/branches")) return json({ items: [{ name: "main", is_current: true }], current_branch: "main", default_branch: "main" });
     if (path.endsWith("/normalization/status")) return json({ needs_normalization: false });
-    if (path.endsWith("/revisions/file")) return sourceStatus === 200 ? json({ content: originalSource, revision: "base-commit", filename: "ontology.ttl" }) : json({ detail: "Source unavailable" }, sourceStatus);
+    if (path.endsWith("/revisions/file")) return sourceStatus === 200 ? json({ content: sourceContent, revision: sourceRevision, filename: "ontology.ttl" }) : json({ detail: "Source unavailable" }, sourceStatus);
     if (path.endsWith("/source")) {
       savedBodies.push(JSON.parse(String(init?.body)));
       if (saveStatus === 403) return json({ detail: "Save refused" }, 403);
+      if (saveStatus === 200) { sourceContent = (savedBodies.at(-1) as { content: string }).content; sourceRevision = "saved-commit"; }
       return saveStatus === 409
         ? json({ detail: { code: "SOURCE_REVISION_CONFLICT", message: "Source changed", base_revision: "base-commit", current_revision: "other-commit", branch: "main" } }, 409)
         : json({ commit_hash: "saved-commit" });
@@ -248,6 +279,138 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     await screen.findByText("Failed to load source before adding entity");
     expect(screen.queryByText("Uncreated class")).toBeNull();
     expect(savedBodies).toEqual([]);
+  });
+
+  it.each([
+    ["property", 200], ["individual", 200],
+    ["property", 403], ["individual", 403],
+    ["property", 409], ["individual", 409],
+  ] as const)("saves the real %s form through the source writer with HTTP status %i", async (entityType, status) => {
+    saveStatus = status;
+    const label = await openEntityForm(entityType);
+    expect(label).toBeDefined();
+    await editAndSave(label, "Changed entity");
+    await waitFor(() => expect(savedBodies).toHaveLength(1));
+    const payload = savedBodies[0] as { content: string; base_revision: string; commit_message: string };
+    expect(payload).toMatchObject({ base_revision: "base-commit", commit_message: "Update " + entityType + " Changed entity" });
+    const triples = parseBlockTriples(payload.content, editableIri);
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Changed entity", lang: "en" } });
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#comment", object: { type: "literal", value: "Preserved comment", lang: "en" } });
+    expect(parseBlockTriples(payload.content, iri)).toEqual(parseBlockTriples(originalSource, iri));
+    expect(requests.find(r => r.path.endsWith("/source"))).toMatchObject({ method: "PUT", search: "?branch=main", authorization: "Bearer route-fixture-token" });
+    if (status === 200) {
+      await screen.findByText('Updated "Changed entity"');
+      expect(Object.values(useDraftStore.getState().drafts)).toHaveLength(0);
+    } else {
+      if (status === 409) await screen.findByText("A newer source revision is available.");
+      else await screen.findAllByText(/Save refused/);
+      expect(label.value).toBe("Changed entity");
+      expect(Object.values(useDraftStore.getState().drafts).some(draft => draft.labels.some(value => value.value === "Changed entity"))).toBe(true);
+      expect(screen.queryByText('Updated "Changed entity"')).toBeNull();
+    }
+  });
+
+  it.each(["property", "individual"] as const)("discards a %s edit without changing its saved source", async entityType => {
+    const label = await openEntityForm(entityType);
+    fireEvent.change(label, { target: { value: "Discarded label" } }); fireEvent.blur(label);
+    await waitFor(() => expect(Object.values(useDraftStore.getState().drafts)).toHaveLength(1));
+    fireEvent.click(screen.getByTitle("Discard changes"));
+    await waitFor(() => expect(label.value).toBe("Original entity"));
+    expect(Object.values(useDraftStore.getState().drafts)).toHaveLength(0);
+    expect(savedBodies).toEqual([]);
+    expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(true);
+  });
+
+  it.each(["property", "individual"] as const)("uses the newly committed revision for a second %s edit", async entityType => {
+    const label = await openEntityForm(entityType);
+    await editAndSave(label, "First change");
+    await screen.findByText('Updated "First change"');
+    await editAndSave(label, "Second change");
+    await screen.findByText('Updated "Second change"');
+    expect(savedBodies).toHaveLength(2);
+    expect(savedBodies[0]).toMatchObject({ base_revision: "base-commit" });
+    expect(savedBodies[1]).toMatchObject({ base_revision: "saved-commit" });
+    const second = savedBodies[1] as { content: string };
+    const labels = parseBlockTriples(second.content, editableIri)?.filter(triple => triple.predicate === "http://www.w3.org/2000/01/rdf-schema#label");
+    expect(labels).toEqual([{ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Second change", lang: "en" } }]);
+    expect(Object.values(useDraftStore.getState().drafts)).toHaveLength(0);
+  });
+
+  it.each([
+    ["class", null], ["property", null],
+    ["class", "create"], ["property", "create"],
+    ["class", "save"], ["property", "save"],
+  ] as const)("persists a %s suggestion through the real session workflow (failure: %s)", async (entityType, failure) => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    suggestionFailure = failure;
+    let label: HTMLInputElement;
+    if (entityType === "property") label = await openEntityForm("property");
+    else {
+      mount(); fireEvent.click(await screen.findByText("Person"));
+      label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+      await waitFor(() => expect(label.value).toBe("Person"));
+    }
+    await editAndSave(label, "Suggested entity");
+    if (failure) {
+      await screen.findAllByText(failure === "create" ? "The suggestion session could not start. Please retry." : "The suggested update was not saved. Please retry.");
+      expect(Object.values(useDraftStore.getState().drafts).some(draft => draft.labels.some(value => value.value === "Suggested entity"))).toBe(true);
+      expect(screen.queryByText('Suggested update to "Suggested entity"')).toBeNull();
+    } else {
+      await screen.findByText('Suggested update to "Suggested entity"');
+      expect(Object.values(useDraftStore.getState().drafts)).toHaveLength(0);
+      expect(screen.getByRole("button", { name: /Submit Suggestions/ })).toBeDefined();
+    }
+    expect(savedBodies).toEqual([]);
+    const creates = requests.filter(r => r.path.endsWith("/suggestions/sessions"));
+    expect(creates).toHaveLength(1);
+    expect(creates[0]).toMatchObject({ method: "POST", authorization: "Bearer route-fixture-token" });
+    expect(suggestionBodies).toHaveLength(failure === "create" ? 0 : 1);
+    if (failure !== "create") {
+      const target = entityType === "class" ? iri : editableIri;
+      expect(suggestionBodies[0]).toMatchObject({ entity_iri: target, entity_label: "Suggested entity" });
+      expect(parseBlockTriples(suggestionBodies[0].content, target)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Suggested entity", lang: "en" } });
+    }
+    if (failure) {
+      suggestionFailure = null;
+      fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+      await screen.findByText('Suggested update to "Suggested entity"');
+      expect(suggestionBodies).toHaveLength(failure === "create" ? 1 : 2);
+      expect(requests.filter(r => r.path.endsWith("/suggestions/sessions"))).toHaveLength(failure === "create" ? 2 : 1);
+      expect(Object.values(useDraftStore.getState().drafts)).toHaveLength(0);
+      expect(savedBodies).toEqual([]);
+    }
+  });
+
+  it.each(["class", "property"] as const)("reuses an active suggestion session for a second %s save", async entityType => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    let label: HTMLInputElement;
+    if (entityType === "property") label = await openEntityForm("property");
+    else {
+      mount(); fireEvent.click(await screen.findByText("Person"));
+      label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+      await waitFor(() => expect(label.value).toBe("Person"));
+    }
+    await editAndSave(label, "First suggestion");
+    await screen.findByText('Suggested update to "First suggestion"');
+    await editAndSave(label, "Second suggestion");
+    await screen.findByText('Suggested update to "Second suggestion"');
+    expect(requests.filter(r => r.path.endsWith("/suggestions/sessions"))).toHaveLength(1);
+    expect(suggestionBodies).toHaveLength(2);
+    const target = entityType === "class" ? iri : editableIri;
+    expect(parseBlockTriples(suggestionBodies[1].content, target)?.filter(triple => triple.predicate === "http://www.w3.org/2000/01/rdf-schema#label")).toEqual([{ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Second suggestion", lang: "en" } }]);
+    expect(savedBodies).toEqual([]);
+  });
+
+  it.each(["property", "individual"] as const)("rejects a blank %s label and saves after correction", async entityType => {
+    const label = await openEntityForm(entityType);
+    fireEvent.change(label, { target: { value: "   " } }); fireEvent.blur(label);
+    await screen.findByText("At least one label is required");
+    expect(screen.getByRole("button", { name: "Save" }).hasAttribute("disabled")).toBe(true);
+    expect(savedBodies).toEqual([]);
+    await editAndSave(label, "Corrected entity");
+    await screen.findByText('Updated "Corrected entity"');
+    expect(screen.queryByText("At least one label is required")).toBeNull();
+    expect(savedBodies).toHaveLength(1);
   });
 
 });
