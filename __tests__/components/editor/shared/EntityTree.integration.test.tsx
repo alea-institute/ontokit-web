@@ -35,6 +35,30 @@ const key = (value: string) => fireEvent.keyDown(screen.getByRole('tree'), { key
 const selected = () => screen.getByLabelText('Selected entity').textContent;
 
 describe('entity tree keyboard interactions through lazy ontology state and HTTP', () => {
+  it('finds the correct parent after searching an unrelated expanded subtree', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/tree')) return Response.json({ nodes: ['First', 'Second'].map(name => ({ iri: iri(name), label: name, child_count: 1 })), total_classes: 4 });
+      const parent = decodeURIComponent(path.split('/').at(-2)!);
+      const label = parent === iri('First') ? 'First child' : 'Second child';
+      return Response.json({ nodes: [{ iri: iri(label), label, child_count: 0 }], total_classes: 4 });
+    }));
+    render(<Harness toolbar />);
+    await screen.findByText('Second');
+    fireEvent.click(screen.getByRole('button', { name: 'Expand one level' }));
+    await screen.findByText('First child');
+    await screen.findByText('Second child');
+    fireEvent.click(screen.getByText('Second child'));
+    expect(selected()).toBe(iri('Second child'));
+    key('ArrowLeft'); key('Enter');
+    expect(selected()).toBe(iri('Second'));
+    key('ArrowLeft');
+    expect(screen.queryByText('Second child')).toBeNull();
+    expect(screen.getByText('First child')).toBeDefined();
+    key('ArrowLeft'); key('Enter');
+    expect(selected()).toBe(iri('Second'));
+  });
+
   it('expands through the toolbar and remembers the dismissed teaching tip across remounts', async () => {
     const view = render(<Harness toolbar />);
     await screen.findByText('Root');

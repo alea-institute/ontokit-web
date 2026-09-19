@@ -59,4 +59,37 @@ describe('HTTP error contracts through the real domain and transport client', ()
     expect([...url.searchParams.entries()]).toEqual([['branch', 'feature/a b'], ['dry_run', 'false']]);
     expect(new Headers(call[1]?.headers).has('Content-Type')).toBe(false); expect(call[1]?.body).toBe(data);
   });
+
+  it('cancels an in-flight request and removes the caller abort listener without retrying', async () => {
+    const controller = new AbortController();
+    const remove = vi.spyOn(controller.signal, 'removeEventListener');
+    let transportSignal: AbortSignal | undefined;
+    const fetcher = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      transportSignal = init?.signal ?? undefined;
+      transportSignal?.addEventListener('abort', () => reject(transportSignal?.reason), { once: true });
+    }));
+    vi.stubGlobal('fetch', fetcher);
+    const request = api.get('/api/v1/projects/project', { signal: controller.signal });
+    const rejected = expect(request).rejects.toHaveProperty('name', 'AbortError');
+    expect(transportSignal?.aborted).toBe(false);
+    controller.abort();
+    await rejected;
+    expect(transportSignal?.aborted).toBe(true);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+  });
+
+  it('detaches cancellation after success so a later caller abort cannot reach the completed transport', async () => {
+    const controller = new AbortController();
+    let transportSignal: AbortSignal | undefined;
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      transportSignal = init?.signal ?? undefined;
+      return Response.json({ id: 'project' });
+    }));
+    await expect(api.get('/api/v1/projects/project', { signal: controller.signal })).resolves.toEqual({ id: 'project' });
+    expect(transportSignal).toBeInstanceOf(AbortSignal);
+    controller.abort();
+    expect(controller.signal.aborted).toBe(true);
+    expect(transportSignal?.aborted).toBe(false);
+  });
 });

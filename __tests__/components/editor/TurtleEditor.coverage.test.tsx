@@ -112,6 +112,9 @@ describe('TurtleEditor production language providers', () => {
     ['owl:Class', 1, 3, 'Full IRI: `http://www.w3.org/2002/07/owl#Class`', 'open in browser'],
     ['@prefix owl: <https://custom.org/> .\nowl:Class', 2, 3, 'Full IRI: `https://custom.org/Class`', 'navigate to class'],
     ['<https://external.org/Class>', 1, 4, '**<https://external.org/Class>**', 'open in browser'],
+    ['@prefix ex: <https://example.org/> .\n<https://example.org/Person>', 2, 4, '**<https://example.org/Person>**', 'navigate to class'],
+    ['@prefix ex: <https://example.org/> .\n<https://external.org/Person>', 2, 4, '**<https://external.org/Person>**', 'open in browser'],
+    ['@prefix owl: <http://www.w3.org/2002/07/owl#> .\n<http://www.w3.org/2002/07/owl#Class>', 2, 4, '**<http://www.w3.org/2002/07/owl#Class>**', 'open in browser'],
   ])('resolves hover namespaces in %s', (source, line, column, expected, action) => {
     const { model } = mount(source);
     const result = hover(model!, line, column);
@@ -300,6 +303,20 @@ describe('TurtleEditor navigation and diagnostics', () => {
     expect(monaco.editor.setModelMarkers).toHaveBeenCalledExactlyOnceWith(view.model, 'turtle-linter', []);
     act(() => vi.advanceTimersByTime(100));
     expect(monaco.editor.setModelMarkers).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts with a dark system preference and restores it when an explicit override is removed', () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true, addEventListener: (_name: string, handler: typeof mediaChange) => { mediaChange = handler; }, removeEventListener: mediaRemove })));
+    const view = mount();
+    expect(bridge.props.theme).toBe('vs-dark');
+    view.rerender(<TurtleEditor value="" theme="light" />);
+    expect(bridge.props.theme).toBe('vs');
+    view.rerender(<TurtleEditor value="" />);
+    expect(bridge.props.theme).toBe('vs-dark');
+    act(() => mediaChange({ matches: false }));
+    expect(bridge.props.theme).toBe('vs');
+    view.unmount();
+    expect(mediaRemove).toHaveBeenCalledWith('change', mediaChange);
   });
 
   it('responds to theme preference changes, honors override, and removes listener', () => {
