@@ -17,6 +17,27 @@ function setup(initialBranch?: string) {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); sessionStorage.clear(); });
 
 describe('branch provider storage and API integration', () => {
+  it('keeps a newly created branch selected when saving its preference fails', async () => {
+    const { result, fetcher } = setup();
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    fetcher.mockImplementation(async (_input, init) => {
+      if (init?.method === 'POST') return jsonResponse({ name: 'new-review', commit_hash: 'created', is_default: false });
+      if (init?.method === 'PUT') return jsonResponse({ detail: 'Preference unavailable' }, 403);
+      return jsonResponse({ items: [{ name: 'main' }, { name: 'review' }, { name: 'new-review' }], current_branch: 'main', default_branch: 'main', preferred_branch: 'review', has_github_remote: true, last_sync_at: null, sync_status: 'idle' });
+    });
+    await act(async () => {
+      const branch = await result.current.createBranch('new-review', 'main');
+      expect(branch.name).toBe('new-review');
+    });
+    await waitFor(() => expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(1));
+    expect(result.current.currentBranch).toBe('new-review');
+    expect(result.current.error).toBeNull();
+    expect(result.current.branches.some(branch => branch.name === 'new-review')).toBe(true);
+    expect(sessionStorage.getItem('ontokit:branch:storage-project')).toBe('new-review');
+    const created = fetcher.mock.calls.find(([, init]) => init?.method === 'POST');
+    expect(JSON.parse(String(created?.[1]?.body))).toEqual({ name: 'new-review', from_branch: 'main' });
+  });
+
   it('restores the requested feature branch when authentication arrives after the public branch response', async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       expect(new URL(String(input)).pathname).toBe('/api/v1/projects/storage-project/branches');
