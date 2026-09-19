@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
+import { parseBlockTriples } from "@/lib/ontology/turtleBlockParser";
 import { TURTLE_FIXTURE } from "./fixtures";
 
 describe("updateClassInTurtle", () => {
@@ -8,6 +9,22 @@ describe("updateClassInTurtle", () => {
     comments: [{ value: "A domesticated canine", lang: "en" }],
     parent_iris: ["http://example.org/ont#Animal"],
   };
+
+  it.each(["comments", "annotations"] as const)("omits blank %s in the writer-to-parser chain without losing parents", field => {
+    const note = "http://www.w3.org/2004/02/skos/core#editorialNote";
+    const values = [{ value: " \t", lang: "en" }, { value: "meaningful", lang: "fr" }];
+    const result = updateClassInTurtle(TURTLE_FIXTURE, "http://example.org/ont#Dog", {
+      ...baseData,
+      ...(field === "comments" ? { comments: values } : { annotations: [{ property_iri: note, values }] }),
+    });
+    const triples = parseBlockTriples(result, "http://example.org/ont#Dog")!;
+    const predicate = field === "comments" ? "http://www.w3.org/2000/01/rdf-schema#comment" : note;
+    expect(triples.filter(triple => triple.predicate === predicate)).toEqual([
+      { predicate, object: { type: "literal", value: "meaningful", lang: "fr" } },
+    ]);
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: "http://example.org/ont#Animal" } });
+    expect(parseBlockTriples(result, "http://example.org/ont#Animal")).toEqual(parseBlockTriples(TURTLE_FIXTURE, "http://example.org/ont#Animal"));
+  });
 
   describe("characterization: class block regeneration", () => {
     it("preserves 13 alt labels across nine languages when only the label is edited", () => {

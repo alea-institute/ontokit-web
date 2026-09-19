@@ -55,6 +55,25 @@ describe("property grouping through the real API and entity tree", () => {
     expect(fetchBoundary.mock.calls.map(([url]) => new URL(String(url)).searchParams.get("branch"))).toEqual(["main", "review"]);
   });
 
+  it.each(["success", "error"])("retains the loading state when an obsolete %s arrives before the current request", async outcome => {
+    let releaseOld!: (response: Response) => void;
+    let releaseCurrent!: (response: Response) => void;
+    fetchBoundary.mockReturnValueOnce(new Promise(resolve => { releaseOld = resolve; }))
+      .mockReturnValueOnce(new Promise(resolve => { releaseCurrent = resolve; }));
+    const onNodesLoaded = vi.fn();
+    const view = render(<Harness onNodesLoaded={onNodesLoaded} />);
+    view.rerender(<Harness branch="review" onNodesLoaded={onNodesLoaded} />);
+    await act(async () => { releaseOld(outcome === "success" ? json([objectProperty]) : new Response("Obsolete failure", { status: 403 })); });
+    expect(view.container.querySelector(".animate-spin")).not.toBeNull();
+    expect(screen.queryByRole("tree")).toBeNull();
+    expect(screen.queryByText("Obsolete failure")).toBeNull();
+    expect(onNodesLoaded).not.toHaveBeenCalled();
+    await act(async () => { releaseCurrent(json([dataProperty])); });
+    expect(screen.getByRole("treeitem", { name: "age" })).toBeDefined();
+    expect(view.container.querySelector(".animate-spin")).toBeNull();
+    expect(onNodesLoaded).toHaveBeenCalledExactlyOnceWith([{ iri: dataProperty.iri, label: "age" }]);
+  });
+
   it("recovers from a failed search through an empty branch into a populated branch", async () => {
     fetchBoundary.mockResolvedValueOnce(new Response("Search unavailable", { status: 403 })).mockResolvedValueOnce(json([])).mockResolvedValueOnce(json([objectProperty]));
     const view = render(<Harness />);
