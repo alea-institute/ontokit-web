@@ -1,0 +1,117 @@
+import { createRef } from "react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OntologySourceEditor, type OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+import type { IndexWorkerResult } from "@/lib/editor/indexWorker";
+
+const bridge = vi.hoisted(() => ({ props: {} as Record<string, unknown> }));
+vi.mock("@monaco-editor/react", () => ({
+  default: (props: Record<string, unknown>) => {
+    bridge.props = props;
+    return <textarea aria-label="Source" value={props.value as string} onChange={event => (props.onChange as (value: string) => void)(event.target.value)} />;
+  },
+  loader: { config: vi.fn() },
+}));
+class IndexWorker {
+  static instances: IndexWorker[] = [];
+  onmessage: ((event: MessageEvent<IndexWorkerResult>) => void) | null = null;
+  onerror: ((event: ErrorEvent) => void) | null = null;
+  postMessage = vi.fn();
+  terminate = vi.fn();
+  constructor() { IndexWorker.instances.push(this); }
+}
+const content = '@prefix ex: <https://example.org/> .\nex:Thing a <http://www.w3.org/2002/07/owl#Class> .';
+const issue = { id: "missing", rule_id: "missing-label", message: "A label is needed", subject_iri: "https://example.org/Thing", issue_type: "warning" };
+const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
+let fetcher: ReturnType<typeof vi.fn>;
+const position = { line: 2, col: 1, len: 8 };
+function result(): IndexWorkerResult {
+  return { type: "result", positions: [[issue.id, position]], iriIndex: [[issue.subject_iri, position]], iriLabels: [[issue.subject_iri, "Thing"]], diagnostics: [{ issueId: issue.id, startLineNumber: 2, startColumn: 1, endLineNumber: 2, endColumn: 9, message: "[missing-label] A label is needed", severity: "warning" }], stats: { linesProcessed: 2, irisIndexed: 1, localNamesIndexed: 1, issuesMatched: 1, timeMs: 1 } };
+}
+function mountEditor() {
+  const model = { getValue: () => bridge.props.value, isDisposed: () => false, getLineContent: () => "", getLineCount: () => 2 };
+  let mouse: (event: unknown) => void = () => {};
+  const editor = { getModel: () => model, revealLineInCenter: vi.fn(), setPosition: vi.fn(), focus: vi.fn(), onMouseDown: (handler: typeof mouse) => { mouse = handler; } };
+  const monaco = { editor: { setModelMarkers: vi.fn(), MouseTargetType: { GUTTER_GLYPH_MARGIN: 2 } }, MarkerSeverity: { Error: 8, Warning: 4, Info: 2, Hint: 1 } };
+  act(() => (bridge.props.onMount as (e: typeof editor, m: typeof monaco) => void)(editor, monaco));
+  return { editor, monaco, clickDiagnostic: () => act(() => mouse({ target: { type: 2, position: { lineNumber: 2, column: 1 } }, event: { ctrlKey: false, metaKey: false } })) };
+}
+beforeEach(() => {
+  IndexWorker.instances = [];
+  vi.stubGlobal("Worker", IndexWorker);
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+  fetcher = vi.fn(async () => json({ items: [issue] }));
+  vi.stubGlobal("fetch", fetcher);
+});
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+const props = { projectId: "source-project", accessToken: "source-token", initialValue: content };
+
+describe("source editor integration through real TurtleEditor and lint API", () => {
+  it("loads authenticated lint, maps worker results to navigation and Monaco diagnostics", async () => {
+    const navigate = vi.fn();
+    render(<OntologySourceEditor {...props} onNavigateToClass={navigate} />);
+    const mounted = mountEditor();
+    await screen.findByText(issue.message);
+    const worker = IndexWorker.instances.at(-1)!;
+    expect(worker.postMessage).toHaveBeenCalledWith(expect.objectContaining({ content, issues: [expect.objectContaining({ id: issue.id })] }));
+    act(() => worker.onmessage?.({ data: result() } as MessageEvent<IndexWorkerResult>));
+    fireEvent.click(screen.getByText(issue.message));
+    expect(mounted.editor.setPosition).toHaveBeenCalledWith({ lineNumber: 2, column: 1 });
+    await waitFor(() => expect(mounted.monaco.editor.setModelMarkers).toHaveBeenCalledWith(expect.anything(), "turtle-linter", [expect.objectContaining({ severity: 4, startLineNumber: 2 })]));
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(new URL(url).searchParams.get("include_resolved")).toBe("false");
+    expect(new Headers(init.headers).get("Authorization")).toBe("Bearer source-token");
+    expect(worker.terminate).toHaveBeenCalled();
+  });
+
+  it("fulfills an imperative scroll queued before the local worker index arrives", async () => {
+    const ref = createRef<OntologySourceEditorRef>();
+    render(<OntologySourceEditor {...props} ref={ref} />);
+    const { editor } = mountEditor();
+    await screen.findByText(issue.message);
+    expect(ref.current!.scrollToIri(issue.subject_iri)).toBe(true);
+    expect(editor.setPosition).not.toHaveBeenCalled();
+    act(() => IndexWorker.instances.at(-1)!.onmessage?.({ data: result() } as MessageEvent<IndexWorkerResult>));
+    expect(editor.setPosition).toHaveBeenCalledWith({ lineNumber: 2, column: 1 });
+    expect(ref.current!.scrollToIri("https://elsewhere.org/Absent")).toBe(false);
+  });
+
+  it("preserves editable content when the lint endpoint fails and recovers on project change", async () => {
+    const logged = vi.spyOn(console, "error");
+    fetcher.mockResolvedValueOnce(json({ detail: "Lint unavailable" }, 403));
+    const view = render(<OntologySourceEditor {...props} />);
+    mountEditor();
+    await waitFor(() => expect(logged).toHaveBeenCalledWith("Failed to fetch lint issues:", expect.any(Error)));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(content);
+    view.rerender(<OntologySourceEditor {...props} projectId="recovered" />);
+    expect(await screen.findByText(issue.message)).toBeTruthy();
+  });
+
+  it("retries failed saves through the real change handler and keeps the new baseline on revert", async () => {
+    const save = vi.fn().mockRejectedValueOnce("offline").mockResolvedValueOnce(undefined);
+    render(<OntologySourceEditor {...props} onSave={save} />);
+    mountEditor();
+    await screen.findByText(issue.message);
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: `${content}\n# changed` } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Failed to save")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.queryByText("Failed to save")).toBeNull());
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true));
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "another edit" } });
+    fireEvent.click(screen.getByRole("button", { name: "Revert" }));
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe(`${content}\n# changed`);
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it("avoids requests and workers for an empty unbound editor while exposing a usable ref", () => {
+    const ref = createRef<OntologySourceEditorRef>();
+    render(<OntologySourceEditor projectId="" initialValue="" ref={ref} />);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(IndexWorker.instances).toHaveLength(0);
+    expect(ref.current!.getValue()).toBe("");
+    expect(() => ref.current!.insertAtEnd("unused before mount")).not.toThrow();
+    act(() => ref.current!.replaceValue(""));
+    expect(ref.current!.getValue()).toBe("");
+  });
+});

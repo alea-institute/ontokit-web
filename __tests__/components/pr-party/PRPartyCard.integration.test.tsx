@@ -1,0 +1,140 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { PRPartyCard } from "@/components/pr-party/PRPartyCard";
+import { ScreenReaderAnnouncerProvider } from "@/components/ui/ScreenReaderAnnouncer";
+import { usePRPartyQueue } from "@/lib/hooks/usePRPartyQueue";
+import type { PRPartyCardDetail, PRPartyQueueCard } from "@/lib/api/prParty";
+
+vi.mock("next-auth/react", () => ({ useSession: () => ({ data: { user: { id: "reviewer", email: "reviewer@example.test" }, accessToken: "test-token" }, status: "authenticated" }) }));
+const card: PRPartyQueueCard = {
+  card_id: "card-1", repo_full_name: "example/ontology", pr_number: 3,
+  title: "Improve ontology", author_kind: "counterpart", author_github_login: "author",
+  read_only: false, state: "open", head_sha: "abc123", mergeable_state: "clean",
+  checks_rollup: "success", brief_status: "ready", brief_truncated: false,
+  ready_at: "2026-09-01T00:00:00Z", updated_at_github: "2026-09-01T00:00:00Z",
+  pr_url: "https://github.com/example/ontology/pull/3", diff_url: "https://github.com/example/ontology/pull/3/files",
+  readiness: { ready: true, reason: null }, actions: [],
+  other_reviewer: { has_approved: true, has_pending_intent: false }, stale: false, parked: false,
+};
+const detail: PRPartyCardDetail = {
+  ...card, brief_what: "Improves class hierarchy", brief_why: "Removes ambiguity",
+  brief_decisions: [], brief_links: [], truncated_note: null, brewing_since: null,
+  created_at: "2026-09-01T00:00:00Z", updated_at: "2026-09-01T00:00:00Z", qa_thread: [],
+};
+const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { "Content-Type": "application/json" } });
+let row: PRPartyQueueCard;
+let respond: (path: string, init: RequestInit) => Response;
+const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+  const path = new URL(String(input)).pathname;
+  if (path.endsWith("/queue")) return json({ cards: [row], generated_at: "2026-09-01T00:00:00Z" });
+  return respond(path, init);
+});
+let client: QueryClient;
+function Harness() {
+  const queue = usePRPartyQueue();
+  return <>{queue.cards.map(item => <PRPartyCard key={item.card_id} card={item} detail={detail}
+    onSubmitAction={queue.submitAction} onUnpark={queue.unparkCard} onRerunReview={queue.rerunReview} />)}</>;
+}
+function mount() {
+  return render(<QueryClientProvider client={client}><ScreenReaderAnnouncerProvider><Harness /></ScreenReaderAnnouncerProvider></QueryClientProvider>);
+}
+beforeEach(() => {
+  row = { ...card }; client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  fetchMock.mockClear(); sessionStorage.clear(); vi.stubGlobal("fetch", fetchMock);
+  respond = () => json({ action: { merged: false, status: "recorded" }, card: detail });
+});
+afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+describe("PRPartyCard real queue, controls, API and announcements", () => {
+  it("opens a trusted degraded receipt and exposes the fallback link", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    respond = () => json({ action: { status: "recorded" }, card: detail, degraded: true, deep_link: card.pr_url });
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    expect(await screen.findByRole("link", { name: "Recorded here — finish it on GitHub" })).toBeDefined();
+    expect(open).toHaveBeenCalledWith(card.pr_url, "_blank", "noopener,noreferrer");
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("Verdict recorded"));
+    const request = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/actions"));
+    expect(JSON.parse(String(request?.[1]?.body))).toMatchObject({ action_kind: "review", verdict: "approve", head_sha: "abc123", idempotency_key: expect.any(String) });
+  });
+
+  it("rejects unsafe degraded links while announcing the replay accurately", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    respond = () => json({ action: { status: "recorded" }, card: detail, degraded: true, replayed: true, deep_link: "javascript:alert(1)" });
+    mount(); fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("was already recorded"));
+    expect(open).not.toHaveBeenCalled();
+    expect(screen.queryByRole("link", { name: "Recorded here — finish it on GitHub" })).toBeNull();
+  });
+
+  it("reports a confirmed own-PR merge from the actual response receipt", async () => {
+    row = { ...card, read_only: true, author_kind: "own" };
+    respond = () => json({ action: { merged: true, status: "merged" }, card: detail });
+    mount(); fireEvent.click(await screen.findByRole("button", { name: "Merge pull request" }));
+    expect(await screen.findByText("Merged. Improve ontology is in.")).toBeDefined();
+    await waitFor(() => expect(screen.getByText("Improve ontology merged.")).toBeDefined());
+    expect(screen.getByTestId("pr-party-card-merge-outcome").getAttribute("data-outcome")).toBe("merged");
+  });
+
+  it("does not claim merge success on an HTTP success with a declined receipt", async () => {
+    row = { ...card, read_only: true, author_kind: "own" };
+    respond = () => json({ action: { merged: false, status: "blocked" }, card: detail, deep_link: "https://evil.example/pull/3" });
+    mount(); fireEvent.click(await screen.findByRole("button", { name: "Merge pull request" }));
+    expect(await screen.findByText(/Not merged — GitHub recorded the request \(blocked\)/)).toBeDefined();
+    expect(screen.getByRole("link", { name: "Open it on GitHub" }).getAttribute("href")).toBe(card.pr_url);
+  });
+
+  it.each(["unpark", "rerun-review"])("shows %s errors, then announces and refreshes after retry", async endpoint => {
+    row = { ...card, parked: true, brief_status: "failed" };
+    let attempts = 0;
+    respond = path => {
+      expect(path.endsWith(`/${endpoint}`)).toBe(true);
+      if (++attempts === 1) return json({ detail: "Request forbidden" }, 403);
+      row = { ...row, parked: endpoint === "unpark" ? false : row.parked, brief_status: endpoint === "rerun-review" ? "brewing" : row.brief_status };
+      return json(detail);
+    };
+    mount();
+    const name = endpoint === "unpark" ? "Unpark — back to the queue" : "Run AI review again";
+    fireEvent.click(await screen.findByRole("button", { name }));
+    expect(await screen.findByText(/Request forbidden/)).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain(endpoint === "unpark" ? "returned to the queue" : "AI review re-requested"));
+    await waitFor(() => expect(screen.queryByRole("button", { name })).toBeNull());
+    expect(attempts).toBe(2);
+  });
+
+  it("requires a second explicit verdict after drift and submits the fresh head", async () => {
+    let attempts = 0;
+    const heads: string[] = [];
+    respond = (_path, init) => {
+      heads.push(JSON.parse(String(init.body)).head_sha);
+      return ++attempts === 1
+        ? json({ detail: { message: "PR moved", card: { ...detail, title: "Updated ontology", head_sha: "fresh456" } } }, 409)
+        : json({ action: { status: "submitted" }, card: detail });
+    };
+    mount(); fireEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    expect(await screen.findByTestId("pr-party-drift-strip")).toBeDefined();
+    expect(screen.getByRole("article").getAttribute("aria-label")).toBe("Updated ontology");
+    expect(heads).toEqual(["abc123"]);
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(screen.queryByTestId("pr-party-drift-strip")).toBeNull());
+    expect(heads).toEqual(["abc123", "fresh456"]);
+  });
+
+  it("shows a rejected merge without retrying the side effect", async () => {
+    row = { ...card, read_only: true, author_kind: "own" };
+    respond = () => json({ detail: "Branch protection blocked merge" }, 403);
+    mount(); fireEvent.click(await screen.findByRole("button", { name: "Merge pull request" }));
+    expect(await screen.findByText("Not merged. Branch protection blocked merge")).toBeDefined();
+    expect(screen.getByTestId("pr-party-card-merge-outcome").getAttribute("data-outcome")).toBe("failed");
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).endsWith("/actions"))).toHaveLength(1);
+  });
+
+  it("renders an empty queue without actionable cards", async () => {
+    fetchMock.mockImplementationOnce(async () => json({ cards: [], generated_at: "2026-09-01T00:00:00Z" }));
+    mount(); await waitFor(() => expect(client.isFetching()).toBe(0));
+    expect(screen.queryByTestId("pr-party-card")).toBeNull();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

@@ -117,4 +117,44 @@ describe("graph loading with the real API client, graph builder and layout engin
     act(() => result.current.resetGraph());
     expect(result.current).toMatchObject({ graphData: null, resolvedCount: 0, isLoading: false });
   });
+
+  it("follows secondary equivalence, disjoint and reference targets without losing relationship labels", async () => {
+    serveGraph([
+      detail("Focus", { parent_iris: [iri("Parent")] }),
+      detail("Parent", { equivalent_iris: [iri("Equivalent")], disjoint_iris: [iri("Disjoint")], annotations: [{ property_iri: "http://www.w3.org/2000/01/rdf-schema#seeAlso", property_label: "see also", values: [{ value: iri("Reference"), lang: "" }] }] }),
+      detail("Equivalent"), detail("Disjoint"), detail("Reference"),
+    ]);
+    const { result } = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
+    await waitFor(() => expect(result.current.resolvedCount).toBe(5));
+    expect(result.current.graphData?.edges).toEqual(expect.arrayContaining([
+      expect.objectContaining({ source: iri("Parent"), target: iri("Equivalent"), edgeType: "equivalentClass" }),
+      expect.objectContaining({ source: iri("Parent"), target: iri("Disjoint"), edgeType: "disjointWith" }),
+      expect.objectContaining({ source: iri("Parent"), target: iri("Reference"), edgeType: "seeAlso" }),
+    ]));
+  });
+
+  it("reuses a cached class on expansion and resolves new second-order targets", async () => {
+    const calls = serveGraph([
+      detail("Focus"), detail("Expansion", { parent_iris: [iri("Parent")] }),
+      detail("Parent", { parent_iris: [iri("Root")] }), detail("Root"),
+    ]);
+    const { result } = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
+    await waitFor(() => expect(result.current.resolvedCount).toBe(1));
+    await act(async () => { await result.current.expandNode(iri("Expansion")); });
+    expect(result.current.resolvedCount).toBe(4);
+    await act(async () => { await result.current.expandNode(iri("Expansion")); });
+    expect(calls.filter(url => url.pathname.endsWith(`/classes/${encodeURIComponent(iri("Expansion"))}`))).toHaveLength(1);
+  });
+
+  it("bounds ancestry requests and refuses additional expansion once one hundred classes are resolved", async () => {
+    const names = Array.from({ length: 99 }, (_, index) => `Parent${index}`);
+    const calls = serveGraph([detail("Focus", { parent_iris: names.map(iri) }), ...names.map(name => detail(name))]);
+    const { result } = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
+    await waitFor(() => expect(result.current.resolvedCount).toBe(100));
+    expect(calls.filter(url => url.pathname.endsWith('/ancestors'))).toHaveLength(50);
+    await act(async () => { await result.current.expandNode(iri("OverLimit")); });
+    expect(result.current.resolvedCount).toBe(100);
+    expect(calls.some(url => url.pathname.endsWith(`/classes/${encodeURIComponent(iri("OverLimit"))}`))).toBe(false);
+  });
+
 });
