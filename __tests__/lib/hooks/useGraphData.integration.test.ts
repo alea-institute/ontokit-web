@@ -107,7 +107,7 @@ describe("graph loading with the real API client, graph builder and layout engin
 
   it("resolves non-class targets by exact IRI and keeps caller label hints", async () => {
     const hints = new Map([[iri("Property"), "Preferred label"]]);
-    serveGraph([detail("Focus", { equivalent_iris: [iri("Property"), iri("Individual")] })], {
+    const calls = serveGraph([detail("Focus", { equivalent_iris: [iri("Property"), iri("Individual")] }), detail("Expansion", { parent_iris: [iri("Focus")] })], {
       search: {
         Property: [{ iri: iri("Other"), label: "Wrong hit", entity_type: "class" }, { iri: iri("Property"), label: "Server label", entity_type: "property" }],
         Individual: [{ iri: iri("Individual"), label: "", entity_type: "individual" }],
@@ -120,6 +120,17 @@ describe("graph loading with the real API client, graph builder and layout engin
       expect.objectContaining({ id: iri("Individual"), label: "Individual", nodeType: "individual" }),
     ]));
     expect(hints.size).toBe(1);
+    const searches = calls.filter(url => url.pathname.endsWith("/search")).map(url => url.toString());
+    expect(searches).toHaveLength(2);
+    await act(async () => { await result.current.expandNode(iri("Expansion")); });
+    expect(result.current.graphData?.nodes).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: iri("Expansion"), nodeType: "class" }),
+      expect.objectContaining({ id: iri("Property"), label: "Preferred label", nodeType: "property" }),
+      expect.objectContaining({ id: iri("Individual"), label: "Individual", nodeType: "individual" }),
+    ]));
+    expect(calls.filter(url => url.pathname.endsWith("/search")).map(url => url.toString())).toEqual(searches);
+    expect(calls.filter(url => url.pathname.endsWith(`/classes/${encodeURIComponent(iri("Property"))}`))).toHaveLength(1);
+    expect(calls.filter(url => url.pathname.endsWith(`/classes/${encodeURIComponent(iri("Individual"))}`))).toHaveLength(1);
   });
 
   it("keeps useful unresolved nodes when ancestry and search fail", async () => {
