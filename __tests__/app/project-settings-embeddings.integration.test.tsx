@@ -1,5 +1,5 @@
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { SessionProvider } from 'next-auth/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { SessionProvider, useSession } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ProjectSettingsPage from '@/app/projects/[id]/settings/page';
@@ -11,18 +11,28 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePar
 const session: Session = { user: { id: 'owner', name: 'Fixture Owner' }, accessToken: 'fixture-token', expires: '2099-01-01T00:00:00Z' };
 const config: EmbeddingConfig = { provider: 'local', model_name: 'all-MiniLM-L6-v2', api_key_set: false, dimensions: 384, auto_embed_on_save: false };
 const status: EmbeddingStatus = { provider: 'local', model_name: config.model_name, total_entities: 12, embedded_entities: 4, coverage_percent: 33.33, job_in_progress: false };
+function RefreshSession() {
+  const { update } = useSession();
+  return <button onClick={() => void update({ refresh: true })}>Refresh fixture session</button>;
+}
 function mount(options: { config?: EmbeddingConfig | null; status?: EmbeddingStatus | null; loadFailure?: boolean } = {}) {
   let currentConfig = options.config === undefined ? config : options.config;
   let currentStatus = options.status === undefined ? status : options.status;
   let saveFailure = false;
   let generationFailure = false;
   let statusFailure = false;
+  let token = session.accessToken;
   class Socket extends EventTarget { static OPEN = 1; static CONNECTING = 0; readyState = 1; close = vi.fn(); }
   vi.stubGlobal('WebSocket', Socket);
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
-    const path = new URL(String(input)).pathname;
+    const path = new URL(String(input), window.location.origin).pathname;
+    if (path === '/api/auth/csrf') return jsonResponse({ csrfToken: 'fixture-csrf' });
+    if (path === '/api/auth/session') {
+      token = 'refreshed-fixture-token';
+      return jsonResponse({ ...session, accessToken: token });
+    }
     if (path.includes('/embeddings/')) {
-      expect(new Headers(init?.headers).get('Authorization')).toBe('Bearer fixture-token');
+      expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${token}`);
       if (path.endsWith('/config')) {
         if (init?.method === 'PUT') {
           if (saveFailure) return new Response('Embedding save refused', { status: 403 });
@@ -47,7 +57,7 @@ function mount(options: { config?: EmbeddingConfig | null; status?: EmbeddingSta
   });
   vi.stubGlobal('fetch', fetcher);
   const { wrapper: QueryWrapper } = llmHookHarness();
-  const view = render(<SessionProvider session={session} refetchOnWindowFocus={false}><QueryWrapper><ToastProvider><ProjectSettingsPage /></ToastProvider></QueryWrapper></SessionProvider>);
+  const view = render(<SessionProvider session={session} refetchOnWindowFocus={false}><RefreshSession /><QueryWrapper><ToastProvider><ProjectSettingsPage /></ToastProvider></QueryWrapper></SessionProvider>);
   return { ...view, fetcher, failSave: (value: boolean) => { saveFailure = value; }, failGeneration: (value: boolean) => { generationFailure = value; }, failStatus: (value: boolean) => { statusFailure = value; }, setStatus: (value: EmbeddingStatus) => { currentStatus = value; } };
 }
 async function section() {
@@ -61,6 +71,27 @@ const statusReads = (fetcher: ReturnType<typeof mount>['fetcher']) => fetcher.mo
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('embedding settings through the settings route and real HTTP client', () => {
+  it('uses the refreshed session token while polling an existing embedding job', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const harness = mount({ status: { ...status, job_in_progress: true } });
+    await section();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh fixture session' }));
+    await waitFor(() => {
+      const calls = harness.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/embeddings/status'));
+      expect(new Headers(calls.at(-1)?.[1]?.headers).get('Authorization')).toBe('Bearer refreshed-fixture-token');
+    });
+    await section();
+    const beforePoll = statusReads(harness.fetcher);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    const reads = harness.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/embeddings/status'));
+    expect(new Headers(reads.at(-1)?.[1]?.headers).get('Authorization')).toBe('Bearer refreshed-fixture-token');
+    expect(reads).toHaveLength(beforePoll + 1);
+    harness.setStatus({ ...status, embedded_entities: 12, coverage_percent: 100 });
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    await screen.findByText('12 of 12 entities embedded');
+    expect(harness.fetcher.mock.calls.some(([url]) => String(url).endsWith('/embeddings/generate'))).toBe(false);
+  });
+
   it('loads coverage and persists local auto-embedding without an API key', async () => {
     const { fetcher } = mount(); const ui = await section();
     expect(ui.getByText('4 of 12 entities embedded')).toBeDefined();

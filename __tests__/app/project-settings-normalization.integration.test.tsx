@@ -15,6 +15,7 @@ let status: { needs_normalization: boolean; last_run: string | null; last_run_id
 let route: (url: URL, init?: RequestInit) => Response | Promise<Response> | undefined;
 let fetcher: ReturnType<typeof vi.fn>;
 const scroll = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollIntoView');
+const originalUrl = window.location.href;
 beforeEach(() => {
   status = { needs_normalization: true, last_run: null, last_run_id: null, last_check: null, preview_report: null, checking: false, error: null };
   route = () => undefined;
@@ -46,6 +47,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();
+  window.history.replaceState(null, '', originalUrl);
   if (scroll) Object.defineProperty(Element.prototype, 'scrollIntoView', scroll); else Reflect.deleteProperty(Element.prototype, 'scrollIntoView');
 });
 async function mount() {
@@ -63,6 +65,24 @@ async function queue() {
 const jobCalls = () => fetcher.mock.calls.filter(([input]) => String(input).includes('/normalization/jobs/'));
 
 describe('settings normalization through the real page, query hooks and HTTP client', () => {
+  it('scrolls an editor deep link to the normalization section after project loading', async () => {
+    window.history.replaceState(null, '', '#normalization');
+    await mount();
+    await waitFor(() => expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' }));
+    const target = screen.getByRole('heading', { name: 'Ontology Normalization' }).closest('section');
+    expect(vi.mocked(Element.prototype.scrollIntoView).mock.contexts).toEqual([target]);
+    expect(target?.id).toBe('normalization');
+  });
+
+  it('keeps settings usable when a deep link names a missing section', async () => {
+    window.history.replaceState(null, '', '#removed-section');
+    await mount();
+    expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+    fireEvent.click(section().getByRole('button', { name: 'Preview Changes' }));
+    await screen.findByText('Preview of Changes');
+    expect(section().getByRole('button', { name: 'Run Normalization' }).hasAttribute('disabled')).toBe(false);
+  });
+
   it('previews statistics without mutating the ontology and refreshes the normalized status', async () => {
     await mount();
     fireEvent.click(section().getByRole('button', { name: 'Preview Changes' }));
