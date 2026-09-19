@@ -289,9 +289,10 @@ describe("useFilteredTree", () => {
       total_classes: 2,
     });
 
+    const searchResults = [makeClassResult("urn:leaf", "Leaf")];
     const { result } = renderHook(() =>
       useFilteredTree({
-        searchResults: [makeClassResult("urn:leaf", "Leaf")],
+        searchResults,
         projectId: "p1",
         accessToken: "tok",
         branch: "main",
@@ -306,14 +307,16 @@ describe("useFilteredTree", () => {
     expect(result.current.filteredNodes![0].children[0].iri).toBe("urn:leaf");
     expect(result.current.firstMatchIri).toBe("urn:leaf");
     expect(result.current.truncated).toBe(false);
+    expect(mockedGetClassAncestors).toHaveBeenCalledExactlyOnceWith("p1", "urn:leaf", "tok", "main");
   });
 
   it("handles ancestor fetch failure gracefully (empty ancestors)", async () => {
     mockedGetClassAncestors.mockRejectedValue(new Error("fetch failed"));
 
+    const searchResults = [makeClassResult("urn:orphan", "Orphan")];
     const { result } = renderHook(() =>
       useFilteredTree({
-        searchResults: [makeClassResult("urn:orphan", "Orphan")],
+        searchResults,
         projectId: "p1",
       })
     );
@@ -325,6 +328,7 @@ describe("useFilteredTree", () => {
     expect(result.current.filteredNodes).toHaveLength(1);
     expect(result.current.filteredNodes![0].iri).toBe("urn:orphan");
     expect(result.current.filteredNodes![0].isSearchMatch).toBe(true);
+    expect(mockedGetClassAncestors).toHaveBeenCalledTimes(1);
   });
 
   it("filters out non-class results and only processes classes", async () => {

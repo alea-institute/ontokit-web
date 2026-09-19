@@ -54,4 +54,25 @@ describe("filtered ontology trees through the real ancestor API", () => {
     expect(result.current).toMatchObject({ filteredNodes: null, firstMatchIri: null, isBuilding: false, truncated: false });
     expect(fetchBoundary).toHaveBeenCalledTimes(1);
   });
+  it.each(["success", "denied", "malformed"])("ignores an old branch's %s response while the current branch is loading", async outcome => {
+    const pending: ((response: Response) => void)[] = [];
+    fetchBoundary.mockImplementation(() => new Promise<Response>(resolve => pending.push(resolve)));
+    const searchResults = [match("Shared")];
+    const { result, rerender } = renderHook(({ branch }) => useFilteredTree({ ...options, branch, searchResults }), {
+      initialProps: { branch: "old-branch" },
+    });
+    rerender({ branch: "new-branch" });
+    expect(fetchBoundary).toHaveBeenCalledTimes(2);
+    expect(fetchBoundary.mock.calls.map(([url]) => new URL(String(url)).searchParams.get("branch"))).toEqual(["old-branch", "new-branch"]);
+    await act(async () => pending[0](outcome === "denied" ? new Response("Denied", { status: 403 }) : Response.json({ nodes: outcome === "malformed" ? null : [{ iri: "urn:stale", label: "Stale root", child_count: 1 }] })));
+    expect(result.current.isBuilding).toBe(true);
+    expect(result.current.filteredNodes).toBeNull();
+    await act(async () => pending[1](Response.json({ nodes: [{ iri: "urn:current", label: "Current root", child_count: 1 }] })));
+    expect(result.current.isBuilding).toBe(false);
+    expect(result.current.filteredNodes?.map(node => node.iri)).toEqual(["urn:current"]);
+    expect(result.current.filteredNodes?.[0].children.map(node => node.iri)).toEqual([match("Shared").iri]);
+    expect(result.current.firstMatchIri).toBe(match("Shared").iri);
+    expect(fetchBoundary).toHaveBeenCalledTimes(2);
+  });
+
 });
