@@ -1,22 +1,24 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { SessionProvider } from 'next-auth/react';
 import type { Session } from 'next-auth';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { projectQueryKeys } from '@/lib/hooks/useProject';
 import Dashboard from '@/app/projects/[id]/dashboard/page';
 import { jsonResponse, llmHookHarness } from '../fixtures/llm-hook-harness';
 
 vi.mock('next/navigation', () => ({ useParams: () => ({ id: 'dashboard-project' }), usePathname: () => '/projects/dashboard-project/dashboard' }));
 const session: Session = { accessToken: 'dashboard-token', user: { name: 'Fixture' }, expires: '2099-01-01T00:00:00Z' };
 const request = { id: 'join-1', project_id: 'dashboard-project', user_id: 'fixture', message: 'I can contribute', status: 'pending', created_at: '2026-01-01T00:00:00Z' };
-function mount(options: { role?: string; public?: boolean; anonymous?: boolean; projectStatus?: number; pending?: boolean; declined?: boolean; count?: number; languages?: string[]; metadataError?: boolean } = {}) {
+function mount(options: { role?: string; public?: boolean; anonymous?: boolean; projectStatus?: number; pending?: boolean; declined?: boolean; count?: number; languages?: string[]; metadataError?: boolean; memberCount?: number; description?: string; updatedAt?: string } = {}) {
   let pending = options.pending ?? false;
   let failMutation = false;
+  let languageReply: (() => Response | Promise<Response>) | undefined;
   const fetcher = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const path = new URL(String(input)).pathname;
     if (path.endsWith('/pr-party/me')) return jsonResponse({ is_reviewer: false });
     if (path.endsWith('/notifications')) return jsonResponse({ items: [], unread_count: 0 });
-    if (path === '/api/v1/projects/dashboard-project') return options.projectStatus ? jsonResponse({ detail: 'Unavailable' }, options.projectStatus) : jsonResponse({ id: 'dashboard-project', name: 'Connected ontology', is_public: options.public ?? true, user_role: options.role, member_count: 1, created_at: '2026-01-01T00:00:00Z' });
-    if (path.endsWith('/my-reviewer-languages')) return options.metadataError ? new Response('Language lookup failed', { status: 503 }) : jsonResponse({ languages: options.languages ?? [] });
+    if (path === '/api/v1/projects/dashboard-project') return options.projectStatus ? jsonResponse({ detail: 'Unavailable' }, options.projectStatus) : jsonResponse({ id: 'dashboard-project', name: 'Connected ontology', is_public: options.public ?? true, user_role: options.role, member_count: options.memberCount ?? 1, description: options.description, updated_at: options.updatedAt, created_at: '2026-01-01T00:00:00Z' });
+    if (path.endsWith('/my-reviewer-languages')) return languageReply ? languageReply() : options.metadataError ? new Response('Language lookup failed', { status: 503 }) : jsonResponse({ languages: options.languages ?? [] });
     if (path.endsWith('/join-requests/mine')) return jsonResponse({ has_pending_request: pending, request: pending ? request : options.declined ? { ...request, status: 'declined' } : undefined });
     if (path.endsWith('/join-requests/join-1') && init?.method === 'DELETE') {
       if (failMutation) return new Response('Withdrawal unavailable', { status: 503 });
@@ -32,9 +34,14 @@ function mount(options: { role?: string; public?: boolean; anonymous?: boolean; 
     throw new Error(`Unexpected request: ${path}`);
   });
   vi.stubGlobal('fetch', fetcher);
-  const { wrapper: QueryWrapper } = llmHookHarness();
+  const { wrapper: QueryWrapper, client } = llmHookHarness();
   render(<SessionProvider session={options.anonymous ? null : session} refetchOnWindowFocus={false}><QueryWrapper><Dashboard /></QueryWrapper></SessionProvider>);
-  return { fetcher, fail: (value: boolean) => { failMutation = value; } };
+  return { fetcher, languages: (reply: () => Response | Promise<Response>) => { languageReply = reply; },
+    role: (role: string) => {
+      const key = projectQueryKeys.detail('dashboard-project', true);
+      const current = client.getQueryData<Record<string, unknown>>(key)!;
+      client.setQueryData(key, { ...current, user_role: role });
+    }, fail: (value: boolean) => { failMutation = value; } };
 }
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 const main = () => within(screen.getByRole('main'));
@@ -103,7 +110,10 @@ describe('dashboard through project queries, permissions and join-request HTTP c
   it('keeps an owner dashboard usable when optional count and reviewer requests fail', async () => {
     const { fetcher } = mount({ role: 'owner', metadataError: true });
     expect(await screen.findByRole('heading', { name: 'Connected ontology' })).toBeDefined();
-    await waitFor(() => expect(fetcher.mock.calls.some(([url]) => String(url).endsWith('/my-reviewer-languages'))).toBe(true));
+    await waitFor(() => {
+      expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/my-reviewer-languages'))).toHaveLength(3);
+      expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/join-requests'))).toHaveLength(3);
+    }, { timeout: 4000 });
     expect(main().getByRole('link', { name: /Translation Review/ })).toBeDefined();
     expect(screen.queryByText(/pending join request/)).toBeNull();
   });
@@ -118,6 +128,48 @@ describe('dashboard through project queries, permissions and join-request HTTP c
     expect(main().queryByRole('link', { name: 'Open Editor' })).toBeNull();
     expect(main().queryByRole('link', { name: 'Settings' })).toBeNull();
     expect(fetcher.mock.calls.some(([url]) => String(url).includes('/join-requests'))).toBe(false);
+  });
+
+  it('removes reviewer navigation after an authoritative language failure and recovers on a later role refresh', async () => {
+    const h = mount({ role: 'viewer', public: false, languages: ['sw'] });
+    await screen.findByRole('link', { name: /Translation Review/ });
+    h.languages(() => new Response('Reviewer lookup denied', { status: 403 }));
+    act(() => h.role('suggester'));
+    await waitFor(() => expect(screen.queryByRole('link', { name: /Translation Review/ })).toBeNull());
+    expect(main().getByRole('link', { name: /Translation Coverage/ })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Connected ontology' })).toBeDefined();
+    h.languages(() => jsonResponse({ languages: ['fr'] }));
+    act(() => h.role('viewer'));
+    await screen.findByRole('link', { name: /Translation Review/ });
+    expect(h.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/my-reviewer-languages'))).toHaveLength(3);
+  });
+
+  it.each([200, 403])('ignores an old reviewer-language response after another role refresh (HTTP %s)', async status => {
+    const h = mount({ role: 'viewer', public: false, languages: ['sw'] });
+    await screen.findByRole('link', { name: /Translation Review/ });
+    let finish!: (response: Response) => void;
+    const pending = new Promise<Response>(resolve => { finish = resolve; });
+    h.languages(() => pending);
+    act(() => h.role('suggester'));
+    await waitFor(() => expect(h.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/my-reviewer-languages'))).toHaveLength(2));
+    h.languages(() => jsonResponse({ languages: ['fr'] }));
+    act(() => h.role('viewer'));
+    await waitFor(() => expect(h.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/my-reviewer-languages'))).toHaveLength(3));
+    await act(async () => { finish(status === 200 ? jsonResponse({ languages: [] }) : new Response('Obsolete language failure', { status })); });
+    expect(screen.getByRole('link', { name: /Translation Review/ })).toBeDefined();
+    expect(screen.queryByText('Obsolete language failure')).toBeNull();
+    expect(h.fetcher.mock.calls.every(([, init]) => init?.method === 'GET')).toBe(true);
+  });
+
+  it.each([0, 3])('renders descriptive metadata and the appropriate team navigation for %s members', async memberCount => {
+    mount({ role: 'viewer', public: false, memberCount, description: 'A shared vocabulary', updatedAt: '2026-09-19T00:00:00Z' });
+    await screen.findByRole('heading', { name: 'Connected ontology' });
+    expect(screen.getByText('A shared vocabulary')).toBeDefined();
+    expect(screen.getByText(`${memberCount} members`)).toBeDefined();
+    expect(screen.getByText(/^Updated /).textContent).not.toContain('Invalid');
+    if (memberCount === 0) expect(main().queryByRole('link', { name: /Team Members/ })).toBeNull();
+    else expect(main().getByRole('link', { name: /Team Members/ }).getAttribute('href')).toBe('/projects/dashboard-project/settings#members');
+    expect(main().queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
   it('shows public read-only navigation to an anonymous visitor without private metadata requests', async () => {
