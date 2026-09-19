@@ -67,15 +67,34 @@ describe("property suggestion persistence", () => {
     if (predicate === example) expect(values).toContainEqual({ value: "Existing example", lang: "en" });
   });
 
-  it.each(["domain", "range"])("adds and deduplicates suggested %s targets", async (kind) => {
-    const target = ns + (kind === "domain" ? "Person" : "NewRange");
+  it.each([
+    ["domain", "Person"], ["domain", "NewDomain"],
+    ["range", "Place"], ["range", "NewRange"],
+  ])("adds and deduplicates suggested %s target %s", async (kind, localName) => {
+    const target = ns + localName;
     seed(suggestion("edges", { iri: target, relationship_type: rdfs + kind }));
     const panel = mount();
     fireEvent.click(screen.getAllByRole("button", { name: "Accept suggestion" })[0]);
     await waitFor(() => expect(state("edges").status).toBe("accepted"));
     await saveDraft();
     const detail = extractPropertyDetail(panel.output(), iri)!;
-    expect(kind === "domain" ? detail.domainIris : detail.rangeIris).toEqual(kind === "domain" ? [target] : [ns + "Place", target]);
+    const existing = ns + (kind === "domain" ? "Person" : "Place");
+    expect(kind === "domain" ? detail.domainIris : detail.rangeIris).toEqual(target === existing ? [existing] : [existing, target]);
+    expect(kind === "domain" ? detail.rangeIris : detail.domainIris).toEqual([ns + (kind === "domain" ? "Place" : "Person")]);
+  });
+
+  it("uses the annotation label and default language when optional generated fields are absent", async () => {
+    seed(suggestion("annotations", { property_iri: example, label: "Fallback example" }));
+    const panel = mount();
+    fireEvent.click(screen.getAllByRole("button", { name: "Accept suggestion" })[0]);
+    await waitFor(() => expect(state("annotations").status).toBe("accepted"));
+    await saveDraft();
+    const detail = extractPropertyDetail(panel.output(), iri)!;
+    expect(detail.annotations.find(a => a.property_iri === example)?.values).toEqual([
+      { value: "Existing example", lang: "en" },
+      { value: "Fallback example", lang: "en" },
+    ]);
+    expect(detail.labels).toEqual([{ value: "Relation", lang: "en" }]);
   });
 
   it.each(["object", "data", "annotation"] as const)("persists an edited child as the parent's %s property kind with provenance", async (kind) => {

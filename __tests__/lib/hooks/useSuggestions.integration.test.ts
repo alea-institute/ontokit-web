@@ -57,7 +57,7 @@ describe("suggestion request and acceptance integration", () => {
   });
 
   it.each([
-    [400, "No generation model"], [402, "budget has been exhausted"], [403, "role does not allow"],
+    [400, "No generation model"], [401, "Could not generate suggestions."], [402, "budget has been exhausted"], [403, "role does not allow"],
     [429, "request limit"], [500, "unexpected error"], [502, "provider is unavailable"], [503, "pricing is unavailable"],
   ])("surfaces HTTP %s and invalidates budgets only for quota errors", async (status, message) => {
     const fetch = vi.fn().mockResolvedValue(json({ detail: "backend detail" }, status));
@@ -118,5 +118,70 @@ describe("suggestion request and acceptance integration", () => {
     act(() => { result.current.reject(0); result.current.edit(0, "ignored"); result.current.markDistinct(0, { iri: "unused", label: "Unused", score: 1 }); });
     expect(result.current.items).toEqual([]);
     expect(useSuggestionStore.getState().suggestions).toEqual({});
+  });
+
+  it("ignores a cancelled transport rejection while a replacement generation completes", async () => {
+    let calls = 0;
+    vi.stubGlobal("fetch", (_url: string, init: RequestInit) => {
+      calls++;
+      if (calls === 2) return Promise.resolve(json({ suggestions: [suggestion({ label: "Replacement" })] }));
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal!.addEventListener("abort", () => reject(new DOMException("Cancelled", "AbortError")), { once: true });
+      });
+    });
+    const { result } = renderHook(() => useSuggestions(options));
+    let first!: Promise<void>;
+    act(() => { first = result.current.request(); });
+    expect(result.current.isLoading).toBe(true);
+    await act(async () => { await result.current.request(); await first; });
+    expect(calls).toBe(2);
+    expect(result.current.error).toBeNull();
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.items[0]).toMatchObject({ status: "pending", suggestion: { label: "Replacement" } });
+  });
+
+  it.each([
+    [new TypeError("Network unavailable"), "Network unavailable"],
+    ["transport failure", "Could not generate suggestions."],
+  ])("recovers from a transport rejection %s without losing the pending draft", async (failure, message) => {
+    useSuggestionStore.getState().setSuggestions(scope, entityIri, "children", [suggestion()]);
+    const fetch = vi.fn().mockRejectedValueOnce(failure).mockResolvedValueOnce(json({ suggestions: [] }));
+    vi.stubGlobal("fetch", fetch);
+    const { result } = renderHook(() => useSuggestions(options));
+    await act(async () => { await result.current.request(); });
+    expect(result.current.error).toBe(message);
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.items[0].suggestion.label).toBe("Child");
+    await act(async () => { await result.current.request(); });
+    expect(result.current.error).toBeNull();
+    expect(result.current.items).toEqual([]);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("serializes one accepted child despite duplicate acceptance and generation attempts", async () => {
+    useSuggestionStore.getState().setSuggestions(scope, entityIri, "children", [suggestion()]);
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    let finish!: () => void;
+    const ready = new Promise<void>((resolve) => { finish = resolve; });
+    let writes = 0;
+    let source = "@prefix owl: <http://www.w3.org/2002/07/owl#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n";
+    const { result } = renderHook(() => useSuggestions({ ...options, onAccepted: async (item) => {
+      writes++;
+      await ready;
+      source += generateTurtleSnippet({ iri: item.iri, label: item.label, entityType: "class" });
+    } }));
+    let acceptance!: Promise<void>;
+    act(() => { acceptance = result.current.accept(0); });
+    await act(async () => { await result.current.accept(0); await result.current.request(); });
+    expect(writes).toBe(1);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(result.current.items[0].status).toBe("pending");
+    await act(async () => { finish(); await acceptance; });
+    expect(result.current.items[0].status).toBe("accepted");
+    expect(result.current.acceptingIndices.size).toBe(0);
+    await act(async () => { await result.current.accept(0); await result.current.accept(99); });
+    expect(writes).toBe(1);
+    expect(parseBlockTriples(source, suggestion().iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Child", lang: "en" } });
   });
 });
