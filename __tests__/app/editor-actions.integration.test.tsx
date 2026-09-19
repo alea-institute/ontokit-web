@@ -8,6 +8,7 @@ import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useDraftStore } from "@/lib/stores/draftStore";
 import { parseBlockTriples } from "@/lib/ontology/turtleBlockParser";
 import { useAnonymousTokenStore, useAnonymousCreditStore } from "@/lib/stores/anonymousCreditStore";
+import { useSuggestionStore, storeKey } from "@/lib/stores/suggestionStore";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 
 const boundary = vi.hoisted(() => ({
@@ -36,6 +37,11 @@ import EditorPage from "@/app/projects/[id]/editor/page";
 // replaced at their boundaries; application orchestration stays real.
 const iri = "https://example.test/Person";
 const initialEditorMode = useEditorModeStore.getState();
+let llmConfigured: boolean;
+let generationBodies: unknown[];
+let extraTreeNodes: object[];
+let nestPerson: boolean;
+let classParents: string[];
 let projectResponse: object;
 let deleted: boolean;
 let deleteFailure: boolean;
@@ -66,10 +72,11 @@ function authenticate() {
 
 type EditableType = "property" | "individual";
 const editableIri = "https://example.test/Editable";
-async function openEntityForm(entityType: EditableType) {
-  const owlType = entityType === "property" ? "ObjectProperty" : "NamedIndividual";
+async function openEntityForm(entityType: EditableType, propertyKind: "object" | "data" | "annotation" = "object") {
+  const propertyTypes = { object: "ObjectProperty", data: "DatatypeProperty", annotation: "AnnotationProperty" };
+  const owlType = entityType === "property" ? propertyTypes[propertyKind] : "NamedIndividual";
   sourceContent = originalSource + '\nex:Editable a owl:' + owlType + ' ;\n  rdfs:label "Original entity"@en ;\n  rdfs:comment "Preserved comment"@en .';
-  entityResults = [{ iri: editableIri, label: "Original entity", entity_type: entityType, property_kind: "object" }];
+  entityResults = [{ iri: editableIri, label: "Original entity", entity_type: entityType, property_kind: propertyKind }];
   mount(); await screen.findByText("Person");
   await act(async () => { fireEvent.mouseEnter(screen.getByRole("button", { name: "Source" })); });
   fireEvent.click(screen.getByRole("button", { name: entityType === "property" ? "Properties" : "Individuals" }));
@@ -102,8 +109,22 @@ async function saveAnonymousProposal() {
   await screen.findByText('Proposed update to "Anonymous label"');
 }
 
+// jsdom has no layout; only element geometry is replaced. The drag sensor,
+// tree hook, page callbacks and persistence chain remain real.
+function installTreeGeometry(positions: Record<string, number>, rootY?: number) {
+  const rect = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const y = positions[this.getAttribute("data-iri") ?? ""];
+    if (y !== undefined) return new DOMRect(0, y, 200, 24);
+    if (rootY !== undefined && this.textContent === "Drop here to make root class") return new DOMRect(0, rootY, 200, 24);
+    return rect.call(this);
+  });
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
+  useSuggestionStore.getState().clearAllSuggestions();
   useAnonymousTokenStore.setState({ tokens: {} });
   useAnonymousCreditStore.getState().clearCredit();
   anonymousFailure = null; anonymousSubmissions = [];
@@ -146,18 +167,24 @@ beforeEach(() => {
     }
     if (path.endsWith("/suggestions/capabilities")) return json({ tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 });
     if (path.endsWith("/ontology/search")) return json({ results: entityResults, total: entityResults.length });
-    if (path.endsWith("/ontology/tree")) return json({ nodes: deleted ? [] : [{ iri, label: "Person", child_count: 0 }], total_classes: deleted ? 0 : 1 });
+    if (path.endsWith("/ontology/tree/" + encodeURIComponent("https://example.test/OldParent") + "/children")) return json({ nodes: [{ iri, label: "Person", child_count: 0 }], total_classes: 1 });
+    if (path.endsWith("/ontology/tree")) return json({ nodes: deleted ? [] : [nestPerson ? { iri: "https://example.test/OldParent", label: "Old parent", child_count: 1 } : { iri, label: "Person", child_count: 0 }, ...extraTreeNodes], total_classes: deleted ? 0 : 1 });
     if (path.endsWith('/ontology/classes/' + encodeURIComponent(iri))) {
       if (init?.method === 'DELETE') { if (deleteFailure) return json({ detail: 'Delete refused' }, 403); deleted = true; return new Response(null, { status: 204 }); }
-      return json({ iri, labels: [{ value: 'Person', lang: 'en' }], comments: [], parent_iris: [], parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
+      return json({ iri, labels: [{ value: 'Person', lang: 'en' }], comments: [], parent_iris: classParents, parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     }
+    if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Generated"))) return json({ iri: "https://example.test/Generated", labels: [{ value: "Generated child", lang: "en" }], comments: [], parent_iris: [iri], parent_labels: { [iri]: "Person" }, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/NewEntity"))) return json({ detail: "Not persisted yet" }, 404);
     if (path.endsWith("/history")) return json({ entity_iri: iri, events: [], total: 0 });
     if (path.endsWith("/similar")) return json([]);
     if (path.endsWith('/references')) return json({ groups: [], total: 1 });
     if (path.endsWith("/pull-requests")) return json({ items: [], total: 0 });
     if (path.endsWith("/lint/status")) return json(null);
-    if (path.endsWith("/llm/status")) return json({ configured: false });
+    if (path.endsWith("/llm/generate-suggestions")) {
+      generationBodies.push(JSON.parse(String(init?.body)));
+      return json({ suggestions: [{ iri: "https://example.test/Generated", label: "Generated child", suggestion_type: "children", provenance: "llm-proposed", model: "fixture-model", prompt_template: "children", validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }], input_tokens: 10, output_tokens: 20 });
+    }
+    if (path.endsWith("/llm/status")) return json({ configured: llmConfigured });
     if (path === "/api/v1/pr-party/me") return json({ is_reviewer: false });
     if (path.endsWith("/suggestions/pending")) return json({ items: [] });
     if (path.endsWith("/branches")) return json({ items: [{ name: "main", is_current: true }], current_branch: "main", default_branch: "main" });
@@ -182,12 +209,14 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  useSuggestionStore.getState().clearAllSuggestions();
   useAnonymousTokenStore.setState({ tokens: {} });
   useAnonymousCreditStore.getState().clearCredit();
   useDraftStore.setState({ drafts: {} });
   useEditorModeStore.setState(initialEditorMode);
   useSelectionStore.getState().clear();
   client?.clear();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   expect(unexpected, JSON.stringify(unexpected)).toEqual([]);
@@ -507,6 +536,143 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(requests.filter(r => r.path.endsWith("/discard"))).toHaveLength(1);
     expect(screen.queryByRole("button", { name: /Submit Proposal/ })).toBeNull();
     expect(savedBodies).toEqual([]);
+  });
+
+  it.each([200, 403, 409])("persists a generated child through generation, acceptance and revision-guarded source (HTTP %i)", async status => {
+    llmConfigured = true; saveStatus = status;
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    const section = await screen.findByTitle("Suggest child classes");
+    fireEvent.click(within(section).getByRole("button", { name: "Get LLM suggestions for this section" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Accept suggestion" }));
+    await waitFor(() => expect(savedBodies).toHaveLength(1));
+    expect(generationBodies).toEqual([{ class_iri: iri, branch: "main", suggestion_type: "children", batch_size: 5 }]);
+    const payload = savedBodies[0] as { content: string };
+    expect(savedBodies[0]).toMatchObject({ base_revision: "base-commit", commit_message: 'Add generated class "Generated child"' });
+    const triples = parseBlockTriples(payload.content, "https://example.test/Generated");
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: iri } });
+    expect(triples?.some(t => t.predicate === "http://www.w3.org/ns/prov#wasGeneratedBy")).toBe(true);
+    expect(parseBlockTriples(payload.content, iri)).toEqual(parseBlockTriples(originalSource, iri));
+    const key = storeKey({ projectId: "route-project", branch: "main" }, iri, "children");
+    await waitFor(() => expect(useSuggestionStore.getState().suggestions[key][0].status).toBe(status === 200 ? "accepted" : "pending"));
+    if (status === 200) await screen.findByRole("treeitem", { name: /Generated child/ });
+    else {
+      if (status === 409) await screen.findByText("A newer source revision is available.");
+      else await screen.findByText(/Save refused/);
+      expect(screen.queryByRole("treeitem", { name: /Generated child/ })).toBeNull();
+    }
+  });
+
+  it.each([
+    ["direct", false, "object"], ["direct", true, "object"],
+    ["suggestion", false, "object"], ["suggestion", true, "object"],
+    ["direct", false, "data"], ["direct", false, "annotation"],
+    ["suggestion", false, "data"], ["suggestion", false, "annotation"],
+  ] as const)("persists a generated sub-property in %s mode (save failure: %s, kind: %s)", async (mode, failure, kind) => {
+    llmConfigured = true;
+    if (mode === "suggestion") {
+      projectResponse = { ...projectResponse, user_role: "suggester" };
+      suggestionFailure = failure ? "save" : null;
+    } else saveStatus = failure ? 403 : 200;
+    await openEntityForm("property", kind);
+    const section = screen.getByText("Sub-Properties").parentElement!;
+    fireEvent.click(within(section).getByRole("button", { name: "Get LLM suggestions for this section" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Accept suggestion" }));
+    const key = storeKey({ projectId: "route-project", branch: "main" }, editableIri, "children");
+    const payloads = mode === "direct" ? savedBodies : suggestionBodies;
+    await waitFor(() => expect(payloads).toHaveLength(1));
+    if (failure) await screen.findByText(mode === "direct" ? /Save refused/ : /The generated entity was not saved/);
+    await waitFor(() => expect(useSuggestionStore.getState().suggestions[key][0].status).toBe(failure ? "pending" : "accepted"));
+    const payload = payloads[0] as { content: string };
+    const triples = parseBlockTriples(payload.content, "https://example.test/Generated");
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type", object: { type: "iri", value: "http://www.w3.org/2002/07/owl#" + ({ object: "ObjectProperty", data: "DatatypeProperty", annotation: "AnnotationProperty" }[kind]) } });
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subPropertyOf", object: { type: "iri", value: editableIri } });
+    expect(generationBodies).toEqual([{ class_iri: editableIri, branch: "main", suggestion_type: "children", batch_size: 5 }]);
+    if (mode === "suggestion") {
+      expect(savedBodies).toEqual([]);
+      expect(suggestionBodies[0]).toMatchObject({ entity_iri: "https://example.test/Generated", entity_label: "Generated child" });
+      expect(requests.some(r => r.path.endsWith("/revisions/file") && new URLSearchParams(r.search).get("version") === "suggestion/draft")).toBe(true);
+    } else expect(savedBodies[0]).toMatchObject({ base_revision: "base-commit", commit_message: 'Add generated property "Generated child"' });
+    expect(screen.queryByRole("treeitem", { name: /Generated child/ })).toBeNull();
+    if (failure) {
+      saveStatus = 200; suggestionFailure = null;
+      fireEvent.click(screen.getByRole("button", { name: "Accept suggestion" }));
+      await waitFor(() => expect(useSuggestionStore.getState().suggestions[key][0].status).toBe("accepted"));
+      expect(payloads).toHaveLength(2);
+      if (mode === "suggestion") expect(requests.filter(r => r.path.endsWith("/suggestions/sessions"))).toHaveLength(1);
+    }
+  });
+
+  it.each(["empty", "unavailable"] as const)("retains a generated class when authoritative source is %s", async outcome => {
+    llmConfigured = true;
+    if (outcome === "empty") sourceContent = "   ";
+    else sourceStatus = 403;
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    fireEvent.click(within(await screen.findByTitle("Suggest child classes")).getByRole("button", { name: "Get LLM suggestions for this section" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Accept suggestion" }));
+    await screen.findByText(outcome === "empty" ? /ontology source is empty/ : /Could not accept this suggestion.*Source unavailable/);
+    expect(savedBodies).toEqual([]);
+    const key = storeKey({ projectId: "route-project", branch: "main" }, iri, "children");
+    expect(useSuggestionStore.getState().suggestions[key][0].status).toBe("pending");
+    expect(screen.queryByRole("treeitem", { name: /Generated child/ })).toBeNull();
+    sourceStatus = 200; sourceContent = originalSource;
+    fireEvent.click(screen.getByRole("button", { name: "Accept suggestion" }));
+    await waitFor(() => expect(useSuggestionStore.getState().suggestions[key][0].status).toBe("accepted"));
+    expect(savedBodies).toHaveLength(1);
+  });
+
+  it.each([200, 403, 409])("reparents or rolls back through the real keyboard drag sensor (HTTP %i)", async status => {
+    saveStatus = status;
+    const destination = "https://example.test/Destination";
+    extraTreeNodes = [{ iri: destination, label: "Destination", child_count: 0 }];
+    installTreeGeometry({ [iri]: 100, [destination]: 125 });
+    mount();
+    const row = await screen.findByRole("treeitem", { name: /Person/ });
+    row.focus();
+    fireEvent.keyDown(row, { key: " ", code: "Space" });
+    await screen.findByText("Drop here to make root class");
+    await act(async () => { fireEvent.keyDown(document, { key: "ArrowDown", code: "ArrowDown" }); });
+    fireEvent.keyDown(document, { key: " ", code: "Space" });
+    await waitFor(() => expect(savedBodies).toHaveLength(1));
+    const payload = savedBodies[0] as { content: string };
+    expect(parseBlockTriples(payload.content, iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: destination } });
+    if (status === 200) {
+      await screen.findByText('Moved "Person"');
+      fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+      await waitFor(() => expect(savedBodies).toHaveLength(2));
+      expect(savedBodies[1]).toMatchObject({ base_revision: "saved-commit" });
+      expect(parseBlockTriples((savedBodies[1] as { content: string }).content, iri)?.filter(t => t.predicate === "http://www.w3.org/2000/01/rdf-schema#subClassOf")).toEqual([]);
+      expect(screen.getByRole("treeitem", { name: /Person/ }).classList.contains("tree-item-root")).toBe(true);
+    } else {
+      await screen.findByText("Failed to reparent class");
+      expect(screen.getByRole("treeitem", { name: /Person/ }).classList.contains("tree-item-root")).toBe(true);
+      expect(sourceContent).toBe(originalSource);
+    }
+  });
+
+  it.each(["move", "add", "add-existing", "root", "changed-parent"] as const)("reconciles authoritative parents through a real nested keyboard drag (%s)", async mode => {
+    const destination = "https://example.test/Destination";
+    const oldParent = "https://example.test/OldParent";
+    const otherParent = "https://example.test/Other";
+    nestPerson = true;
+    extraTreeNodes = [{ iri: destination, label: "Destination", child_count: 0 }];
+    classParents = mode === "changed-parent" ? [otherParent] : mode === "add-existing" ? [oldParent, otherParent, destination] : [oldParent, otherParent];
+    sourceContent = originalSource.slice(0, -1) + ' ; rdfs:subClassOf ' + classParents.map(parent => '<' + parent + '>').join(', ') + ' .';
+    installTreeGeometry({ [iri]: 100, [destination]: 125, [oldParent]: 50 }, 75);
+    mount(); fireEvent.doubleClick(await screen.findByRole("treeitem", { name: /Old parent/ }));
+    const row = await screen.findByRole("treeitem", { name: /Person/ }); row.focus();
+    fireEvent.keyDown(row, { key: " ", code: "Space" });
+    await screen.findByText("Drop here to make root class");
+    if (mode.startsWith("add")) fireEvent.keyDown(window, { key: "Alt", altKey: true });
+    const arrow = mode === "root" ? "ArrowUp" : "ArrowDown";
+    await act(async () => { fireEvent.keyDown(document, { key: arrow, code: arrow, altKey: mode.startsWith("add") }); });
+    fireEvent.keyDown(document, { key: " ", code: "Space", altKey: mode.startsWith("add") });
+    fireEvent.keyUp(window, { key: "Alt", altKey: false });
+    await waitFor(() => expect(savedBodies).toHaveLength(1));
+    const triples = parseBlockTriples((savedBodies[0] as { content: string }).content, iri);
+    const parents = triples?.filter(t => t.predicate === "http://www.w3.org/2000/01/rdf-schema#subClassOf").map(t => t.object.value);
+    expect(parents?.sort()).toEqual((mode === "root" ? [] : mode.startsWith("add") ? [oldParent, otherParent, destination] : [otherParent, destination]).sort());
+    await screen.findByText('Moved "Person"');
+    expect(savedBodies[0]).toMatchObject({ base_revision: "base-commit", commit_message: "Update class Person" });
   });
 
 });
