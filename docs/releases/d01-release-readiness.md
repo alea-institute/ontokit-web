@@ -2,6 +2,10 @@
 
 Observed: 2026-09-20. This packet records local preparation under [D01](../plans/2026-09-20-0659-chore-repaired-release-baseline-plan.md). Progress belongs in the [master roadmap](../plans/2026-09-20-0649-requirements-delivery-roadmap.md).
 
+## D03 follow-up
+
+The original observations below are historical. [D03](d03-image-readiness.md) now resolves the configured-provider build/runtime blocker locally at `30b8ecb2`, with three image profiles and 5,222 tests passing. API prerequisites and authenticated DEV acceptance remain open. Publication status is tracked in the master roadmap.
+
 ## Verdict
 
 **Local D01 preparation complete; not ready for authenticated DEV activation.** The committed integration candidate passes its regression, type and lint checks and the optional-auth production image build; verification results follow below. Configured-provider image fidelity and API trust/error-contract gaps require focused follow-up. Live host and promotion settings also need operator evidence.
