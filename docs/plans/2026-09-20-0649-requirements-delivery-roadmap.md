@@ -28,10 +28,10 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**D02: hosted identity authority pending. D06 is merged. D07: plan the remaining B14 schema-mint authorization gap.**
+**D02: hosted identity authority pending. D06 is merged. D07: implement the reviewed B14 schema-mint authorization plan.**
 
 - D06 completed U1–U6 and merged through [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49) as `83eaf9574315b71a165b80370dd964572d2ccac9` after all eight verification checks passed. One CI assertion finding was repaired; two final fresh runs passed all 21 mandatory tests with identical source fingerprints, complete cleanup and preserved neighboring resources. [Merged evidence](../releases/d06-merged-readiness.json) and [local acceptance](../releases/d06-full-stack-readiness.md) preserve the limits. No deployment occurred. B10 is accepted as a local regression foundation; B11–B13 remain open.
-- D07 research is underway in `.worktrees/api-d07-schema-mint`, branch `fix/d07-schema-mint-20260920`, based on merged API `d9272cc8`. Close the three-type schema authorization gap retained by D04 (`owl:DeprecatedClass`, `owl:DeprecatedProperty`, `rdfs:ContainerMembershipProperty`), preserving existing-entity edit compatibility and submission billing/caps. No plan artifact or implementation exists yet. Complete ce-plan and document review before ce-work.
+- D07 research is underway in `.worktrees/api-d07-schema-mint`, branch `fix/d07-schema-mint-20260920`, based on merged API `d9272cc8`. Close the three-type schema authorization gap retained by D04 (`owl:DeprecatedClass`, `owl:DeprecatedProperty`, `rdfs:ContainerMembershipProperty`), preserving existing-entity edit compatibility and submission billing/caps. The reviewed API plan is `docs/plans/2026-09-20-1820-fix-schema-mint-authorization-plan.md`, checkpoint `e24864bc`; five local and three Claude document reviews are resolved with no remaining findings. Native ce-work is implementing U1 then U2, beginning with failing recognition regressions.
 
 - D06's first real probes found a default API Dockerfile defect: the package directory is root-owned `0644`, preventing non-root imports and migrations. [Lifecycle evidence](../releases/d06-lifecycle-readiness.md) records the reproduced failure and successful cleanup. The repair in `.worktrees/api-d06-image` is locally committed as `4d17d949`; its full-image non-root smoke and fresh migrations pass. Image and PR serializer repairs merged through [API PR50](https://github.com/alea-institute/ontokit-api/pull/50) as `d9272cc8` after all six verification checks passed; hosted DEV acceptance remains separate. U1 normal/setup-failure/late-failure/INT/TERM/crash-recovery probes all pass, with no owned leftovers and unchanged neighboring resource identities.
 
@@ -98,7 +98,7 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | D02 | B02–03 DEV runtime and persona acceptance | Awaiting identity access | [Reviewed plan](2026-09-20-1323-chore-dev-recovery-acceptance-plan.md) | [Plan review](../releases/d02-plan-review.json): six local and three independent Claude reviews resolved; [Recovery proof](../releases/d02-recovery-receipt.md) passed; hosted admin tokens invalid; local credential also rejected by hosted DEV after authorized validation. Return when supported DEV admin authority is available; no deployment or migration performed |
 
 | D06 | B10 isolated local full-stack foundation | Accepted: local foundation | [Plan](2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) | [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49), merge `83eaf957`; eight CI checks passed, final two runs 21 tests each; [evidence](../releases/d06-merged-readiness.json) |
-| D07 | B14 schema mint authorization | Scoping | Plan pending | Isolated API branch `fix/d07-schema-mint-20260920` at `d9272cc8`; read-only research underway |
+| D07 | B14 schema mint authorization | Implementing | API `docs/plans/2026-09-20-1820-fix-schema-mint-authorization-plan.md` | Reviewed checkpoint `e24864bc` in isolated API branch `fix/d07-schema-mint-20260920`; U1 recognition and U2 persisted authorization proof |
 
 ## Decision record
 
