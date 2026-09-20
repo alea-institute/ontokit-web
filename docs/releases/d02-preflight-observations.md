@@ -1,6 +1,6 @@
 # D02 preflight observations — 2026-09-20
 
-Read-only checks while D05 implementation proceeds; no deployment or configuration changes.
+Read-only host checks while D05 implementation proceeds; no deployment or host configuration changes. The obsolete waiting GitHub deployment was subsequently canceled under standing delivery authorization.
 
 - SSH operator access succeeded using existing pinned host verification and existing key; no credentials were printed.
 - Installed `/usr/local/sbin/ontokit-deploy`: root:root, mode755, SHA256 `96d0ed73d2ae4d62bfed084d6853ef5099f50091ad1ca260f693735b973d23aa`.
@@ -9,7 +9,7 @@ Read-only checks while D05 implementation proceeds; no deployment or configurati
 - Both API and worker logs identify `PermissionError` errno13 reading relative `pyproject.toml`. Host checkout file is mode600 root:root; current reviewed Dockerfile explicitly copies that file with mode0644, and current deploy script uses checkout umask022. This is consistent with the already repaired source/image-permissions defect, but a rebuilt matched deployment is needed to prove recovery.
 - Current API, worker and web containers carry no image-revision label in their container configuration; do not infer running revisions from checkout SHAs.
 - API and worker: restarting/unhealthy. Login: running/unhealthy. Web: running. PostgreSQL, Redis, MinIO, Mailpit and Zitadel: running/healthy. No logs or environment values were disclosed.
-- Old deployment run34155698435 remains waiting at workflow head `6464f74c68fa942c96e5aa411b250254102c11e4`; never approve it as the new release.
+- Old deployment run34155698435 at workflow head `6464f74c68fa942c96e5aa411b250254102c11e4` was canceled; GitHub now confirms status completed, conclusion cancelled. It cannot be mistaken for the new release.
 - Repository Actions variables are empty. Effective organization-level PROD_ENABLED remains unverified; an empty repository list alone does not establish containment.
 - dev-deploy environment retains required Damien review and allows self review. Existing user authorization covers normal deployment approval; protections must remain intact.
 
