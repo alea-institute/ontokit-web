@@ -1,0 +1,45 @@
+{
+  "unit": "U5",
+  "status": "complete",
+  "requirements": [
+    "R3",
+    "R8"
+  ],
+  "behavior_changed": true,
+  "run": {
+    "id": "34fb576c7bbe9f397b033e94d462dafe",
+    "exit_code": 0,
+    "passed": 21,
+    "skipped": 0,
+    "failed": 0,
+    "cleanup_verified": true,
+    "neighbor_identities_preserved": true
+  },
+  "source_note": "Web HEAD 715c86b6 with the two staged U5 files; API HEAD f5f036b9. Successful manifest was removed by cleanup before its source fingerprints were captured. U6 will capture two final fresh-run fingerprints.",
+  "test_files": {
+    "e2e/browser/ontology-workflow.spec.ts": "d0c57db1f614ddb4c089478f6ee587fb43146e7f16a6370842bce063235ab09e",
+    "e2e/fixtures/editor.ts": "dc391c43719c74a350e8fe7d50348814784bc87e8dc5316ce24f013f4ad46852"
+  },
+  "verification": {
+    "type_check": "passed",
+    "focused_eslint": "passed",
+    "diff_check": "passed",
+    "production_build": "passed in fresh private source copy"
+  },
+  "contracts": [
+    "Fresh empty browser context completes real ordinary-user OIDC login",
+    "UI imports Turtle, selects exact class IRI and creates branch",
+    "Real Monaco Find and keyboard input change label; UI save persists exact expected bytes and leaves main unchanged",
+    "UI reviews PR diff and merges; API read confirms returned merge revision and target bytes",
+    "Explicit target selection and page reload show persisted class label and Turtle source"
+  ],
+  "characterization": [
+    "First run:20 passed,1 failed because helper assumed tree clicks rewrite classIri URL; source confirmed selection store and Share control contract",
+    "Second run:20 passed,1 failed because rendered Monaco line intercepts textarea click; helper now clicks visible text and asserts keyboard focus",
+    "Both failures cleaned up all owned resources and preserved neighbors; consumed private diagnostic bundles deleted"
+  ],
+  "limitations": [
+    "Final repeatability and current browser-process crash recovery remain U6 work",
+    "Review/publication and hosted DEV acceptance remain pending; B11-B13 are separate"
+  ]
+}
