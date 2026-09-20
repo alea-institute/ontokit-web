@@ -1,0 +1,64 @@
+{
+  "status": "complete",
+  "verdict": "Ready to merge",
+  "scope": {
+    "base": "c95991c7",
+    "branch": "fix/d06-runtime-package-permissions-20260920",
+    "head_sha": "4d17d9496378ff7602c9ae3ee4c3419f2c065da0",
+    "pr_url": null,
+    "files_changed": 3
+  },
+  "intent": "Restore configured non-root imports and migration readability in the default development Dockerfile, with a direct image smoke in CI.",
+  "intent_confidence": "explicit",
+  "reviewers": [
+    "correctness",
+    "adversarial-claude"
+  ],
+  "findings": [],
+  "actionable_findings": [],
+  "triage_groups": [],
+  "pre_existing_findings": [],
+  "requirements_completeness": null,
+  "learnings": [],
+  "agent_native_gaps": [],
+  "deployment_notes": [],
+  "residual_risks": [
+    "The new smoke deliberately covers default development-image source imports and migration readability. Existing production-image preflight remains build-only; no production runtime-smoke coverage is claimed.",
+    "The script overrides entrypoint for a dependency-free import/readability probe. Real entrypoint startup and migrations were separately exercised by D06 lifecycle/full-stack verification. Future entrypoint regressions are outside this focused CI smoke.",
+    "Additional default image build increases CI disk/time costs; remote required checks remain pending."
+  ],
+  "testing_gaps": [],
+  "coverage": {
+    "depth": "focused",
+    "criteria": [
+      "AGENTS.md instruction-file fallback for all3 changed files"
+    ],
+    "plan_discovery": "No runtime/package-permissions/image plan matches; scoped prerequisite repair from explicit conversation intent.",
+    "not_assessed": [
+      "Dedicated specialist personas, validator batch, learnings, agent-native and deployment lenses; declared Compound Packs not applied"
+    ],
+    "cross_model": {
+      "cross_model_route": "claude",
+      "model_requested": "claude-opus-5",
+      "effort_requested": "high",
+      "receipt_supported": true,
+      "model_actual": "claude-opus-5",
+      "effort_actual": "unverified",
+      "independence_verified": true
+    },
+    "peer_triage": [
+      {
+        "title": "Green-while-red: prod image published without ever being smoked",
+        "disposition": "Scope mismatch: production Dockerfile and its build-only coverage predate this change; the reported failure requires an additional future chmod change, absent from current production file. Retained as coverage limitation."
+      },
+      {
+        "title": "Smoke bypasses ENTRYPOINT though RUN_MIGRATIONS=0 makes it DB-free",
+        "disposition": "Coverage extension, not defect in promised import/readability smoke. Entrypoint is deliberately bypassed; actual default entrypoint has separately passed fresh migrations and API/worker startup. Retained as limitation."
+      }
+    ],
+    "peer_other_notes": "Future optimization flags, arq import-order changes and missing-local-image pulls are hypothetical hardening suggestions; none is present in tested image/CI build-load sequence. Host bind-mount behavior is outside immutable-image scope. Local tiny red/green and full-image positive evidence already demonstrate sensitivity to original permission defect.",
+    "verification": "Full non-root image smoke, 50 readable migrations, actual database heads, focused Dockerfile tests and fresh15-test authenticated full-stack run passed. Shell syntax and diffcheck passed during review."
+  },
+  "artifact_path": "/tmp/compound-engineering-1000/ce-code-review/d06-api-260ab951bcf7",
+  "run_id": "d06-api-260ab951bcf7"
+}
