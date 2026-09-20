@@ -68,10 +68,14 @@ API paths in this table refer to provisional revision `24242ea0…`, read with G
 | Operational credentials | **Authenticated activation evidence blocker.** DEV initialization PAT expiry dates are 2026-09-15; existing runtime token validity is unknown. | DEV operator supplies validity/rotation receipt without credentials |
 | Automatic PROD promotion | **Activation evidence blocker.** Source gates on exact `PROD_ENABLED=true`. Repository variable listing has no such variable; organization variable query returned 403, so effective inheritance is unverified. | Authorized operator confirms effective flag/production environment containment before manifest merge |
 
+## Publication authority update
+
+On 2026-09-20 Damien authorized pushes, merges, deployments and Claude repository-content disclosure for future sessions. `AGENTS.md` now governs. Earlier no-publication actions and the rejected external review remain historical facts, not current permission blockers. Technical release prerequisites remain in force.
+
 ## Later publication and activation proposal
 
 1. Finish the focused image/auth prerequisite and any API release-blocking repairs, then refresh the proposed pair and rerun affected gates.
-2. Present the exact local candidate branch/diff for explicit publication authorization under the standing rule in `docs/handoffs/2026-09-18-codex-pickup.md`. Target ALEA web `dev`; CatholicOS upstream delivery remains B08.
+2. Publish the exact local candidate branch/diff under the standing authorization in `AGENTS.md`, with the required review and checks. Target ALEA web `dev`; CatholicOS upstream delivery remains B08.
 3. After authorized publication/integration, verify the actual immutable web revision. If upstream squash/rebase changes its SHA, use the published revision and rerun affected checks. Verify the API counterpart is published and compatible.
 4. Prepare a separate API manifest change using those full fetchable SHAs. Before merge, obtain effective promotion-gate, installed-script, credential-readiness and rollback receipts. The manifest path triggers deployment; it is not a documentation-only change.
 5. Resolve the stale waiting run deliberately. [Run 34155698435](https://github.com/alea-institute/ontokit-api/actions/runs/34155698435) was still `waiting` on 2026-09-20, at workflow head `6464f74c68fa942c96e5aa411b250254102c11e4`. Do not approve it as delivery of the new candidate. An authorized operator must retire/replace it to prevent accidental old-pair deployment.

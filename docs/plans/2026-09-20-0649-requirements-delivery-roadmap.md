@@ -10,6 +10,8 @@ status: ongoing
 
 ## Working agreement
 
+On 2026-09-20 Damien granted durable authorization for pushes, PRs, merges, deployments and Claude repository-content disclosure. The current rule lives in `AGENTS.md` and supersedes earlier local-only/confirmation restrictions.
+
 Proceed through the recovered requirements in priority order, creating and executing a focused CE implementation plan for each coherent deliverable. Maintain this master tracker throughout. The user selected thorough serial planning on 2026-09-20 and asked that later work remain visible across sessions.
 
 This document coordinates the work; it is not an implementation plan to pass wholesale to ce-work. Broad areas may require several deliverable plans. Plan the next deliverable in detail when its prerequisites are understood, so later plans benefit from what earlier work teaches us.
@@ -30,7 +32,7 @@ The accepted direction is to work through every area. Alternative storage archit
 
 - Start with [the D01 evidence packet](../releases/d01-release-readiness.md) and its required-auth Docker failure. The credential-free image builds; the required-auth image does not.
 - Create a focused ce-plan for build-time public provider configuration versus runtime secrets, retaining fail-closed runtime validation. Work from the local release candidate identified in that packet, not the older repair branch.
-- D01 local preparation is complete under [its reviewed plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md). The candidate incorporates current ALEA `dev`, the repair/test work and one dashboard fixture adaptation. No publication or activation is authorized by this tracker.
+- D01 local preparation is complete under [its reviewed plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md). The candidate incorporates current ALEA `dev`, the repair/test work and one dashboard fixture adaptation. Standing authorization in `AGENTS.md` now permits publication, merge and deployment after their verification gates.
 - D04 follows: API individual mint-capability enforcement. D05 follows: API submit/resubmit embedding error mapping. Both have source findings; reproduce them before repair. The API checkout is stale and must not be used as the source baseline.
 - D02 remains authenticated DEV lifecycle acceptance (B02–03), after code prerequisites and authorized release activation. The old waiting workflow run pins an older pair and is not the release of this candidate.
 - If only external activation blocks, continue with the independent full-stack foundation in A02 (B10). Record the blocker owner, next action and return condition.
