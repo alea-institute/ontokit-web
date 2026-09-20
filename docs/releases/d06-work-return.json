@@ -1,0 +1,300 @@
+{
+  "status": "complete",
+  "plan_path": "docs/plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md",
+  "changed_files": [
+    ".dockerignore",
+    ".gitignore",
+    "__tests__/components/editor/DeveloperEditorLayout.integration.test.tsx",
+    "__tests__/config/auth-session.integration.test.ts",
+    "auth.ts",
+    "components/editor/developer/DeveloperEditorLayout.tsx",
+    "docs/plans/2026-09-20-0649-requirements-delivery-roadmap.md",
+    "docs/plans/2026-09-20-1323-chore-dev-recovery-acceptance-plan.md",
+    "docs/plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md",
+    "docs/releases/d02-plan-review.json",
+    "docs/releases/d02-recovery-receipt.md",
+    "docs/releases/d04-merged-readiness.md",
+    "docs/releases/d05-merged-readiness.md",
+    "docs/releases/d06-api-review.json",
+    "docs/releases/d06-cluster-simplification.json",
+    "docs/releases/d06-editor-preload-verification.json",
+    "docs/releases/d06-full-stack-readiness.md",
+    "docs/releases/d06-lifecycle-readiness.md",
+    "docs/releases/d06-plan-review.json",
+    "docs/releases/d06-run-ce831e0704737a0dc8297a2810d9bfd9.json",
+    "docs/releases/d06-run-ecc14e55bdb8135416e568ee36e3f35a.json",
+    "docs/releases/d06-u1-verification.json",
+    "docs/releases/d06-u2-verification.json",
+    "docs/releases/d06-u3-verification.json",
+    "docs/releases/d06-u4-verification.json",
+    "docs/releases/d06-u5-verification.json",
+    "docs/releases/d06-u6-verification.json",
+    "e2e/README.md",
+    "e2e/api/branches.spec.ts",
+    "e2e/api/errors.spec.ts",
+    "e2e/api/ontology.spec.ts",
+    "e2e/api/projects.spec.ts",
+    "e2e/api/pull-requests.spec.ts",
+    "e2e/api/search-lint.spec.ts",
+    "e2e/auth-foundation.spec.ts",
+    "e2e/browser/ontology-workflow.spec.ts",
+    "e2e/compose.yaml",
+    "e2e/fixtures/auth.ts",
+    "e2e/fixtures/editor.ts",
+    "e2e/fixtures/polling.ts",
+    "e2e/fixtures/projects.ts",
+    "e2e/fixtures/run.ts",
+    "e2e/fixtures/tiny-ontology.ttl",
+    "e2e/stack.setup.ts",
+    "e2e/stack.teardown.ts",
+    "package-lock.json",
+    "package.json",
+    "playwright.config.ts",
+    "scripts/e2e/README.md",
+    "scripts/e2e/bootstrap-identity.mjs",
+    "scripts/e2e/cleanup.mjs",
+    "scripts/e2e/diagnostics.mjs",
+    "scripts/e2e/diagnostics.test.mjs",
+    "scripts/e2e/evidence.mjs",
+    "scripts/e2e/evidence.test.mjs",
+    "scripts/e2e/full-stack.mjs",
+    "scripts/e2e/identity.test.mjs",
+    "scripts/e2e/ownership.mjs",
+    "scripts/e2e/ownership.test.mjs",
+    "scripts/e2e/run.mjs",
+    "scripts/e2e/runtime.mjs",
+    "scripts/e2e/supervisor.mjs"
+  ],
+  "u_ids_attempted": [
+    "U1",
+    "U2",
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+  ],
+  "u_ids_completed": [
+    "U1",
+    "U2",
+    "U3",
+    "U4",
+    "U5",
+    "U6"
+  ],
+  "verification_results": {
+    "unit_tests": "5223pass/365files",
+    "lint": "0errors19pre-existingwarnings",
+    "type_check": "pass",
+    "fresh_full_stack_runs": [
+      "ecc14e55bdb8135416e568ee36e3f35a",
+      "ce831e0704737a0dc8297a2810d9bfd9"
+    ],
+    "full_stack": "21pass0skip0fail each; identical source fingerprints",
+    "lifecycle": "setup/testfailure,INT,TERM,liveChromiumhardkillrecovery verified; neighbors preserved"
+  },
+  "verification_evidence": [
+    {
+      "unit": "U1",
+      "behavior_changed": true,
+      "existing_tests_inspected": "No prior isolated lifecycle harness; existing Dockerfile contract coverage inspected",
+      "tests_added_or_changed": "Ownership/process cleanup tests",
+      "tests_used_unchanged": "All existing unit tests; prior unit full-stack assertions retained",
+      "red_or_characterization": [
+        "Initial missing harness module",
+        "Detached child cleanup regression",
+        "Supervisor pre-registration disconnect regression",
+        "Hold process exited before INT/TERM; fixed with referenced abortable timer",
+        "API image package directory mode 0644 blocked non-root imports; fixed by pre-creating directory"
+      ],
+      "verification": [
+        "Harness ESLint passed",
+        "git diff --check passed",
+        "Missing API checkout rejected before provisioning",
+        "Fresh migrations reached every repository head",
+        "API image non-root imports and 50 migration files passed"
+      ],
+      "evidence_receipt": "docs/releases/d06-u1-verification.json",
+      "exception_reason": null
+    },
+    {
+      "unit": "U2",
+      "behavior_changed": true,
+      "existing_tests_inspected": "Existing auth encrypted-cookie callback tests",
+      "tests_added_or_changed": "Identity readiness, private diagnostics, encrypted-cookie subject assertions",
+      "tests_used_unchanged": "All existing unit tests; prior unit full-stack assertions retained",
+      "red_or_characterization": [
+        "Missing identity helper before implementation",
+        "Read-only API503 readiness, fail-fast401 and single-shot mutation regressions",
+        "Missing private JavaScript diagnostic capture before implementation",
+        "Auth.js generated user ID differed from Zitadel subject in real browser session; strengthened two existing encrypted-cookie cases failed before production fix"
+      ],
+      "verification": {
+        "frontend_tests_passed": 5222,
+        "frontend_test_files_passed": 365,
+        "ownership_and_diagnostic_tests_passed": 14,
+        "identity_guard_tests_passed": 8,
+        "lint": "passed",
+        "type_check": "passed",
+        "production_build": "passed in fresh private source copy"
+      },
+      "evidence_receipt": "docs/releases/d06-u2-verification.json",
+      "exception_reason": null
+    },
+    {
+      "unit": "U3",
+      "behavior_changed": false,
+      "existing_tests_inspected": "Current API routes/schemas and project fixtures",
+      "tests_added_or_changed": [
+        "e2e/fixtures/tiny-ontology.ttl",
+        "e2e/fixtures/projects.ts",
+        "e2e/api/projects.spec.ts",
+        "e2e/api/ontology.spec.ts",
+        "e2e/api/errors.spec.ts"
+      ],
+      "tests_used_unchanged": "All existing unit tests; prior unit full-stack assertions retained",
+      "red_or_characterization": "Characterization tests against existing HTTP routes and schema; no production change or pre-implementation red claimed",
+      "verification": {
+        "type_check": "passed",
+        "targeted_eslint": "passed",
+        "whitespace": "passed",
+        "production_build": "passed in fresh isolated source copy"
+      },
+      "evidence_receipt": "docs/releases/d06-u3-verification.json",
+      "exception_reason": null
+    },
+    {
+      "unit": "U4",
+      "behavior_changed": true,
+      "existing_tests_inspected": "Existing API TestToPrResponse plus U3 project fixture",
+      "tests_added_or_changed": "Branch/PR/search/lint specs and API serializer regression",
+      "tests_used_unchanged": "All existing unit tests; prior unit full-stack assertions retained",
+      "red_or_characterization": "Strengthened existing TestToPrResponse before production fix: merged hash assertion failed, null open case passed. After3field serializer fix,71service tests and full3261suite pass.",
+      "verification": {
+        "web_type_check": "passed",
+        "web_focused_eslint": "passed",
+        "api_tests": 3261,
+        "api_coverage_percent": 90,
+        "api_ruff": "passed",
+        "api_mypy": "193 source files, no issues",
+        "api_pyright": "0 errors after binding verified Python3.11 environment",
+        "production_build": "passed in fresh private source copy"
+      },
+      "evidence_receipt": "docs/releases/d06-u4-verification.json",
+      "exception_reason": null
+    },
+    {
+      "unit": "U5",
+      "behavior_changed": true,
+      "existing_tests_inspected": "U2 real OIDC fixture and current editor/PR components",
+      "tests_added_or_changed": "Browser workflow spec and real editor fixture",
+      "tests_used_unchanged": "All existing unit tests; prior unit full-stack assertions retained",
+      "red_or_characterization": [
+        "First run:20 passed,1 failed because helper assumed tree clicks rewrite classIri URL; source confirmed selection store and Share control contract",
+        "Second run:20 passed,1 failed because rendered Monaco line intercepts textarea click; helper now clicks visible text and asserts keyboard focus",
+        "Both failures cleaned up all owned resources and preserved neighbors; consumed private diagnostic bundles deleted"
+      ],
+      "verification": {
+        "type_check": "passed",
+        "focused_eslint": "passed",
+        "diff_check": "passed",
+        "production_build": "passed in fresh private source copy"
+      },
+      "evidence_receipt": "docs/releases/d06-u5-verification.json",
+      "exception_reason": null
+    },
+    {
+      "unit": "U6",
+      "behavior_changed": true,
+      "existing_tests_inspected": "Existing lifecycle/identity guards, four-test report floor, layout/editor tests",
+      "tests_added_or_changed": "23 evidence-gate cases; deferred source preload regression",
+      "tests_used_unchanged": "All existing unit tests; prior unit full-stack assertions retained",
+      "red_or_characterization": "Foundation-only green synthetic report failed the strengthened assertion before gate repair",
+      "verification": {
+        "lint": "0 errors;19 pre-existing warnings",
+        "type_check": "passed",
+        "existing_unit_suite": "5223 passed across365files after editor preload repair",
+        "production_build": "fresh run-owned build per accepted run"
+      },
+      "evidence_receipt": "docs/releases/d06-u6-verification.json",
+      "exception_reason": null
+    }
+  ],
+  "implementation_engine_binding": null,
+  "requested_route": "native inline/subagent",
+  "actual_route": "native inline/subagent",
+  "requested_model": "session default",
+  "actual_model": "unverified",
+  "requested_effort": null,
+  "fallback_reason": null,
+  "run_id": null,
+  "source_kind": "plan",
+  "source_digest": "faef05f5c23c945314a84b955a01d162c7193b1e1e513be210b2be10b71888bc",
+  "unit_receipts": [
+    {
+      "unit": "U1",
+      "route": "native inline/subagent",
+      "model": "unverified",
+      "detached_processes": "owned by launcher; all removed",
+      "integration": "complete",
+      "verification": "passed; see docs/releases/d06-u1-verification.json",
+      "canonical_commit": "a5800e49",
+      "cleanup": "verified"
+    },
+    {
+      "unit": "U2",
+      "route": "native inline/subagent",
+      "model": "unverified",
+      "detached_processes": "owned by launcher; all removed",
+      "integration": "complete",
+      "verification": "passed; see docs/releases/d06-u2-verification.json",
+      "canonical_commit": "19c40e86",
+      "cleanup": "verified"
+    },
+    {
+      "unit": "U3",
+      "route": "native inline/subagent",
+      "model": "unverified",
+      "detached_processes": "owned by launcher; all removed",
+      "integration": "complete",
+      "verification": "passed; see docs/releases/d06-u3-verification.json",
+      "canonical_commit": "f09738e5",
+      "cleanup": "verified"
+    },
+    {
+      "unit": "U4",
+      "route": "native inline/subagent",
+      "model": "unverified",
+      "detached_processes": "owned by launcher; all removed",
+      "integration": "complete",
+      "verification": "passed; see docs/releases/d06-u4-verification.json",
+      "canonical_commit": "715c86b6",
+      "cleanup": "verified"
+    },
+    {
+      "unit": "U5",
+      "route": "native inline/subagent",
+      "model": "unverified",
+      "detached_processes": "owned by launcher; all removed",
+      "integration": "complete",
+      "verification": "passed; see docs/releases/d06-u5-verification.json",
+      "canonical_commit": "48db779c",
+      "cleanup": "verified"
+    },
+    {
+      "unit": "U6",
+      "route": "native inline/subagent",
+      "model": "unverified",
+      "detached_processes": "owned by launcher; all removed",
+      "integration": "complete",
+      "verification": "passed; see docs/releases/d06-u6-verification.json",
+      "canonical_commit": "9e768112",
+      "cleanup": "verified"
+    }
+  ],
+  "plan_checkpoint": "db9162921a9ef7e514548f81eb74eb422780e86c",
+  "blockers": [],
+  "recovery_path": null,
+  "settled_decision_conflicts": [],
+  "behavior_change": true,
+  "standalone_shipping_skipped": true
+}

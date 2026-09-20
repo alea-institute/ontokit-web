@@ -81,9 +81,10 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
     if (failAt === 'after-workflow') throw new Error('Injected workflow failure');
     const containers = docker(['ps', '-aq', '--filter', `label=io.ontokit.e2e.run=${id}`]).split('\n').filter(Boolean);
     manifest.evidenceImages = containers.map(container => {
-      const labels = JSON.parse(docker(['inspect', '--format', '{{json .Config.Labels}}', container]));
+      const [labelJson, imageId, reference] = docker(['inspect', '--format', '{{json .Config.Labels}}\n{{.Image}}\n{{.Config.Image}}', container]).split('\n');
+      const labels = JSON.parse(labelJson);
       if (labels['com.docker.compose.project'] !== manifest.project) throw new Error('Invalid image evidence ownership');
-      return {service: labels['com.docker.compose.service'], id: docker(['inspect', '--format', '{{.Image}}', container]), reference: docker(['inspect', '--format', '{{.Config.Image}}', container])};
+      return {service: labels['com.docker.compose.service'], id: imageId, reference};
     });
     workflowPassed = !!manifest.tests;
     await saveManifest(manifestDir, manifest);

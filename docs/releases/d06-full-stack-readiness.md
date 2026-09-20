@@ -1,7 +1,8 @@
 # D06 full-stack readiness
 
-Status: U1–U6 locally verified. Two fresh full-stack passes and current failure/recovery
-proof are complete. Independent final web review and publication remain required.
+Status: U1–U6 locally verified; full review and both recovery repairs are complete.
+Two final fresh full-stack passes and current failure/recovery proof are complete.
+Web publication and required CI remain pending.
 [Plan](../plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) ·
 [Contributor invocation](../../e2e/README.md)
 
@@ -44,16 +45,16 @@ with the strengthened gate. No synthetic test is counted as live B10 acceptance.
 
 | Gate | Evidence slot |
 |---|---|
-| Fresh complete run 1 | [`ecc14e55…`](d06-run-ecc14e55bdb8135416e568ee36e3f35a.json): 21 passed, zero skipped/failed; accepted receipt, complete cleanup and unchanged neighbors |
-| Fresh complete run 2 | [`ce831e07…`](d06-run-ce831e0704737a0dc8297a2810d9bfd9.json): 21 passed; new identity/storage/build state; identical source pair and fingerprints; complete cleanup and unchanged neighbors |
-| Setup failure | `b5ee508a…`: injected after dependencies; exit1; cleanup and neighbors passed |
-| Workflow failure | `cfc0970c…`: real browser failure, exit1,20passed/1failed; cleanup and neighbors passed; preload race repaired as `9e559bdd` |
-| SIGINT and SIGTERM | `bffb9314…`/`acb9fd3d…`: dependencies migrated, exit130, cleanup and neighbors passed |
-| Hard-kill recovery | `c1c978b0…`: SIGKILL after owned Chromium observed; exact manifest recovery; zero browser/Next/Docker/runtime leftovers; neighbors unchanged |
+| Fresh complete run 1 | [`86bbc69d…`](d06-run-86bbc69dea452ba371f10cbe4a27e684.json): 21 passed, zero skipped/failed; accepted receipt, complete cleanup and unchanged neighbors |
+| Fresh complete run 2 | [`a1b6d164…`](d06-run-a1b6d164d289a2e630b5be6ebc565baa.json): 21 passed; new identity/storage/build state; identical source pair and fingerprints; complete cleanup and unchanged neighbors |
+| Setup failure | `b5d71420…`: injected after dependencies; exit1; cleanup and neighbors passed |
+| Workflow failure | `76e0dce7…`: injected after 21 passing workflow checks, exit1/acceptedRun=false; private publication, cleanup and neighbors passed; earlier real preload failure repaired as `9e559bdd` |
+| SIGINT and SIGTERM | `550d29dc…`/`e78a89c0…`: dependencies migrated, exit130, cleanup and neighbors passed |
+| Hard-kill recovery | `87b576c6…`: SIGKILL after owned Chromium observed; exact manifest recovery; zero browser/Next/Docker/runtime leftovers; neighbors unchanged |
 | Missing prerequisites | Missing explicit API source: exit1 with actionable message and no new allocation |
-| Web verification | Lint0errors/19existingwarnings; type-check pass;5223tests/365files pass; both fresh production builds pass |
-| Independent review | Final web review pending; [API review](d06-api-review.json) complete,0actionable findings |
-| Publication | Web local only; API [PR50](https://github.com/alea-institute/ontokit-api/pull/50) pushed,CI pending; no deployment |
+| Web verification | Lint: 0 errors / 19 existing warnings; type-check pass; 5,223 tests / 365 files pass; both fresh production builds pass |
+| Independent review | [Full web review](d06-web-review.json) completed; two P2 findings repaired in `59004edd` and [closure verified](d06-recovery-fix-closure.json); [API review](d06-api-review.json) complete |
+| Publication | Web local only; API [PR50](https://github.com/alea-institute/ontokit-api/pull/50) merged as `d9272cc8`, six verification checks passed; no deployment |
 
 B11 (broader auth/editor/suggestions), B12 (collaboration/WebSocket), B13
 (browser CI/Firefox/schema/retention) remain unfinished. D03–D05 are already shipped;
@@ -61,4 +62,8 @@ D02 remains blocked on hosted identity authority. No DEV activation or acceptanc
 claimed by this local harness. Keep all 75 backlog IDs in the roadmap.
 
 [U6 verification](d06-u6-verification.json) records full lifecycle run IDs and source snapshots.
-The final pair used API `f5f036b9`, snapshot `c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df`, and web `9e559bdd` plus staged U6 files, snapshot `5d09b80f1e940b36058093b8c21b5e1fb05837984fcf44091cd5c953aef4668e`. Actual migration head: `i7j8k9l0m1n2`; both receipts contain exact observed image references and IDs. Later evidence-only documentation updates are outside those snapshots.
+The pre-review pair used API `f5f036b9`, snapshot `c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df`, and web `9e559bdd` plus staged U6 files, snapshot `5d09b80f1e940b36058093b8c21b5e1fb05837984fcf44091cd5c953aef4668e`. Actual migration head: `i7j8k9l0m1n2`; both receipts contain exact observed image references and IDs. Later evidence-only documentation updates are outside those snapshots.
+
+The final post-repair pair used API `f5f036b9`, snapshot `c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df`, and web `59004edd` plus the reviewed inspect consolidation and staged evidence, snapshot `959610352e217462173357559b874448d14276cb62f4dc327f6f7902bc749bd4`. Both runs accepted all 21 mandatory tests with complete cleanup and unchanged neighbors. Final evidence-only documentation updates follow those snapshots.
+
+[Recovery verification](d06-recovery-repair.json) records 34 focused tests, 5,223 unit tests, lint/type-check, real obsolete-PID Docker cleanup and current interruption probes. [Browser verification](d06-browser-verification.md) distinguishes host Browser entry-page checks from the fully authenticated authored workflow. The original review remains intact; both findings were resolved through bounded U1 work and same-reviewer closure, without relabeling confidence or corroboration.

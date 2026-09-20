@@ -1,5 +1,5 @@
 {
-  "status": "locally_verified",
+  "status": "complete",
   "plan_path": "docs/plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md",
   "unit": "U1 recovery follow-up",
   "requirements": [
@@ -133,7 +133,166 @@
       }
     ],
     "closure": "docs/releases/d06-recovery-fix-closure.json",
-    "full_workflow_acceptance": "post-repair late failure and repeatability gates pending"
+    "full_workflow_acceptance": {
+      "runs": [
+        "86bbc69dea452ba371f10cbe4a27e684",
+        "a1b6d164d289a2e630b5be6ebc565baa"
+      ],
+      "passed_each": 21,
+      "skipped_each": 0,
+      "failed_each": 0,
+      "source_fingerprints_equal": true,
+      "cleanup_each": "complete",
+      "neighbors_preserved_each": true
+    },
+    "late_workflow_failure": {
+      "run": "76e0dce7b389f04ba6fe976e143e22af",
+      "scenario": "injected failure after21passed workflow and native page check",
+      "exit_code": 1,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true,
+      "private_diagnostics_complete": true,
+      "private_modes_verified": true,
+      "expiry_one_hour_verified": true,
+      "diagnostics_removed_after_verification": true,
+      "raw_log_printed": false,
+      "receipt": {
+        "version": 1,
+        "run": "76e0dce7b389f04ba6fe976e143e22af",
+        "startedAt": "2026-09-20T22:42:41.304Z",
+        "finishedAt": "2026-09-20T22:46:44.343Z",
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "59004edd2e95b5ee7c26a0c907f5c1c9105bb795",
+            "sha256": "46750bd24381769f07c5cc0c9f1343da267087366180c05a421384e7b20e7afd"
+          }
+        },
+        "images": [],
+        "migrationHeads": [
+          "i7j8k9l0m1n2"
+        ],
+        "tests": {
+          "passed": 21,
+          "skipped": 0,
+          "failed": 0,
+          "flaky": 0,
+          "mandatory": [
+            {
+              "file": "api/branches.spec.ts",
+              "title": "branch edits persist independently of the target branch",
+              "project": "chromium"
+            },
+            {
+              "file": "api/branches.spec.ts",
+              "title": "stale branch revision is rejected without changing source or target",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "absent project write returns stable 404 and creates nothing",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "schema-invalid project create returns validation locations and creates nothing",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "anonymous source write is rejected without changing owner state",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "unrelated source write is rejected without changing owner state",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "invalid Turtle source write is rejected without changing owner state",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "invalid schema source write is rejected without changing owner state",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "malformed Turtle import leaves no partial project",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "malformed multipart import leaves no partial project",
+              "project": "chromium"
+            },
+            {
+              "file": "api/ontology.spec.ts",
+              "title": "import initializes persisted source, branch, class and property labels",
+              "project": "chromium"
+            },
+            {
+              "file": "api/ontology.spec.ts",
+              "title": "source save persists a new immutable revision",
+              "project": "chromium"
+            },
+            {
+              "file": "api/projects.spec.ts",
+              "title": "project create, list, read, update and delete persist through HTTP",
+              "project": "chromium"
+            },
+            {
+              "file": "api/pull-requests.spec.ts",
+              "title": "ordinary owner reviews a diff and merges persisted branch content into the target",
+              "project": "chromium"
+            },
+            {
+              "file": "api/search-lint.spec.ts",
+              "title": "lexical search reflects the saved target revision and excludes nonmatching entities",
+              "project": "chromium"
+            },
+            {
+              "file": "api/search-lint.spec.ts",
+              "title": "each lint enqueue produces a fresh completed persisted worker run with deterministic issues",
+              "project": "chromium"
+            },
+            {
+              "file": "auth-foundation.spec.ts",
+              "title": "real owner and unrelated sessions authenticate protected API reads",
+              "project": "chromium"
+            },
+            {
+              "file": "auth-foundation.spec.ts",
+              "title": "anonymous context has no identity and cannot access a protected API read",
+              "project": "chromium"
+            },
+            {
+              "file": "browser/ontology-workflow.spec.ts",
+              "title": "fresh UI sign-in imports, edits, reviews and merges a label that survives target reload",
+              "project": "chromium"
+            },
+            {
+              "file": "stack.setup.ts",
+              "title": "genuine OIDC sessions for two fresh ordinary users",
+              "project": "stack setup"
+            },
+            {
+              "file": "stack.teardown.ts",
+              "title": "remove private browser credentials",
+              "project": "stack teardown"
+            }
+          ]
+        },
+        "workflowPassed": false,
+        "cleanup": "complete",
+        "acceptedRun": false
+      }
+    }
   },
   "publication": "not pushed; web PR not created",
   "worker_evidence": {
@@ -162,5 +321,6 @@
   "resolved_findings": [
     1,
     2
-  ]
+  ],
+  "canonical_commit": "59004edd2e95b5ee7c26a0c907f5c1c9105bb795"
 }
