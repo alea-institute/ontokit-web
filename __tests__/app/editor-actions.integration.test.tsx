@@ -1307,14 +1307,21 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     };
     mount(); await screen.findByText("Person");
     fireEvent.click(screen.getByRole("button", { name: "Source" }));
-    await screen.findByRole("textbox", { name: "Turtle source boundary" });
+    // The first textarea can precede the branch source response. Wait for the
+    // loaded document and its mounted editor before exercising the imperative path.
+    await waitFor(() => {
+      expect((screen.getByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement).value).toBe(sourceContent);
+      expect(editor.onMouseDown).toHaveBeenCalled();
+    });
     fireEvent.keyDown(document, { key: "n", ctrlKey: true });
     const dialog = await screen.findByRole("dialog", { name: "Add Entity" });
     fireEvent.change(within(dialog).getByLabelText("Label"), { target: { value: "Inserted entity" } });
     fireEvent.change(within(dialog).getByLabelText("Type"), { target: { value: entityType } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Advanced" }));
     fireEvent.change(within(dialog).getByLabelText("IRI"), { target: { value: "https://example.test/NewEntity" } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+    const create = within(dialog).getByRole("button", { name: "Create" });
+    await waitFor(() => expect(create.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(create);
     expect(editor.executeEdits).toHaveBeenCalledTimes(1);
     const source = screen.getByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement;
     await waitFor(() => expect(source.value).toContain('"Inserted entity"'));
