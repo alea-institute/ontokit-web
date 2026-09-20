@@ -37,7 +37,7 @@ console.log(`Updated package.json: ${current} -> ${release}`);
 
 // Git commit
 execFileSync("git", ["add", packagePath], { stdio: "inherit" });
-execFileSync("git", ["commit", "-m", `chore: releasing ${release}`], { stdio: "inherit" });
+execFileSync("git", ["commit", "-m", `chore: releasing ${release}`, "--", packagePath], { stdio: "inherit" });
 console.log(`Created commit: chore: releasing ${release}`);
 console.log();
 console.log("Next steps:");

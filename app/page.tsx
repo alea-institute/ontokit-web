@@ -82,7 +82,9 @@ export default function HomePage() {
   const handleLoadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
       setNextPageError(null);
-      fetchNextPage().catch((err) => {
+      fetchNextPage().then((result) => {
+        if (result.isError) setNextPageError(result.error instanceof Error ? result.error.message : "Failed to load more projects");
+      }).catch((err) => {
         setNextPageError(err instanceof Error ? err.message : "Failed to load more projects");
       });
     }

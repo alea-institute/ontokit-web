@@ -104,33 +104,46 @@ export function useOntologyTree({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIri, setSelectedIri] = useState<string | null>(null);
+  const scopeRef = useRef(0);
+  const rootRequestRef = useRef(0);
+  const navigationRef = useRef(0);
+  const [isExpandingAll, setIsExpandingAll] = useState(false);
 
   // Reset tree state when branch changes
   useEffect(() => {
+    const scope = ++scopeRef.current;
     setNodes([]);
     setTotalClasses(0);
     setSelectedIri(null);
     setError(null);
-  }, [branchKey]);
+    setIsLoading(false);
+    setIsExpandingAll(false);
+    return () => { scopeRef.current = scope + 1; };
+  }, [projectId, accessToken, branchKey]);
 
   /**
    * Load root classes
    */
   const loadRootClasses = useCallback(async () => {
     if (!projectId) return;
+    const scope = scopeRef.current;
+    const request = ++rootRequestRef.current;
+    const isCurrent = () => scope === scopeRef.current && request === rootRequestRef.current;
 
     setIsLoading(true);
     setError(null);
 
     try {
       const response = await projectOntologyApi.getRootClasses(projectId, accessToken, branchKey);
+      if (!isCurrent()) return;
       setNodes(response.nodes.map(apiNodeToTreeNode));
       setTotalClasses(response.total_classes);
     } catch (err) {
+      if (!isCurrent()) return;
       const message = err instanceof Error ? err.message : "Failed to load ontology tree";
       setError(message);
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   }, [projectId, accessToken, branchKey]);
 
@@ -139,6 +152,7 @@ export function useOntologyTree({
    */
   const expandNode = useCallback(
     async (iri: string) => {
+      const scope = scopeRef.current;
       // Mark node as loading
       setNodes((prev) =>
         updateNodeInTree(prev, iri, (node) => ({
@@ -149,6 +163,7 @@ export function useOntologyTree({
 
       try {
         const response = await projectOntologyApi.getClassChildren(projectId, iri, accessToken, branchKey);
+        if (scope !== scopeRef.current) return;
         const children = response.nodes.map(apiNodeToTreeNode);
 
         // Update node with children
@@ -161,6 +176,7 @@ export function useOntologyTree({
           }))
         );
       } catch (err) {
+        if (scope !== scopeRef.current) return;
         // Mark as not loading on error
         setNodes((prev) =>
           updateNodeInTree(prev, iri, (node) => ({
@@ -190,6 +206,7 @@ export function useOntologyTree({
    * Select a node
    */
   const selectNode = useCallback((iri: string) => {
+    navigationRef.current++;
     setSelectedIri(iri);
   }, []);
 
@@ -198,20 +215,26 @@ export function useOntologyTree({
    */
   const navigateToNode = useCallback(
     async (iri: string) => {
+      const scope = scopeRef.current;
+      const navigation = ++navigationRef.current;
+      const isCurrent = () => scope === scopeRef.current && navigation === navigationRef.current;
       try {
         // Fetch the ancestor path
         const response = await projectOntologyApi.getClassAncestors(projectId, iri, accessToken, branchKey);
+        if (!isCurrent()) return;
         const ancestorNodes = response.nodes;
 
         // Expand each ancestor in sequence
         // We always expand to ensure children are loaded, even if already expanded
         for (const ancestor of ancestorNodes) {
           await expandNode(ancestor.iri);
+          if (!isCurrent()) return;
         }
 
         // Select the target node
         setSelectedIri(iri);
       } catch (err) {
+        if (!isCurrent()) return;
         console.error("Failed to navigate to node:", err);
         // Still try to select the node even if navigation failed
         setSelectedIri(iri);
@@ -348,14 +371,12 @@ export function useOntologyTree({
     await Promise.all(irisToExpand.map((iri) => expandNode(iri)));
   }, [nodes, expandNode, collectUnexpanded]);
 
-  // Loading state for expandAllFully
-  const [isExpandingAll, setIsExpandingAll] = useState(false);
-
   /**
    * Expand all nodes fully by looping expansion rounds until the tree is fully expanded.
    * Caps at MAX_ROUNDS rounds or MAX_NODES visible nodes to avoid runaway expansion.
    */
   const expandAllFully = useCallback(async () => {
+    const scope = scopeRef.current;
     const MAX_ROUNDS = 20;
     const MAX_NODES = 500;
     setIsExpandingAll(true);
@@ -381,11 +402,12 @@ export function useOntologyTree({
             return currentNodes; // no-op — same reference, no re-render
           });
         });
-        if (frontier.length === 0) break;
+        if (scope !== scopeRef.current || frontier.length === 0) break;
         await Promise.all(frontier.map((iri) => expandNode(iri)));
+        if (scope !== scopeRef.current) break;
       }
     } finally {
-      setIsExpandingAll(false);
+      if (scope === scopeRef.current) setIsExpandingAll(false);
     }
   }, [expandNode, collectUnexpanded]);
 

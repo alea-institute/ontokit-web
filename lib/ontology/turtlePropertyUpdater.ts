@@ -4,6 +4,13 @@
  * Generates and replaces property blocks in Turtle source text.
  */
 
+import {
+  LABEL_IRI,
+  COMMENT_IRI,
+  DEFINITION_IRI,
+  SEE_ALSO_IRI,
+  IS_DEFINED_BY_IRI,
+} from "@/lib/ontology/annotationProperties";
 import type { LocalizedString, AnnotationUpdate } from "@/lib/api/client";
 import {
   parseDeclarations,
@@ -40,9 +47,9 @@ export interface TurtlePropertyUpdateData {
 // ── OWL type mappings ─────────────────────────────────────────────────
 
 const PROPERTY_TYPE_MAP: Record<PropertyType, string> = {
-  object: "owl:ObjectProperty",
-  data: "owl:DatatypeProperty",
-  annotation: "owl:AnnotationProperty",
+  object: "http://www.w3.org/2002/07/owl#ObjectProperty",
+  data: "http://www.w3.org/2002/07/owl#DatatypeProperty",
+  annotation: "http://www.w3.org/2002/07/owl#AnnotationProperty",
 };
 
 const CHARACTERISTIC_CURIE_MAP: Record<string, string> = {
@@ -67,69 +74,69 @@ function genPropertyBlock(
   const po: string[] = [];
 
   // rdf:type — primary type + characteristics on same line with commas
-  const typeTokens = [PROPERTY_TYPE_MAP[data.propertyType]];
+  const typeTokens = [toTurtle(PROPERTY_TYPE_MAP[data.propertyType], rev)];
   for (const ch of data.characteristics) {
     const curie = CHARACTERISTIC_CURIE_MAP[ch];
-    if (curie) typeTokens.push(curie);
+    if (curie) typeTokens.push(toTurtle(ch, rev));
   }
   po.push(`a ${typeTokens.join(", ")}`);
 
   if (data.deprecated) {
-    po.push("owl:deprecated true");
+    po.push(`${toTurtle("http://www.w3.org/2002/07/owl#deprecated", rev)} true`);
   }
 
   for (const l of data.labels) {
     if (!l.value.trim()) continue;
-    po.push(`rdfs:label ${literal(l.value, l.lang)}`);
+    po.push(`${toTurtle(LABEL_IRI, rev)} ${literal(l.value, l.lang)}`);
   }
 
   for (const c of data.comments) {
     if (!c.value.trim()) continue;
-    po.push(`rdfs:comment ${literal(c.value, c.lang)}`);
+    po.push(`${toTurtle(COMMENT_IRI, rev)} ${literal(c.value, c.lang)}`);
   }
 
   for (const d of data.definitions) {
     if (!d.value.trim()) continue;
-    po.push(`skos:definition ${literal(d.value, d.lang)}`);
+    po.push(`${toTurtle(DEFINITION_IRI, rev)} ${literal(d.value, d.lang)}`);
   }
 
   for (const d of data.domainIris) {
-    po.push(`rdfs:domain ${toTurtle(d, rev)}`);
+    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#domain", rev)} ${toTurtle(d, rev)}`);
   }
 
   for (const r of data.rangeIris) {
-    po.push(`rdfs:range ${toTurtle(r, rev)}`);
+    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#range", rev)} ${toTurtle(r, rev)}`);
   }
 
   for (const p of data.parentIris) {
-    po.push(`rdfs:subPropertyOf ${toTurtle(p, rev)}`);
+    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#subPropertyOf", rev)} ${toTurtle(p, rev)}`);
   }
 
   if (data.inverseOf) {
-    po.push(`owl:inverseOf ${toTurtle(data.inverseOf, rev)}`);
+    po.push(`${toTurtle("http://www.w3.org/2002/07/owl#inverseOf", rev)} ${toTurtle(data.inverseOf, rev)}`);
   }
 
   if (data.equivalentIris) {
     for (const e of data.equivalentIris) {
-      po.push(`owl:equivalentProperty ${toTurtle(e, rev)}`);
+      po.push(`${toTurtle("http://www.w3.org/2002/07/owl#equivalentProperty", rev)} ${toTurtle(e, rev)}`);
     }
   }
 
   if (data.disjointIris) {
     for (const d of data.disjointIris) {
-      po.push(`owl:propertyDisjointWith ${toTurtle(d, rev)}`);
+      po.push(`${toTurtle("http://www.w3.org/2002/07/owl#propertyDisjointWith", rev)} ${toTurtle(d, rev)}`);
     }
   }
 
   if (data.seeAlsoIris) {
     for (const s of data.seeAlsoIris) {
-      po.push(`rdfs:seeAlso ${toTurtle(s, rev)}`);
+      po.push(`${toTurtle(SEE_ALSO_IRI, rev)} ${toTurtle(s, rev)}`);
     }
   }
 
   if (data.isDefinedByIris) {
     for (const d of data.isDefinedByIris) {
-      po.push(`rdfs:isDefinedBy ${toTurtle(d, rev)}`);
+      po.push(`${toTurtle(IS_DEFINED_BY_IRI, rev)} ${toTurtle(d, rev)}`);
     }
   }
 
@@ -150,7 +157,7 @@ function genPropertyBlock(
   po.push(...carriedPredicateObjects);
 
   if (po.length <= 1) {
-    return `${subject} ${po[0] || `a ${PROPERTY_TYPE_MAP[data.propertyType]}`} .`;
+    return `${subject} ${po[0]} .`;
   }
 
   const lines = [`${subject} ${po[0]} ;`];

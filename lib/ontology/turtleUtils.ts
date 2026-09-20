@@ -27,7 +27,7 @@ export interface ExistingTurtleBlock {
 }
 
 export function parseExistingTurtleBlock(block: string): ExistingTurtleBlock {
-  const subjectMatch = block.match(/^\s*(<[^>]+>|(?:[A-Za-z_][\w-]*)?:[\w-]+)/u);
+  const subjectMatch = block.match(/^\s*(<[^>]+>|[^\s:<>]*:[^\s]+)/u);
   if (!subjectMatch) {
     throw new Error("Could not parse the subject from its Turtle block");
   }
@@ -147,6 +147,12 @@ export function toTurtle(iri: string, rev: Map<string, string>): string {
   return `<${iri}>`;
 }
 
+// Turtle PN_CHARS_BASE / PN_CHARS, used for existing unescaped local names.
+// Escaped spellings are not synthesized from an IRI here.
+const PN_CHARS_BASE = "A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\u{10000}-\\u{EFFFF}";
+const PN_CHARS = `${PN_CHARS_BASE}_0-9\\-\\u00B7\\u0300-\\u036F\\u203F-\\u2040`;
+const UNESCAPED_LOCAL_NAME = new RegExp(`^[${PN_CHARS_BASE}_:0-9](?:[${PN_CHARS}.:]*[${PN_CHARS}:])?$`, "u");
+
 /**
  * Get all possible Turtle representations of an IRI.
  *
@@ -166,7 +172,7 @@ export function iriTurtleForms(
   for (const [alias, ns] of Object.entries(prefixes)) {
     if (iri.startsWith(ns)) {
       const local = iri.slice(ns.length);
-      if (local && /^[A-Za-z_][\w-]*$/.test(local)) {
+      if (local && UNESCAPED_LOCAL_NAME.test(local)) {
         forms.push(alias === "" ? `:${local}` : `${alias}:${local}`);
       }
     }
@@ -194,6 +200,7 @@ export function scanToBlockEnd(lines: string[], start: number): number {
   let inStr = false;
   let longStr = false;
   let strCh = "";
+  let inIri = false;
 
   for (let j = start; j < lines.length; j++) {
     const line = lines[j];
@@ -215,6 +222,15 @@ export function scanToBlockEnd(lines: string[], start: number): number {
           continue;
         }
         if (c === strCh) inStr = false;
+        continue;
+      }
+
+      if (inIri) {
+        if (c === ">") inIri = false;
+        continue;
+      }
+      if (c === "<") {
+        inIri = true;
         continue;
       }
 
@@ -241,7 +257,7 @@ export function scanToBlockEnd(lines: string[], start: number): number {
 
       if (c === "." && depth === 0) {
         const next = k + 1 < line.length ? line[k + 1] : "";
-        if (!next || /\s/.test(next)) {
+        if (!next || /[\s#]/.test(next)) {
           return j;
         }
       }
@@ -254,9 +270,8 @@ export function scanToBlockEnd(lines: string[], start: number): number {
 /**
  * Find the subject block for an entity IRI in Turtle source.
  *
- * Strategy:
- * 1. Try all known Turtle forms (full IRI, prefixed, relative via @base)
- * 2. Fallback: search for the raw IRI string on any subject-position line
+ * Only consider the first token of each statement. Matching an object or a
+ * local name without its namespace could replace an unrelated entity.
  */
 export function findBlock(
   lines: string[],
@@ -266,10 +281,8 @@ export function findBlock(
 ): BlockRange | null {
   const forms = iriTurtleForms(iri, prefixes, base);
 
-  // Primary: match one of the known Turtle forms at the start of a line
   for (let i = 0; i < lines.length; i++) {
     const trimmed = lines[i].trim();
-
     if (
       !trimmed ||
       trimmed.startsWith("#") ||
@@ -279,83 +292,17 @@ export function findBlock(
       continue;
     }
 
-    const isSubject = forms.some((f) => {
-      if (!trimmed.startsWith(f)) return false;
-      const after = trimmed[f.length];
-      return !after || after === " " || after === "\t";
+    const endLine = scanToBlockEnd(lines, i);
+    const isSubject = forms.some((form) => {
+      if (!trimmed.startsWith(form)) return false;
+      const after = trimmed[form.length];
+      return !after || /\s/.test(after);
     });
+    if (isSubject) return { startLine: i, endLine };
 
-    if (isSubject) {
-      // Verify it's actually a subject position (not an object on a continuation line)
-      const prevLine = i > 0 ? lines[i - 1].trim() : "";
-      const isContinuation =
-        prevLine.endsWith(";") || prevLine.endsWith(",");
-
-      if (!isContinuation) {
-        return { startLine: i, endLine: scanToBlockEnd(lines, i) };
-      }
-    }
+    // Skip the whole statement, including objects after comments/blank lines.
+    i = endLine;
   }
-
-  // Fallback: search for the full IRI string inside angle brackets anywhere
-  // as the first token on a non-continuation line
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (
-      !trimmed ||
-      trimmed.startsWith("#") ||
-      trimmed.startsWith("@") ||
-      /^(PREFIX|BASE)\s/i.test(trimmed)
-    ) {
-      continue;
-    }
-
-    // Check if this line contains the full IRI as a subject
-    if (trimmed.includes(iri)) {
-      const prevLine = i > 0 ? lines[i - 1].trim() : "";
-      const isContinuation =
-        prevLine.endsWith(";") || prevLine.endsWith(",");
-
-      if (!isContinuation) {
-        return { startLine: i, endLine: scanToBlockEnd(lines, i) };
-      }
-    }
-  }
-
-  // Last resort: extract the local name and search for it as a prefixed subject
-  const localName = iri.includes("#")
-    ? iri.split("#").pop()
-    : iri.split("/").pop();
-
-  if (localName) {
-    for (let i = 0; i < lines.length; i++) {
-      const trimmed = lines[i].trim();
-      if (
-        !trimmed ||
-        trimmed.startsWith("#") ||
-        trimmed.startsWith("@") ||
-        /^(PREFIX|BASE)\s/i.test(trimmed)
-      ) {
-        continue;
-      }
-
-      // Match patterns like  :LocalName  or  prefix:LocalName  at line start
-      const localNamePattern = new RegExp( // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp  Reason: localName is passed through escapeRegex() (defined below in this file), so the pattern cannot contain unescaped metacharacters.
-        `^(\\w*:)?${escapeRegex(localName)}(\\s|$)`,
-      );
-      if (localNamePattern.test(trimmed)) {
-        // Verify it's not a continuation line
-        const prevLine = i > 0 ? lines[i - 1].trim() : "";
-        const isContinuation =
-          prevLine.endsWith(";") || prevLine.endsWith(",");
-
-        if (!isContinuation) {
-          return { startLine: i, endLine: scanToBlockEnd(lines, i) };
-        }
-      }
-    }
-  }
-
   return null;
 }
 

@@ -100,16 +100,40 @@ export function HealthCheckPanel({
 
   // Track whether the quality WebSocket is connected
   const qualityWsConnected = useRef(false);
-  // Cancellation flag for the polling fallback loop
-  const pollCancelled = useRef(false);
+  const scopeRef = useRef(0);
+  const lintRequestRef = useRef(0);
+  const consistencyRequestRef = useRef(0);
+  const duplicatesRequestRef = useRef(0);
   // Safety timeout refs for WS path (so they can be cleared on completion/unmount)
   const consistencyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const duplicatesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Invalidate all work when its project, branch, credentials or panel changes.
+  useEffect(() => {
+    const scope = ++scopeRef.current;
+    setSummary(null);
+    setIssues([]);
+    setError(null);
+    setIsRunning(false);
+    setIsClearing(false);
+    setConsistencyIssues([]);
+    setConsistencyError(null);
+    setDuplicateClusters([]);
+    setDuplicatesError(null);
+    setIsCheckingConsistency(false);
+    setIsDetectingDuplicates(false);
+    setIsLoadingCachedConsistency(false);
+    setIsLoadingCachedDuplicates(false);
+    return () => { scopeRef.current = scope + 1; };
+  }, [projectId, branch, accessToken, isOpen]);
 
   // Fetch lint status and issues
   const fetchData = useCallback(async (issueFilter?: IssueFilter) => {
     if (!isOpen) return;
 
+    const scope = scopeRef.current;
+    const request = ++lintRequestRef.current;
+    const isCurrent = () => scope === scopeRef.current && request === lintRequestRef.current;
     setIsLoading(true);
     setError(null);
 
@@ -126,6 +150,7 @@ export function HealthCheckPanel({
         lintApi.getIssues(projectId, accessToken, issueOptions),
       ]);
 
+      if (!isCurrent()) return;
       setSummary(summaryData);
       setIssues(issuesData.items);
 
@@ -139,10 +164,11 @@ export function HealthCheckPanel({
         setIsRunning(false);
       }
     } catch (err) {
+      if (!isCurrent()) return;
       const message = getApiErrorMessage(err, "Failed to load lint data");
       setError(message);
     } finally {
-      setIsLoading(false);
+      if (isCurrent()) setIsLoading(false);
     }
   }, [projectId, accessToken, isOpen, filter]);
 
@@ -152,6 +178,7 @@ export function HealthCheckPanel({
 
   // Fetch lint config hint (level name + rule count)
   useEffect(() => {
+    setLintConfigHint(null);
     if (!isOpen || !accessToken) return;
     let cancelled = false;
     (async () => {
@@ -188,7 +215,7 @@ export function HealthCheckPanel({
     if (isOpen) {
       fetchData();
     }
-  }, [isOpen, fetchData]);
+  }, [isOpen, fetchData, branch]);
 
   // WebSocket for real-time updates
   useEffect(() => {
@@ -242,8 +269,10 @@ export function HealthCheckPanel({
   const handleClearResults = async () => {
     if (!accessToken) return;
     setIsClearing(true);
+    const scope = scopeRef.current;
     try {
       await lintApi.clearResults(projectId, accessToken);
+      if (scope !== scopeRef.current) return;
       setSummary((prev) => prev ? {
         ...prev,
         last_run: null,
@@ -254,9 +283,10 @@ export function HealthCheckPanel({
       } : null);
       setIssues([]);
     } catch (err) {
+      if (scope !== scopeRef.current) return;
       setError(getApiErrorMessage(err, "Failed to clear results"));
     } finally {
-      setIsClearing(false);
+      if (scope === scopeRef.current) setIsClearing(false);
     }
   };
 
@@ -270,10 +300,12 @@ export function HealthCheckPanel({
     setIsRunning(true);
     setError(null);
 
+    const scope = scopeRef.current;
     try {
       await lintApi.triggerLint(projectId, accessToken);
       // The WebSocket will notify us when it's complete
     } catch (err) {
+      if (scope !== scopeRef.current) return;
       const message = getApiErrorMessage(err, "Failed to start lint");
       setError(message);
       setIsRunning(false);
@@ -286,7 +318,9 @@ export function HealthCheckPanel({
     if (!accessToken) return;
     setIsCheckingConsistency(true);
     setConsistencyError(null);
-    pollCancelled.current = false;
+    const scope = scopeRef.current;
+    const request = ++consistencyRequestRef.current;
+    const isCurrent = () => scope === scopeRef.current && request === consistencyRequestRef.current;
 
     let jobId: string;
     try {
@@ -296,15 +330,19 @@ export function HealthCheckPanel({
         branch
       ));
     } catch (err) {
+      if (!isCurrent()) return;
       setConsistencyError(getApiErrorMessage(err, "Consistency check failed"));
       setIsCheckingConsistency(false);
       return;
     }
 
+    if (!isCurrent()) return;
+
     // When WS is connected the effect handler manages loading state
     if (qualityWsConnected.current) {
       if (consistencyTimeoutRef.current) clearTimeout(consistencyTimeoutRef.current);
       consistencyTimeoutRef.current = setTimeout(() => {
+        if (!isCurrent()) return;
         consistencyTimeoutRef.current = null;
         setIsCheckingConsistency((prev) => {
           if (prev) setConsistencyError("Consistency check timed out — try again later");
@@ -320,14 +358,15 @@ export function HealthCheckPanel({
       const maxDelay = 5000;
       const maxAttempts = 20;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (pollCancelled.current) return;
+        if (!isCurrent()) return;
         await new Promise((r) => setTimeout(r, delay));
-        if (pollCancelled.current) return;
+        if (!isCurrent()) return;
         const result = await qualityApi.getConsistencyJobResult(
           projectId,
           jobId,
           accessToken
         );
+        if (!isCurrent()) return;
         if ("status" in result && result.status === "pending") {
           delay = Math.min(delay * 1.5, maxDelay);
           continue;
@@ -338,11 +377,11 @@ export function HealthCheckPanel({
       }
       setConsistencyError("Consistency check timed out — try again later");
     } catch (err) {
-      if (!pollCancelled.current) {
+      if (isCurrent()) {
         setConsistencyError(getApiErrorMessage(err, "Consistency check failed"));
       }
     } finally {
-      if (!pollCancelled.current) {
+      if (isCurrent()) {
         setIsCheckingConsistency(false);
       }
     }
@@ -356,7 +395,9 @@ export function HealthCheckPanel({
     if (!accessToken) return;
     setIsDetectingDuplicates(true);
     setDuplicatesError(null);
-    pollCancelled.current = false;
+    const scope = scopeRef.current;
+    const request = ++duplicatesRequestRef.current;
+    const isCurrent = () => scope === scopeRef.current && request === duplicatesRequestRef.current;
 
     let jobId: string;
     try {
@@ -366,10 +407,13 @@ export function HealthCheckPanel({
         branch
       ));
     } catch (err) {
+      if (!isCurrent()) return;
       setDuplicatesError(getApiErrorMessage(err, "Duplicate detection failed"));
       setIsDetectingDuplicates(false);
       return;
     }
+
+    if (!isCurrent()) return;
 
     // When WS is connected the effect handler manages loading state.
     // Add a safety timeout so the spinner doesn't stay forever if the
@@ -377,6 +421,7 @@ export function HealthCheckPanel({
     if (qualityWsConnected.current) {
       if (duplicatesTimeoutRef.current) clearTimeout(duplicatesTimeoutRef.current);
       duplicatesTimeoutRef.current = setTimeout(() => {
+        if (!isCurrent()) return;
         duplicatesTimeoutRef.current = null;
         setIsDetectingDuplicates((prev) => {
           if (prev) setDuplicatesError("Duplicate detection timed out — try again later");
@@ -392,14 +437,15 @@ export function HealthCheckPanel({
       const maxDelay = 5000;
       const maxAttempts = 20;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (pollCancelled.current) return;
+        if (!isCurrent()) return;
         await new Promise((r) => setTimeout(r, delay));
-        if (pollCancelled.current) return;
+        if (!isCurrent()) return;
         const result = await qualityApi.getDuplicateJobResult(
           projectId,
           jobId,
           accessToken
         );
+        if (!isCurrent()) return;
         // 202 Accepted: job still pending — keep polling
         if ("status" in result && result.status === "pending") {
           delay = Math.min(delay * 1.5, maxDelay);
@@ -412,11 +458,11 @@ export function HealthCheckPanel({
       }
       setDuplicatesError("Duplicate detection timed out — try again later");
     } catch (err) {
-      if (!pollCancelled.current) {
+      if (isCurrent()) {
         setDuplicatesError(getApiErrorMessage(err, "Duplicate detection failed"));
       }
     } finally {
-      if (!pollCancelled.current) {
+      if (isCurrent()) {
         setIsDetectingDuplicates(false);
       }
     }
@@ -426,37 +472,32 @@ export function HealthCheckPanel({
   // Use requestAnimationFrame so the tab switch paints before the loading
   // state is set, preventing the UI from appearing frozen.
   useEffect(() => {
+    if (!isOpen) return;
     let cancelled = false;
-    if (activeTab === "consistency" && consistencyIssues.length === 0 && !isCheckingConsistency) {
+    const consistencyRequest = consistencyRequestRef.current;
+    const duplicatesRequest = duplicatesRequestRef.current;
+    if (activeTab === "consistency") {
       requestAnimationFrame(() => {
         if (cancelled) return;
         setIsLoadingCachedConsistency(true);
         qualityApi.getConsistencyIssues(projectId, accessToken, branch)
-          .then((r) => { if (!cancelled) setConsistencyIssues(r.issues); })
+          .then((r) => { if (!cancelled && consistencyRequest === consistencyRequestRef.current) setConsistencyIssues(r.issues); })
           .catch((err) => { console.error("Failed to load cached consistency issues", { projectId, err }); })
           .finally(() => { if (!cancelled) setIsLoadingCachedConsistency(false); });
       });
     }
-    if (activeTab === "duplicates" && duplicateClusters.length === 0 && !isDetectingDuplicates) {
+    if (activeTab === "duplicates") {
       requestAnimationFrame(() => {
         if (cancelled) return;
         setIsLoadingCachedDuplicates(true);
         qualityApi.getLatestDuplicates(projectId, accessToken, branch)
-          .then((r) => { if (!cancelled) setDuplicateClusters(r.clusters); })
+          .then((r) => { if (!cancelled && duplicatesRequest === duplicatesRequestRef.current) setDuplicateClusters(r.clusters); })
           .catch((err) => { console.error("Failed to load cached duplicates", { projectId, err }); })
           .finally(() => { if (!cancelled) setIsLoadingCachedDuplicates(false); });
       });
     }
     return () => { cancelled = true; };
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Clear stale quality data when project or branch changes
-  useEffect(() => {
-    setConsistencyIssues([]);
-    setConsistencyError(null);
-    setDuplicateClusters([]);
-    setDuplicatesError(null);
-  }, [projectId, branch]);
+  }, [activeTab, projectId, branch, accessToken, isOpen]);
 
   // Quality WebSocket for real-time consistency / duplicates updates
   useEffect(() => {
@@ -475,17 +516,20 @@ export function HealthCheckPanel({
       if (message.type === "consistency_started") {
         setIsCheckingConsistency(true);
       } else if (message.type === "consistency_complete") {
+        const request = ++consistencyRequestRef.current;
+        const isCurrent = () => isActive && request === consistencyRequestRef.current;
         if (consistencyTimeoutRef.current) {
           clearTimeout(consistencyTimeoutRef.current);
           consistencyTimeoutRef.current = null;
         }
         qualityApi.getConsistencyIssues(projectId, accessToken, branch)
-          .then((r) => { if (isActive) setConsistencyIssues(r.issues); })
+          .then((r) => { if (isCurrent()) setConsistencyIssues(r.issues); })
           .catch((err) => {
-            if (isActive) setConsistencyError(getApiErrorMessage(err, "Failed to load consistency results"));
+            if (isCurrent()) setConsistencyError(getApiErrorMessage(err, "Failed to load consistency results"));
           })
-          .finally(() => { if (isActive) setIsCheckingConsistency(false); });
+          .finally(() => { if (isCurrent()) setIsCheckingConsistency(false); });
       } else if (message.type === "consistency_failed") {
+        consistencyRequestRef.current++;
         if (consistencyTimeoutRef.current) {
           clearTimeout(consistencyTimeoutRef.current);
           consistencyTimeoutRef.current = null;
@@ -495,17 +539,20 @@ export function HealthCheckPanel({
       } else if (message.type === "duplicates_started") {
         setIsDetectingDuplicates(true);
       } else if (message.type === "duplicates_complete") {
+        const request = ++duplicatesRequestRef.current;
+        const isCurrent = () => isActive && request === duplicatesRequestRef.current;
         if (duplicatesTimeoutRef.current) {
           clearTimeout(duplicatesTimeoutRef.current);
           duplicatesTimeoutRef.current = null;
         }
         qualityApi.getLatestDuplicates(projectId, accessToken, branch)
-          .then((r) => { if (isActive) setDuplicateClusters(r.clusters); })
+          .then((r) => { if (isCurrent()) setDuplicateClusters(r.clusters); })
           .catch((err) => {
-            if (isActive) setDuplicatesError(getApiErrorMessage(err, "Failed to load duplicate results"));
+            if (isCurrent()) setDuplicatesError(getApiErrorMessage(err, "Failed to load duplicate results"));
           })
-          .finally(() => { if (isActive) setIsDetectingDuplicates(false); });
+          .finally(() => { if (isCurrent()) setIsDetectingDuplicates(false); });
       } else if (message.type === "duplicates_failed") {
+        duplicatesRequestRef.current++;
         if (duplicatesTimeoutRef.current) {
           clearTimeout(duplicatesTimeoutRef.current);
           duplicatesTimeoutRef.current = null;
@@ -520,10 +567,10 @@ export function HealthCheckPanel({
         ws = createQualityWebSocket(
           projectId,
           handleQualityMessage,
-          () => { qualityWsConnected.current = false; },
-          () => { qualityWsConnected.current = false; },
+          () => { if (isActive) qualityWsConnected.current = false; },
+          () => { if (isActive) qualityWsConnected.current = false; },
           accessToken,
-          () => { qualityWsConnected.current = true; }
+          () => { if (isActive) qualityWsConnected.current = true; }
         );
       }
     }, 100);
@@ -531,7 +578,6 @@ export function HealthCheckPanel({
     return () => {
       isActive = false;
       qualityWsConnected.current = false;
-      pollCancelled.current = true;
       if (consistencyTimeoutRef.current) {
         clearTimeout(consistencyTimeoutRef.current);
         consistencyTimeoutRef.current = null;
@@ -549,8 +595,10 @@ export function HealthCheckPanel({
   const handleDismissIssue = async (issueId: string) => {
     if (!accessToken) return;
 
+    const scope = scopeRef.current;
     try {
       await lintApi.dismissIssue(projectId, issueId, accessToken);
+      if (scope !== scopeRef.current) return;
       // Remove from local state
       setIssues((prev) => prev.filter((i) => i.id !== issueId));
       // Update counts
@@ -576,6 +624,7 @@ export function HealthCheckPanel({
         }
       }
     } catch (err) {
+      if (scope !== scopeRef.current) return;
       console.error("Failed to dismiss issue:", err);
     }
   };

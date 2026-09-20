@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("@/lib/api/quality", () => ({
@@ -58,8 +58,30 @@ describe("DeleteImpactAnalysis", () => {
       />
     );
     await waitFor(() => {
-      expect(screen.getByText("Failed to check references. Proceed with caution.")).toBeDefined();
+      expect(screen.getByText("Failed to check references. Retry before deleting.")).toBeDefined();
     });
+  });
+
+  it("keeps deletion blocked after a failed lookup and retries successfully", async () => {
+    mockGetCrossReferences.mockRejectedValueOnce(new Error("Offline"))
+      .mockResolvedValueOnce({ target_iri: "http://example.org/A", total: 0, groups: [] });
+    render(<DeleteImpactAnalysis projectId="p1" entityIri="http://example.org/A" onAcknowledge={onAcknowledge} />);
+    await screen.findByRole("button", { name: "Retry" });
+    expect(onAcknowledge).not.toHaveBeenCalledWith(true);
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(onAcknowledge).toHaveBeenLastCalledWith(true));
+  });
+
+  it("ignores an obsolete empty lookup when the selected entity changes", async () => {
+    let resolve!: (value: { target_iri: string; total: number; groups: [] }) => void;
+    mockGetCrossReferences.mockReturnValueOnce(new Promise((done) => { resolve = done; }))
+      .mockResolvedValueOnce({ target_iri: "http://example.org/B", total: 1, groups: [] });
+    const view = render(<DeleteImpactAnalysis projectId="p1" entityIri="http://example.org/A" onAcknowledge={onAcknowledge} />);
+    view.rerender(<DeleteImpactAnalysis projectId="p1" entityIri="http://example.org/B" onAcknowledge={onAcknowledge} />);
+    await screen.findByRole("checkbox");
+    await act(async () => resolve({ target_iri: "http://example.org/A", total: 0, groups: [] }));
+    expect(onAcknowledge).not.toHaveBeenCalledWith(true);
+    expect(screen.getByRole("checkbox")).toBeDefined();
   });
 
   it("shows impact warning when references exist", async () => {

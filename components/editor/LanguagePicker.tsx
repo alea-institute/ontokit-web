@@ -156,7 +156,7 @@ export function LanguagePicker({ value, onChange, disabled, ariaLabel = "Languag
               </Command.Empty>
 
               {showCustomOption && (
-                <Command.Group heading="Custom" className={GROUP_HEADING_CLASS}>
+                <Command.Group heading="Custom" className={GROUP_HEADING_CLASS} forceMount>
                   <Command.Item
                     value={`__custom__${trimmedSearch}`}
                     onSelect={() => handleSelect(trimmedSearch)}

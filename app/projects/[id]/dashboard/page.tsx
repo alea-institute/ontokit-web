@@ -117,6 +117,7 @@ export default function ProjectDashboardPage() {
     )
       return;
 
+    setJoinError(null);
     try {
       await joinRequestApi.withdraw(
         project.id,
@@ -355,6 +356,8 @@ export default function ProjectDashboardPage() {
             </Link>
           )}
 
+          {joinError && <p role="alert" className="mt-4 text-sm text-red-700 dark:text-red-400">{joinError}</p>}
+
           {/* Join Request Form */}
           {showJoinForm && (
             <div className="mt-4 rounded-lg border border-primary-200 bg-primary-50 p-5 dark:border-primary-800 dark:bg-primary-900/20">
@@ -364,11 +367,6 @@ export default function ProjectDashboardPage() {
               <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
                 Tell the project owners why you&apos;d like to join this project.
               </p>
-              {joinError && (
-                <div className="mb-3 rounded-sm bg-red-50 p-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-                  {joinError}
-                </div>
-              )}
               <textarea
                 value={joinMessage}
                 onChange={(e) => setJoinMessage(e.target.value)}

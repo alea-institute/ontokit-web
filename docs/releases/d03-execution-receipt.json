@@ -1,0 +1,142 @@
+{
+  "status": "complete",
+  "completion_boundary": "D03 implementation and local verification; review/publication owned by delivery orchestrator",
+  "plan_path": "docs/plans/2026-09-20-0731-fix-configured-provider-image-plan.md",
+  "changed_files": [
+    "auth.ts",
+    "lib/env.ts",
+    "instrumentation.ts",
+    "__tests__/lib/env.test.ts",
+    "__tests__/config/auth-bootstrap.test.ts",
+    "__tests__/config/auth-session.integration.test.ts",
+    "__tests__/config/instrumentation.test.ts",
+    "Dockerfile",
+    "__tests__/config/docker-release-fidelity.test.ts",
+    ".github/workflows/release.yml",
+    "scripts/verify-auth-image.sh",
+    "next.config.ts",
+    "__tests__/config/next-config-env.test.ts"
+  ],
+  "u_ids_attempted": [
+    "U1",
+    "U2",
+    "U3"
+  ],
+  "u_ids_completed": [
+    "U1",
+    "U2",
+    "U3"
+  ],
+  "verification_results": {
+    "source_revision": "30b8ecb2c128f82ff067b6f3e444edc5f7f04ed3",
+    "test_files": 365,
+    "tests_passed": 5222,
+    "failed": 0,
+    "skipped": 0,
+    "duration_seconds": 213.9,
+    "types": "pass",
+    "lint": "0 errors / 19 existing warnings",
+    "docker_builds": [
+      "required configured: pass",
+      "optional configured: pass",
+      "optional anonymous: pass"
+    ],
+    "runtime_smoke": "Three profiles pass; thirteen negative startup checks exit nonzero with fixed marker; missing secrets, omitted provider, changed mode/issuer and anonymous provider additions covered; public override cannot mask compiled issuer; provider discovery, assets and canaries pass; zero fixture containers remain",
+    "live_oidc": "not tested; D02"
+  },
+  "verification_evidence": [
+    {
+      "unit": "U1",
+      "behavior_changed": true,
+      "existing_tests_inspected": [
+        "__tests__/lib/env.test.ts",
+        "__tests__/config/auth-bootstrap.test.ts",
+        "__tests__/config/auth-session.integration.test.ts",
+        "__tests__/config/instrumentation.test.ts"
+      ],
+      "tests_added_or_changed": [
+        "__tests__/lib/env.test.ts",
+        "__tests__/config/auth-bootstrap.test.ts",
+        "__tests__/config/auth-session.integration.test.ts",
+        "__tests__/config/instrumentation.test.ts"
+      ],
+      "tests_used_unchanged": "Existing real Auth.js encrypted-cookie, refresh and session behavior retained",
+      "red_failure": "33 failed / 12 passed before lazy initialization; 45/45 afterward. Real container then exposed Next logging rejection without exiting; fatal-exit regression 8 failed / 5 passed before correction, 13/13 afterward.",
+      "verification": "Final suite 5222/5222 and expanded container smoke pass",
+      "exception_reason": null
+    },
+    {
+      "unit": "U2",
+      "behavior_changed": true,
+      "existing_tests_inspected": [
+        "__tests__/config/docker-release-fidelity.test.ts",
+        "__tests__/config/next-config-env.test.ts",
+        "__tests__/lib/auth-mode.test.ts"
+      ],
+      "tests_added_or_changed": [
+        "__tests__/config/docker-release-fidelity.test.ts"
+      ],
+      "tests_used_unchanged": [
+        "__tests__/config/next-config-env.test.ts",
+        "__tests__/lib/auth-mode.test.ts"
+      ],
+      "red_failure": "New provider-argument assertion failed: 1 failed / 2 passed",
+      "verification": "29 focused tests passed; three image profiles build without credentials; compiled public settings verified",
+      "exception_reason": null
+    },
+    {
+      "unit": "U3",
+      "behavior_changed": true,
+      "existing_tests_inspected": [
+        "__tests__/config/docker-release-fidelity.test.ts"
+      ],
+      "tests_added_or_changed": [
+        "__tests__/config/docker-release-fidelity.test.ts",
+        "scripts/verify-auth-image.sh"
+      ],
+      "tests_used_unchanged": "Existing generic build/publication parity assertions retained",
+      "red_failure": "Missing CI gate: 1 failed / 3 passed; 4/4 afterward. Harness caught the non-exiting invalid startup before U1 correction.",
+      "verification": "Bash syntax and targeted lint pass; complete local harness matches CI invocation; all three profiles pass and no containers remain",
+      "exception_reason": null
+    }
+  ],
+  "implementation_engine_binding": null,
+  "requested_route": "native",
+  "actual_route": "native serial workers for U1/U3 and startup correction; U2 inline; parent integration and verification",
+  "requested_model": null,
+  "actual_model": "inherited session model",
+  "requested_effort": null,
+  "fallback_reason": null,
+  "run_id": null,
+  "source_kind": "plan",
+  "source_digest": "b4e21ba883cd1a0ab7b535b78d9bc9137dd6c4702353358ee4442d254fc6a852",
+  "unit_receipts": {
+    "U1": {
+      "commits": [
+        "d957e344",
+        "254cd432"
+      ],
+      "cleanup": "temporary config removed"
+    },
+    "U2": {
+      "commit": "d271327b"
+    },
+    "U3": {
+      "commit": "10e944cc",
+      "cleanup": "temporary files and containers removed"
+    }
+  },
+  "plan_checkpoint": "7c153e47",
+  "blockers": [],
+  "recovery_path": null,
+  "settled_decision_conflicts": [],
+  "behavior_change": true,
+  "standalone_shipping_skipped": true,
+  "review_resolution": {
+    "original_review": "d03-code-review.json",
+    "followup": "d03-review-resolution.json",
+    "commit": "30b8ecb2c128f82ff067b6f3e444edc5f7f04ed3",
+    "red_evidence": "Parity regressions: 8 failed / 39 passed before guard; anonymous empty-issuer regression: 2 failed / 9 passed before correction; final focused 59/59.",
+    "final_evidence": "All three rebuilt images at reviewed hash pass expanded real-container harness."
+  }
+}

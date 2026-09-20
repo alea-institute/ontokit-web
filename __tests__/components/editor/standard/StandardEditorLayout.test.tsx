@@ -819,12 +819,12 @@ describe("StandardEditorLayout", () => {
     ) => Promise<void>;
     expect(capturedOnReparent).toBeDefined();
 
-    await capturedOnReparent(
+    await expect(capturedOnReparent(
       "http://example.org/ClassA",
       ["http://example.org/OldParent"],
       ["http://example.org/NewParent"],
       "move",
-    );
+    )).rejects.toBeDefined();
 
     expect(reparentOptimistic).toHaveBeenCalledWith(
       "http://example.org/ClassA",
@@ -856,13 +856,14 @@ describe("StandardEditorLayout", () => {
       mode: string,
     ) => Promise<void>;
 
-    // Should not throw
-    await capturedOnReparent(
+    await expect(capturedOnReparent(
       "http://example.org/ClassA",
       ["http://example.org/OldParent"],
       ["http://example.org/NewParent"],
       "move",
-    );
+    )).resolves.toBeUndefined();
+    expect(_toastErrorFn).not.toHaveBeenCalled();
+    expect(screen.getByTestId("class-tree")).toBeDefined();
   });
 
   it("calls reparentOptimistic with null when parentIris arrays are empty", async () => {
@@ -1029,12 +1030,12 @@ describe("StandardEditorLayout", () => {
       mode: string,
     ) => Promise<void>;
 
-    await capturedOnReparent(
+    await expect(capturedOnReparent(
       "http://example.org/ClassA",
       ["http://example.org/Old"],
       ["http://example.org/New"],
       "move",
-    );
+    )).rejects.toBeDefined();
 
     expect(_toastErrorFn).toHaveBeenCalledWith("Failed to reparent class", "Unknown error");
   });

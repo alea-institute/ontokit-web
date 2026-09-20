@@ -89,6 +89,26 @@ describe("anonymous token store", () => {
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
+  it.each([NaN, Infinity, -Infinity])("normalizes a non-finite issue time %s before persisting", issuedAt => {
+    useAnonymousTokenStore.getState().setToken(PROJECT_ID, "fixture-token", "fixture-session", "anon/fixture", issuedAt);
+    const expected = { issuedAt: Date.now(), expiresAt: Date.now() + ANONYMOUS_TOKEN_TTL_MS };
+    expect(useAnonymousTokenStore.getState().getToken(PROJECT_ID)).toMatchObject(expected);
+    expect(JSON.parse(sessionStorage.getItem(STORAGE_KEY)!).state.tokens[PROJECT_ID]).toMatchObject(expected);
+  });
+
+  it("recovers from malformed persisted JSON after storage is corrected", async () => {
+    sessionStorage.setItem(STORAGE_KEY, "{broken-json");
+    await useAnonymousTokenStore.persist.rehydrate();
+    expect(useAnonymousTokenStore.getState().getToken(PROJECT_ID)).toBeNull();
+    expect(useAnonymousTokenStore.persist.hasHydrated()).toBe(false);
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ state: { tokens: {
+      [PROJECT_ID]: { token: "recovered", sessionId: "session", branch: "anon/session", issuedAt: Date.now(), expiresAt: Date.now() + ANONYMOUS_TOKEN_TTL_MS },
+    } }, version: 0 }));
+    await useAnonymousTokenStore.persist.rehydrate();
+    expect(useAnonymousTokenStore.persist.hasHydrated()).toBe(true);
+    expect(useAnonymousTokenStore.getState().getToken(PROJECT_ID)?.token).toBe("recovered");
+  });
+
   it("isolates tokens per project", () => {
     const s = useAnonymousTokenStore.getState();
     s.setToken("project-a", "tok-a", "sess-a", "anon/sess-a");

@@ -24,6 +24,7 @@ export function DeleteImpactAnalysis({
   const [data, setData] = useState<CrossReferencesResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -37,16 +38,23 @@ export function DeleteImpactAnalysis({
       setFetchError(false);
       return;
     }
+    let cancelled = false;
+    setData(null);
     setIsLoading(true);
     setAcknowledged(false);
     onAcknowledge(false);
     setFetchError(false);
     qualityApi
       .getCrossReferences(projectId, entityIri, accessToken, branch)
-      .then(setData)
-      .catch(() => setFetchError(true))
-      .finally(() => setIsLoading(false));
-  }, [entityIri, projectId, accessToken, branch]); // eslint-disable-line react-hooks/exhaustive-deps
+      .then((result) => {
+        if (cancelled) return;
+        setData(result);
+        onAcknowledge(result.total === 0);
+      })
+      .catch(() => { if (!cancelled) setFetchError(true); })
+      .finally(() => { if (!cancelled) setIsLoading(false); });
+    return () => { cancelled = true; };
+  }, [entityIri, projectId, accessToken, branch, attempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const total = data?.total ?? 0;
 
@@ -65,8 +73,9 @@ export function DeleteImpactAnalysis({
         <div className="flex items-start gap-2">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
           <p className="text-sm text-red-800 dark:text-red-300">
-            Failed to check references. Proceed with caution.
+            Failed to check references. Retry before deleting.
           </p>
+          <button type="button" onClick={() => setAttempt((value) => value + 1)}>Retry</button>
         </div>
       </div>
     );

@@ -54,6 +54,11 @@ export function OntologyFilePicker({
     const scan = async () => {
       setIsLoading(true);
       setError(null);
+      setFiles([]);
+      setSelectedFile(null);
+      setSelectedTurtleFile(null);
+      setTurtlePathMode("new");
+      setCustomTurtlePath("");
       try {
         const result = await projectApi.scanGitHubRepoFiles(owner, repo, token);
         if (cancelled) return;

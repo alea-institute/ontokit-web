@@ -1,5 +1,6 @@
 "use client";
 
+import { getApiErrorMessage } from "@/lib/api/client";
 import { useState } from "react";
 import { pullRequestsApi, type Comment } from "@/lib/api/pullRequests";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ export function PRCommentThread({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [replyBody, setReplyBody] = useState("");
   const [editBody, setEditBody] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const formatDate = (timestamp: string) => {
@@ -44,6 +46,7 @@ export function PRCommentThread({
   const handleReply = async (parentId: string) => {
     if (!replyBody.trim()) return;
 
+    setError(null);
     setIsSubmitting(true);
     try {
       await pullRequestsApi.createComment(
@@ -57,6 +60,7 @@ export function PRCommentThread({
       onCommentsChange();
     } catch (err) {
       console.error("Failed to reply:", err);
+      setError(getApiErrorMessage(err, "Failed to reply"));
     } finally {
       setIsSubmitting(false);
     }
@@ -65,6 +69,7 @@ export function PRCommentThread({
   const handleEdit = async (commentId: string) => {
     if (!editBody.trim()) return;
 
+    setError(null);
     setIsSubmitting(true);
     try {
       await pullRequestsApi.updateComment(
@@ -79,6 +84,7 @@ export function PRCommentThread({
       onCommentsChange();
     } catch (err) {
       console.error("Failed to edit:", err);
+      setError(getApiErrorMessage(err, "Failed to edit"));
     } finally {
       setIsSubmitting(false);
     }
@@ -89,6 +95,7 @@ export function PRCommentThread({
       return;
     }
 
+    setError(null);
     try {
       await pullRequestsApi.deleteComment(
         projectId,
@@ -99,6 +106,7 @@ export function PRCommentThread({
       onCommentsChange();
     } catch (err) {
       console.error("Failed to delete:", err);
+      setError(getApiErrorMessage(err, "Failed to delete"));
     }
   };
 
@@ -255,6 +263,7 @@ export function PRCommentThread({
 
   return (
     <div className={cn("space-y-4", className)}>
+      {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
       {comments.length === 0 ? (
         <p className="py-4 text-center text-sm text-slate-500">
           No comments yet. Be the first to comment!

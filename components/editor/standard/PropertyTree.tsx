@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { getLocalName } from "@/lib/utils";
-import { projectOntologyApi, type EntitySearchResult } from "@/lib/api/client";
+import { getApiErrorMessage, projectOntologyApi, type EntitySearchResult } from "@/lib/api/client";
 import { EntityTree } from "@/components/editor/shared/EntityTree";
 import type { EntityTreeNode } from "@/lib/ontology/types";
 
@@ -104,7 +104,7 @@ export function PropertyTree({
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load properties");
+          setError(getApiErrorMessage(err, "Failed to load properties"));
         }
       } finally {
         if (!cancelled) {

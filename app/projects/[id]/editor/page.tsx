@@ -207,7 +207,7 @@ export default function EditorPage() {
   // most once via consumedSelectionRef — that way an in-page selection change
   // (which doesn't update the URL) isn't undone on the next render.
   useEffect(() => {
-    if (!initialSelection) return;
+    if (!initialSelection || !activeBranch) return;
     const key = `${initialSelection.type}:${initialSelection.iri}`;
     if (consumedSelectionRef.current === key) return;
 
@@ -236,7 +236,7 @@ export default function EditorPage() {
     if (!entityNavigationRef.current) return; // layout's ref not yet populated
     entityNavigationRef.current(initialSelection.iri, initialSelection.type);
     consumedSelectionRef.current = key;
-  }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode, isLoading]);
+  }, [initialSelection, activeBranch, isTreeLoading, nodes.length, selectedIri, navigateToNode, isLoading]);
 
   // Track accepted suggestion IRIs for sparkle badges (D-07)
   const [acceptedSuggestionIris, setAcceptedSuggestionIris] = useState<Set<string>>(new Set());
@@ -338,6 +338,7 @@ export default function EditorPage() {
 
   const suggestionSession = useSuggestionSession({
     projectId,
+    viewerId: session?.user?.id,
     accessToken: session?.accessToken,
     resumeSessionId: isSuggestionMode ? resumeSessionParam : undefined,
     resumeBranch: isSuggestionMode ? resumeBranchParam : undefined,
@@ -966,10 +967,10 @@ export default function EditorPage() {
     newParentIris: string[],
     mode: "move" | "add",
   ) => {
-    if (!session?.accessToken) throw new Error("Not authenticated");
+    if (!session?.accessToken && !isAnonymousProposalMode) throw new Error("Not authenticated");
 
     // Fetch the full class detail to get authoritative parent_iris
-    const detail = await projectOntologyApi.getClassDetail(projectId, classIri, session.accessToken, activeBranch);
+    const detail = await projectOntologyApi.getClassDetail(projectId, classIri, session?.accessToken, activeBranch);
 
     // Build new parent list based on mode
     let updatedParentIris: string[];
@@ -1021,8 +1022,9 @@ export default function EditorPage() {
 
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
-    // Discard any active suggestion session tied to the old branch
-    if (suggestionSession.isActive) {
+    if (branchName === activeBranch) return;
+    // Initial synchronization must preserve a resumed session.
+    if (activeBranch && suggestionSession.isActive) {
       suggestionSession.discardSession();
     }
     setActiveBranch(branchName);
@@ -1034,7 +1036,7 @@ export default function EditorPage() {
     next.set("branch", branchName);
     const qs = next.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname);
-  }, [pathname, router, suggestionSession, resetSourceState, searchParamsString]);
+  }, [activeBranch, pathname, router, suggestionSession, resetSourceState, searchParamsString]);
 
   // --- Keyboard shortcuts ---
   const keyboardShortcuts = useMemo((): ShortcutDefinition[] => [

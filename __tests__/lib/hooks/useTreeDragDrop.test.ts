@@ -55,6 +55,27 @@ beforeEach(() => {
 });
 
 describe("useTreeDragDrop", () => {
+  it.each(["permission", "editing"])("revalidates root drops after %s changes", async kind => {
+    const { result, rerender } = renderHook(({ canEdit, editingIri }) => useTreeDragDrop({ ...BASE_OPTIONS, canEdit, editingIri }), { initialProps: { canEdit: true, editingIri: null as string | null } });
+    act(() => result.current.handleDragStart(makeDragStartEvent("http://ex.org/B")));
+    rerender({ canEdit: kind !== "permission", editingIri: kind === "editing" ? "http://ex.org/B" : null });
+    await act(async () => result.current.handleDragEnd(makeDragEndEvent("root-drop-zone")));
+    expect(BASE_OPTIONS.onReparent).not.toHaveBeenCalled();
+  });
+
+  it("cancels a queued expansion on unmount", () => {
+    vi.useFakeTimers();
+    try {
+      const collapsed = { ...BASE_TREE[0], isExpanded: false };
+      const { result, unmount } = renderHook(() => useTreeDragDrop({ ...BASE_OPTIONS, nodes: [collapsed] }));
+      act(() => result.current.handleDragStart(makeDragStartEvent("http://ex.org/B")));
+      act(() => result.current.handleDragEnterNode(collapsed.iri));
+      unmount();
+      act(() => vi.advanceTimersByTime(800));
+      expect(BASE_OPTIONS.expandNode).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
   it("starts with inactive drag state", () => {
     const { result } = renderHook(() => useTreeDragDrop(BASE_OPTIONS));
 

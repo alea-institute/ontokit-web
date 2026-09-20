@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   MiniMap,
@@ -12,6 +12,7 @@ import {
   type Node,
   type Edge,
   type ColorMode,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { ArrowDown, ArrowRight, ChevronDown, ChevronUp, Maximize2, RotateCcw } from "lucide-react";
@@ -147,6 +148,7 @@ export function OntologyGraph({
       labelHints,
     });
 
+  const flowRef = useRef<ReactFlowInstance<Node, Edge> | null>(null);
   const [direction, setDirection] = useState<"TB" | "LR">("TB");
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -318,6 +320,7 @@ export function OntologyGraph({
           </div>
         )}
         <ReactFlow
+          onInit={(instance) => { flowRef.current = instance; }}
           nodes={nodes}
           edges={edges}
           onNodesChange={onNodesChange}
@@ -335,7 +338,7 @@ export function OntologyGraph({
           <Controls showInteractive={false}>
             <button
               onClick={() => {
-                // Fit view is handled by Controls built-in, but add a toolbar one too
+                void flowRef.current?.fitView({ padding: 0.2 });
               }}
               className="react-flow__controls-button"
               aria-label="Fit view"

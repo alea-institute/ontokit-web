@@ -4,6 +4,7 @@ import type { LocalizedString, AnnotationUpdate, ClassUpdatePayload } from "@/li
 import type { RelationshipGroup } from "@/components/editor/standard/RelationshipSection";
 import type { OWLClassDetail } from "@/lib/api/client";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { RELATIONSHIP_PROPERTY_IRIS } from "@/lib/ontology/annotationProperties";
 import type { SaveOrigin } from "@/lib/editor/autoSave";
 
 export type SaveStatus = "idle" | "draft" | "saving" | "saved" | "error";
@@ -73,7 +74,12 @@ export function useAutoSave({
   // Refs to hold current edit state so flush closure reads latest values
   const editStateRef = useRef<EditState | null>(null);
   const classDetailRef = useRef<OWLClassDetail | null>(null);
-  const flushingRef = useRef(false);
+  const scopeKey = JSON.stringify([projectId, branch, classIri]);
+  const scopeRef = useRef({ key: scopeKey });
+  if (scopeRef.current.key !== scopeKey) scopeRef.current = { key: scopeKey };
+  const mountedRef = useRef(true);
+  const editGenerationRef = useRef(0);
+  const flushingRef = useRef<object | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep classDetail ref up to date
@@ -83,18 +89,18 @@ export function useAutoSave({
 
   // Check for restored draft on class change
   useEffect(() => {
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    setRestoredDraft(null);
+    setSaveStatus("idle");
+    setSaveError(null);
+    setValidationError(null);
     if (!classIri || !branch) return;
     const key = draftKey(projectId, branch, classIri);
     const draft = getDraft(key);
     // Only restore class drafts (no entityType or entityType === "class")
     if (draft && (!draft.entityType || draft.entityType === "class")) {
       setRestoredDraft(draft as DraftEntry);
-    } else {
-      setRestoredDraft(null);
     }
-    setSaveStatus("idle");
-    setSaveError(null);
-    setValidationError(null);
   }, [classIri, branch, projectId, getDraft]);
 
   const clearRestoredDraft = useCallback(() => {
@@ -103,6 +109,8 @@ export function useAutoSave({
 
   // Discard draft for current classIri (used by Cancel)
   const discardDraft = useCallback(() => {
+    editGenerationRef.current++;
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     if (!classIri || !branch) return;
     const key = draftKey(projectId, branch, classIri);
     clearDraft(key);
@@ -115,6 +123,7 @@ export function useAutoSave({
 
   // Save edit state to draft store (Tier 1: instant, local)
   const triggerSave = useCallback(() => {
+    editGenerationRef.current++;
     const canSave = canEdit || saveMode === "suggest";
     if (!classIri || !branch || !canSave) return;
     const state = editStateRef.current;
@@ -149,7 +158,7 @@ export function useAutoSave({
   // Flush draft to git (Tier 2: commit on navigate away)
   // Returns true on success, false on error or no-op
   const flushToGit = useCallback(async (origin: SaveOrigin = "auto"): Promise<boolean> => {
-    if (flushingRef.current) return false;
+    if (flushingRef.current === scopeRef.current) return false;
     const canFlush = canEdit || saveMode === "suggest";
     const hasHandler = saveMode === "suggest" ? !!onSuggestSave : !!onUpdateClass;
     if (!classIri || !branch || !canFlush || !hasHandler) return false;
@@ -172,7 +181,11 @@ export function useAutoSave({
 
     const detail = classDetailRef.current;
 
-    flushingRef.current = true;
+    const scope = scopeRef.current;
+    const generation = editGenerationRef.current;
+    const isCurrent = () => mountedRef.current && scopeRef.current === scope
+      && editGenerationRef.current === generation;
+    flushingRef.current = scope;
     setSaveStatus("saving");
     setSaveError(null);
 
@@ -185,13 +198,20 @@ export function useAutoSave({
         }))
         .filter((a) => a.values.length > 0);
 
-      // Convert relationships back to annotation format
+      // Explicit empty updates remove managed predicates after a group is
+      // cleared or changes property. Omitted unrelated annotations stay intact.
       const relationshipAnnotations: AnnotationUpdate[] = draft.relationships
-        .filter((g) => g.targets.length > 0)
         .map((g) => ({
           property_iri: g.property_iri,
           values: g.targets.map((t) => ({ value: t.iri, lang: "" })),
         }));
+
+      for (const annotation of detail?.annotations ?? []) {
+        if (RELATIONSHIP_PROPERTY_IRIS.has(annotation.property_iri)
+          && !relationshipAnnotations.some((group) => group.property_iri === annotation.property_iri)) {
+          relationshipAnnotations.push({ property_iri: annotation.property_iri, values: [] });
+        }
+      }
 
       const validLabels = draft.labels.filter((l) => l.value.trim());
 
@@ -211,33 +231,44 @@ export function useAutoSave({
       } else if (onUpdateClass) {
         await onUpdateClass(classIri, payload);
       }
-      clearDraft(key);
+      // A successful write owns only the exact draft it submitted. A timestamp
+      // cannot distinguish edits made in the same clock tick.
+      const ownsDraft = getDraft(key) === draft;
+      if (ownsDraft) clearDraft(key);
+      if (!isCurrent() || !ownsDraft) return true;
       setSaveStatus("saved");
 
-      if (
-        origin === "auto" &&
-        await useEditorModeStore.getState().claimAutoSaveTeachingToast()
-      ) {
-        onFirstAutoSaveRef.current?.();
+      if (origin === "auto") {
+        const claimed = await useEditorModeStore.getState().claimAutoSaveTeachingToast();
+        if (!isCurrent() || getDraft(key)) return true;
+        if (claimed) onFirstAutoSaveRef.current?.();
       }
 
-      // Fade "saved" indicator after 2s
-      savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      // The teaching announcement can itself cause navigation or another edit.
+      if (isCurrent() && !getDraft(key)) {
+        savedTimerRef.current = setTimeout(() => {
+          if (isCurrent() && !getDraft(key)) setSaveStatus("idle");
+        }, 2000);
+      }
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save";
-      setSaveStatus("error");
-      setSaveError(msg);
-      onErrorRef.current?.(msg);
+      if (isCurrent() && getDraft(key) === draft) {
+        setSaveStatus("error");
+        setSaveError(msg);
+        onErrorRef.current?.(msg);
+      }
       return false;
     } finally {
-      flushingRef.current = false;
+      if (flushingRef.current === scope) flushingRef.current = null;
     }
   }, [classIri, branch, projectId, canEdit, saveMode, onUpdateClass, onSuggestSave, getDraft, clearDraft]);
 
   // Cleanup timer on unmount
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     };
   }, []);
