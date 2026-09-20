@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
+import { useNotifications } from "@/lib/hooks/useNotifications";
 import { NotificationBell, NOTIFICATIONS_CHANGED_EVENT } from "@/components/layout/notification-bell";
 import type { Notification } from "@/lib/api/notifications";
 
@@ -21,10 +22,69 @@ async function open() {
   fireEvent.click(screen.getByRole("button", { name: "Notifications" }));
   await screen.findByText("Review update");
 }
-beforeEach(() => { boundary.token = "notification-token"; vi.clearAllMocks(); vi.stubGlobal("fetch", fetchMock); });
+beforeEach(() => { boundary.token = "notification-token"; vi.clearAllMocks(); fetchMock.mockReset(); vi.stubGlobal("fetch", fetchMock); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("NotificationBell through notification API", () => {
+  it.each(['one', 'all'])('ignores a previous identity mark-%s completion', async operation => {
+    let finish!: (response: Response) => void;
+    fetchMock.mockResolvedValueOnce(listing(item({ is_read: false })))
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+      .mockResolvedValueOnce(listing(item({ is_read: false, title: 'Current user' })));
+    const { result, rerender } = renderHook(() => useNotifications());
+    await waitFor(() => expect(result.current.unreadCount).toBe(1));
+    let mutation!: Promise<void>;
+    act(() => { mutation = operation === 'one' ? result.current.markAsRead('notice-1') : result.current.markAllAsRead(); });
+    boundary.token = 'new-user-token';
+    rerender();
+    await waitFor(() => expect(result.current.notifications[0]?.title).toBe('Current user'));
+    await act(async () => { finish(new Response(null, { status: 204 })); await mutation; });
+    expect(result.current.unreadCount).toBe(1);
+    expect(result.current.notifications[0].is_read).toBe(false);
+  });
+
+  it('keeps loading the current identity when an obsolete request finishes', async () => {
+    let finishOld!: (response: Response) => void;
+    let finishCurrent!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(() => new Promise(resolve => { finishOld = resolve; }))
+      .mockImplementationOnce(() => new Promise(resolve => { finishCurrent = resolve; }));
+    const { result, rerender } = renderHook(() => useNotifications());
+    boundary.token = 'new-user-token';
+    rerender();
+    await act(async () => finishOld(listing(item())));
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.notifications).toEqual([]);
+    await act(async () => finishCurrent(listing(item({ title: 'Current user' }))));
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.notifications[0].title).toBe('Current user');
+  });
+
+  it('resumes notification requests after replacing a rejected credential', async () => {
+    fetchMock.mockResolvedValueOnce(response({ detail: 'Expired' }, 401))
+      .mockResolvedValueOnce(listing(item()));
+    const { result, rerender } = renderHook(() => useNotifications());
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    boundary.token = 'renewed-token';
+    rerender();
+    await waitFor(() => expect(result.current.notifications).toHaveLength(1));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([200, 401])('ignores an old credential response with status %s', async status => {
+    let finish!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+      .mockResolvedValueOnce(listing(item({ title: 'Current user' })))
+      .mockResolvedValueOnce(listing(item({ title: 'Refreshed user' })));
+    const { result, rerender } = renderHook(() => useNotifications());
+    boundary.token = 'new-user-token';
+    rerender();
+    await waitFor(() => expect(result.current.notifications[0]?.title).toBe('Current user'));
+    await act(async () => finish(status === 200 ? listing(item({ title: 'Previous user' })) : response({ detail: 'Expired' }, 401)));
+    expect(result.current.notifications[0]?.title).toBe('Current user');
+    await act(async () => result.current.refetch());
+    expect(result.current.notifications[0]?.title).toBe('Refreshed user');
+  });
+
   it.each<[Partial<Notification>, string]>([
     [{ type: "suggestion_auto_submitted" }, "/projects/project-1/suggestions/review"],
     [{ type: "suggestion_approved" }, "/projects/project-1/suggestions"],
@@ -58,9 +118,9 @@ describe("NotificationBell through notification API", () => {
     await open();
     boundary.token = "";
     view.rerender(<NotificationBell />);
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Mark all as read" })));
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("1")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Mark all as read" })).toBeNull();
+    expect(screen.queryByText("1")).toBeNull();
     boundary.token = "renewed-notification-token";
     view.rerender(<NotificationBell />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
