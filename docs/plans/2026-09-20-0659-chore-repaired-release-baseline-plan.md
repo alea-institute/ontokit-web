@@ -10,6 +10,8 @@ execution: code
 
 # Prepare the repaired DEV release baseline - Plan
 
+> Authorization update, 2026-09-20: Damien subsequently granted standing permission for pushes, merges, deployment and Claude repository disclosure (see `AGENTS.md`). This completed plan records the original local-preparation scope; its earlier publication restriction does not govern subsequent delivery work.
+
 ## Goal Capsule
 
 - **Objective:** Maintainers can identify exactly what remains before the repaired OntoKit release can safely reach DEV.
