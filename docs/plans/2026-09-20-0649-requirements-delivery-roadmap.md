@@ -28,9 +28,10 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**D02: hosted identity authority pending. D06: local acceptance and review complete; web PR49 published, CI repair active.**
+**D02: hosted identity authority pending. D06 is merged. D07: plan the remaining B14 schema-mint authorization gap.**
 
-- D06's [reviewed implementation plan](2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) completed U1–U6 in `.worktrees/web-d06-full-stack`, branch `feat/d06-full-stack-tests-20260920`. [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49) targets `dev`, initially published at `a8e3deefff3ec19a953841fb07a067cd3bc97ef9`. Two fresh runs passed all 21 mandatory tests with identical source fingerprints, complete cleanup and unchanged neighboring resources. Full review and both recovery repairs are complete; [local acceptance evidence](../releases/d06-full-stack-readiness.md) records the limits. CI found a dynamic-regex browser-test assertion; a bounded CE debug repair is active. Finish CI, merge after checks clear, then plan the bounded B14 schema-taxonomy follow-up while preserving B11–B15.
+- D06 completed U1–U6 and merged through [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49) as `83eaf9574315b71a165b80370dd964572d2ccac9` after all eight verification checks passed. One CI assertion finding was repaired; two final fresh runs passed all 21 mandatory tests with identical source fingerprints, complete cleanup and preserved neighboring resources. [Merged evidence](../releases/d06-merged-readiness.json) and [local acceptance](../releases/d06-full-stack-readiness.md) preserve the limits. No deployment occurred. B10 is accepted as a local regression foundation; B11–B13 remain open.
+- D07 research is underway in `.worktrees/api-d07-schema-mint`, branch `fix/d07-schema-mint-20260920`, based on merged API `d9272cc8`. Close the three-type schema authorization gap retained by D04 (`owl:DeprecatedClass`, `owl:DeprecatedProperty`, `rdfs:ContainerMembershipProperty`), preserving existing-entity edit compatibility and submission billing/caps. No plan artifact or implementation exists yet. Complete ce-plan and document review before ce-work.
 
 - D06's first real probes found a default API Dockerfile defect: the package directory is root-owned `0644`, preventing non-root imports and migrations. [Lifecycle evidence](../releases/d06-lifecycle-readiness.md) records the reproduced failure and successful cleanup. The repair in `.worktrees/api-d06-image` is locally committed as `4d17d949`; its full-image non-root smoke and fresh migrations pass. Image and PR serializer repairs merged through [API PR50](https://github.com/alea-institute/ontokit-api/pull/50) as `d9272cc8` after all six verification checks passed; hosted DEV acceptance remains separate. U1 normal/setup-failure/late-failure/INT/TERM/crash-recovery probes all pass, with no owned leftovers and unchanged neighboring resource identities.
 
@@ -51,7 +52,7 @@ Local verification, publication, deployment and authenticated acceptance remain 
 | Order / ID | Area | Backlog IDs | State | Dependency / next planning boundary |
 |---|---|---|---|---|
 | 1 / A01 | Deliver and validate existing work | B01–B09 | Awaiting hosted identity access | D03–05 and API prerequisites merged; D02 recovery proved; supported DEV administrator authority still required |
-| 2 / A02 | Full-stack proof and integrity | B10–B15 | D06 CI repair | B10 locally verified and published; finish CI and merge, then bounded B14 taxonomy follow-up before broader B11–B15 work |
+| 2 / A02 | Full-stack proof and integrity | B10–B15 | D07 planning | B10 accepted locally; bounded B14 schema authorization next, with B11–B13 and B15 retained |
 | 3 / A03 | Ontology batching and reviewer intelligence | B16–B23 | Queued | Verify API contracts; provenance/duplicate comparison can precede shard-dependent review |
 | 4 / A04 | Entity workspace and graph | B24–B27 | Queued | Reconcile historical graph port and current repairs; preserve all eleven Phase17 requirements |
 | 5 / A05 | Ecosystem suggestion import loop | B28–B34 | Queued | Prove one producer-to-reviewed-change pilot before scaling feeder volume |
@@ -96,7 +97,8 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | D05 | B14 submission embedding errors | Merged | [API PR49](https://github.com/alea-institute/ontokit-api/pull/49) | Merge `c95991c7`; 3,260 tests, zero skips, 90% coverage; eight review lenses clear; six CI successes/six conditional skips; [receipt](../releases/d05-merged-readiness.md) |
 | D02 | B02–03 DEV runtime and persona acceptance | Awaiting identity access | [Reviewed plan](2026-09-20-1323-chore-dev-recovery-acceptance-plan.md) | [Plan review](../releases/d02-plan-review.json): six local and three independent Claude reviews resolved; [Recovery proof](../releases/d02-recovery-receipt.md) passed; hosted admin tokens invalid; local credential also rejected by hosted DEV after authorized validation. Return when supported DEV admin authority is available; no deployment or migration performed |
 
-| D06 | B10 isolated local full-stack foundation | Published; CI repair | [Plan](2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) | [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49), initial head `a8e3deef`; all 21 mandatory tests passed twice; full review and recovery repairs complete; dynamic-regex CI repair active |
+| D06 | B10 isolated local full-stack foundation | Accepted: local foundation | [Plan](2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) | [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49), merge `83eaf957`; eight CI checks passed, final two runs 21 tests each; [evidence](../releases/d06-merged-readiness.json) |
+| D07 | B14 schema mint authorization | Scoping | Plan pending | Isolated API branch `fix/d07-schema-mint-20260920` at `d9272cc8`; read-only research underway |
 
 ## Decision record
 
@@ -122,7 +124,7 @@ The catalog owns the full requirement wording and source status. This ledger own
 | B07 | Complete PR Party external activation and its credentialed, degraded, and Q&A end-to-end flows | Queued | See catalog; assign a bounded deliverable when reached |
 | B08 | Finish CatholicOS delivery of the remaining feature tranches and documentation | Queued | See catalog; assign a bounded deliverable when reached |
 | B09 | Complete the parallel FOLIO PROD rehearsal, UAT, reversible cutover, and gated promotion proof | Queued | See catalog; assign a bounded deliverable when reached |
-| B10 | Establish repeatable full-stack API and browser tests with isolated projects, real backend state, setup and cleanup | Published; CI repair | D06 local acceptance and review complete; [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49) awaits CI repair and merge |
+| B10 | Establish repeatable full-stack API and browser tests with isolated projects, real backend state, setup and cleanup | Accepted: local foundation | D06 merged via [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49), `83eaf957`; all 21 mandatory tests passed twice after final repair, cleanup and neighbors verified |
 | B11 | Prove real OIDC login, logout, credential renewal, session expiry, anonymous/optional/required modes, Monaco editing, and save/submit/review/merge | Queued | See catalog; assign a bounded deliverable when reached |
 | B12 | Prove WebSocket authentication, presence, acknowledgments, sync, reconnect after server restart, multi-client behavior, and index notifications | Queued | See catalog; assign a bounded deliverable when reached |
 | B13 | Add browser CI, reproducible seed/cleanup, Chromium/Firefox coverage, failure traces, and frontend/backend response-contract checks | Queued | See catalog; assign a bounded deliverable when reached |
