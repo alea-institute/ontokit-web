@@ -28,8 +28,9 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**D03 published in PR48; await CI and merge, then plan D04 API mint enforcement.**
+**Next deliverable D04: plan and repair API individual mint-capability enforcement (B14).**
 
+- D01/D03 candidate merged into ALEA web `dev` through [PR48](https://github.com/alea-institute/ontokit-web/pull/48), revision `ab903e145e2a6ad30aefd915a83cb0bafbaa0678`, after all eight verification checks passed. No deployment occurred.
 - [D03 evidence](../releases/d03-image-readiness.md) supersedes D01’s required-auth image failure: all three images build and pass expanded runtime checks; 5,222 tests pass.
 - Completed implementation of [the reviewed D03 plan](2026-09-20-0731-fix-configured-provider-image-plan.md): build-time public provider configuration versus runtime secrets, retaining fail-closed runtime validation. Work from the local release candidate identified in that packet, not the older repair branch.
 - D01 local preparation is complete under [its reviewed plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md). The candidate incorporates current ALEA `dev`, the repair/test work and one dashboard fixture adaptation. Standing authorization in `AGENTS.md` now permits publication, merge and deployment after their verification gates.
@@ -85,7 +86,7 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | ID | Scope | State | Plan | Evidence / remainder |
 |---|---|---|---|---|
 | D01 | B01; readiness portions of B02/B14 | Accepted: local preparation only | [Plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md) | [Release evidence](../releases/d01-release-readiness.md); candidate `3d45af5b`: 364 files / 5,188 tests pass; optional-auth image builds; authenticated activation blocked |
-| D03 | B14 configured-provider image fidelity | Locally verified | [Plan](2026-09-20-0731-fix-configured-provider-image-plan.md) | [Image and review evidence](../releases/d03-image-readiness.md); code `30b8ecb2`; [PR48](https://github.com/alea-institute/ontokit-web/pull/48), head `29ba0d5b`, CI pending |
+| D03 | B14 configured-provider image fidelity | Integrated | [Plan](2026-09-20-0731-fix-configured-provider-image-plan.md) | [Image and review evidence](../releases/d03-image-readiness.md); [PR48](https://github.com/alea-institute/ontokit-web/pull/48) merged as `ab903e14`; eight CI checks passed |
 | D04 | B14 individual mint enforcement | Queued prerequisite | Not yet created | API declaration gate omits individuals; reproduce on current API dev before repair |
 | D05 | B14 submit/resubmit embedding errors | Queued prerequisite | Not yet created | API source lacks explicit 402/503 mapping; prove retry/state behavior |
 | D02 | B02–03 DEV runtime and persona acceptance | Awaiting prerequisites | Not yet created | D03–05 and authorized published pair/activation first |
@@ -105,7 +106,7 @@ The catalog owns the full requirement wording and source status. This ledger own
 
 | ID | Outcome | Program state | Plan / evidence / next action |
 |---|---|---|---|
-| B01 | Integrate the September coverage-driven production repairs and their tests into the intended delivery branch, then ship the reviewed pair | Locally verified | [PR48](https://github.com/alea-institute/ontokit-web/pull/48) published; CI/merge and matched deployment remain |
+| B01 | Integrate the September coverage-driven production repairs and their tests into the intended delivery branch, then ship the reviewed pair | Locally verified | [PR48](https://github.com/alea-institute/ontokit-web/pull/48) merged as `ab903e14`; matched deployment remains |
 | B02 | Complete the matched API/web DEV deployment and record running revisions, migration state, health, seeded project, write smoke, and rollback evidence | Scoping | D01 evidence; prerequisites and acceptance remain open |
 | B03 | Finish authenticated persona UAT, including trust promotion, translation/audit, autosave, permissions, and the real submission/merge chain | Queued | See catalog; assign a bounded deliverable when reached |
 | B04 | Activate the two isolated demo repositories, scoped source/destination credentials, atomic refresh, cleanup and rollback | Queued | See catalog; assign a bounded deliverable when reached |
