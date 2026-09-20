@@ -75,10 +75,9 @@ export function PRListItem({ pr, projectId, className }: PRListItemProps) {
   };
 
   return (
-    <Link
-      href={`/projects/${projectId}/pull-requests/${pr.pr_number}`}
+    <div
       className={cn(
-        "block rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-700/50",
+        "relative block rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-700/50",
         className
       )}
     >
@@ -91,7 +90,12 @@ export function PRListItem({ pr, projectId, className }: PRListItemProps) {
           {/* Title and number */}
           <div className="flex items-center gap-2">
             <h3 className="truncate font-medium text-slate-900 dark:text-slate-100">
-              {pr.title}
+              <Link
+                href={`/projects/${projectId}/pull-requests/${pr.pr_number}`}
+                className="after:absolute after:inset-0 after:rounded-lg focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-primary-500"
+              >
+                {pr.title}
+              </Link>
             </h3>
             <span className="text-sm text-slate-500">#{pr.pr_number}</span>
             {getStatusBadge()}
@@ -142,8 +146,7 @@ export function PRListItem({ pr, projectId, className }: PRListItemProps) {
                 href={pr.github_pr_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-primary-600"
-                onClick={(e) => e.stopPropagation()}
+                className="relative z-10 hover:text-primary-600"
               >
                 View on GitHub
               </a>
@@ -163,6 +166,6 @@ export function PRListItem({ pr, projectId, className }: PRListItemProps) {
           </div>
         )}
       </div>
-    </Link>
+    </div>
   );
 }

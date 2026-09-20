@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
 import { PRList } from "@/components/pr/PRList";
 import type { PullRequest } from "@/lib/api/pullRequests";
 
@@ -63,17 +64,40 @@ describe("pull request rows rendered by their real list and API", () => {
     ]));
   });
 
-  it("keeps an external GitHub click from bubbling into surrounding row navigation", async () => {
+  it("keeps an external GitHub click independent of the internal navigation link", async () => {
     serve(1);
-    const outerClick = vi.fn();
-    render(<div onClick={outerClick}><PRList projectId="project" accessToken="test-token" /></div>);
+    render(<PRList projectId="project" accessToken="test-token" />);
     const link = await screen.findByRole("link", { name: "View on GitHub" });
     expect(link.getAttribute("href")).toBe("https://github.com/example/ontology/pull/42");
     expect(link.getAttribute("target")).toBe("_blank");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    const internal = screen.getByRole("link", { name: /Add Person/ });
+    const internalClick = vi.fn();
+    internal.addEventListener("click", internalClick);
+    expect(internal.contains(link)).toBe(false);
     const event = new MouseEvent("click", { bubbles: true, cancelable: true });
     event.preventDefault(); // Keep actual browser navigation outside the local test.
     fireEvent(link, event);
-    expect(outerClick).not.toHaveBeenCalled();
+    expect(internalClick).not.toHaveBeenCalled();
   });
+});
+
+it.each([undefined, 'https://github.com/fixture/ontology/pull/42'])('renders independently focusable valid links from the real list response (%s)', async github_pr_url => {
+  const fetcher = vi.fn(async () => new Response(JSON.stringify({ items: [{ ...makePR(0), github_pr_url }], total: 1, skip: 0, limit: 20 }), { headers: { 'Content-Type': 'application/json' } }));
+  vi.stubGlobal('fetch', fetcher);
+  const { container } = render(<PRList projectId="project" accessToken="fixture-token" />);
+  await screen.findByText("Add Person");
+  expect(container.querySelector('a a')).toBeNull();
+  const links = screen.getAllByRole('link');
+  expect(links).toHaveLength(github_pr_url ? 2 : 1);
+  const internal = links.find(link => link.getAttribute('href') === '/projects/project/pull-requests/42')!;
+  expect(internal).toBeDefined();
+  internal.focus(); expect(document.activeElement).toBe(internal);
+  if (github_pr_url) {
+    const external = screen.getByRole('link', { name: 'View on GitHub' });
+    expect(external.getAttribute('href')).toBe(github_pr_url);
+    expect(external.getAttribute('target')).toBe('_blank');
+    expect(external.getAttribute('rel')).toBe('noopener noreferrer');
+    await userEvent.tab(); expect(document.activeElement).toBe(external);
+  }
 });

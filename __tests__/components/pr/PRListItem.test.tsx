@@ -159,11 +159,10 @@ describe("PRListItem", () => {
   });
 
   it("merges custom className", () => {
-    render(
+    const { container } = render(
       <PRListItem pr={makePR()} projectId="proj-1" className="extra" />
     );
-    const link = screen.getByRole("link");
-    expect(link.className).toContain("extra");
+    expect(container.firstElementChild?.className).toContain("extra");
   });
 
   it("shows 'merged' date for merged PRs", () => {
