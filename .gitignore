@@ -54,3 +54,10 @@ public/sitemap.xml
 
 # Local git worktrees
 .worktrees/
+
+# Private browser and disposable stack artifacts
+e2e/.auth/
+playwright-report/
+test-results/
+*.pat
+.e2e-runs/

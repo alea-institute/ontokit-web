@@ -1,0 +1,83 @@
+{
+  "unit": "U2",
+  "status": "complete",
+  "requirements": [
+    "R2",
+    "R3",
+    "R7"
+  ],
+  "scope": "Genuine disposable identity and API authentication foundation; B10 domain/editor workflows remain pending",
+  "api_commit": "4d17d949",
+  "production_auth_fix": "6f1d9687",
+  "behavior_changed": true,
+  "normal_run": {
+    "run_id": "b0de0c9e0180654e206ee73c341ca356",
+    "exit_code": 0,
+    "browser_tests": {
+      "passed": 4,
+      "skipped": 0,
+      "failed": 0
+    },
+    "genuine_ordinary_user_callbacks": 2,
+    "protected_api_reads": "200 for each independent real user token",
+    "anonymous_protected_read": 401,
+    "cleanup_verified": true,
+    "neighbor_identities_preserved": true
+  },
+  "negative_runs": [
+    {
+      "case": "identity-issuer",
+      "run_id": "1423ad84f6a59bb250a6cf9997b8440e",
+      "exit_code": 1,
+      "seconds": 45.6,
+      "expected_rejection_observed": true,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true
+    },
+    {
+      "case": "identity-pat",
+      "run_id": "4d80b0c4cccfcd19c291dc91ce78ffa5",
+      "exit_code": 1,
+      "seconds": 55.0,
+      "expected_rejection_observed": true,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true
+    },
+    {
+      "case": "identity-callback",
+      "run_id": "9efe1eff35c059850e9926b5329df511",
+      "exit_code": 1,
+      "seconds": 157.4,
+      "expected_rejection_observed": true,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true
+    }
+  ],
+  "verification": {
+    "frontend_tests_passed": 5222,
+    "frontend_test_files_passed": 365,
+    "ownership_and_diagnostic_tests_passed": 14,
+    "identity_guard_tests_passed": 8,
+    "lint": "passed",
+    "type_check": "passed",
+    "production_build": "passed in fresh private source copy"
+  },
+  "red_evidence": [
+    "Missing identity helper before implementation",
+    "Read-only API503 readiness, fail-fast401 and single-shot mutation regressions",
+    "Missing private JavaScript diagnostic capture before implementation",
+    "Auth.js generated user ID differed from Zitadel subject in real browser session; strengthened two existing encrypted-cookie cases failed before production fix"
+  ],
+  "integration_findings": [
+    "CreateUser V2 response field is id",
+    "Discovery can precede internal administrative API readiness",
+    "Current /projects route redirects to homepage",
+    "Disposable client ID-token profile claims must match existing setup script",
+    "Auth.js generated application user IDs must not replace backend Zitadel identity"
+  ],
+  "limitations": [
+    "Existing sessions created before the subject fix require a new sign-in for the corrected identity",
+    "B10 domain/editor acceptance and final repeatability remain U3-U6",
+    "No hosted DEV access, deployment, review or publication is claimed"
+  ]
+}

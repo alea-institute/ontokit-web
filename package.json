@@ -13,7 +13,12 @@
     "lint:fix": "eslint --fix .",
     "type-check": "tsc --noEmit",
     "test": "vitest",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:e2e:lifecycle": "node scripts/e2e/run.mjs --lifecycle-probe",
+    "test:e2e:ownership": "node --test scripts/e2e/ownership.test.mjs scripts/e2e/diagnostics.test.mjs",
+    "test:e2e:evidence": "node scripts/e2e/evidence.test.mjs",
+    "test:e2e": "node scripts/e2e/run.mjs",
+    "test:e2e:identity": "node scripts/e2e/identity.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -52,6 +57,7 @@
   },
   "devDependencies": {
     "@codecov/webpack-plugin": "^2.0.1",
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.6.4",

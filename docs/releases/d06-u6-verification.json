@@ -1,0 +1,139 @@
+{
+  "unit": "U6",
+  "status": "complete",
+  "requirements": [
+    "R1",
+    "R2",
+    "R9",
+    "R10"
+  ],
+  "behavior_changed": true,
+  "evidence_strategy": "Proof-first mandatory gate regression; real fresh-stack repeatability and lifecycle recovery",
+  "red_before_fix": "Foundation-only green synthetic report failed the strengthened assertion before gate repair",
+  "tests_added_or_changed": [
+    "scripts/e2e/evidence.test.mjs"
+  ],
+  "pure_gate_tests": 23,
+  "runs": [
+    {
+      "id": "ecc14e55bdb8135416e568ee36e3f35a",
+      "receipt": "d06-run-ecc14e55bdb8135416e568ee36e3f35a.json",
+      "accepted": true
+    },
+    {
+      "id": "ce831e0704737a0dc8297a2810d9bfd9",
+      "receipt": "d06-run-ce831e0704737a0dc8297a2810d9bfd9.json",
+      "accepted": true
+    }
+  ],
+  "same_source_pair_and_fingerprints": true,
+  "lifecycle": [
+    {
+      "case": "setup-failure",
+      "run_id": "b5ee508ae2d6158451b02b4b52d32986",
+      "exit_code": 1,
+      "seconds": 18.4,
+      "observed_owned_browser_processes": 0,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true,
+      "sources": {
+        "api": {
+          "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+          "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+        },
+        "web": {
+          "revision": "48db779cfb0f8c329ac4d3e7a6872388decf52b3",
+          "sha256": "573b80985f50a0780b03070ce5536d7d699352dc4898d07f6bf056fb6ffaafaa"
+        }
+      }
+    },
+    {
+      "case": "sigint",
+      "run_id": "bffb931470c8b3479dde72cb91cb3d2a",
+      "exit_code": 130,
+      "seconds": 15.7,
+      "observed_owned_browser_processes": 0,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true,
+      "sources": {
+        "api": {
+          "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+          "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+        },
+        "web": {
+          "revision": "48db779cfb0f8c329ac4d3e7a6872388decf52b3",
+          "sha256": "573b80985f50a0780b03070ce5536d7d699352dc4898d07f6bf056fb6ffaafaa"
+        }
+      }
+    },
+    {
+      "case": "sigterm",
+      "run_id": "acb9fd3d2f78c38060d57d549eeb9071",
+      "exit_code": 130,
+      "seconds": 13.3,
+      "observed_owned_browser_processes": 0,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true,
+      "sources": {
+        "api": {
+          "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+          "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+        },
+        "web": {
+          "revision": "48db779cfb0f8c329ac4d3e7a6872388decf52b3",
+          "sha256": "573b80985f50a0780b03070ce5536d7d699352dc4898d07f6bf056fb6ffaafaa"
+        }
+      }
+    },
+    {
+      "case": "hard-interruption-browser",
+      "run_id": "c1c978b099037f5a2752748c735e128d",
+      "exit_code": -9,
+      "seconds": 134.1,
+      "observed_owned_browser_processes": 1,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true,
+      "sources": {
+        "api": {
+          "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+          "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+        },
+        "web": {
+          "revision": "48db779cfb0f8c329ac4d3e7a6872388decf52b3",
+          "sha256": "573b80985f50a0780b03070ce5536d7d699352dc4898d07f6bf056fb6ffaafaa"
+        }
+      }
+    }
+  ],
+  "workflow_failure": {
+    "run_id": "cfc0970c585c19abfdfd82a35dbbc87e",
+    "exit_code": 1,
+    "passed": 20,
+    "failed": 1,
+    "failure": "Monaco source remained empty during find; pending preload race under investigation",
+    "cleanup_verified": true,
+    "neighbor_identities_preserved": true,
+    "private_diagnostics": "consumed and deleted"
+  },
+  "missing_prerequisites": {
+    "missing_api_source": {
+      "exit_code": 1,
+      "no_allocation": true,
+      "actionable_message": true
+    }
+  },
+  "verification": {
+    "lint": "0 errors;19 pre-existing warnings",
+    "type_check": "passed",
+    "existing_unit_suite": "5223 passed across365files after editor preload repair",
+    "production_build": "fresh run-owned build per accepted run"
+  },
+  "publication": "pending",
+  "limitations": [
+    "Neighbor identity proof recorded separately by delivery owner; receipts alone do not prove it",
+    "B11-B13 and hosted DEV remain separate",
+    "Final independent web review and publication still required"
+  ],
+  "neighbor_identities_preserved_both_runs": true,
+  "cleanup_verified_both_runs": true
+}

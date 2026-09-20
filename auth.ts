@@ -51,12 +51,18 @@ export function createAuthConfig(): NextAuthConfig {
       async jwt({ token, account, user }) {
         // Initial sign in
         if (account && user) {
+          // Auth.js gives user.id a generated ID. The backend identifies people
+          // by the verified Zitadel subject retained in providerAccountId.
+          const sessionUser = account.provider === "zitadel"
+            ? { ...user, id: account.providerAccountId }
+            : user;
           return {
             ...token,
+            sub: sessionUser.id,
             accessToken: account.access_token,
             refreshToken: account.refresh_token,
             expiresAt: account.expires_at,
-            user,
+            user: sessionUser,
           };
         }
 

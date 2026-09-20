@@ -46,10 +46,13 @@ describe('authenticated sessions through encrypted cookies and real callbacks', 
     const provider = authConfig.providers[0] as OIDCConfig<Record<string, unknown>>;
     const signedInUser = await provider.profile!(profile, {});
     expect(signedInUser).toEqual({ id: 'reviewer', name, email: 'reviewer@example.invalid', image: "picture" in profile ? profile.picture : undefined });
-    const initial = await authConfig.callbacks!.jwt!({ token: { sub: 'reviewer' }, user: signedInUser, account: { provider: 'zitadel', type: 'oidc', providerAccountId: 'reviewer', access_token: 'initial-access', refresh_token: 'initial-refresh', expires_at: Math.floor(Date.now() / 1000) + 600 } });
+    // Auth.js replaces profile.id with a generated application ID before jwt;
+    // the verified issuer subject is retained in account.providerAccountId.
+    const authJsUser = { ...signedInUser, id: 'authjs-generated-user-id' };
+    const initial = await authConfig.callbacks!.jwt!({ token: { sub: authJsUser.id }, user: authJsUser, account: { provider: 'zitadel', type: 'oidc', providerAccountId: 'reviewer', access_token: 'initial-access', refresh_token: 'initial-refresh', expires_at: Math.floor(Date.now() / 1000) + 600 } });
     const response = await session(initial!);
     expect(await response.json()).toMatchObject({ user: { id: 'reviewer', name, email: 'reviewer@example.invalid' }, accessToken: 'initial-access' });
-    expect(await cookieToken(response)).toMatchObject({ refreshToken: 'initial-refresh' });
+    expect(await cookieToken(response)).toMatchObject({ sub: 'reviewer', user: { id: 'reviewer' }, refreshToken: 'initial-refresh' });
     expect(fetcher).not.toHaveBeenCalled();
   });
 

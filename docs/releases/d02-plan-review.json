@@ -1,0 +1,397 @@
+{
+  "status": "complete",
+  "mode": "non-interactive",
+  "document": "docs/plans/2026-09-20-1323-chore-dev-recovery-acceptance-plan.md",
+  "document_sha256": "e2f441567c832471271bb85e3def07793db0aa8bac69d5ae123a201d103c57ca",
+  "reviewed_utc": "2026-09-20T18:34:34.463796+00:00",
+  "classification": "unified-plan",
+  "edit_authority": "Apply implementation and verification corrections needed to satisfy the established Product Contract; preserve constraints and settled decisions.",
+  "coverage": {
+    "local_completed": 6,
+    "cross_model_completed": 3,
+    "failed": [],
+    "packs": []
+  },
+  "original_evidence": [
+    {
+      "reviewer": "coherence-reviewer",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "feasibility",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "design-lens",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "security-lens",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "scope-guardian",
+      "findings": [
+        {
+          "title": "U5 silently expands into B10 implementation",
+          "severity": "P2",
+          "section": "U5 — Observe the real quiet-period lifecycle",
+          "why_it_matters": "Implementers could begin the B10 full-stack test foundation as part of D02, despite its B02–B03 completion boundary and the program rule requiring focused plans.",
+          "finding_type": "error",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Require B10 implementation through its own bounded deliverable plan while retaining D02 timer ownership.",
+          "confidence": 75,
+          "evidence": [
+            "continue independent B10 work during natural waits.",
+            "D02 owns recovery and acceptance of existing behavior."
+          ]
+        }
+      ],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "adversarial",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "cross_model_route": "claude",
+      "cross_model_target": "claude",
+      "cross_model_harness": "claude",
+      "serving_family": "claude",
+      "independence_verified": true,
+      "model_requested": "claude-opus-5",
+      "model_actual": "claude-opus-5",
+      "effort_requested": "high",
+      "findings": [
+        {
+          "title": "Recovery set and restored copies lack retention, deletion and access terms",
+          "severity": "P2",
+          "section": "KTD3 - Verify coordinated recovery before mutation / U6 - Reconcile cleanup and publish acceptance",
+          "why_it_matters": "The plan creates a new high-sensitivity data store — full PostgreSQL dumps, globals, Redis persistence, object storage and the live credential/config files — plus at least two restored copies (the untouched baseline and the migration-rehearsal copy), but never says who may access it, whether it is encrypted, or when it is destroyed. U6's cleanup inventory covers application objects, sessions and browser captures and the Definition of Done bans 'abandoned credentials', yet neither names the backup set or the isolated restores, so an implementer following the checklist will leave a complete copy of DEV secrets and user data on operator storage indefinitely. The fix closes the gap inside the plan's own pattern of agent-selected defaults listed under 'Assumptions and execution-time gates'.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "In KTD3 add: 'The recovery set is encrypted at rest and readable only by the operator role; the isolated restore and rehearsal copies are destroyed with a receipt once U2's migration proof is recorded.' Add to 'Assumptions and execution-time gates': 'Retain the verified recovery set until B02 closure is recorded plus 14 days, then destroy it with a receipt.' Add a U6 verification scenario: 'The recovery set, isolated restore and rehearsal copies are absent or within their stated retention, with location, access list and destruction receipts recorded in the recovery receipt.'",
+          "confidence": 75,
+          "evidence": [
+            "Retain both databases, globals, Git, object storage, actual Redis persistence, credential/config files and image identities in restricted durable operator storage.",
+            "Preserve an untouched restored baseline and rehearse the observed live-to-candidate migration interval on a separate restored copy",
+            "No abandoned repair code, test fixtures, credentials, raw browser data or unmanaged timers remain."
+          ]
+        },
+        {
+          "title": "Persona accounts and operator admin PAT not decommissioned at cleanup",
+          "severity": "P2",
+          "section": "U6 - Reconcile cleanup and publish acceptance / KTD5 - Repair identity through supported same-version administration",
+          "why_it_matters": "After the run, DEV Zitadel will retain three disposable authenticated accounts — one holding reviewer/editor and one administrator authority — and the personal access token the operator used for supported administration, because U6's identity cleanup is scoped to sign-in sessions ('each run-created sign-in session revoked; logout alone is insufficient') and KTD5 revokes only the replaced service credential. A PAT is not a session and an account outlives its sessions, so an implementer who satisfies every listed verification still leaves standing privileged credentials on the environment that the next plan (B04 demo activation, B06 credential rewrap) inherits unknowingly. Extending the U6 verification list to accounts and run-created admin credentials, and stating where persona credentials live during the up-to-96-hour window, closes the lifecycle the plan already intends.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Add to U4 Approach: 'Persona account credentials live only in private operator secret storage for the run and never in the observation register or receipts.' Add a U6 verification scenario: 'Every run-created persona account is deactivated or deleted through the supported admin path, and every run-created operator PAT or admin credential is revoked, with nonsecret confirmation recorded; session revocation alone is insufficient.' Amend the Definition of Done list to read 'No abandoned repair code, test fixtures, persona accounts, credentials, raw browser data or unmanaged timers remain.'",
+          "confidence": 75,
+          "evidence": [
+            "Register every run-created object, use three disposable authenticated roles and five contexts",
+            "Every changed setting/preference/tier is restored and each run-created sign-in session revoked; logout alone is insufficient.",
+            "KTD5 uses [Zitadel PAT authentication](https://zitadel.com/docs/guides/integrate/service-accounts/personal-access-token) and the installed version's supported administration API.",
+            "Replace only a proven invalid required service credential through an existing authorized admin path, write it privately and atomically, verify consumers, then revoke the replaced credential."
+          ]
+        }
+      ],
+      "residual_risks": [
+        "Most likely exploit if implemented as written: an orphaned disposable administrator persona account on DEV Zitadel remains valid after B03 closes and is reused or compromised; mitigation is account deactivation as a U6 gate (finding 2).",
+        "Highest impact: the coordinated recovery set contains live credential/config files and real DEV user identities; without an access list, encryption and destruction date it becomes a long-lived secondary copy of every DEV secret outside the rotation path B06 will later assume is complete (finding 1).",
+        "Most subtle: KTD8 keeps 'maintenance ingress restrictions' but no unit establishes them, so during the U2 maintenance window the public ingress may still reach a restart-looping older API; the plan's writer-quiescence gate mitigates data risk but the ingress posture during maintenance is undocumented and should be recorded in the recovery receipt."
+      ],
+      "deferred_questions": [
+        "Which storage location and access group constitutes 'restricted durable operator storage' for the recovery set, and is it encrypted at rest?",
+        "Are the disposable persona accounts created as Zitadel instance-level or project-scoped users, and does the 'administrator' persona require instance admin rights or only application admin rights?"
+      ]
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "cross_model_route": "claude",
+      "cross_model_target": "claude",
+      "cross_model_harness": "claude",
+      "serving_family": "claude",
+      "independence_verified": true,
+      "model_requested": "claude-opus-5",
+      "model_actual": "claude-opus-5",
+      "effort_requested": "high",
+      "findings": [
+        {
+          "title": "Live migration precedes any proof the candidate containers start",
+          "severity": "P2",
+          "section": "KTD3/KTD4 - Coordinated recovery and controlled migration; U2 - Prepare matching host assets and migration",
+          "why_it_matters": "The plan's known failure is that API and worker restart-loop on a file-permission error, yet no unit owns diagnosing that cause, and the rehearsal on the restored copy proves only the migration interval, not that the candidate images actually start and pass health against restored data and host volumes. If the permission fault is host-side (volume ownership, mounted path modes) rather than in the installed script drift, the plan will have already moved the live schema to the candidate head before discovering at gate G that the pair still cannot run; KTD8 forbids treating checkout rollback as schema rollback, so the only way back is a full restore from the U1 backup. Adding an isolated candidate startup/health rehearsal on the restored copy (no ingress, no live integrations, consistent with KTD3's restore rules) and explicitly attributing the restart-loop root cause before the live migration gate converts that expensive failure into a pre-mutation blocker.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "In KTD3's rehearsal step and U2's verification scenarios, add: 'Start the candidate API and worker images against the separate restored copy with no ingress, live integrations or scheduled work; both must reach healthy without the observed file-permission restart, and the restart cause must be attributed (installed-asset mode, host volume ownership, or code) and its fix recorded before the live migration gate opens.'",
+          "confidence": 75,
+          "evidence": [
+            "API and worker restart on a file-permission error, login is unhealthy, and installed deployment assets differ from reviewed source.",
+            "rehearse the observed live-to-candidate migration interval on a separate restored copy; verify affected row changes and constraints before live migration",
+            "No checkout-only rollback may be treated as schema rollback"
+          ]
+        },
+        {
+          "title": "PROD_ENABLED containment ignores environment-scoped variable precedence",
+          "severity": "P2",
+          "section": "KTD2 - Contain promotion with repository PROD_ENABLED=false",
+          "why_it_matters": "The containment proof rests on 'repository variables override organization variables', but GitHub's precedence also places environment-scoped variables above repository variables. If the promotion job declares an environment that carries its own PROD_ENABLED, reading back the repository value as false proves nothing and the first evidence of a live promotion path is the merged manifest triggering it. Extending the pre-merge read-back to the promotion job's environment scope and confirming the gate expression evaluates at a scope where the repository value governs closes that gap before the merge rather than after.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Amend KTD2: 'Read back PROD_ENABLED at repository scope and at the scope of every environment the promotion job declares; confirm no environment-level override exists and that the workflow gate expression reads the variable at a scope where the repository value applies, before manifest merge.'",
+          "confidence": 50,
+          "evidence": [
+            "Read back the value and current remote workflow before manifest merge; prove the resulting promotion job is skipped. Repository variables override organization variables"
+          ]
+        },
+        {
+          "title": "Migration-proof image not required to equal deployed image",
+          "severity": "P2",
+          "section": "KTD4 - Use one controlled migration before normal startup; U3 - Activate and prove the immutable DEV release",
+          "why_it_matters": "KTD4 proves the migration head using a one-off candidate image the operator builds, while U3 later deploys whatever image the protected workflow produces or pulls for the same SHA; the plan records the one-off image ID but never requires U3's image-ID match to include it. If the two builds diverge (unpinned build-time dependency, different checkout, different migration files), the deployed API and worker entrypoints, which migrate by default, would each discover pending DDL at startup and run the concurrent migration race KTD4 exists to prevent, with the 'no pending DDL' check only confirming the problem after the fact. Binding U3's image-identity verification to the KTD4 migration image (or running the controlled migration from the exact registry digest the workflow will deploy) makes the proven head and the running head the same artifact.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "In KTD4 add: 'The controlled migration runs from the exact immutable image the protected workflow will deploy (same digest); if the workflow builds on host, build once and pin that digest for both steps.' In U3 verification add: 'API/worker image IDs equal the KTD4 migration image ID recorded in the recovery receipt.'",
+          "confidence": 50,
+          "evidence": [
+            "Use a one-off candidate image with automatic entrypoint migration disabled and dependency startup suppressed, then explicitly migrate and compare current versus expected head sets. Record the immutable image ID.",
+            "API/worker/web image-ID labels match the manifest, migration head matches U2, and required services are healthy.",
+            "API `scripts/entrypoint.sh` migrates by default in both API and worker containers."
+          ]
+        },
+        {
+          "title": "S0190 steps assumed current for the D03–05 candidate",
+          "severity": "P2",
+          "section": "KTD6 - Recover the UAT procedure with a complete trace matrix; U4 - Execute immediate authenticated persona acceptance",
+          "why_it_matters": "The acceptance procedure is recovered verbatim from a runbook written for the web27 pair, and the plan asserts its acceptance requirements 'remain applicable' without a step that checks each of the 31 feature steps against behavior D03–05 deliberately changed (autosave, stale-tab, translation backfill, audit pagination are all in the repaired areas). A step that fails because the UI or API contract legitimately moved will be indistinguishable from a product defect, and the plan's rule that a release-blocking defect triggers a bounded repair and a fresh pair would then invalidate in-flight U5 timers for a non-defect. A short currency reconciliation in U4's preflight, marking superseded steps with their D03–05 replacement and provenance, keeps the 26-item matrix intact while preventing false repairs.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Add to U4's Approach: 'Before executing, reconcile each S0190 feature step against the D03–05 change set; where the candidate intentionally changed the interaction, record the superseded step, its replacement and the source commit in d02-persona-acceptance.md so a divergence is classified as superseded-step versus defect before any bounded repair is opened.'",
+          "confidence": 50,
+          "evidence": [
+            "Its earlier permission gates are superseded by current authorization; its acceptance requirements remain applicable.",
+            "recover S0190's procedure into the former with provenance and current authorization annotation.",
+            "A discovered release-blocking product defect receives a bounded repair and fresh affected acceptance."
+          ]
+        }
+      ],
+      "residual_risks": [
+        "KTD5 requires identity repair through 'an existing authorized admin path' and rules out root SSH as authority, but the Problem Frame says login itself is unhealthy. If the invalid credential is the sole admin PAT/service account, the plan's own rules leave no permitted recovery route; U1 names this only as a blocker, and since every unit after U3 depends on real sign-in, that blocker stalls B02 and B03 entirely rather than 'only dependent mutations'.",
+        "The natural-time lifecycle needs someone to act at specific UTC points (resolve HUMAN-B's objection after the original deadline, observe sweeps, cancel before the 96-hour retention expires). The Goal Capsule assigns observation to the executing agent, which cannot persist between sittings; if no human or scheduled owner is bound to the register, KTD7's 'ownership cannot persist' branch will fire on each attempt and B03 will never close."
+      ],
+      "deferred_questions": [
+        "Who is the continuation owner for the run-owned timers across the multi-day observation window, and what check-in cadence (in UTC) does that owner commit to so HUMAN-B's objection is resolved after its original deadline and before the 96-hour retention expires?"
+      ]
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "cross_model_route": "claude",
+      "cross_model_target": "claude",
+      "cross_model_harness": "claude",
+      "serving_family": "claude",
+      "independence_verified": true,
+      "model_requested": "claude-opus-5",
+      "model_actual": "claude-opus-5",
+      "effort_requested": "high",
+      "findings": [
+        {
+          "title": "Named live defects have no unit that repairs them",
+          "severity": "P2",
+          "section": "Implementation Units — U2 Prepare matching host assets and migration / U3 Activate and prove the immutable DEV release",
+          "why_it_matters": "An implementer following U1–U3 will reach activation without any step that diagnoses and fixes the two defects the Problem Frame names: the API/worker file-permission restart loop and the unhealthy login. KTD5 (identity repair via supported administration) describes credential replacement and revocation, but U1 only implements its 'preflight' gate and U3 only proves 'running identity'; no unit executes the replacement, and nothing assigns root-causing the permission error, which a fresh deployment will not fix if it lives in host volume ownership rather than shipped assets. Adding the repair steps to U2 (host assets, before candidate freeze) and U3 (identity, after U1's verified backup and before smoke) closes the gap without changing the KTDs, and keeps KTD3's backup-before-mutation ordering intact.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "In U2 Approach add: 'Diagnose the API/worker file-permission restart cause from the preflight observations; if it is host ownership/mode, correct it under the maintenance lock and record it in the recovery receipt; if it is shipped code/config, land its reviewed repair before candidate freeze.' In U3 Approach add: 'After U1's verified recovery set and before smoke, execute KTD5: diagnose issuer/Host/role versus expiry, replace only a proven-invalid required service credential through the supported admin path, verify consumers, and revoke the replaced credential; record nonsecret evidence in the activation receipt.'",
+          "confidence": 75,
+          "evidence": [
+            "API and worker restart on a file-permission error, login is unhealthy, and installed deployment assets differ from reviewed source.",
+            "**Approach:** Implement KTD2/KTD3/KTD5's preflight and backup gates.",
+            "Replace only a proven invalid required service credential through an existing authorized admin path, write it privately and atomically, verify consumers, then revoke the replaced credential.",
+            "B02 is complete when U1–U3 prove recovery, the protected immutable release, running identity, migration state, health, seed/write smoke and cleanup."
+          ]
+        },
+        {
+          "title": "Goal Capsule cites KTD1–KTD7 but plan defines KTD8",
+          "severity": "P3",
+          "section": "Goal Capsule — Means",
+          "why_it_matters": "Readers using the capsule as an index will conclude the plan has seven technical decisions and miss KTD8 (deliberate recovery after partial activation failure), which governs R3/R4 and is the only decision covering the deploy script's failure to stop started containers. The Planning Contract enumerates KTD1–KTD8, so the range is a stale count.",
+          "finding_type": "error",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Change 'run isolated authenticated acceptance (KTD1–KTD7)' to 'run isolated authenticated acceptance (KTD1–KTD8)'.",
+          "confidence": 75,
+          "evidence": [
+            "**Means:** Restore the existing environment, activate one immutable API/web pair, and run isolated authenticated acceptance (KTD1–KTD7).",
+            "KTD8. **Recover deliberately after partial failure.**"
+          ]
+        },
+        {
+          "title": "Lock handoff to approved workflow has no defined check",
+          "severity": "P3",
+          "section": "Planning Contract — KTD4 Use one controlled migration before normal startup / U2 verification scenarios",
+          "why_it_matters": "The operator must release the host deployment lock before approving the protected run, which opens a window in which any other deployment could take the lock first; the plan requires the operator to 'verify no competing deployment can take the handoff' but never says what evidence satisfies that. Naming the concrete check (exactly one pending dev-deploy run exists, the obsolete run remains canceled, no other manifest change is queued, and release/approval timestamps are recorded) lets U2's verification scenario be executed rather than asserted, and reuses U3's existing 'old canceled deployment stays canceled' evidence.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "In U2 verification scenarios, replace 'The operator releases the actual deploy lock before workflow approval' with: 'Before releasing the deploy lock, the operator confirms exactly one pending dev-deploy run (the verified candidate) exists, the obsolete run remains canceled, and no other manifest change is queued; lock release and approval UTC timestamps are recorded in the recovery receipt.'",
+          "confidence": 50,
+          "evidence": [
+            "then release that lock before approving the verified workflow; verify no competing deployment can take the handoff.",
+            "The operator releases the actual deploy lock before workflow approval; a failed activation is followed by verified writer shutdown, not inferred quiescence."
+          ]
+        }
+      ],
+      "residual_risks": [
+        "The 96-hour run-owned timer window (Assumptions) may be exhausted if HUMAN-B's objection resolution is delayed, since the objected suggestion needs a fresh full day after resolution; a late resolution forces cancel-and-restart under KTD7 and repeats U5 work.",
+        "KTD3 quiesces the identity service for the coordinated backup, so any KTD5 credential replacement must occur after restore verification; if the identity service cannot be brought back to a working same-version state without the replacement, U1's authenticated preflight checks cannot complete until that mutation, creating a circular dependency the plan does not address."
+      ],
+      "deferred_questions": [
+        "U4 uses 'three disposable authenticated roles and five contexts' while R5 forbids personal accounts as fixtures; the executing agent must decide whether the administrator context uses the operator's private admin access from U1 (non-disposable) or a fourth disposable account, and record that choice in the persona acceptance document."
+      ]
+    }
+  ],
+  "resolved_claims": [
+    {
+      "reviewer": "scope-guardian",
+      "title": "U5 silently expands into B10 implementation",
+      "disposition": "dismissed",
+      "reason": "The user-directed Key Decision requires bounded serial plans, R12 expressly continues independent work, and Scope Boundaries excludes counting manual D02 work as B10 automation. Continuing the independent deliverable does not transfer its implementation or acceptance into D02."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "title": "Recovery set and restored copies lack retention, deletion and access terms",
+      "disposition": "dismissed",
+      "reason": "KTD3 already requires restricted durable operator storage and isolated copies; the DoD prohibits abandoned credentials/state. Storage mechanism, retained ownership and removal of temporary restore copies are execution choices. A new encryption mechanism and arbitrary B02+14-day retention policy are not established requirements; general retention remains a separate deliverable. No proven contradictory instruction requires a plan edit."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "title": "Persona accounts and operator admin PAT not decommissioned at cleanup",
+      "disposition": "dismissed",
+      "reason": "R11/U4 register every run-created object and U6 verifies every created application object and session; DoD excludes abandoned fixtures/credentials. This includes disposable accounts and any temporary admin credential. KTD5 preserves necessary service credentials and revokes replaced ones, rather than requiring removal of valid pre-existing credentials. Competent execution can distinguish these without new scope."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "claim": "Most likely exploit if implemented as written: an orphaned disposable administrator persona account on DEV Zitadel remains valid after B03 closes and is reused or compromised; mitigation is account deactivation as a U6 gate (finding 2).",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "claim": "Highest impact: the coordinated recovery set contains live credential/config files and real DEV user identities; without an access list, encryption and destruction date it becomes a long-lived secondary copy of every DEV secret outside the rotation path B06 will later assume is complete (finding 1).",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "claim": "Most subtle: KTD8 keeps 'maintenance ingress restrictions' but no unit establishes them, so during the U2 maintenance window the public ingress may still reach a restart-looping older API; the plan's writer-quiescence gate mitigates data risk but the ingress posture during maintenance is undocumented and should be recorded in the recovery receipt.",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "claim": "Which storage location and access group constitutes 'restricted durable operator storage' for the recovery set, and is it encrypted at rest?",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "claim": "Are the disposable persona accounts created as Zitadel instance-level or project-scoped users, and does the 'administrator' persona require instance admin rights or only application admin rights?",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "title": "Live migration precedes any proof the candidate containers start",
+      "disposition": "dismissed",
+      "reason": "Existing preflight identifies the permission failure in copied pyproject.toml, not a mounted path; reviewed Dockerfile repairs its mode. U2 requires prerequisite repair and isolated migration proof, and U3 explicitly verifies health. The proposed worker startup on restored production queues conflicts with the isolated no-worker boundary; no observed unmitigated host-volume fault supports adding that requirement."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "title": "PROD_ENABLED containment ignores environment-scoped variable precedence",
+      "disposition": "dismissed",
+      "reason": "The current promote-prod workflow gates the entire job with jobs.promote.if vars.PROD_ENABLED before environment activation. Environment variables are unavailable to that job-level pre-run gate; KTD2 also requires reading the current workflow before merge. The claimed override path does not apply to the inspected workflow."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "title": "Migration-proof image not required to equal deployed image",
+      "disposition": "dismissed",
+      "reason": "The protected workflow builds the pinned source pair on the same host, migrations are repository source, and KTD4 explicitly requires proving no pending DDL at normal startup. Different image IDs alone do not demonstrate different migration files or concurrent DDL. Exact runtime image identities and heads remain required evidence."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "title": "S0190 steps assumed current for the D03–05 candidate",
+      "disposition": "dismissed",
+      "reason": "KTD6 requires recovering requirements with a complete trace matrix using supported current interfaces. D03 changes deployment assets, D04 mint accounting and D05 submission error mapping, not the listed autosave/translation UI contracts. No cited step is demonstrated obsolete; execution still maps steps to current interfaces."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "claim": "KTD5 requires identity repair through 'an existing authorized admin path' and rules out root SSH as authority, but the Problem Frame says login itself is unhealthy. If the invalid credential is the sole admin PAT/service account, the plan's own rules leave no permitted recovery route; U1 names this only as a blocker, and since every unit after U3 depends on real sign-in, that blocker stalls B02 and B03 entirely rather than 'only dependent mutations'.",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "claim": "The natural-time lifecycle needs someone to act at specific UTC points (resolve HUMAN-B's objection after the original deadline, observe sweeps, cancel before the 96-hour retention expires). The Goal Capsule assigns observation to the executing agent, which cannot persist between sittings; if no human or scheduled owner is bound to the register, KTD7's 'ownership cannot persist' branch will fire on each attempt and B03 will never close.",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "claim": "Who is the continuation owner for the run-owned timers across the multi-day observation window, and what check-in cadence (in UTC) does that owner commit to so HUMAN-B's objection is resolved after its original deadline and before the 96-hour retention expires?",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "title": "Named live defects have no unit that repairs them",
+      "disposition": "dismissed",
+      "reason": "The referenced preflight record identifies pyproject.toml mode600; D03 already repairs Docker COPY mode and deployment umask. U2 explicitly applies prerequisite repairs, KTD5 prescribes supported identity repair and U3 requires health before acceptance. The peer could not inspect repository references and wrongly assumes no existing repair."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "title": "Goal Capsule cites KTD1–KTD7 but plan defines KTD8",
+      "disposition": "dismissed",
+      "reason": "The Means line describes the success path, not an exhaustive count of decisions. U2 explicitly cites KTD8 and requires failure shutdown. No missed recovery outcome is demonstrated by the abbreviated capsule citation."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "title": "Lock handoff to approved workflow has no defined check",
+      "disposition": "dismissed",
+      "reason": "KTD4 explicitly requires proving no competing deployment can take the handoff; U3 names the verified new run and canceled obsolete run. Checking pending runs and recording timestamps are direct operational execution details, not unavailable essential information."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "claim": "The 96-hour run-owned timer window (Assumptions) may be exhausted if HUMAN-B's objection resolution is delayed, since the objected suggestion needs a fresh full day after resolution; a late resolution forces cancel-and-restart under KTD7 and repeats U5 work.",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "claim": "KTD3 quiesces the identity service for the coordinated backup, so any KTD5 credential replacement must occur after restore verification; if the identity service cannot be brought back to a working same-version state without the replacement, U1's authenticated preflight checks cannot complete until that mutation, creating a circular dependency the plan does not address.",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "claim": "U4 uses 'three disposable authenticated roles and five contexts' while R5 forbids personal accounts as fixtures; the executing agent must decide whether the administrator context uses the operator's private admin access from U1 (non-disposable) or a fourth disposable account, and record that choice in the persona acceptance document.",
+      "disposition": "dismissed",
+      "reason": "Already governed by KTD3/KTD5/KTD7 and U1/U4/U6: credential capabilities are checked before dependent mutation; maintenance quiescence is explicit; timer ownership and cancellation are mandatory; account roles/storage and cleanup are executable choices. This restates an existing gate or an unproven failure and requires no new user decision."
+    }
+  ],
+  "fixes_applied": 0,
+  "proposed_fixes_count": 0,
+  "decisions_count": 0,
+  "fyi_count": 0,
+  "remaining_findings": [],
+  "plan_handoff": "ready for U1; runtime gates remain execution obligations, not passed observations"
+}

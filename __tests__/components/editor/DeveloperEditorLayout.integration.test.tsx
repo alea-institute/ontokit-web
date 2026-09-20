@@ -12,7 +12,9 @@ vi.mock("next-auth/react", () => ({ useSession: () => ({ data: null, status: "un
 vi.mock("next/dynamic", () => ({ default: (loader: () => unknown) => {
   if (!String(loader).includes("OntologySourceEditor")) return function GraphBoundary() { return <div>Browser graph boundary</div>; };
   return function SourceBoundary(props: { initialValue: string; onScrollComplete: () => void }) {
-    return <div><pre>{props.initialValue}</pre><button onClick={props.onScrollComplete}>Finish source scroll</button></div>;
+    // Match OntologySourceEditor: initialValue seeds local state only at mount.
+    const [value] = React.useState(props.initialValue);
+    return <div><pre data-testid="source-value">{value}</pre><button onClick={props.onScrollComplete}>Finish source scroll</button></div>;
   };
 } }));
 beforeEach(() => { useSelectionStore.getState().clear(); useSuggestionStore.getState().clearAllSuggestions(); vi.stubGlobal("fetch", layoutFetch()); });
@@ -57,6 +59,33 @@ describe("developer layout real tree/detail integration", () => {
     fireEvent.mouseEnter(sourceTab); fireEvent.mouseLeave(sourceTab); fireEvent.mouseEnter(sourceTab);
     expect(p.loadSourceContent).toHaveBeenCalledTimes(1);
     expect(p.loadSourceContent).toHaveBeenCalledWith(true);
+  });
+
+  it("waits for a hovered source request before mounting the editor", async () => {
+    let resolveSource!: (content: string) => void;
+    const request = new Promise<string>(resolve => { resolveSource = resolve; });
+    const load = vi.fn();
+    function DeferredSource() {
+      const [sourceContent, setSourceContent] = React.useState("");
+      const [isPreloading, setIsPreloading] = React.useState(false);
+      const loadSourceContent = React.useCallback(async (isPreload?: boolean) => {
+        load(isPreload);
+        setIsPreloading(true);
+        setSourceContent(await request);
+        setIsPreloading(false);
+      }, []);
+      return <DeveloperEditorLayout {...props({ sourceContent, setSourceContent, isPreloading, loadSourceContent })} />;
+    }
+    render(<LayoutProviders><DeferredSource /></LayoutProviders>);
+    const sourceTab = screen.getByRole("button", { name: "Source" });
+    fireEvent.mouseEnter(sourceTab);
+    fireEvent.click(sourceTab);
+    expect(screen.getByText("Loading source...")).toBeDefined();
+    expect(screen.queryByTestId("source-value")).toBeNull();
+    await act(async () => { resolveSource("Loaded branch source"); await request; });
+    expect(screen.getByTestId("source-value").textContent).toBe("Loaded branch source");
+    expect(load).toHaveBeenCalledExactlyOnceWith(true);
+    expect(screen.queryByText("Loading source...")).toBeNull();
   });
 
   it("lets an error be retried and completes source scrolling through the editor boundary", () => {

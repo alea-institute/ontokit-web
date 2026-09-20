@@ -1,0 +1,326 @@
+{
+  "status": "complete",
+  "plan_path": "docs/plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md",
+  "unit": "U1 recovery follow-up",
+  "requirements": [
+    "R1",
+    "R2",
+    "R9"
+  ],
+  "review": "docs/releases/d06-web-review.json",
+  "review_run_id": "20260920-d06-final-c99b56f0",
+  "automatic_apply": "No eligible LFG step5 fixes: both confidence75/manual with one independent reviewer; validator confirmation and parent reproduction are not relabeled cross-persona agreement.",
+  "resolution_route": "Bounded CE-work return-to-caller under existing U1/R9 and plan requirement to resolve actionable findings before publication; no new product decision.",
+  "worker": "/root/d06_recovery_repair",
+  "ownership": [
+    "scripts/e2e/cleanup.mjs",
+    "scripts/e2e/diagnostics.mjs",
+    "scripts/e2e/ownership.test.mjs",
+    "scripts/e2e/diagnostics.test.mjs",
+    "scripts/e2e/README.md"
+  ],
+  "pre_fix_reproduction": {
+    "recycledIdentityCleanup": "Host process is not a run supervisor; refusing cleanup",
+    "unrelatedProcessPreserved": true,
+    "ownedDescendantStillAlive": true,
+    "incompleteDiagnosticStartup": "ENOENT",
+    "actual_os_pid_reuse_forced": false,
+    "incidence_measured": false
+  },
+  "post_fix_verification": {
+    "focused_command": "npm run test:e2e:ownership",
+    "focused_tests": {
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0
+    },
+    "lint": {
+      "errors": 0,
+      "existing_warnings": 19
+    },
+    "type_check": "passed",
+    "unit_suite": {
+      "files_passed": 365,
+      "tests_passed": 5223
+    },
+    "real_recycled_identity_cleanup": {
+      "run": "8a801d0f5f98af4b613cc31fd33ffe3c",
+      "scenario": "obsolete process identity with real Docker/private runtime cleanup",
+      "constructedStaleIdentity": true,
+      "actualOsPidReuseForced": false,
+      "unrelatedProcessPreserved": true,
+      "ownedDescendantRemoved": true,
+      "ownedContainerNetworkVolumeRemoved": true,
+      "privateRuntimeAndManifestRemoved": true
+    },
+    "neighbor_identities_preserved": true,
+    "lifecycle_probes": [
+      {
+        "case": "setup-failure",
+        "run_id": "b5d71420a6811b93cf371d618e94a392",
+        "exit_code": 1,
+        "seconds": 26.7,
+        "observed_owned_browser_processes": 0,
+        "cleanup_verified": true,
+        "neighbor_identities_preserved": true,
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+            "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+          }
+        }
+      },
+      {
+        "case": "sigint",
+        "run_id": "550d29dc1da1c365c8cfcb9312cdbb5c",
+        "exit_code": 130,
+        "seconds": 33.3,
+        "observed_owned_browser_processes": 0,
+        "cleanup_verified": true,
+        "neighbor_identities_preserved": true,
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+            "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+          }
+        }
+      },
+      {
+        "case": "sigterm",
+        "run_id": "e78a89c0eeb451f389dd8a6fcc839c33",
+        "exit_code": 130,
+        "seconds": 30.9,
+        "observed_owned_browser_processes": 0,
+        "cleanup_verified": true,
+        "neighbor_identities_preserved": true,
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+            "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+          }
+        }
+      },
+      {
+        "case": "hard-interruption-browser",
+        "run_id": "87b576c6038956d3f41842c47f909a12",
+        "exit_code": -9,
+        "seconds": 92.8,
+        "observed_owned_browser_processes": 1,
+        "cleanup_verified": true,
+        "neighbor_identities_preserved": true,
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+            "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+          }
+        }
+      }
+    ],
+    "closure": "docs/releases/d06-recovery-fix-closure.json",
+    "full_workflow_acceptance": {
+      "runs": [
+        "86bbc69dea452ba371f10cbe4a27e684",
+        "a1b6d164d289a2e630b5be6ebc565baa"
+      ],
+      "passed_each": 21,
+      "skipped_each": 0,
+      "failed_each": 0,
+      "source_fingerprints_equal": true,
+      "cleanup_each": "complete",
+      "neighbors_preserved_each": true
+    },
+    "late_workflow_failure": {
+      "run": "76e0dce7b389f04ba6fe976e143e22af",
+      "scenario": "injected failure after21passed workflow and native page check",
+      "exit_code": 1,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true,
+      "private_diagnostics_complete": true,
+      "private_modes_verified": true,
+      "expiry_one_hour_verified": true,
+      "diagnostics_removed_after_verification": true,
+      "raw_log_printed": false,
+      "receipt": {
+        "version": 1,
+        "run": "76e0dce7b389f04ba6fe976e143e22af",
+        "startedAt": "2026-09-20T22:42:41.304Z",
+        "finishedAt": "2026-09-20T22:46:44.343Z",
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "59004edd2e95b5ee7c26a0c907f5c1c9105bb795",
+            "sha256": "46750bd24381769f07c5cc0c9f1343da267087366180c05a421384e7b20e7afd"
+          }
+        },
+        "images": [],
+        "migrationHeads": [
+          "i7j8k9l0m1n2"
+        ],
+        "tests": {
+          "passed": 21,
+          "skipped": 0,
+          "failed": 0,
+          "flaky": 0,
+          "mandatory": [
+            {
+              "file": "api/branches.spec.ts",
+              "title": "branch edits persist independently of the target branch",
+              "project": "chromium"
+            },
+            {
+              "file": "api/branches.spec.ts",
+              "title": "stale branch revision is rejected without changing source or target",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "absent project write returns stable 404 and creates nothing",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "schema-invalid project create returns validation locations and creates nothing",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "anonymous source write is rejected without changing owner state",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "unrelated source write is rejected without changing owner state",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "invalid Turtle source write is rejected without changing owner state",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "invalid schema source write is rejected without changing owner state",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "malformed Turtle import leaves no partial project",
+              "project": "chromium"
+            },
+            {
+              "file": "api/errors.spec.ts",
+              "title": "malformed multipart import leaves no partial project",
+              "project": "chromium"
+            },
+            {
+              "file": "api/ontology.spec.ts",
+              "title": "import initializes persisted source, branch, class and property labels",
+              "project": "chromium"
+            },
+            {
+              "file": "api/ontology.spec.ts",
+              "title": "source save persists a new immutable revision",
+              "project": "chromium"
+            },
+            {
+              "file": "api/projects.spec.ts",
+              "title": "project create, list, read, update and delete persist through HTTP",
+              "project": "chromium"
+            },
+            {
+              "file": "api/pull-requests.spec.ts",
+              "title": "ordinary owner reviews a diff and merges persisted branch content into the target",
+              "project": "chromium"
+            },
+            {
+              "file": "api/search-lint.spec.ts",
+              "title": "lexical search reflects the saved target revision and excludes nonmatching entities",
+              "project": "chromium"
+            },
+            {
+              "file": "api/search-lint.spec.ts",
+              "title": "each lint enqueue produces a fresh completed persisted worker run with deterministic issues",
+              "project": "chromium"
+            },
+            {
+              "file": "auth-foundation.spec.ts",
+              "title": "real owner and unrelated sessions authenticate protected API reads",
+              "project": "chromium"
+            },
+            {
+              "file": "auth-foundation.spec.ts",
+              "title": "anonymous context has no identity and cannot access a protected API read",
+              "project": "chromium"
+            },
+            {
+              "file": "browser/ontology-workflow.spec.ts",
+              "title": "fresh UI sign-in imports, edits, reviews and merges a label that survives target reload",
+              "project": "chromium"
+            },
+            {
+              "file": "stack.setup.ts",
+              "title": "genuine OIDC sessions for two fresh ordinary users",
+              "project": "stack setup"
+            },
+            {
+              "file": "stack.teardown.ts",
+              "title": "remove private browser credentials",
+              "project": "stack teardown"
+            }
+          ]
+        },
+        "workflowPassed": false,
+        "cleanup": "complete",
+        "acceptedRun": false
+      }
+    }
+  },
+  "publication": "not pushed; web PR not created",
+  "worker_evidence": {
+    "behavior_changed": true,
+    "existing_tests_inspected": [
+      "scripts/e2e/ownership.test.mjs",
+      "scripts/e2e/diagnostics.test.mjs"
+    ],
+    "tests_changed": [
+      "scripts/e2e/ownership.test.mjs",
+      "scripts/e2e/diagnostics.test.mjs"
+    ],
+    "red": {
+      "passed": 18,
+      "failed": 10,
+      "additional_unreadable_failures": 2
+    },
+    "post_fix": {
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0
+    },
+    "controlled_hard_kill": "Actual publisher child killed at intercepted filesystem metadata-write boundary; no production test hook.",
+    "limits": "No actual operating-system PID recycling forced; stale identity tuples constructed; incidence unmeasured."
+  },
+  "resolved_findings": [
+    1,
+    2
+  ],
+  "canonical_commit": "59004edd2e95b5ee7c26a0c907f5c1c9105bb795"
+}

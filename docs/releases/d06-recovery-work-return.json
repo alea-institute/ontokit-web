@@ -1,0 +1,294 @@
+{
+  "status": "complete",
+  "plan_path": "docs/plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md",
+  "changed_files": [
+    "scripts/e2e/cleanup.mjs",
+    "scripts/e2e/diagnostics.mjs",
+    "scripts/e2e/ownership.test.mjs",
+    "scripts/e2e/diagnostics.test.mjs",
+    "scripts/e2e/README.md",
+    "docs/releases/d06-recovery-repair.json",
+    "docs/releases/d06-recovery-fix-closure.json"
+  ],
+  "u_ids_attempted": [
+    "U1"
+  ],
+  "u_ids_completed": [
+    "U1"
+  ],
+  "verification_results": {
+    "focused_command": "npm run test:e2e:ownership",
+    "focused_tests": {
+      "passed": 34,
+      "failed": 0,
+      "skipped": 0
+    },
+    "lint": {
+      "errors": 0,
+      "existing_warnings": 19
+    },
+    "type_check": "passed",
+    "unit_suite": {
+      "files_passed": 365,
+      "tests_passed": 5223
+    },
+    "real_recycled_identity_cleanup": {
+      "run": "8a801d0f5f98af4b613cc31fd33ffe3c",
+      "scenario": "obsolete process identity with real Docker/private runtime cleanup",
+      "constructedStaleIdentity": true,
+      "actualOsPidReuseForced": false,
+      "unrelatedProcessPreserved": true,
+      "ownedDescendantRemoved": true,
+      "ownedContainerNetworkVolumeRemoved": true,
+      "privateRuntimeAndManifestRemoved": true
+    },
+    "neighbor_identities_preserved": true,
+    "lifecycle_probes": [
+      {
+        "case": "setup-failure",
+        "run_id": "b5d71420a6811b93cf371d618e94a392",
+        "exit_code": 1,
+        "seconds": 26.7,
+        "observed_owned_browser_processes": 0,
+        "cleanup_verified": true,
+        "neighbor_identities_preserved": true,
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+            "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+          }
+        }
+      },
+      {
+        "case": "sigint",
+        "run_id": "550d29dc1da1c365c8cfcb9312cdbb5c",
+        "exit_code": 130,
+        "seconds": 33.3,
+        "observed_owned_browser_processes": 0,
+        "cleanup_verified": true,
+        "neighbor_identities_preserved": true,
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+            "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+          }
+        }
+      },
+      {
+        "case": "sigterm",
+        "run_id": "e78a89c0eeb451f389dd8a6fcc839c33",
+        "exit_code": 130,
+        "seconds": 30.9,
+        "observed_owned_browser_processes": 0,
+        "cleanup_verified": true,
+        "neighbor_identities_preserved": true,
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+            "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+          }
+        }
+      },
+      {
+        "case": "hard-interruption-browser",
+        "run_id": "87b576c6038956d3f41842c47f909a12",
+        "exit_code": -9,
+        "seconds": 92.8,
+        "observed_owned_browser_processes": 1,
+        "cleanup_verified": true,
+        "neighbor_identities_preserved": true,
+        "sources": {
+          "api": {
+            "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+            "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+          },
+          "web": {
+            "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+            "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+          }
+        }
+      }
+    ],
+    "closure": "docs/releases/d06-recovery-fix-closure.json",
+    "full_workflow_acceptance": "post-repair late failure and repeatability gates pending"
+  },
+  "verification_evidence": [
+    {
+      "unit": "U1",
+      "task": "recovery follow-up for final review findings1/2",
+      "behavior_changed": true,
+      "existing_tests_inspected": [
+        "scripts/e2e/ownership.test.mjs",
+        "scripts/e2e/diagnostics.test.mjs"
+      ],
+      "tests_added_or_changed": [
+        "scripts/e2e/ownership.test.mjs",
+        "scripts/e2e/diagnostics.test.mjs"
+      ],
+      "tests_used_unchanged": [
+        "existing matching-but-unverifiable supervisor refusal",
+        "Docker dual-label ownership",
+        "confined recovery and repeated cleanup",
+        "valid retention expiry boundary"
+      ],
+      "red_failure_observed": {
+        "passed": 18,
+        "failed": 10,
+        "additional_unreadable_failures": 2
+      },
+      "verification_commands_results": {
+        "focused_command": "npm run test:e2e:ownership",
+        "focused_tests": {
+          "passed": 34,
+          "failed": 0,
+          "skipped": 0
+        },
+        "lint": {
+          "errors": 0,
+          "existing_warnings": 19
+        },
+        "type_check": "passed",
+        "unit_suite": {
+          "files_passed": 365,
+          "tests_passed": 5223
+        },
+        "real_recycled_identity_cleanup": {
+          "run": "8a801d0f5f98af4b613cc31fd33ffe3c",
+          "scenario": "obsolete process identity with real Docker/private runtime cleanup",
+          "constructedStaleIdentity": true,
+          "actualOsPidReuseForced": false,
+          "unrelatedProcessPreserved": true,
+          "ownedDescendantRemoved": true,
+          "ownedContainerNetworkVolumeRemoved": true,
+          "privateRuntimeAndManifestRemoved": true
+        },
+        "neighbor_identities_preserved": true,
+        "lifecycle_probes": [
+          {
+            "case": "setup-failure",
+            "run_id": "b5d71420a6811b93cf371d618e94a392",
+            "exit_code": 1,
+            "seconds": 26.7,
+            "observed_owned_browser_processes": 0,
+            "cleanup_verified": true,
+            "neighbor_identities_preserved": true,
+            "sources": {
+              "api": {
+                "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+                "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+              },
+              "web": {
+                "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+                "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+              }
+            }
+          },
+          {
+            "case": "sigint",
+            "run_id": "550d29dc1da1c365c8cfcb9312cdbb5c",
+            "exit_code": 130,
+            "seconds": 33.3,
+            "observed_owned_browser_processes": 0,
+            "cleanup_verified": true,
+            "neighbor_identities_preserved": true,
+            "sources": {
+              "api": {
+                "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+                "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+              },
+              "web": {
+                "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+                "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+              }
+            }
+          },
+          {
+            "case": "sigterm",
+            "run_id": "e78a89c0eeb451f389dd8a6fcc839c33",
+            "exit_code": 130,
+            "seconds": 30.9,
+            "observed_owned_browser_processes": 0,
+            "cleanup_verified": true,
+            "neighbor_identities_preserved": true,
+            "sources": {
+              "api": {
+                "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+                "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+              },
+              "web": {
+                "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+                "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+              }
+            }
+          },
+          {
+            "case": "hard-interruption-browser",
+            "run_id": "87b576c6038956d3f41842c47f909a12",
+            "exit_code": -9,
+            "seconds": 92.8,
+            "observed_owned_browser_processes": 1,
+            "cleanup_verified": true,
+            "neighbor_identities_preserved": true,
+            "sources": {
+              "api": {
+                "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+                "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+              },
+              "web": {
+                "revision": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+                "sha256": "72e5071699fe2559578dda70557f6d64b6342cb10aba422c2a5538f62e32d87c"
+              }
+            }
+          }
+        ],
+        "closure": "docs/releases/d06-recovery-fix-closure.json",
+        "full_workflow_acceptance": "post-repair late failure and repeatability gates pending"
+      },
+      "exception_reason": null,
+      "worker": "/root/d06_recovery_repair"
+    }
+  ],
+  "implementation_engine_binding": null,
+  "requested_route": "native Codex subagent",
+  "actual_route": "native Codex subagent via collaboration.spawn_agent",
+  "requested_model": null,
+  "actual_model": "unverified",
+  "requested_effort": null,
+  "fallback_reason": null,
+  "run_id": null,
+  "source_kind": "plan",
+  "source_digest": "faef05f5c23c945314a84b955a01d162c7193b1e1e513be210b2be10b71888bc",
+  "unit_receipts": [
+    {
+      "unit": "U1",
+      "worker": "/root/d06_recovery_repair",
+      "route": "native Codex subagent",
+      "requested_model": null,
+      "actual_model": "unverified",
+      "detached_process": null,
+      "integration": "parent inspected actual five-path code/doc diff and matched closure fingerprints",
+      "verification": "parent34focused/5223unit tests;lint/typecheck;real Docker stale-identity recovery;setup/INT/TERM/live-browser hard-kill recovery passed",
+      "canonical_commit": "59004edd2e95b5ee7c26a0c907f5c1c9105bb795",
+      "cleanup": "worker fixtures removed;parent owned resources removed and neighbors preserved",
+      "worker_lifecycle": "completed and integrated; handle retired"
+    }
+  ],
+  "plan_checkpoint": null,
+  "blockers": [],
+  "recovery_path": null,
+  "settled_decision_conflicts": [],
+  "behavior_change": true,
+  "standalone_shipping_skipped": true
+}

@@ -1,0 +1,57 @@
+{
+  "unit": "U3",
+  "status": "complete",
+  "requirements": [
+    "R4",
+    "R7"
+  ],
+  "behavior_changed": false,
+  "evidence_strategy": "Characterization tests against existing HTTP routes and schema; no production change or pre-implementation red claimed",
+  "files": [
+    "e2e/fixtures/tiny-ontology.ttl",
+    "e2e/fixtures/projects.ts",
+    "e2e/api/projects.spec.ts",
+    "e2e/api/ontology.spec.ts",
+    "e2e/api/errors.spec.ts"
+  ],
+  "run": {
+    "id": "e2a9b56af512d7a2bae80b5f12143ee6",
+    "exit_code": 0,
+    "passed": 15,
+    "new_tests": 11,
+    "skipped": 0,
+    "failed": 0,
+    "cleanup_verified": true,
+    "neighbor_identities_preserved": true
+  },
+  "sources": {
+    "api": {
+      "revision": "4d17d9496378ff7602c9ae3ee4c3419f2c065da0",
+      "sha256": "ec46d16fe4078a58c8d858357ebf062b9f4a5ac08db12310aba225b37c8ae725"
+    },
+    "web": {
+      "revision": "19c40e861fa94365c225c923b50b88e2809af1a6",
+      "sha256": "3bfaf4ec7347f7de3649972a8f65b2c577a7b47e945524193005ebfc7980e226",
+      "staged_u3_files_included": true
+    }
+  },
+  "verification": {
+    "type_check": "passed",
+    "targeted_eslint": "passed",
+    "whitespace": "passed",
+    "production_build": "passed in fresh isolated source copy"
+  },
+  "contracts": [
+    "Project CRUD and exact-ID cleanup",
+    "Import initializes persisted Git source and main branch",
+    "Class hierarchy and object/data property labels read through supported project routes",
+    "Revision-aware source save changes commit and persists bytes",
+    "401, 403, Turtle422 and schema422 rejected source writes preserve source, commit and metadata",
+    "Absent project update404 and invalid project create422 leave owner ID list unchanged",
+    "Invalid Turtle and missing multipart file422 imports leave owner ID list unchanged"
+  ],
+  "limitations": [
+    "U4-U6 and final review/publication remain incomplete",
+    "No hosted DEV acceptance or B11-B13 completion claimed"
+  ]
+}

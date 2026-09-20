@@ -1,0 +1,91 @@
+{
+  "unit": "U1",
+  "status": "complete",
+  "requirements": [
+    "R1",
+    "R2",
+    "R9"
+  ],
+  "scope": "Disposable lifecycle only; authentication and full-stack acceptance remain pending",
+  "api_commit": "4d17d949",
+  "behavior_changed": true,
+  "focused_tests": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0
+  },
+  "checks": [
+    "Harness ESLint passed",
+    "git diff --check passed",
+    "Missing API checkout rejected before provisioning",
+    "Fresh migrations reached every repository head",
+    "API image non-root imports and 50 migration files passed"
+  ],
+  "red_evidence": [
+    "Initial missing harness module",
+    "Detached child cleanup regression",
+    "Supervisor pre-registration disconnect regression",
+    "Hold process exited before INT/TERM; fixed with referenced abortable timer",
+    "API image package directory mode 0644 blocked non-root imports; fixed by pre-creating directory"
+  ],
+  "live_probes": [
+    {
+      "case": "setup-failure",
+      "run_id": "f5d48b5807a97d0b592ba8b06bb824bf",
+      "exit_code": 1,
+      "seconds": 31.2,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true
+    },
+    {
+      "case": "late-failure",
+      "run_id": "9cc5820395d9acf74e143d9f859a045c",
+      "exit_code": 1,
+      "seconds": 41.8,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true
+    },
+    {
+      "case": "sigint",
+      "run_id": "4509e6220cab013add68d8e289773cb4",
+      "exit_code": 130,
+      "seconds": 47.0,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true
+    },
+    {
+      "case": "sigterm",
+      "run_id": "bf53170bb98b7a714879a7eb3379055f",
+      "exit_code": 130,
+      "seconds": 48.5,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true
+    },
+    {
+      "case": "hard-interruption",
+      "run_id": "769d7f6432f1c17fb92e5808429bb70f",
+      "exit_code": -9,
+      "seconds": 51.6,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true
+    },
+    {
+      "case": "normal-success",
+      "run_id": "3a8822fbebb7b7e4e543cd36138a329f",
+      "exit_code": 0,
+      "cleanup_verified": true,
+      "neighbor_identities_preserved": true
+    }
+  ],
+  "isolation_baseline": {
+    "containers": 18,
+    "volumes": 25,
+    "networks": 11
+  },
+  "hard_recovery": "SIGKILL launcher after migrations, remove only its private runtime directory, recover using durable manifest; all owned resources removed",
+  "implementation_notes": [
+    "Focused Node subprocess tests replace proposed Vitest wrapper to exercise process ownership directly",
+    "Runtime CI smoke and API Dockerfile repair committed separately",
+    "No hosted deployment or identity access is claimed"
+  ]
+}
