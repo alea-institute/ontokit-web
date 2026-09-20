@@ -1,0 +1,97 @@
+# All substitutions come from the private generated runtime.env, never developer .env.
+x-labels: &labels
+  io.ontokit.e2e.run: ${RUN_ID:?}
+x-api: &api
+  image: ${PROJECT:?}/api:run
+  labels: *labels
+  environment: &api-env
+    APP_ENV: staging
+    DEBUG: "false"
+    RUN_MIGRATIONS: "0"
+    AUTH_MODE: required
+    SECRET_KEY: ${APP_SECRET:?}
+    DATABASE_URL: postgresql+asyncpg://ontokit:${APP_DB_PASSWORD:?}@postgres:5432/ontokit
+    REDIS_URL: redis://redis:6379/0
+    MINIO_ENDPOINT: minio:9000
+    MINIO_ACCESS_KEY: ${MINIO_USER:?}
+    MINIO_SECRET_KEY: ${MINIO_PASSWORD:?}
+    MINIO_BUCKET: ontokit
+    MINIO_SECURE: "false"
+    GIT_REPOS_BASE_PATH: /data/repos
+    ZITADEL_ISSUER: http://localhost:${IDENTITY_PORT:?}
+    ZITADEL_INTERNAL_URL: http://zitadel:${IDENTITY_PORT:?}
+    CORS_ORIGINS: '["http://localhost:${WEB_PORT:?}"]'
+    FRONTEND_URL: http://localhost:${WEB_PORT:?}
+  volumes: [git:/data/repos]
+  networks: [data, ingress]
+services:
+  postgres:
+    image: pgvector/pgvector@sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38
+    labels: *labels
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      ZITADEL_DB_PASSWORD: ${IDENTITY_DB_PASSWORD:?}
+      ONTOKIT_DB_PASSWORD: ${APP_DB_PASSWORD:?}
+    volumes: [postgres:/var/lib/postgresql/data, "./init-db.sh:/docker-entrypoint-initdb.d/init-db.sh:ro"]
+    networks: [data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -h 127.0.0.1 -U postgres -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+  redis:
+    image: redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    labels: *labels
+    networks: [data]
+    volumes: [redis:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  minio:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    labels: *labels
+    command: [server, /data]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:?}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:?}
+    networks: [data]
+    volumes: [minio:/data]
+    healthcheck:
+      test: [CMD, mc, ready, local]
+      interval: 2s
+      timeout: 3s
+      retries: 60
+  api:
+    <<: *api
+    build:
+      context: ./api
+      labels:
+        <<: *labels
+        com.docker.compose.project: ${PROJECT:?}
+    command: [uvicorn, ontokit.main:app, --host, 0.0.0.0, --port, "8000"]
+    ports: ["127.0.0.1:${API_PORT:?}:8000"]
+  migrate:
+    <<: *api
+    command: [python, -m, alembic, upgrade, heads]
+  worker:
+    <<: *api
+    command: [arq, ontokit.worker.WorkerSettings]
+    healthcheck:
+      disable: true
+networks:
+  data:
+    internal: true
+    labels: *labels
+  ingress:
+    labels: *labels
+volumes:
+  postgres:
+    labels: *labels
+  redis:
+    labels: *labels
+  minio:
+    labels: *labels
+  git:
+    labels: *labels
