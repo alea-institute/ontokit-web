@@ -35,9 +35,17 @@ export function UserSearchInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestRef = useRef(0);
+
+  const cancelSearch = useCallback(() => {
+    requestRef.current++;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+  }, []);
 
   const doSearch = useCallback(
-    async (searchQuery: string) => {
+    async (searchQuery: string, request: number) => {
+      if (request !== requestRef.current || disabled) return;
       if (searchQuery.length < 2) {
         setResults([]);
         setIsOpen(false);
@@ -51,21 +59,28 @@ export function UserSearchInput({
           searchQuery,
           10
         );
+        if (request !== requestRef.current) return;
         setResults(response.items);
         setIsOpen(response.items.length > 0);
         setHighlightIndex(-1);
       } catch {
+        if (request !== requestRef.current) return;
         setResults([]);
         setIsOpen(false);
       } finally {
-        setIsLoading(false);
+        if (request === requestRef.current) setIsLoading(false);
       }
     },
-    [token]
+    [token, disabled]
   );
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
+    cancelSearch();
+    const request = requestRef.current;
+    setResults([]);
+    setIsOpen(false);
+    setIsLoading(false);
     setQuery(val);
 
     // Clear selection if user modifies input
@@ -74,16 +89,14 @@ export function UserSearchInput({
       onClear();
     }
 
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
     debounceRef.current = setTimeout(() => {
-      doSearch(val);
+      doSearch(val, request);
     }, 300);
   };
 
   const handleSelect = (user: UserSearchResult) => {
+    cancelSearch();
+    setIsLoading(false);
     setSelectedUser(user);
     setQuery(user.display_name || user.username);
     setIsOpen(false);
@@ -92,6 +105,8 @@ export function UserSearchInput({
   };
 
   const handleClear = () => {
+    cancelSearch();
+    setIsLoading(false);
     setQuery("");
     setSelectedUser(null);
     setResults([]);
@@ -141,14 +156,14 @@ export function UserSearchInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Cleanup debounce on unmount
+  // A credential or enabled-state change invalidates both queued and active work.
   useEffect(() => {
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-    };
-  }, []);
+    cancelSearch();
+    setResults([]);
+    setIsOpen(false);
+    setIsLoading(false);
+    return cancelSearch;
+  }, [token, disabled, cancelSearch]);
 
   const isSelected = !!value && !!selectedUser;
 

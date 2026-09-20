@@ -268,6 +268,7 @@ export default function ProjectSettingsPage() {
     projectId,
     session?.accessToken,
     !!canManage,
+    session?.user?.id,
   );
   const trustByUserId = useMemo(
     () => new Map((memberTrustRows ?? []).map((row) => [row.user_id, row])),

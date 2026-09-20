@@ -10,9 +10,9 @@ const users = [
 const fetchBoundary = vi.fn<typeof fetch>();
 const response = (items = users) => new Response(JSON.stringify({ items, total: items.length }), { headers: { "Content-Type": "application/json" } });
 
-function Harness({ disabled = false }: { disabled?: boolean }) {
+function Harness({ disabled = false, token = 'coverage-token' }: { disabled?: boolean; token?: string }) {
   const [selected, setSelected] = useState("");
-  return <><output>{selected || "none"}</output><UserSearchInput value={selected} onSelect={setSelected} onClear={() => setSelected("")} token="coverage-token" disabled={disabled} /></>;
+  return <><output>{selected || "none"}</output><UserSearchInput value={selected} onSelect={setSelected} onClear={() => setSelected("")} token={token} disabled={disabled} /></>;
 }
 const input = () => screen.getByRole("textbox") as HTMLInputElement;
 async function search(query = "sample") {
@@ -21,6 +21,44 @@ async function search(query = "sample") {
 }
 
 describe("UserSearchInput through the real user settings API and client", () => {
+  it.each(['credentials', 'disabled'])('rejects pending results when %s change', async change => {
+    let finish!: (value: Response) => void;
+    fetchBoundary.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const view = render(<Harness />);
+    await search();
+    view.rerender(change === 'credentials' ? <Harness token="new-token" /> : <Harness disabled />);
+    await act(async () => finish(response()));
+    expect(screen.queryAllByRole('option')).toHaveLength(0);
+    expect(view.container.querySelector('.animate-spin')).toBeNull();
+    view.rerender(<Harness token="new-token" />);
+    await search('fresh');
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+  });
+
+  it('does not search after clearing during the debounce', async () => {
+    render(<Harness />);
+    fireEvent.change(input(), { target: { value: 'sample' } });
+    fireEvent.click(screen.getByRole('button'));
+    await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+    expect(fetchBoundary).not.toHaveBeenCalled();
+    expect(screen.queryByRole('option')).toBeNull();
+  });
+
+  it.each(['clear', 'new query'])('ignores an in-flight response after %s', async action => {
+    let finish!: (value: Response) => void;
+    fetchBoundary.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    render(<Harness />);
+    await search('sample');
+    if (action === 'clear') fireEvent.click(screen.getByRole('button'));
+    else fireEvent.change(input(), { target: { value: 'different' } });
+    await act(async () => finish(response()));
+    expect(screen.queryByRole('option')).toBeNull();
+    if (action === 'new query') {
+      await act(async () => { await vi.advanceTimersByTimeAsync(300); });
+      expect(screen.getAllByRole('option')).toHaveLength(2);
+    }
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
     fetchBoundary.mockReset().mockImplementation(async () => response());

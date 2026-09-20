@@ -40,6 +40,45 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe("ontology tree through the real API client", () => {
+  it('preserves a newer selection when an older navigation completes', async () => {
+    const { result } = await loadedTree();
+    let finish!: (value: Response) => void;
+    transport.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.navigateToNode(leaf); });
+    act(() => result.current.selectNode(sibling));
+    await act(async () => { finish(response([node(root)])); await pending; });
+    expect(result.current.selectedIri).toBe(sibling);
+    expect(transport).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([200, 403])('ignores obsolete root results with status %s after changing branch', async status => {
+    let finish!: (value: Response) => void;
+    transport.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const { result, rerender } = renderHook(({ branch }) => useOntologyTree({ projectId: 'project', branchKey: branch }), { initialProps: { branch: 'old' } });
+    rerender({ branch: 'current' });
+    await waitFor(() => expect(result.current.nodes).toHaveLength(2));
+    await act(async () => finish(status === 200 ? response([node(leaf)], 1) : new Response('Old branch denied', { status })));
+    expect(result.current.nodes.map(n => n.iri)).toEqual([root, sibling]);
+    expect(result.current.totalClasses).toBe(4);
+    expect(result.current.error).toBeNull();
+  });
+
+  it.each(['children', 'ancestors'])('ignores obsolete %s work after changing branch', async kind => {
+    const { result, rerender } = renderHook(({ branch }) => useOntologyTree({ projectId: 'project', branchKey: branch }), { initialProps: { branch: 'old' } });
+    await waitFor(() => expect(result.current.nodes).toHaveLength(2));
+    let finish!: (value: Response) => void;
+    transport.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    let pending!: Promise<void>;
+    act(() => { pending = kind === 'children' ? result.current.expandNode(root) : result.current.navigateToNode(leaf); });
+    rerender({ branch: 'current' });
+    await waitFor(() => expect(result.current.nodes).toHaveLength(2));
+    await act(async () => { finish(response([node(child)])); await pending; });
+    expect(result.current.nodes[0].children).toEqual([]);
+    expect(result.current.selectedIri).toBeNull();
+    expect(transport).toHaveBeenCalledTimes(3);
+  });
+
   it("navigates a multi-level path using encoded IRIs, branch and authentication", async () => {
     const { result } = await expandedTree();
     expect(result.current.nodes[0].children[0].children[0].iri).toBe(leaf);

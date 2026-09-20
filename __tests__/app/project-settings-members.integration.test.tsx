@@ -89,12 +89,12 @@ describe('settings membership and join decisions through real UI and HTTP', () =
     fireEvent.click(ui.getByRole('menuitem', { name: /Grant trusted/ }));
     if (retry) {
       expect((await ui.findByRole('alert')).textContent).toBe('Trust decision refused');
-      expect(h.client.getQueryData(memberTrustQueryKeys.list('project'))).toMatchObject([{ trust_override: 'none' }]);
+      expect(h.client.getQueryData(memberTrustQueryKeys.list('project', 'owner'))).toMatchObject([{ trust_override: 'none' }]);
       h.fail(null);
       fireEvent.click(ui.getByRole('button', { name: /Trust status/ }));
       fireEvent.click(ui.getByRole('menuitem', { name: /Grant trusted/ }));
     }
-    await waitFor(() => expect(h.client.getQueryData(memberTrustQueryKeys.list('project'))).toMatchObject([{ user_id: 'admin', trust_override: 'granted', is_trusted: true }]));
+    await waitFor(() => expect(h.client.getQueryData(memberTrustQueryKeys.list('project', 'owner'))).toMatchObject([{ user_id: 'admin', trust_override: 'granted', is_trusted: true }]));
     expect(ui.getByText('Trusted (granted)')).toBeDefined();
     expect(ui.queryByRole('alert')).toBeNull();
     const writes = h.fetcher.mock.calls.filter(([url, init]) => String(url).endsWith('/trust/members/admin') && init?.method === 'PATCH');
