@@ -1,0 +1,47 @@
+{
+  "status": "verified-locally",
+  "check": "Semgrep/scan",
+  "invariant_key": "browser-pr-url-literal-project-prefix-numeric-id",
+  "ci_run": 35543325665,
+  "ci_job": 106164805032,
+  "rule": "javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp",
+  "pre_fix_head": "a8e3deefff3ec19a953841fb07a067cd3bc97ef9",
+  "pre_fix_tree": "clean",
+  "changed_source": "e2e/browser/ontology-workflow.spec.ts",
+  "cause": "An API-returned project ID was compiled as regular-expression syntax in the PR navigation assertion.",
+  "fix": "Compare the complete project path prefix literally and match only the remaining PR ID with a fixed anchored numeric expression.",
+  "verification": {
+    "url_boundaries": {
+      "cases": 9,
+      "before": "failed: project.1 incorrectly matched projectX1",
+      "after": "all passed",
+      "instrument": "Temporary script extracts and executes the actual toHaveURL predicate; not a duplicated matcher."
+    },
+    "targeted_eslint": "passed",
+    "full_stack_runs": [
+      "958b95380e5a7b7c6ab7bcabc75725be",
+      "b0892d17df681513835a7ac3c5e7a85f"
+    ],
+    "sources_identical": true,
+    "sources": {
+      "api": {
+        "revision": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+        "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+      },
+      "web": {
+        "revision": "a8e3deefff3ec19a953841fb07a067cd3bc97ef9",
+        "sha256": "a047bdeec9e18dff99323fdac1dd68bed956f32648fa62d6b6769eaeb7a46aed"
+      }
+    },
+    "tests_per_run": {
+      "passed": 21,
+      "skipped": 0,
+      "failed": 0,
+      "flaky": 0
+    },
+    "cleanup": "complete on both runs; no owned containers, volumes, networks, or images remained",
+    "neighbors": "All pre-existing container, volume, and network identities preserved after each run",
+    "semgrep": "Exact CI finding confirmed from job log; no local Semgrep installed. Remote CI must verify scanner after push."
+  },
+  "residuals": []
+}

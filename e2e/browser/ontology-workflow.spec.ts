@@ -67,7 +67,10 @@ test("fresh UI sign-in imports, edits, reviews and merges a label that survives 
   await form.getByRole("combobox").nth(1).selectOption("main");
   await form.getByRole("textbox", {name: "Title", exact: true}).fill("Review browser Person rename");
   await form.getByRole("button", {name: "Create Pull Request", exact: true}).click();
-  await expect(page).toHaveURL(url => new RegExp(`/projects/${imported.id}/pull-requests/[0-9]+$`).test(url.pathname));
+  await expect(page).toHaveURL(url => {
+    const prefix = `/projects/${imported.id}/pull-requests/`;
+    return url.pathname.startsWith(prefix) && /^[0-9]+$/.test(url.pathname.slice(prefix.length));
+  });
   const prPath = new URL(page.url()).pathname;
   await page.getByRole("button", {name: "Files Changed", exact: true}).click();
   const patch = page.locator("pre");
