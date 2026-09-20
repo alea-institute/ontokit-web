@@ -105,8 +105,11 @@
   "delivery": {
     "pr": "https://github.com/alea-institute/ontokit-api/pull/50",
     "pushed": true,
-    "merged": false,
-    "ci": "pending",
-    "testing_gap_disposition": "Optional coverage extension. The reproduced nested COPY parent mode defect is independent of checkout modes and covered by the current smoke test."
+    "merged": true,
+    "ci": "six verification checks passed; six conditional jobs skipped",
+    "testing_gap_disposition": "Optional coverage extension. The reproduced nested COPY parent mode defect is independent of checkout modes and covered by the current smoke test.",
+    "merge_commit": "d9272cc8fd3a45af4d3d2c0bc074f92cf235e1dc",
+    "merged_at": "2026-09-20T21:55:46Z",
+    "babysit": "success; no fixes or residuals;970seconds"
   }
 }
