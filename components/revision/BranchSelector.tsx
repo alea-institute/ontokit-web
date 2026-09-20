@@ -44,6 +44,8 @@ export function BranchSelector({
     currentBranch,
     defaultBranch: _defaultBranch,
     isLoading,
+    error: branchListError,
+    refreshBranches,
     isFeatureBranch,
     switchBranch,
     createBranch,
@@ -156,6 +158,15 @@ export function BranchSelector({
         )}
         {!readOnly && <ChevronDown className="h-4 w-4" />}
       </Button>
+
+      {branchListError && (
+        <div role="alert" className="mt-2 flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+          <span>{branchListError}</span>
+          <Button type="button" variant="outline" size="sm" onClick={() => void refreshBranches()}>
+            Retry branches
+          </Button>
+        </div>
+      )}
 
       {/* Dropdown */}
       {isOpen && (

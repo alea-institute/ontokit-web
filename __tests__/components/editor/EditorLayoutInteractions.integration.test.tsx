@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { layoutProps, layoutNs, layoutFetch, LayoutProviders } from "../../fixtures/editor-layout-harness";
@@ -97,4 +97,20 @@ it("developer tree context navigation scrolls an already indexed editor to the s
   expect(scrollToIri).toHaveBeenCalledExactlyOnceWith(node.iri);
   expect(setPendingScrollIri).toHaveBeenCalledExactlyOnceWith(node.iri);
   expect(screen.getByText("Browser renderer boundary")).toBeDefined();
+});
+
+it.each(["Graph", "Source"])("developer navigation from %s reveals the selected class", async view => {
+  const entityNavigationRef = { current: null as ((iri: string, type?: string) => void) | null };
+  const props = layoutProps({ nodes: [node], entityNavigationRef });
+  render(<LayoutProviders><DeveloperEditorLayout {...props}
+    sourceContent={props.sourceContent!} setSourceContent={vi.fn()} isLoadingSource={false}
+    sourceError={null} isPreloading={false} loadSourceContent={vi.fn().mockResolvedValue(undefined)}
+    sourceIriIndex={new Map()} pendingScrollIri={null} setPendingScrollIri={vi.fn()}
+    sourceEditorRef={{ current: null }} onSaveSource={vi.fn().mockResolvedValue(undefined)}
+  /></LayoutProviders>);
+  fireEvent.click(screen.getByRole("button", { name: view }));
+  expect(screen.queryByRole("treeitem", { name: /Root class/ })).toBeNull();
+  await act(async () => entityNavigationRef.current?.(node.iri, "class"));
+  expect(screen.getByRole("treeitem", { name: /Root class/ })).toBeDefined();
+  expect(props.navigateToNode).toHaveBeenCalledWith(node.iri);
 });

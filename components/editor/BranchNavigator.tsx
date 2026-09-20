@@ -10,6 +10,8 @@ export interface BranchNavigatorProps {
   onNavigate: (iri: string) => void;
   autoSuggestOnNavigate?: boolean;
   onAutoSuggest?: (iri: string) => void;
+  /** Schedule in a persistent parent when this navigator remounts per entity. */
+  scheduleAutoSuggest?: (iri: string) => void;
   /** Flat alternative for property lists (Plan 04) */
   simpleNodes?: { iri: string; label: string }[];
 }
@@ -39,6 +41,7 @@ export function BranchNavigator({
   onNavigate,
   autoSuggestOnNavigate,
   onAutoSuggest,
+  scheduleAutoSuggest,
   simpleNodes,
 }: BranchNavigatorProps) {
   const autoSuggestTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -51,6 +54,13 @@ export function BranchNavigator({
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!autoSuggestOnNavigate && autoSuggestTimerRef.current) {
+      clearTimeout(autoSuggestTimerRef.current);
+      autoSuggestTimerRef.current = null;
+    }
+  }, [autoSuggestOnNavigate]);
 
   // Compute siblings and current index
   const { siblings, currentIndex } = useMemo(() => {
@@ -93,14 +103,16 @@ export function BranchNavigator({
       onNavigate(targetIri);
 
       // Debounce auto-suggest: wait 800ms after navigation
-      if (autoSuggestOnNavigate && onAutoSuggest) {
+      if (autoSuggestOnNavigate && scheduleAutoSuggest) {
+        scheduleAutoSuggest(targetIri);
+      } else if (autoSuggestOnNavigate && onAutoSuggest) {
         autoSuggestTimerRef.current = setTimeout(() => {
           onAutoSuggest(targetIri);
           autoSuggestTimerRef.current = null;
         }, 800);
       }
     },
-    [onNavigate, autoSuggestOnNavigate, onAutoSuggest]
+    [onNavigate, autoSuggestOnNavigate, onAutoSuggest, scheduleAutoSuggest]
   );
 
   const handlePrev = useCallback(() => {

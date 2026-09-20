@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { getApiErrorMessage } from "@/lib/api/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   branchesApi,
@@ -97,9 +98,7 @@ export function BranchProvider({
   const lastSyncAt = response?.last_sync_at ?? null;
   const syncStatus = response?.sync_status ?? null;
   const error = queryError
-    ? queryError instanceof Error
-      ? queryError.message
-      : "Failed to load branches"
+    ? getApiErrorMessage(queryError, "Failed to load branches")
     : null;
 
   // Local state (not from server)

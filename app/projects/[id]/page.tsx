@@ -217,7 +217,7 @@ function ViewerContent({
   // dispatched through the layout's nav handler so the active tab and
   // per-tab selection are set correctly.
   useEffect(() => {
-    if (!initialSelection) return;
+    if (!initialSelection || isBranchLoading) return;
     const key = `${initialSelection.type}:${initialSelection.iri}`;
     if (consumedSelectionRef.current === key) return;
 
@@ -242,7 +242,7 @@ function ViewerContent({
     if (!entityNavigationRef.current) return;
     entityNavigationRef.current(initialSelection.iri, initialSelection.type);
     consumedSelectionRef.current = key;
-  }, [initialSelection, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
+  }, [initialSelection, isBranchLoading, isTreeLoading, nodes.length, selectedIri, navigateToNode]);
 
   const toast = useToast();
   const handleCopyIri = useCallback(async (iri: string) => {

@@ -16,6 +16,7 @@ const boundary = vi.hoisted(() => ({
   replace: vi.fn(), push: vi.fn(), signIn: vi.fn(),
   search: new URLSearchParams(),
   monacoProps: {} as Record<string, unknown>,
+  mountMonaco: null as null | ((props: { value: string; onMount: (editor: unknown, monaco: unknown) => void }) => void),
 }));
 vi.mock("next-auth/react", () => ({ useSession: () => boundary.session, signIn: boundary.signIn, signOut: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -29,13 +30,18 @@ vi.mock("next/navigation", () => ({
 // Router loadable refs and does not expose the source editor imperative handle.
 vi.mock("next/dynamic", async () => ({ default: (await import("next/dist/shared/lib/app-dynamic")).default }));
 
-vi.mock("@monaco-editor/react", () => ({
-  loader: { config: vi.fn() },
-  default: (props: { value: string; onChange: (value: string) => void }) => {
-    boundary.monacoProps = props;
-    return <textarea aria-label="Turtle source boundary" value={props.value} onChange={(event) => props.onChange(event.target.value)} />;
-  },
-}));
+vi.mock("@monaco-editor/react", async () => {
+  const { useEffect, useRef } = await import("react");
+  return {
+    loader: { config: vi.fn() },
+    default: function MonacoBoundary(props: { value: string; onChange: (value: string) => void; onMount: (editor: unknown, monaco: unknown) => void }) {
+      boundary.monacoProps = props;
+      const initialProps = useRef(props);
+      useEffect(() => { boundary.mountMonaco?.(initialProps.current); }, []);
+      return <textarea aria-label="Turtle source boundary" value={props.value} onChange={(event) => props.onChange(event.target.value)} />;
+    },
+  };
+});
 import EditorPage from "@/app/projects/[id]/editor/page";
 
 // The page, its hooks, API client, stores, header and providers are real.
@@ -59,6 +65,8 @@ let trustStatus: number;
 let trustCapabilities: { tier: string; can_mint_entities: boolean; accepted_count: number; promotion_threshold: number };
 let deleted: boolean;
 let deleteFailure: boolean;
+let referenceTotal: number;
+let referenceStatus: number;
 let projectStatus: number;
 let client: QueryClient;
 const originalSource = '@prefix owl: <http://www.w3.org/2002/07/owl#> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix ex: <https://example.test/> .\nex:Person a <http://www.w3.org/2002/07/owl#Class> .';
@@ -149,6 +157,7 @@ function installTreeGeometry(positions: Record<string, number>, rootY?: number) 
 beforeEach(() => {
   vi.clearAllMocks();
   boundary.monacoProps = {};
+  boundary.mountMonaco = null;
   boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; lintIssues = []; extraBranches = [];
   sessionStorage.removeItem("ontokit:branch:route-project");
   llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
@@ -165,7 +174,7 @@ beforeEach(() => {
   projectResponse = { id: "route-project", name: "Route ontology", source_file_path: "ontology.ttl", user_role: "owner", is_public: false };
   trustStatus = 200;
   trustCapabilities = { tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 };
-  projectStatus = 200; deleted = false; deleteFailure = false;
+  projectStatus = 200; deleted = false; deleteFailure = false; referenceTotal = 1; referenceStatus = 200;
   saveStatus = 200; sourceStatus = 200; sourceContent = originalSource; sourceRevision = "base-commit"; entityResults = [];
   savedBodies = []; suggestionBodies = []; suggestionFailure = null; suggestionSubmitStatus = 200; suggestionSubmissions = []; resumableSessions = []; sessionListStatus = 200;
   useEditorModeStore.getState().setEditorMode("developer");
@@ -215,7 +224,7 @@ beforeEach(() => {
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/NewEntity"))) return json({ detail: "Not persisted yet" }, 404);
     if (path.endsWith("/history")) return json({ entity_iri: iri, events: [], total: 0 });
     if (path.endsWith("/similar")) return json([]);
-    if (path.endsWith('/references')) return json({ groups: [], total: 1 });
+    if (path.endsWith('/references')) return referenceStatus === 200 ? json({ groups: [], total: referenceTotal }) : json({ detail: 'References unavailable' }, referenceStatus);
     if (path.endsWith("/pull-requests")) return json({ items: [], total: 0 });
     if (path.endsWith("/revisions")) return revisionStatus === 200 ? json({ commits: [], refs: {} }) : json({ detail: "History unavailable" }, revisionStatus);
     if (path.endsWith("/lint/config")) return json({ effective_rules: [], enabled_rules: null, lint_level: null });
@@ -312,6 +321,40 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     if (failure) expect(await screen.findByText('Person')).toBeDefined();
     else await waitFor(() => expect(screen.queryByText('Person')).toBeNull());
     expect(requests.filter(r => r.path.endsWith('/ontology/tree')).length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("keeps deletion blocked until a failed impact lookup is retried successfully", async () => {
+    referenceTotal = 0; referenceStatus = 403;
+    mount(); fireEvent.contextMenu(await screen.findByText("Person"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete Class" });
+    await within(dialog).findByRole("button", { name: "Retry" });
+    const button = within(dialog).getByRole("button", { name: "Delete" });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(requests.some(request => request.method === "DELETE")).toBe(false);
+    referenceStatus = 200;
+    fireEvent.click(within(dialog).getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(button);
+    await screen.findByText('Deleted "Person"');
+  });
+
+  it("restores a cold editor class URL only after branch initialization", async () => {
+    boundary.search = new URLSearchParams({ classIri: iri });
+    mount();
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await waitFor(() => expect(label.value).toBe("Person"));
+    expect(requests.find(request => request.path.endsWith("/ancestors"))?.search).toBe("?branch=main");
+  });
+
+  it("allows deletion after a successful zero-reference lookup", async () => {
+    referenceTotal = 0; mount(); fireEvent.contextMenu(await screen.findByText("Person"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete Class" });
+    const button = within(dialog).getByRole("button", { name: "Delete" });
+    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(button);
+    await screen.findByText('Deleted "Person"');
   });
 
   it('cancels deletion without removing the class or sending a request', async () => {
@@ -583,6 +626,17 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(savedBodies).toEqual([]);
   });
 
+  it.each(["standard", "developer"] as const)("automatically suggests for the latest navigated class in %s", async mode => {
+    useEditorModeStore.getState().setEditorMode(mode);
+    llmConfigured = true;
+    extraTreeNodes = [{ iri: "https://example.test/Sibling", label: "Sibling", child_count: 0 }];
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    await screen.findByPlaceholderText("Label text");
+    fireEvent.click(screen.getByRole("button", { name: "Next class in branch" }));
+    await waitFor(() => expect(generationBodies).toHaveLength(1), { timeout: 2500 });
+    expect(generationBodies[0]).toMatchObject({ class_iri: "https://example.test/Sibling", suggestion_type: "annotations" });
+  });
+
   it.each([200, 403, 409])("persists a generated child through generation, acceptance and revision-guarded source (HTTP %i)", async status => {
     llmConfigured = true; saveStatus = status;
     mount(); fireEvent.click(await screen.findByText("Person"));
@@ -688,6 +742,34 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(screen.getByRole("button", { name: /Submit Suggestions/ })).toBeDefined();
   });
 
+  it.each(["standard", "developer"] as const)("reparents through an anonymous proposal and undoes it in the %s editor", async mode => {
+    useEditorModeStore.getState().setEditorMode(mode);
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
+    boundary.session = { data: null, status: "unauthenticated" };
+    projectResponse = { ...projectResponse, user_role: "viewer", is_public: true };
+    const destination = "https://example.test/Destination";
+    extraTreeNodes = [{ iri: destination, label: "Destination", child_count: 0 }];
+    installTreeGeometry({ [iri]: 100, [destination]: 125 });
+    mount();
+    const row = await screen.findByRole("treeitem", { name: /Person/ });
+    fireEvent.click(row);
+    fireEvent.click(await screen.findByRole("button", { name: "Propose Edit" }));
+    await screen.findByPlaceholderText("Label text");
+    row.focus();
+    fireEvent.keyDown(row, { key: " ", code: "Space" });
+    await screen.findByText("Drop here to make root class");
+    await act(async () => { fireEvent.keyDown(document, { key: "ArrowDown", code: "ArrowDown" }); });
+    fireEvent.keyDown(document, { key: " ", code: "Space" });
+    await waitFor(() => expect(suggestionBodies).toHaveLength(1));
+    expect(parseBlockTriples(suggestionBodies[0].content, iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: destination } });
+    await screen.findByText('Moved "Person"');
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(suggestionBodies).toHaveLength(2));
+    expect(parseBlockTriples(suggestionBodies[1].content, iri)?.filter(triple => triple.predicate === "http://www.w3.org/2000/01/rdf-schema#subClassOf")).toEqual([]);
+    expect(savedBodies).toEqual([]);
+    expect(screen.getByRole("button", { name: /Submit Proposal/ })).toBeDefined();
+  });
+
   it.each([200, 403, 409])("reparents or rolls back through the real keyboard drag sensor (HTTP %i)", async status => {
     saveStatus = status;
     const destination = "https://example.test/Destination";
@@ -712,6 +794,8 @@ describe('editor route real tree actions and keyboard orchestration', () => {
       expect(screen.getByRole("treeitem", { name: /Person/ }).classList.contains("tree-item-root")).toBe(true);
     } else {
       await screen.findByText("Failed to reparent class");
+      expect(screen.queryByText('Moved "Person"')).toBeNull();
+      expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
       expect(screen.getByRole("treeitem", { name: /Person/ }).classList.contains("tree-item-root")).toBe(true);
       expect(sourceContent).toBe(originalSource);
     }
@@ -1070,6 +1154,42 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(useAnonymousTokenStore.getState().getToken("route-project")).toBeNull();
   });
 
+  it.each([200, 403])("resumes a cold session URL and resubmits (HTTP %i)", async status => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft" });
+    extraBranches = [{ name: "suggestion/draft", is_current: false }];
+    resumableSessions = [{ session_id: "suggestion-session", status: "changes-requested" }];
+    mount();
+    await screen.findByRole("button", { name: "suggestion/draft" });
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && new URLSearchParams(r.search).get("branch") === "suggestion/draft")).toBe(true));
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/suggestions/sessions"))).toBe(true));
+    fireEvent.click(await screen.findByText("Person"));
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await waitFor(() => expect(label.value).toBe("Person"));
+    await editAndSave(label, "Revised label");
+    await screen.findByText('Suggested update to "Revised label"');
+    fireEvent.click(screen.getByRole("button", { name: /Resubmit Suggestions/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+    fireEvent.change(within(dialog).getByLabelText("Describe your changes (optional)"), { target: { value: "Address feedback" } });
+    suggestionSubmitStatus = status;
+    fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
+    if (status === 403) {
+      await screen.findByText(/Submission refused/);
+      expect(screen.queryByText("Suggestions submitted as PR #23")).toBeNull();
+      suggestionSubmitStatus = 200;
+      fireEvent.click(screen.getByRole("button", { name: /Resubmit Suggestions/ }));
+      const retryDialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+      fireEvent.change(within(retryDialog).getByLabelText("Describe your changes (optional)"), { target: { value: "Address feedback" } });
+      fireEvent.click(within(retryDialog).getByRole("button", { name: "Submit for Review" }));
+    }
+    await screen.findByText("Suggestions submitted as PR #23");
+    expect(screen.queryByRole("button", { name: /Resubmit Suggestions/ })).toBeNull();
+    expect(requests.filter(r => r.path.endsWith("/suggestions/sessions") && r.method === "POST")).toEqual([]);
+    expect(requests.find(r => r.path.endsWith("/suggestion-session/resubmit"))).toMatchObject({ method: "POST", authorization: "Bearer route-fixture-token" });
+    expect(suggestionSubmissions).toEqual(Array.from({ length: status === 403 ? 2 : 1 }, () => ({ summary: "Address feedback" })));
+    expect(savedBodies).toEqual([]);
+  });
+
   it.each([200, 403])("resumes a changed session URL after branch initialization and resubmits (HTTP %i)", async status => {
     projectResponse = { ...projectResponse, user_role: "suggester" };
     boundary.search = new URLSearchParams({ branch: "suggestion/draft" });
@@ -1161,10 +1281,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     ["class", false], ["objectProperty", false], ["individual", false],
   ] as const)("inserts a %s into a mounted source editor through its real imperative chain (empty: %s)", async (entityType, empty) => {
     if (empty) sourceContent = "";
-    mount(); await screen.findByText("Person");
-    fireEvent.click(screen.getByRole("button", { name: "Source" }));
-    const source = await screen.findByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement;
-    let text = source.value;
+    let text = sourceContent;
     const model = {
       getValue: () => text,
       getLineCount: () => text.split("\n").length,
@@ -1182,7 +1299,15 @@ describe('editor route real tree actions and keyboard orchestration', () => {
       }),
     };
     const monaco = { editor: { setModelMarkers: vi.fn() } };
-    act(() => (boundary.monacoProps.onMount as (editor: unknown, monaco: unknown) => void)(editor, monaco));
+    // A source reload can remount Monaco. Initialize every mounted boundary,
+    // just as the real renderer invokes onMount for each editor instance.
+    boundary.mountMonaco = (props) => {
+      text = props.value;
+      props.onMount(editor, monaco);
+    };
+    mount(); await screen.findByText("Person");
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    await screen.findByRole("textbox", { name: "Turtle source boundary" });
     fireEvent.keyDown(document, { key: "n", ctrlKey: true });
     const dialog = await screen.findByRole("dialog", { name: "Add Entity" });
     fireEvent.change(within(dialog).getByLabelText("Label"), { target: { value: "Inserted entity" } });
@@ -1191,6 +1316,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     fireEvent.change(within(dialog).getByLabelText("IRI"), { target: { value: "https://example.test/NewEntity" } });
     fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
     expect(editor.executeEdits).toHaveBeenCalledTimes(1);
+    const source = screen.getByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement;
     await waitFor(() => expect(source.value).toContain('"Inserted entity"'));
     expect(editor.executeEdits.mock.calls[0][0]).toBe("add-entity");
     expect(source.value).toBe(model.getValue());

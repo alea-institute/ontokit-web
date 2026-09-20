@@ -50,6 +50,15 @@ describe("BranchNavigator real tree navigation", () => {
     expect(suggest).toHaveBeenLastCalledWith("b");
   });
 
+  it("cancels an already queued suggestion as soon as it is disabled", () => {
+    const suggest = vi.fn();
+    const view = render(<BranchNavigator nodes={roots} selectedIri="a" onNavigate={vi.fn()} autoSuggestOnNavigate onAutoSuggest={suggest} />);
+    fireEvent.click(next());
+    view.rerender(<BranchNavigator nodes={roots} selectedIri="b" onNavigate={vi.fn()} autoSuggestOnNavigate={false} onAutoSuggest={suggest} />);
+    act(() => vi.advanceTimersByTime(800));
+    expect(suggest).not.toHaveBeenCalled();
+  });
+
   it("cancels pending suggestions on unmount", () => {
     const suggest = vi.fn();
     const view = render(<Harness suggest={suggest} />);

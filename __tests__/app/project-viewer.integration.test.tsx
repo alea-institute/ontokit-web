@@ -203,6 +203,14 @@ describe("Project viewer route through real providers and API", () => {
     await screen.findByText(/Tree unavailable/);
     expect(screen.getByTitle("Project dashboard")).toBeTruthy();
   });
+  it("restores a cold class URL after the default branch finishes loading", async () => {
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    boundary.search = new URLSearchParams({ classIri: "https://example.test/Person" });
+    mount();
+    await screen.findByText("A human being");
+    expect(useSelectionStore.getState().iri).toBe("https://example.test/Person");
+  });
+
   it("keeps the selected class when the URL catches up without fetching its ancestors again", async () => {
     projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
     const view = mount();

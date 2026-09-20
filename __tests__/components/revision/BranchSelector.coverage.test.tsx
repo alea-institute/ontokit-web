@@ -13,6 +13,7 @@ const branch = (name: string, extra: Partial<BranchInfo> = {}): BranchInfo => ({
 });
 let items: BranchInfo[];
 let mutationFailure: string | null;
+let listFailure: boolean;
 let responseOverrides: Partial<BranchListResponse>;
 const requests: { url: URL; method: string; body?: BodyInit | null; headers: Headers }[] = [];
 const clients: QueryClient[] = [];
@@ -41,11 +42,12 @@ function create(name: string) {
   fireEvent.keyDown(input, { key: "Enter" });
 }
 beforeEach(() => {
-  sessionStorage.clear(); requests.length = 0; mutationFailure = null; responseOverrides = {};
+  sessionStorage.clear(); requests.length = 0; mutationFailure = null; listFailure = false; responseOverrides = {};
   items = [branch("main"), branch("feature/topic")];
   vi.stubGlobal("fetch", vi.fn(async (input: string, init: RequestInit = {}) => {
     const url = new URL(input); const method = init.method ?? "GET";
     requests.push({ url, method, body: init.body, headers: new Headers(init.headers) });
+    if (method === "GET" && listFailure) return new Response(JSON.stringify({ detail: "Branch list unavailable" }), { status: 403 });
     if (method === "GET") return new Response(JSON.stringify({ items, current_branch: "main", default_branch: "main", preferred_branch: null, has_github_remote: false, last_sync_at: null, sync_status: null, ...responseOverrides }));
     if (mutationFailure) return new Response(mutationFailure, { status: 409 });
     if (method === "POST") {
@@ -59,6 +61,19 @@ beforeEach(() => {
 afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear()); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("BranchSelector real context and API integration", () => {
+  it("shows branch-list errors and retries the real request", async () => {
+    listFailure = true;
+    mount();
+    await screen.findByRole("alert");
+    expect(screen.getByText("Branch list unavailable")).toBeDefined();
+    listFailure = false;
+    fireEvent.click(screen.getByRole("button", { name: "Retry branches" }));
+    await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
+    await open();
+    expect(screen.getByRole("option", { name: "feature/topic" })).toBeDefined();
+    expect(requests.filter(request => request.method === "GET")).toHaveLength(2);
+  });
+
   it("creates a trimmed branch, refreshes the server list and persists the selected branch", async () => {
     const { callback } = mount(); await open(); create("  feature/new  ");
     await waitFor(() => expect(screen.queryByRole("option")).toBeNull());

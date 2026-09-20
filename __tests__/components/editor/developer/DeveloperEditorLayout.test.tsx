@@ -595,12 +595,12 @@ describe("DeveloperEditorLayout", () => {
 
     expect(capturedOnReparent).not.toBeNull();
 
-    await capturedOnReparent!(
+    await expect(capturedOnReparent!(
       "http://example.org/Child",
       ["http://example.org/OldParent"],
       ["http://example.org/NewParent"],
       "move",
-    );
+    )).rejects.toBeDefined();
 
     expect(reparentOptimistic).toHaveBeenCalledWith(
       "http://example.org/Child",
@@ -1072,12 +1072,12 @@ describe("DeveloperEditorLayout", () => {
 
     expect(capturedOnReparent).not.toBeNull();
 
-    await capturedOnReparent!(
+    await expect(capturedOnReparent!(
       "http://example.org/Child",
       ["http://example.org/OldParent"],
       ["http://example.org/NewParent"],
       "move",
-    );
+    )).rejects.toBeDefined();
 
     expect(mockToastError).toHaveBeenCalledWith(
       "Failed to reparent class",
