@@ -63,9 +63,12 @@ describe('user settings through real cards, preferences store, and HTTP client',
     expect(screen.getByTestId('effective-email').textContent).toBe(initialIdentity.commit_email);
     expect(creditToggle().checked).toBe(true);
     expect(screen.getByText('Credit settings updated')).toBeDefined();
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
     fireEvent.click(creditToggle());
     await act(async () => { await vi.advanceTimersByTimeAsync(0); });
     expect(creditToggle().checked).toBe(false);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(screen.getByText('Credit settings updated')).toBeDefined();
     expect(screen.getByTestId('effective-email').textContent).toBe(initialIdentity.noreply_alias);
     const updates = fetcher.mock.calls.filter(([, init]) => init?.method === 'PATCH');
     expect(updates.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([{ use_verified_email: true }, { use_verified_email: false }]);

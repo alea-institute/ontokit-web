@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, act, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import userEvent from "@testing-library/user-event";
+import { api } from "@/lib/api/client";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 describe("ConfirmDialog", () => {
@@ -145,4 +146,17 @@ describe("ConfirmDialog", () => {
     expect(screen.queryByText("Please retry")).toBeNull();
   });
 
+});
+
+it("renders a structured API rejection and retries through the HTTP client", async () => {
+  let fail = true;
+  vi.stubGlobal("fetch", vi.fn(async () => fail ? new Response(JSON.stringify({ detail: "Deletion forbidden" }), { status: 403, headers: { "Content-Type": "application/json" } }) : new Response(null, { status: 204 })));
+  try {
+    const close = vi.fn();
+    render(<ConfirmDialog open onOpenChange={close} title="Delete" description="Delete this item" onConfirm={() => api.delete("/fixture")} />);
+    await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await screen.findByText("Deletion forbidden"); expect(close).not.toHaveBeenCalled();
+    fail = false; await userEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(close).toHaveBeenCalledWith(false));
+  } finally { vi.unstubAllGlobals(); }
 });

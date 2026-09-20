@@ -75,6 +75,20 @@ describe('settings index rebuild through real HTTP, query invalidation and webso
     h.unmount(); expect(ws.close).toHaveBeenCalledWith(1000, 'Client closing connection');
   });
 
+  it('reconciles completion even when index metadata is unchanged', async () => {
+    const h = mount(); const ui = await section(); await ui.findByText('Index up to date'); const ws = await socket(h);
+    expect(new URL(ws.url).searchParams.get('token')).toBe('fixture-token');
+    fireEvent.click(ui.getByRole('button', { name: 'Rebuild Index' }));
+    await screen.findByText('Reindex job queued. The index will update in the background.');
+    expect(ui.getByRole('button', { name: 'Reindexing...' }).hasAttribute('disabled')).toBe(true);
+    expect(ui.getByText('Indexing in progress...')).toBeDefined();
+    act(() => ws.message('index_complete'));
+    await ui.findByText('Index up to date');
+    expect(ui.getByRole('button', { name: 'Rebuild Index' }).hasAttribute('disabled')).toBe(false);
+    expect(h.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/ontology/index-status'))).toHaveLength(2);
+    h.unmount(); expect(ws.close).toHaveBeenCalledWith(1000, 'Client closing connection');
+  });
+
   it('responds to an externally started job and refreshes a failed result', async () => {
     const h = mount(); const ui = await section(); await ui.findByText('Index up to date'); const ws = await socket(h);
     act(() => ws.message('index_started')); expect(ui.getByText('Indexing in progress...')).toBeDefined();

@@ -63,12 +63,14 @@ describe("PRCommentThread through its real parent and API client", () => {
     expect((screen.getByPlaceholderText("Write a reply...") as HTMLTextAreaElement).value).toBe("  Please add a label  ");
     expect(commentReads()).toHaveLength(1);
     expect(attempts).toBe(1);
+    expect(screen.getByRole("alert").textContent).toContain("Try again");
     fireEvent.click(replySubmit());
     expect(await screen.findByText("Please add a label")).toBeDefined();
     expect(screen.queryByPlaceholderText("Write a reply...")).toBeNull();
     expect(screen.getAllByRole("button", { name: "Reply" })).toHaveLength(1);
     expect(commentReads()).toHaveLength(2);
     expect(attempts).toBe(2);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("keeps a failed nested edit open and refreshes its edited timestamp after retry", async () => {
@@ -92,11 +94,13 @@ describe("PRCommentThread through its real parent and API client", () => {
     await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
     expect((screen.getByDisplayValue("Corrected reply") as HTMLTextAreaElement).value).toBe("  Corrected reply  ");
     expect(commentReads()).toHaveLength(1);
+    expect(screen.getByRole("alert").textContent).toContain("Forbidden temporarily");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(await screen.findByText("Corrected reply")).toBeDefined();
     expect(screen.getByText("(edited)")).toBeDefined();
     expect(screen.queryByText(reply.body)).toBeNull();
     expect(attempts).toBe(2);
+    expect(screen.queryByRole("alert")).toBeNull();
     expect(commentReads()).toHaveLength(2);
   });
 
@@ -116,12 +120,14 @@ describe("PRCommentThread through its real parent and API client", () => {
     fireEvent.click(screen.getByTitle("Delete"));
     await waitFor(() => expect(errors).toHaveBeenCalledWith("Failed to delete:", expect.any(Error)));
     expect(screen.getByText(root.body)).toBeDefined();
+    expect(screen.getByRole("alert").textContent).toContain("Delete denied");
     expect(commentReads()).toHaveLength(1);
     fireEvent.click(screen.getByTitle("Delete"));
     expect(await screen.findByText("No comments yet. Be the first to comment!")).toBeDefined();
     expect(screen.queryByText(root.body)).toBeNull();
     expect(commentReads()).toHaveLength(2);
     expect(attempts).toBe(2);
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("does not send blank edits or replies and discards canceled drafts", async () => {

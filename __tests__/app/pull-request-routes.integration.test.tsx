@@ -84,7 +84,7 @@ describe('pull request list route through real providers, controls and HTTP', ()
   });
   it('shows an unstructured project failure on the detail route without loading review actions', async () => {
     const fetcher = mount({ detail: true, handler: url => url.pathname.endsWith('/projects/project')
-      ? new Response('Project temporarily unavailable', { status: 403 }) : undefined });
+      ? new Response('Project temporarily unavailable', { status: 422 }) : undefined });
     expect(await screen.findByText('Project temporarily unavailable')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Merge Pull Request' })).toBeNull();
     expect(fetcher.mock.calls.some(([url]) => new URL(String(url)).pathname.includes('/pull-requests'))).toBe(false);
@@ -153,7 +153,7 @@ describe('pull request detail route passes project permissions and route identit
     expect(screen.queryByRole('button', { name: 'Merge' })).toBeNull();
   });
   it.each([403, 404])('does not load PR data after project detail failure %s', async projectStatus => {
-    const fetcher = mount({ detail: true, projectStatus });
+    const fetcher = mount({ detail: true, handler: url => url.pathname.endsWith('/projects/project') ? jsonResponse({ detail: 'Lookup refused' }, projectStatus) : undefined });
     await screen.findByRole('heading', { name: projectStatus === 403 ? "You don't have access to this project" : 'Project not found' });
     expect(fetcher.mock.calls.some(([url]) => String(url).includes('/pull-requests'))).toBe(false);
   });

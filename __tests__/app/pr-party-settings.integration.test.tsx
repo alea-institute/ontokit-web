@@ -9,7 +9,7 @@ import { jsonResponse, llmHookHarness } from '../fixtures/llm-hook-harness';
 vi.mock('next/navigation', () => ({ usePathname: () => '/pr-party/settings' }));
 const session: Session = { user: { email: 'reviewer@example.invalid', name: 'Fixture reviewer' }, accessToken: 'synthetic-session', expires: '2099-01-01T00:00:00Z' };
 const healthy = { expires_at: null, last_validated_at: null, last_error: null, expired: false, expires_soon: false };
-function mount(options: { auth?: Session | null; me?: Partial<PRPartyMe>; capabilitiesStatus?: number; holdCapabilities?: boolean } = {}) {
+function mount(options: { auth?: Session | null; me?: Partial<PRPartyMe>; capabilitiesStatus?: number; holdCapabilities?: boolean; failSettings?: boolean } = {}) {
   let me: PRPartyMe = { is_reviewer: true, degraded: false, github_login: 'fixture-reviewer', credential: null, generation_token: null, ...options.me };
   let settings: PRPartySettings = { merge_default: 'dashboard', ntfy_topic: 'existing-topic' };
   let failure: string | null = null;
@@ -23,7 +23,7 @@ function mount(options: { auth?: Session | null; me?: Partial<PRPartyMe>; capabi
       if (options.holdCapabilities) await pending;
       return jsonResponse(me, options.capabilitiesStatus ?? 200);
     }
-    if (path.endsWith('/settings') && init?.method === 'GET') return jsonResponse(settings);
+    if (path.endsWith('/settings') && init?.method === 'GET') return options.failSettings ? jsonResponse({ detail: 'Preferences unavailable' }, 403) : jsonResponse(settings);
     if (path.endsWith('/settings') && init?.method === 'PUT') {
       if (failure) return jsonResponse({ detail: { message: failure } }, 403);
       settings = { ...settings, ...JSON.parse(String(init.body)) };
@@ -195,4 +195,12 @@ describe('review settings route with real capability, settings and credential ch
     expect(screen.getByText(text)).toBeDefined();
     expect(screen.getByRole('link', { name: 'Back to the queue' }).getAttribute('href')).toBe('/pr-party');
   });
+});
+
+it('shows failed preference loading and retries without editable fallback values', async () => {
+  const options = { failSettings: true }; mount(options);
+  await screen.findByText('Preferences unavailable');
+  expect(screen.queryByRole('button', { name: 'On GitHub' })).toBeNull();
+  options.failSettings = false; fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+  await ready(); expect(screen.getByRole('button', { name: 'On GitHub' })).toBeDefined();
 });

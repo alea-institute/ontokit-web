@@ -1,5 +1,6 @@
 "use client";
 
+import { getApiErrorMessage } from "@/lib/api/client";
 import { useState } from "react";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import {
@@ -48,7 +49,7 @@ export function ConfirmDialog({
       await onConfirm();
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(getApiErrorMessage(err, "An error occurred"));
     } finally {
       setIsSubmitting(false);
     }

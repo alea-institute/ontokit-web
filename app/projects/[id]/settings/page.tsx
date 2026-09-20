@@ -183,6 +183,7 @@ export default function ProjectSettingsPage() {
   // Ontology index status via React Query
   const {
     data: indexQueryData,
+    dataUpdatedAt: indexUpdatedAt,
   } = useIndexStatus(projectId, session?.accessToken, {
     enabled: !!project?.source_file_path && !!session?.accessToken,
   });
@@ -190,7 +191,7 @@ export default function ProjectSettingsPage() {
   const [indexStatus, setIndexStatus] = useState<IndexStatusResponse | null>(null);
   useEffect(() => {
     if (indexQueryData) setIndexStatus(indexQueryData);
-  }, [indexQueryData]);
+  }, [indexQueryData, indexUpdatedAt]);
 
   const [isReindexing, setIsReindexing] = useState(false);
 
@@ -412,6 +413,7 @@ export default function ProjectSettingsPage() {
   const handleUpdateMemberRole = async (userId: string, data: MemberUpdate) => {
     if (!session?.accessToken || !project) return;
 
+    setLocalError(null);
     try {
       const updated = await projectApi.updateMember(
         project.id,
@@ -430,6 +432,7 @@ export default function ProjectSettingsPage() {
   const handleRemoveMember = async (userId: string) => {
     if (!session?.accessToken || !project) return;
 
+    setLocalError(null);
     try {
       await projectApi.removeMember(project.id, userId, session.accessToken);
       queryClient.setQueryData<MemberListResponse>(memberQueryKeys.list(projectId), (old) =>
@@ -668,6 +671,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setProcessingJoinRequest(requestId);
+    setLocalError(null);
     try {
       await joinRequestApi.approve(project.id, requestId, session.accessToken);
       setJoinRequests(prev => prev.filter((jr) => jr.id !== requestId));
@@ -690,6 +694,7 @@ export default function ProjectSettingsPage() {
     if (!session?.accessToken || !project) return;
 
     setProcessingJoinRequest(requestId);
+    setLocalError(null);
     try {
       await joinRequestApi.decline(project.id, requestId, session.accessToken);
       setJoinRequests(prev => prev.filter((jr) => jr.id !== requestId));

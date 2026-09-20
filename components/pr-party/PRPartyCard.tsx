@@ -507,6 +507,7 @@ export function PRPartyCard({
               className="min-h-11 w-full sm:w-auto"
               disabled={busy}
               onClick={() => {
+                setError(null);
                 void onUnpark({ cardId: active.card_id }).then(
                   () => announce(`${label} returned to the queue.`),
                   (err: unknown) =>
@@ -526,6 +527,7 @@ export function PRPartyCard({
               className="min-h-11 w-full sm:w-auto"
               disabled={busy}
               onClick={() => {
+                setError(null);
                 void onRerunReview?.({ cardId: active.card_id }).then(
                   () => announce(`AI review re-requested for ${label}.`),
                   (err: unknown) =>

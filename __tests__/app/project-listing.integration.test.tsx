@@ -86,9 +86,9 @@ describe('project listing through query pagination, permissions and actual proje
     await screen.findByText('Ontology first');
     fireEvent.click(content().getByRole('button', { name: 'Load More' }));
     await waitFor(() => expect(requests().filter(url => url.searchParams.get('skip') === '50')).toHaveLength(1));
-    await waitFor(() => expect((content().getByRole('button', { name: 'Load More' }) as HTMLButtonElement).disabled).toBe(false));
+    await screen.findByText('Next page unavailable');
     expect(content().getByText('Ontology first')).toBeDefined();
-    failed = false; fireEvent.click(content().getByRole('button', { name: 'Load More' }));
+    failed = false; fireEvent.click(content().getByRole('button', { name: /Retry/ }));
     await screen.findByText('Ontology last');
     expect(requests().filter(url => url.searchParams.get('skip') === '50')).toHaveLength(2);
   });

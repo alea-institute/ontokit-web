@@ -185,6 +185,7 @@ describe("PRPartyCard real queue, controls, API and announcements", () => {
     fireEvent.click(screen.getByRole("button", { name }));
     await waitFor(() => expect(screen.getByRole("status").textContent).toContain(endpoint === "unpark" ? "returned to the queue" : "AI review re-requested"));
     await waitFor(() => expect(screen.queryByRole("button", { name })).toBeNull());
+    expect(screen.queryByText(/Request forbidden/)).toBeNull();
     expect(attempts).toBe(2);
   });
 

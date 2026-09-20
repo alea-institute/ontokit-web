@@ -83,7 +83,7 @@ export default function PRPartySettingsPage() {
     generationToken,
     isLoading: capsLoading,
   } = usePRPartyCapabilities();
-  const { settings } = usePRPartySettings({ enabled: isReviewer });
+  const { settings, isLoading: settingsLoading, error: settingsError } = usePRPartySettings({ enabled: isReviewer });
 
   const [success, setSuccess] = useState<string | null>(null);
   const [pageError, setPageError] = useState<string | null>(null);
@@ -130,7 +130,7 @@ export default function PRPartySettingsPage() {
 
   // --- Gates (same shape as the queue, same fail-closed posture) ---
 
-  if (status === "loading" || (status === "authenticated" && capsLoading)) {
+  if (status === "loading" || (status === "authenticated" && (capsLoading || (isReviewer && settingsLoading)))) {
     return (
       <Shell>
         <div className="flex h-64 items-center justify-center">
@@ -177,6 +177,17 @@ export default function PRPartySettingsPage() {
             affected.
           </p>
         </div>
+      </Shell>
+    );
+  }
+
+  if (settingsError) {
+    return (
+      <Shell>
+        <p role="alert">{errorMessage(settingsError, "Review settings could not be loaded.")}</p>
+        <Button onClick={() => void queryClient.invalidateQueries({ queryKey: prPartyQueryKeys.settings(userKey) })}>
+          Retry
+        </Button>
       </Shell>
     );
   }

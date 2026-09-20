@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Loader2, Plus, X } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -42,11 +42,19 @@ export function TranslationSettingsSection({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
+  const baseline = useRef<{ projectId: string; config: TranslationConfigUpdate } | null>(null);
   useEffect(() => {
     // The query result is the baseline for this deliberately local, failure-preserving form.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (config) setForm(editableConfig(config));
-  }, [config]);
+    if (!config) return;
+    const previous = baseline.current;
+    const next = editableConfig(config);
+    baseline.current = { projectId, config: next };
+    setForm(current => {
+      const untouched = !previous || previous.projectId !== projectId ||
+        JSON.stringify(current) === JSON.stringify(previous.config);
+      return untouched ? next : current;
+    });
+  }, [config, projectId]);
 
   const dirty = useMemo(() => {
     if (!config || !form) return false;
@@ -54,7 +62,7 @@ export function TranslationSettingsSection({
   }, [config, form]);
 
   if (!canManage) return null;
-  if (isLoading) {
+  if (isLoading || (!error && config && !form)) {
     return (
       <div role="status" className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
         <Loader2 className="h-4 w-4 animate-spin" /> Loading translation settings…
@@ -285,7 +293,12 @@ function ReviewerRow({ member, initialLanguages, palette, save, saving }: {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  useEffect(() => { setLanguages(initialLanguages); }, [initialLanguages]);
+  const languageBaseline = useRef(initialLanguages);
+  useEffect(() => {
+    const previous = languageBaseline.current;
+    languageBaseline.current = initialLanguages;
+    setLanguages(current => JSON.stringify(current) === JSON.stringify(previous) ? initialLanguages : current);
+  }, [initialLanguages]);
   const name = member.user?.name || member.user?.email || member.user_id;
   const dirty = JSON.stringify(languages) !== JSON.stringify(initialLanguages);
   const add = () => {

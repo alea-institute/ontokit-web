@@ -82,6 +82,7 @@ describe('dashboard through project queries, permissions and join-request HTTP c
     expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/join-requests/mine'))).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }));
     expect(await screen.findByRole('button', { name: 'Request to Join' })).toBeDefined();
+    expect(screen.queryByText('Withdrawal unavailable')).toBeNull();
     const deletion = fetcher.mock.calls.find(([, init]) => init?.method === 'DELETE')!;
     expect(String(deletion[0])).toContain('/join-requests/join-1');
   });
@@ -114,8 +115,10 @@ describe('dashboard through project queries, permissions and join-request HTTP c
     fireEvent.click(await screen.findByRole('button', { name: 'Withdraw' }));
     await waitFor(() => expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1));
     expect(screen.getByText('Request Pending')).toBeDefined();
+    expect(await screen.findByText('Withdrawal unavailable')).toBeDefined();
     fail(false); fireEvent.click(screen.getByRole('button', { name: 'Withdraw' }));
     expect(await screen.findByRole('button', { name: 'Request to Join' })).toBeDefined();
+    expect(screen.queryByText('Withdrawal unavailable')).toBeNull();
   });
 
   it.each([1, 3])('shows the server-provided pending count to an owner (%s)', async count => {

@@ -146,6 +146,7 @@ describe('settings membership and join decisions through real UI and HTTP', () =
     const h = mount({ member: true }); h.fail('remove'); let ui = await memberMenu(); fireEvent.click(ui.getByRole('button', { name: 'Remove member' }));
     await screen.findByText('Remove refused'); expect(ui.getByText('Target Admin')).toBeDefined(); h.fail(null);
     ui = await memberMenu(); fireEvent.click(ui.getByRole('button', { name: 'Remove member' })); await waitFor(() => expect(ui.queryByText('Target Admin')).toBeNull());
+    expect(screen.queryByText('Remove refused')).toBeNull();
     expect(h.client.getQueryData(projectQueryKeys.detail('project', true))).toMatchObject({ member_count: 0 });
   });
 
@@ -192,6 +193,7 @@ describe('settings membership and join decisions through real UI and HTTP', () =
     expect(ui.getByText(/Please let me contribute/)).toBeDefined();
     fireEvent.click(ui.getByRole('button', { name: 'Decline' }));
     await ui.findByText('No pending join requests.');
+    expect(screen.queryByText('Decision refused')).toBeNull();
     expect(writes(h, '/join-requests/request/decline')).toHaveLength(1);
     expect(writes(h, '/join-requests/request/approve')).toHaveLength(0);
     expect((await section()).queryByText('Applicant')).toBeNull();
@@ -201,6 +203,7 @@ describe('settings membership and join decisions through real UI and HTTP', () =
     const h = mount({ public: true }); h.fail(decision); const ui = await section('Join Requests'); await ui.findByText('Applicant');
     const label = decision === 'approve' ? 'Approve' : 'Decline'; fireEvent.click(ui.getByRole('button', { name: label })); await screen.findByText('Decision refused');
     expect(ui.getByText('Applicant')).toBeDefined(); h.fail(null); fireEvent.click(ui.getByRole('button', { name: label })); await ui.findByText('No pending join requests.');
+    expect(screen.queryByText('Decision refused')).toBeNull();
     expect(writes(h, '/join-requests/request/' + decision)).toHaveLength(2);
     if (decision === 'approve') expect(await (await section()).findByText('Applicant')).toBeDefined();
     else expect((await section()).queryByText('Applicant')).toBeNull();

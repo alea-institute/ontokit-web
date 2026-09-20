@@ -217,3 +217,27 @@ describe("translation settings through query and HTTP clients", () => {
     const { container } = mount(false); await waitFor(() => expect(requests.length).toBe(2)); expect(container.innerHTML).toBe("");
   });
 });
+
+it("preserves unsaved settings through a real background query refresh", async () => {
+  mount(); await screen.findByLabelText("Primary model");
+  fireEvent.change(screen.getByLabelText("Primary model"), { target: { value: "unsaved-model" } });
+  config = { ...config, primary_model: "remote-model" };
+  await act(async () => { await clients[0].invalidateQueries(); await new Promise(resolve => setTimeout(resolve, 20)); });
+  expect((screen.getByLabelText("Primary model") as HTMLInputElement).value).toBe("unsaved-model");
+  fireEvent.click(screen.getByRole("button", { name: "Save translation settings" }));
+  await screen.findByText("Translation settings saved.");
+  expect(config.primary_model).toBe("unsaved-model");
+});
+
+it("preserves unsaved reviewer languages through a background refresh", async () => {
+  members = [{ id: "m", user_id: "u", user: { name: "Ada" } }];
+  reviewers = [{ member_id: "m", user_id: "u", languages: ["fr"] }];
+  mount(); await screen.findByRole("button", { name: "Remove fr from Ada" });
+  fireEvent.click(screen.getByRole("button", { name: "Remove fr from Ada" }));
+  reviewers = [{ member_id: "m", user_id: "u", languages: ["es"] }];
+  await act(async () => { await clients[0].invalidateQueries(); await new Promise(resolve => setTimeout(resolve, 20)); });
+  expect(screen.queryByRole("button", { name: "Remove es from Ada" })).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Save reviewer" }));
+  await screen.findByText("Reviewer languages saved.");
+  expect(reviewers[0].languages).toEqual([]);
+});

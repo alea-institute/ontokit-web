@@ -75,7 +75,7 @@ describe("property grouping through the real API and entity tree", () => {
   });
 
   it("recovers from a failed search through an empty branch into a populated branch", async () => {
-    fetchBoundary.mockResolvedValueOnce(new Response("Search unavailable", { status: 403 })).mockResolvedValueOnce(json([])).mockResolvedValueOnce(json([objectProperty]));
+    fetchBoundary.mockResolvedValueOnce(new Response(JSON.stringify({ detail: "Search unavailable" }), { status: 403, headers: { "Content-Type": "application/json" } })).mockResolvedValueOnce(json([])).mockResolvedValueOnce(json([objectProperty]));
     const view = render(<Harness />);
     await screen.findByText("Search unavailable");
     view.rerender(<Harness branch="empty" />);

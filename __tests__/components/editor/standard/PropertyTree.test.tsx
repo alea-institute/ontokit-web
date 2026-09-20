@@ -6,7 +6,8 @@ import React from "react";
 
 const mockSearchEntities = vi.fn();
 
-vi.mock("@/lib/api/client", () => ({
+vi.mock("@/lib/api/client", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/api/client")>(),
   projectOntologyApi: {
     searchEntities: (...args: unknown[]) => mockSearchEntities(...args),
   },
