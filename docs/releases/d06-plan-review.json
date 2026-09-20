@@ -1,0 +1,506 @@
+{
+  "status": "complete",
+  "mode": "non-interactive",
+  "document_type": "unified-plan",
+  "artifact_path": "docs/plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md",
+  "reviewed_sha256": "06bdbc20ec7d3e7de6ef13fb36fd2a4ae779093572ab9f73eb89503b2b874091",
+  "final_sha256": "faef05f5c23c945314a84b955a01d162c7193b1e1e513be210b2be10b71888bc",
+  "confidence": {
+    "depth": "Deep",
+    "risk": "authentication, run-owned persistent state, external provider bootstrap",
+    "scoring": "KTDs and System-Wide Impact: 0 checklist defects + 1 high-risk + 1 critical-section bonus = 2 each; selected for targeted architecture deepening. Other sections grounded or covered by the selected cross-boundary check.",
+    "deepening": "Completed; confirmed supported ZITADEL_PORT mapping, configured-port readiness, Login shared namespace, and child-process/image-tag cleanup inventory.",
+    "remaining_gaps": []
+  },
+  "coverage": {
+    "local_reviewers": [
+      "coherence",
+      "feasibility",
+      "design-lens",
+      "security-lens",
+      "scope-guardian",
+      "adversarial",
+      "startup-feasibility"
+    ],
+    "cross_model_reviewers": [
+      "security-lens-claude",
+      "adversarial-claude",
+      "whole-doc-claude"
+    ],
+    "cross_model_route": "claude",
+    "requested_model": "claude-opus-5",
+    "actual_model": "claude-opus-5",
+    "requested_effort": "high",
+    "actual_effort": "unverified",
+    "independence_verified": true,
+    "failed_reviewers": [],
+    "timed_out_reviewers": [],
+    "compound_packs": {
+      "roots": [],
+      "warnings": [],
+      "errors": []
+    }
+  },
+  "original_review_returns": [
+    {
+      "reviewer": "coherence",
+      "findings": [
+        {
+          "title": "U5 does not perform the required real login",
+          "severity": "P1",
+          "section": "U5 — Prove the browser write and merge journey",
+          "why_it_matters": "The planned browser workflow can pass using a session created by U2 without proving that the same Chromium workflow performs real login before import, editing, review, and merge. That leaves R8's required end-to-end authentication-to-merge path untested and prevents the B10 browser acceptance claim. Change U5 so its Chromium workflow performs the real login at its start, while U2 may retain its separate authentication foundation coverage.",
+          "finding_type": "error",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Update U5's approach and first test scenario to perform real browser login at the start of the ontology import/edit/pull-request/merge workflow, rather than reusing U2's authenticated session for that path.",
+          "confidence": 100,
+          "evidence": [
+            "R8. A Chromium test performs real login, ontology import, editor navigation, branch editing, saving, pull-request review and merge, then verifies the result after reloading.",
+            "U5 Approach: Use the genuine session from U2, a fresh browser-owned project and accessible locators.",
+            "U2 Approach: Create an owner and unrelated ordinary user, complete each real browser sign-in, and retain private session state only for this run."
+          ]
+        }
+      ],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "feasibility",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "design-lens",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "security-lens",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "scope-guardian",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "adversarial",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "cross_model_route": "claude",
+      "cross_model_target": "claude",
+      "cross_model_harness": "claude",
+      "serving_family": "claude",
+      "independence_verified": true,
+      "model_requested": "claude-opus-5",
+      "model_actual": "claude-opus-5",
+      "effort_requested": "high",
+      "findings": [
+        {
+          "title": "Infrastructure secrets lack per-run generation and storage rule",
+          "severity": "P2",
+          "section": "Planning Contract — KTD1 (fresh Compose project per run) / KTD4 (migrations, PostgreSQL, Redis, MinIO) and U1 — Own the disposable stack lifecycle",
+          "why_it_matters": "An implementer adapting the API's developer compose graph into `e2e/compose.yaml` will most naturally carry over static values for the PostgreSQL passwords, MinIO root credentials, Zitadel masterkey/first-admin password, NextAuth secret and OIDC client secret, committing them to Git and reusing them across every run — which conflicts with the Definition of Done's 'no credentials … committed' and with R1's run-ownership stance. The plan only states 'synthetic run-private credentials' for identity in U2; the U1 stack has no equivalent rule, and KTD7 specifies restrictive permissions only for retained diagnostics, not for the secret/env files and Login PAT token file that exist during the run. A single stated rule — generate all stack secrets per run and write them only to a run-private 0700 directory as 0600 files — closes both gaps and makes KTD7's 'secret files' removal well-defined.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Add to KTD1: 'All stack secrets (database and MinIO credentials, Redis auth if enabled, Zitadel masterkey and first-instance admin credentials, NextAuth secret, OIDC client secret, setup PATs, test-user passwords) are generated per run with a CSPRNG, injected through the allowlisted environment or run-private files under the run root (directory 0700, files 0600), and never written to committed files. `e2e/compose.yaml` contains no default credential values.'",
+          "confidence": 75,
+          "evidence": [
+            "Implement KTD3/KTD5 using synthetic run-private credentials.",
+            "Explicit diagnostic retention must use restrictive permissions and an expiry, never Git or automatic uploads.",
+            "Remove run-owned volumes, networks, process groups including build/install/browser children, image tags created for this run, source/build copies, auth state and secret files.",
+            "no credentials or private traces are committed"
+          ]
+        },
+        {
+          "title": "Filesystem deletions have no ownership check like Docker/PID paths",
+          "severity": "P2",
+          "section": "Planning Contract — KTD7 (outer launcher owns cleanup) and U1 — Own the disposable stack lifecycle",
+          "why_it_matters": "Cleanup and crash recovery delete 'source/build copies, auth state and secret files' by path, but unlike Docker resources (ownership labels) and host processes (identity verification before signaling), the plan gives no ownership test for filesystem paths. A stale, corrupted or hand-edited recovery manifest — or a path-construction bug — can therefore direct `rm -rf` at the developer's real `ontokit-web`/`ontokit-api` checkout, the exact harm R1 forbids; U1 test scenario 4 requires this to be impossible but supplies no mechanism. Confining every run-owned file to one run root the launcher itself created (with a run-identity marker file) and refusing to delete any path outside it gives filesystem cleanup the same authorization gate the other resource classes already have.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Add to KTD7: 'All run-owned files (sanitized source copies, build output, auth state, secret files, manifest, private diagnostics) live under a single run root the launcher creates, containing a marker file with the run identity. Cleanup and recovery delete only paths that resolve (after symlink resolution) inside a run root whose marker matches the manifest run identity; any other path is reported as a cleanup failure, never removed.'",
+          "confidence": 75,
+          "evidence": [
+            "Match both the recorded run identity and Docker ownership labels before deletion; verify host process identity before signaling to avoid PID reuse. Remove run-owned volumes, networks, process groups including build/install/browser children, image tags created for this run, source/build copies, auth state and secret files.",
+            "Persist a nonsecret manifest for crash recovery; recover only its exact owned resources.",
+            "INT/TERM and repeated cleanup are safe; a stale manifest or reused PID cannot authorize deletion of another resource."
+          ]
+        },
+        {
+          "title": "Sanitization has no redaction contract for failure output",
+          "severity": "P3",
+          "section": "Planning Contract — KTD7 (private artifacts) and U5 — Prove the browser write and merge journey",
+          "why_it_matters": "Every unit promises 'sanitized' receipts and failure reporting, but nothing enumerates what must be redacted, so Playwright's default reporter output (API response bodies from token exchange, request headers on failed `expect`), captured console/network logs and the U1 receipt can carry bearer tokens, cookies, PATs and client secrets into durable evidence or a retained diagnostics bundle. Because the stack may still be alive after a hard interruption, a leaked token is briefly usable, and the nonsecret manifest promised for recovery could silently become secret-bearing. Naming the redaction set once lets U1, U5 and U6 implement one consistent filter and lets reviewers verify it.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Add to KTD7: 'Sanitized output means: Authorization and Cookie/Set-Cookie headers, OIDC codes/tokens, PATs, client secrets, passwords, masterkeys and full URLs containing them are replaced by a fixed placeholder before any receipt, reporter output, manifest or retained diagnostic is written; the redaction filter is applied by the launcher and by a custom Playwright reporter, and U1 includes a test that a seeded secret value does not appear in the receipt.'",
+          "confidence": 50,
+          "evidence": [
+            "emits useful sanitized diagnostics and removes only its own resources",
+            "durable evidence contains sanitized status/timing/resource checks only",
+            "Failed UI assertions retain private diagnostics long enough for sanitized failure reporting, then execute U1 cleanup."
+          ]
+        },
+        {
+          "title": "PostgreSQL, Redis and MinIO images not digest-pinned",
+          "severity": "P3",
+          "section": "Planning Contract — KTD3 (bootstrap fresh identity) and KTD4 (run migrations once)",
+          "why_it_matters": "Only the Zitadel and Login images are pinned by digest; the data-store images are named by version family, so each fresh run pulls whatever Docker Hub currently serves for that tag. That is a supply-chain trust decision the harness makes silently, and it undermines the U6 receipt's 'two fresh runs' claim as proof of repeatability when the tag moves between runs. Pinning all images by digest in `e2e/compose.yaml` makes the trust boundary explicit and the recorded digests in the receipt actually reproducible.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Add to KTD4: 'Pin the PostgreSQL/pgvector, Redis and MinIO images by digest in `e2e/compose.yaml`, alongside the Zitadel and Login digests; the U6 receipt records those digests and a digest change is a reviewed plan update, not an implicit pull.'",
+          "confidence": 50,
+          "evidence": [
+            "Reuse the reviewed Zitadel digest `sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64` and Login digest `sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648`.",
+            "use PostgreSQL 17 with pgvector and distinct application/identity database ownership, plus Redis, MinIO and a shared Git volume.",
+            "Record actual tested revisions, image digests, migration heads, test counts and cleanup evidence."
+          ]
+        }
+      ],
+      "residual_risks": [
+        "Plan-level threat model: (1) most likely — a stale or corrupted recovery manifest or path bug directs cleanup at a developer checkout; mitigation is run-root confinement of filesystem deletions. (2) highest impact — developer `.env`/credentials enter the sanitized source copy or Docker build context; the plan mitigates via allowlisted environment, sanitized copies and U1 scenario 6, which must actually assert on a seeded secret. (3) most subtle — Playwright traces/reporter output carry session cookies and tokens into retained diagnostics; mitigated only if the redaction contract is defined and enforced by a custom reporter.",
+        "Loopback-published API, Zitadel and Login ports plus the OIDC flow in Zitadel's local HTTP development mode are reachable by any other local user or process on the workstation; the plan's single-user workstation assumption makes this acceptable for D06 but it should be revisited before any B13 CI or shared-host use.",
+        "Login sharing Zitadel's network namespace (acknowledged in System-Wide Impact) means a compromised Login process has direct reach to Zitadel's internal listener and the data network; acceptable for a disposable stack, but the same topology must not be reused for hosted DEV."
+      ],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "cross_model_route": "claude",
+      "cross_model_target": "claude",
+      "cross_model_harness": "claude",
+      "serving_family": "claude",
+      "independence_verified": true,
+      "model_requested": "claude-opus-5",
+      "model_actual": "claude-opus-5",
+      "effort_requested": "high",
+      "findings": [
+        {
+          "title": "Port re-selection after build or bootstrap invalidates baked URLs",
+          "severity": "P1",
+          "section": "KTD2 — Keep the Next production runtime and Chromium on the host, and Alternatives and Risks (Planning Contract)",
+          "why_it_matters": "An implementer following the stated fallback ('bind failure must choose a new owned port') will produce a stack whose Next production build and Zitadel OIDC client silently point at the wrong port, because the plan bakes the public API/issuer URLs into the Next build (next.config.ts is listed as build-time public API/WS/auth settings) and registers 'exact callback/post-logout URLs' during Bootstrap. The lifecycle diagram never says when the three loopback ports (API, identity+Login, Next) become final relative to Migrate, Bootstrap and the Next build, so a port race hit at Next server start — the last binder — cannot be recovered by re-selection without rebuilding Next and re-registering the OIDC client. Committing to a single port-finalization point and an abort-only rule after it removes the ambiguity and makes the race a bounded, cleanly cleaned-up failure instead of a mis-wired pass or a silent rebuild.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "In KTD2 and the run lifecycle, state that all run-owned loopback ports (API, identity, Login, Next) are selected and recorded in the manifest during Preflight before Provision; Docker-published ports are bound at Provision, and the Next build and OIDC client registration only begin after those bindings succeed. Replace 'bind failure must choose a new owned port or abort' with: a bind failure before Provision selects a new port; any bind failure after Provision (including the Next server's) aborts the run with cleanup and a port-race diagnostic, never re-selecting, because the baked public URLs and registered callback URLs cannot change after Bootstrap.",
+          "confidence": 75,
+          "evidence": [
+            "Port reservation can race another process: bind failure must choose a new owned port or abort, never terminate its occupant.",
+            "`next.config.ts`: build-time public API/WS/auth settings.",
+            "Create a Web OIDC client using supported APIs for that pinned server, exact callback/post-logout URLs, and local HTTP development mode.",
+            "The supported `ZITADEL_PORT` and `ZITADEL_EXTERNALPORT`, published mapping, Login/API transport URLs and readiness probe derive from that one manifest value."
+          ]
+        },
+        {
+          "title": "Default trace deletion defeats the failure-reproduction objective",
+          "severity": "P2",
+          "section": "KTD7 — Make the outer launcher own cleanup and private artifacts (Planning Contract)",
+          "why_it_matters": "A contributor who hits a browser failure will find the Playwright trace and service logs already deleted and must re-run the whole suite — including the per-run API image and Next production builds — with retention explicitly enabled just to see what happened, which undercuts the Goal Capsule objective that contributors can reproduce failures. The privacy justification borrowed from Playwright's auth-state warning targets durable credentials, but every credential in these artifacts is run-private (fresh Zitadel instance, run-generated PATs, run-owned NextAuth secret) and is destroyed by the same cleanup, so post-teardown traces expose nothing that still works. The plan already defines a safe retention mode (restrictive permissions plus expiry, never Git or uploads); making that mode the failure-path default keeps R9's cleanup guarantee for resources and credentials while preserving the diagnostics the suite exists to produce.",
+          "finding_type": "error",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "In KTD7, change the default so that on a failed run, Playwright traces and sanitized service logs are retained under the already-defined restricted-permission, expiring retention location (retain-on-failure), while passing runs delete them; keep cookies/session responses and all credentials in the always-removed set. Reflect the same default in U5 scenario 3 and U6 documentation.",
+          "confidence": 75,
+          "evidence": [
+            "Contributors can reproduce failures across OntoKit's API and browser workflows before shipping changes.",
+            "Raw service logs, traces, cookies and session responses remain private and are removed by default; durable evidence contains sanitized status/timing/resource checks only.",
+            "Explicit diagnostic retention must use restrictive permissions and an expiry, never Git or automatic uploads.",
+            "Failed UI assertions retain private diagnostics long enough for sanitized failure reporting, then execute U1 cleanup."
+          ]
+        },
+        {
+          "title": "Merge policy may require an identity U2 never creates",
+          "severity": "P2",
+          "section": "KTD6 — Seed through real import and verify persistence, and U4 — Prove branches, pull requests, search and lint",
+          "why_it_matters": "If the existing pull-request policy forbids an author from merging their own PR or requires a separate approving member, U4 scenario 3 and the U5 browser journey cannot complete with the only two identities U2 provisions (an owner who authored the branch and an unrelated user who by AE3 must have no write access), forcing an unplanned identity-bootstrap change late in the sequence. The plan defers to 'ordinary project policy' and an 'authorized ordinary project actor' without saying which of its identities that actor is. Stating the assumption and the fallback up front lets U2 provision the right membership once instead of discovering it at U4.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Add to KTD6: the merge step is performed by the project owner who authored the branch under the current merge policy; U2 must confirm this policy during bootstrap validation and, if author self-merge is not permitted, provision a third verified human as a project member with merge rights and use that identity for the merge in U4 scenario 3 and U5.",
+          "confidence": 50,
+          "evidence": [
+            "Keep external integrations empty and use ordinary project policy for merge authorization.",
+            "Create a pull request, inspect the expected diff, merge with an authorized ordinary project actor, and verify PR state and target source.",
+            "Create an owner and unrelated ordinary user, complete each real browser sign-in, and retain private session state only for this run."
+          ]
+        },
+        {
+          "title": "All-in-container topology not weighed against host-side runtime",
+          "severity": "P3",
+          "section": "Alternatives and Risks (Planning Contract)",
+          "why_it_matters": "The plan concludes no architecture fork exists after comparing only host-side Next versus bridge-hosted Next with a host browser, but a third boundary — running Chromium (Playwright image), Next and the stack entirely inside the Compose project with service-name authorities — was not considered. That topology removes several risks the plan then has to engineer around: host port publication and port races, host process-group and PID-reuse cleanup, sanitized host source/build copies, and localhost issuer/port coupling, because nothing is published to the host at all. Its real costs (headed debugging is harder, traces must be copied out, larger images) may still favor the chosen design, but the choice should be recorded as deliberate rather than path-dependent so a later contributor does not reopen it.",
+          "finding_type": "omission",
+          "autofix_class": "manual",
+          "suggested_fix": "Add one sentence to Alternatives and Risks recording that a fully containerized topology (browser, Next and services inside the Compose project, no host publication) was considered and rejected, naming the deciding cost (e.g., headed local debugging and trace extraction) so the host-runtime choice is documented as deliberate.",
+          "confidence": 50,
+          "evidence": [
+            "A bridge-hosted Next runtime needs extra canonical-host routing; the owned host runtime uses existing API internal-issuer support and avoids introducing a proxy. These alternatives are resolved by repository and networking evidence; no unresolved architecture fork warrants a prototype or bake-off.",
+            "This avoids host-file/DNS changes, host networking and container-to-host loopback routing."
+          ]
+        }
+      ],
+      "residual_risks": [
+        "KTD1 publishes only IPv4 loopback while every canonical authority uses `localhost`; on Node releases or hosts where `localhost` resolves to `::1` first without automatic family fallback, NextAuth server-side token exchange or Playwright request contexts could see ECONNREFUSED intermittently.",
+        "With Login sharing Zitadel's network namespace and Zitadel's internal port set equal to a per-run selected external port, the port selector must exclude Login's own in-namespace listener port; a collision would surface only as an opaque Login startup failure.",
+        "Each run rebuilds the API image and performs a sanitized-copy install plus Next production build; the plan sets no time budget and does not say whether dependencies are installed from the network or reused from a shared cache, so the two-fresh-run evidence requirement in U6 may be slow or network-dependent in ways that make failures look environmental."
+      ],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "cross_model_route": "claude",
+      "cross_model_target": "claude",
+      "cross_model_harness": "claude",
+      "serving_family": "claude",
+      "independence_verified": true,
+      "model_requested": "claude-opus-5",
+      "model_actual": "claude-opus-5",
+      "effort_requested": "high",
+      "findings": [
+        {
+          "title": "U1 lifecycle spec needs Playwright that U2 delivers; runner unspecified",
+          "severity": "P2",
+          "section": "U1 - Own the disposable stack lifecycle (Files) and Verification Contract",
+          "why_it_matters": "An implementer executing U1 (the stack lifecycle unit) is told to write `e2e/lifecycle.spec.ts`, but Playwright, `playwright.config.ts` and `package-lock.json` are only introduced in U2 (identity bootstrap), and the document says Vitest discovery stays separate from `e2e/`, so there is no runner for that file at U1 time. The Verification Contract also lists 'Lifecycle failure probes' as a gate distinct from `npm run test:e2e`, yet a `.spec.ts` under `e2e/` would be picked up by that Playwright project — meaning every ordinary e2e run would have to spawn nested child stacks to inject setup failures and INT/TERM signals into the launcher. Naming the probe runner and taking the file out of the Playwright directory resolves both the U1→U2 dependency inversion and the double-discovery.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "In U1 and U6 replace `e2e/lifecycle.spec.ts` with a launcher-level probe script `scripts/e2e/lifecycle-probes.mjs` exposed as `npm run test:e2e:lifecycle`, which spawns `scripts/e2e/run.mjs` child runs and injects prerequisite failures, setup failures, cleanup failures and INT/TERM. State that this script is excluded from both Vitest discovery and the `e2e/` Playwright project, and map the Verification Contract row 'Lifecycle failure probes' to it.",
+          "confidence": 75,
+          "evidence": [
+            "**Files:** `e2e/compose.yaml`, `scripts/e2e/run.mjs`, `scripts/e2e/ownership.mjs`, `scripts/e2e/runtime.mjs`, `scripts/e2e/cleanup.mjs`, `__tests__/scripts/e2e-ownership.test.ts`, `e2e/lifecycle.spec.ts`",
+            "**Files:** `scripts/e2e/bootstrap-identity.mjs`, `e2e/stack.setup.ts`, `e2e/stack.teardown.ts`, `e2e/fixtures/auth.ts`, `e2e/fixtures/run.ts`, `playwright.config.ts`, `package.json`, `package-lock.json`",
+            "| Lifecycle failure probes | U1/U6 | Setup failure, test failure, signals and explicit recovery remove only owned state |",
+            "Existing Vitest discovery remains separate from the E2E suite."
+          ]
+        },
+        {
+          "title": "Cleanup ownership split between stack.teardown.ts and launcher undefined",
+          "severity": "P2",
+          "section": "U2 - Bootstrap fresh identity and genuine sessions (Files) vs KTD7 (launcher owns cleanup)",
+          "why_it_matters": "Implementers must decide what `e2e/stack.teardown.ts` deletes, and the name implies stack resources, while KTD7 (the outer launcher owns cleanup) makes the launcher the sole authority and the Goal Capsule stops a run on 'ambiguous resource ownership'. Without an explicit boundary, the Playwright teardown project may attempt Docker/process removal that the launcher then repeats or races, or may hold auth-state files the launcher expects to own. Stating that the Playwright teardown only disposes Playwright-owned artifacts keeps KTD7's single-owner rule intact.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "In U2's Approach add: `e2e/stack.teardown.ts` disposes only Playwright-owned request contexts and deletes run-private auth-state files it created; it never removes Docker resources, host processes, build copies or the manifest, which remain owned exclusively by `scripts/e2e/cleanup.mjs` under KTD7.",
+          "confidence": 50,
+          "evidence": [
+            "Install cleanup before resource creation; it runs on normal exit, failure, INT and TERM, independently of Playwright teardown.",
+            "`e2e/stack.setup.ts`, `e2e/stack.teardown.ts`",
+            "Stop a run on missing prerequisites, ambiguous resource ownership"
+          ]
+        },
+        {
+          "title": "Next production build not placed relative to identity bootstrap",
+          "severity": "P2",
+          "section": "Planning Contract - Run lifecycle diagram (KTD7) and KTD2 (host Next runtime)",
+          "why_it_matters": "The lifecycle diagram has no build step, and the document notes `next.config.ts` carries build-time auth settings while the OIDC client is only created during Bootstrap (U2). If the build runs in Provision it may bake stale or missing auth configuration and force a rebuild after bootstrap, doubling the already-acknowledged disk/time cost; if it runs after Bootstrap, failure/signal transitions from that stage must also route to Cleanup. Naming the stage settles the order for U1/U2 implementers and keeps the KTD7 failure transitions complete.",
+          "finding_type": "omission",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Add a `BuildWeb` state to the lifecycle diagram between `Bootstrap` and `Ready` with `BuildWeb --> Cleanup: Failure or signal`, and state in KTD2 that the Next production build runs after identity bootstrap so build-time auth settings receive the run's issuer, port and OIDC client values.",
+          "confidence": 50,
+          "evidence": [
+            "Build Next in a run-owned sanitized source copy, bind its server to loopback, and track its process identity.",
+            "`next.config.ts`: build-time public API/WS/auth settings.",
+            "Provision --> Migrate\n  Migrate --> Bootstrap\n  Bootstrap --> Ready",
+            "U2 supplies OIDC configuration before full Next startup and authenticated readiness."
+          ]
+        },
+        {
+          "title": "R8 login step delegated to setup, not the browser journey test",
+          "severity": "P2",
+          "section": "U5 - Prove the browser write and merge journey (Approach)",
+          "why_it_matters": "R8 (the Chromium journey requirement) says a Chromium test 'performs real login' as the first step of the workflow, but U5 starts from 'the genuine session from U2', i.e. replayed storage state, so the R8 test recorded for the B10 receipt never itself logs in. An auditor mapping R8 to a single test name will find the login step in a setup project instead, and a regression that breaks interactive login after the setup project passes would not be caught by the journey test. Having U5 scenario 1 sign in from a fresh context makes the R8 evidence self-contained without changing U2's storage-state approach for API tests.",
+          "finding_type": "error",
+          "autofix_class": "gated_auto",
+          "suggested_fix": "Change U5's Approach and scenario 1 to begin from a fresh browser context with no stored session: perform the UI sign-in with the U2 owner's credentials, then import, edit, review, merge and reload. Keep U2's stored session state for API request contexts only.",
+          "confidence": 50,
+          "evidence": [
+            "R8. A Chromium test performs real login, ontology import, editor navigation, branch editing, saving, pull-request review and merge, then verifies the result after reloading.",
+            "Use the genuine session from U2, a fresh browser-owned project and accessible locators."
+          ]
+        }
+      ],
+      "residual_risks": [
+        "Pinned Zitadel/Login images may not support the V2 bootstrap operations KTD3 relies on; the plan defers this to U2 execution-time checks, so a mismatch would stall U2–U6 with no fallback identity strategy defined.",
+        "A full Next production build per run (KTD2) plus two fresh runs for the B10 receipt (U6) may make the suite too slow for contributors to use routinely; the plan records duration but sets no budget."
+      ],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "startup-feasibility",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    }
+  ],
+  "resolved_claims": [
+    {
+      "reviewer": "coherence",
+      "title": "U5 does not perform the required real login",
+      "disposition": "apply",
+      "reason": "Retained: R8 explicitly requires a Chromium test spanning login through merge, while U5 reused stored state. A fresh login in U5 satisfies the existing Product Contract without changing scope. Local coherence independently supports the issue; Claude whole-document review corroborates it."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "title": "Infrastructure secrets lack per-run generation and storage rule",
+      "disposition": "dismissed",
+      "reason": "Dismissed: KTD3 requires generated fresh-instance identity credentials, U2 requires synthetic run-private credentials, KTD7 owns secret-file removal, U1 requires sanitized/allowlisted runtime copies, and Definition of Done prohibits committed credentials. Static committed credential reuse would violate the existing contract. Exact permission modes and secret-generation plumbing remain implementation choices; independent local security review found no missing boundary."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "title": "Filesystem deletions have no ownership check like Docker/PID paths",
+      "disposition": "dismissed",
+      "reason": "Dismissed: R1 forbids deleting other resources; KTD7 restricts recovery to exact owned resources; U1 explicitly tests that a stale manifest cannot authorize another resource. Run-owned sanitized copies are already required. A competent implementation must implement path ownership to satisfy these existing tests; the peer does not demonstrate that following the contract permits unrestricted deletion."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "title": "Sanitization has no redaction contract for failure output",
+      "disposition": "dismissed",
+      "reason": "Dismissed: KTD7 expressly limits durable evidence to sanitized status/timing/resource checks and keeps raw logs, traces, cookies and session responses private. It does not authorize copying raw reporter output into durable evidence. A custom reporter and exhaustive redaction enumeration are optional mechanisms, not necessary new planning commitments."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "title": "PostgreSQL, Redis and MinIO images not digest-pinned",
+      "disposition": "dismissed",
+      "reason": "Dismissed: U6 records actual image digests for reproducibility, and the plan introduces an owned Compose configuration that can pin those images during implementation. No drifting image or compromised source is evidenced. Requiring a plan update for every data-image digest change exceeds the agreed contract; identity pins are specifically fixed because they shape Login bootstrap compatibility."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "kind": "residual_risk",
+      "claim": "Plan-level threat model: (1) most likely — a stale or corrupted recovery manifest or path bug directs cleanup at a developer checkout; mitigation is run-root confinement of filesystem deletions. (2) highest impact — developer `.env`/credentials enter the sanitized source copy or Docker build context; the plan mitigates via allowlisted environment, sanitized copies and U1 scenario 6, which must actually assert on a seeded secret. (3) most subtle — Playwright traces/reporter output carry session cookies and tokens into retained diagnostics; mitigated only if the redaction contract is defined and enforced by a custom reporter.",
+      "disposition": "dismissed",
+      "reason": "Existing R1/KTD7/U1 ownership and private-output constraints cover the three summarized risks; this restates dismissed suggestions without a new consequence."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "kind": "residual_risk",
+      "claim": "Loopback-published API, Zitadel and Login ports plus the OIDC flow in Zitadel's local HTTP development mode are reachable by any other local user or process on the workstation; the plan's single-user workstation assumption makes this acceptable for D06 but it should be revisited before any B13 CI or shared-host use.",
+      "disposition": "dismissed",
+      "reason": "Loopback-only disposable local identity is an explicit scope choice; shared-host CI is deferred B13. No new attack surface contrary to this local contract is demonstrated."
+    },
+    {
+      "reviewer": "security-lens-claude",
+      "kind": "residual_risk",
+      "claim": "Login sharing Zitadel's network namespace (acknowledged in System-Wide Impact) means a compromised Login process has direct reach to Zitadel's internal listener and the data network; acceptable for a disposable stack, but the same topology must not be reused for hosted DEV.",
+      "disposition": "dismissed",
+      "reason": "Login namespace reachability is already explicit in System-Wide Impact. Hosted DEV deployment is out of scope, so an instruction against copying this test topology there adds no current requirement."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "title": "Port re-selection after build or bootstrap invalidates baked URLs",
+      "disposition": "dismissed",
+      "reason": "Dismissed: the risk paragraph explicitly allows abort and KTD2 derives all endpoint configuration from a single manifest value. It never instructs re-selection without updating dependent state. Choosing abort after bootstrap is an available compliant implementation, so the claimed inevitable mis-wiring does not follow. Fresh independent startup-feasibility review found no architecture blocker."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "title": "Default trace deletion defeats the failure-reproduction objective",
+      "disposition": "dismissed",
+      "reason": "Dismissed: KTD7 deliberately retains sanitized failure evidence and permits explicit private expiring diagnostics. Reproduction does not require default raw trace retention, and the security claim that all trace contents are harmless after teardown ignores failed cleanup/crash paths. Changing the chosen retention default is unnecessary to satisfy B10."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "title": "Merge policy may require an identity U2 never creates",
+      "disposition": "dismissed",
+      "reason": "Dismissed with project evidence: ontokit-api project defaults pr_approval_required to zero and pull-request merge admits the project owner/admin. The planned ordinary owner can merge without a third identity or policy override; parent and flow analysis independently checked this source."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "title": "All-in-container topology not weighed against host-side runtime",
+      "disposition": "dismissed",
+      "reason": "Dismissed: no evidence shows the chosen coherent host-browser topology cannot satisfy the contract. The plan explains the selected boundary and rejected developer reuse/synthetic auth. Exhaustive alternative enumeration or a new product decision would not improve the implementation outcome."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "kind": "residual_risk",
+      "claim": "KTD1 publishes only IPv4 loopback while every canonical authority uses `localhost`; on Node releases or hosts where `localhost` resolves to `::1` first without automatic family fallback, NextAuth server-side token exchange or Playwright request contexts could see ECONNREFUSED intermittently.",
+      "disposition": "dismissed",
+      "reason": "Canonical localhost discovery and real callback are mandatory U2 gates; Node24 is the actual host baseline. Hypothetical older resolution behavior supplies no demonstrated failure under that baseline."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "kind": "residual_risk",
+      "claim": "With Login sharing Zitadel's network namespace and Zitadel's internal port set equal to a per-run selected external port, the port selector must exclude Login's own in-namespace listener port; a collision would surface only as an opaque Login startup failure.",
+      "disposition": "dismissed",
+      "reason": "The port inventory and bounded readiness can detect distinct listener collisions; choosing distinct API/identity/Login/web ports is routine provisioning, not an unresolved design choice."
+    },
+    {
+      "reviewer": "adversarial-claude",
+      "kind": "residual_risk",
+      "claim": "Each run rebuilds the API image and performs a sanitized-copy install plus Next production build; the plan sets no time budget and does not say whether dependencies are installed from the network or reused from a shared cache, so the two-fresh-run evidence requirement in U6 may be slow or network-dependent in ways that make failures look environmental.",
+      "disposition": "dismissed",
+      "reason": "No latency target exists. Disk preflight, bounded readiness and duration evidence already cover measured constraints; caches are explicitly shared and not deleted. A speculative budget would invent product scope."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "title": "U1 lifecycle spec needs Playwright that U2 delivers; runner unspecified",
+      "disposition": "dismissed",
+      "reason": "Dismissed after independent local startup-feasibility check: U1 has package.json and a runnable Vitest ownership test, and its execution note calls for real provisioning/migration/process probes before domain tests are enabled. U2 adds the final Playwright runner before full end-to-end verification. File creation does not require every future integration spec to execute in U1; minimal runner plumbing is routine implementation. Both initial and focused feasibility reviews found no consequential ordering defect."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "title": "Cleanup ownership split between stack.teardown.ts and launcher undefined",
+      "disposition": "dismissed",
+      "reason": "Dismissed: KTD7 explicitly makes the launcher own cleanup independently of Playwright teardown, and requires idempotent repeated cleanup. A teardown hook can invoke the same owned cleanup path without competing ownership; the proposed restriction to auth files is one implementation preference."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "title": "Next production build not placed relative to identity bootstrap",
+      "disposition": "dismissed",
+      "reason": "Dismissed: U1 expressly defers OIDC configuration and full Next startup to U2, while KTD2 identifies build-time public settings and sanitized runtime ownership. The executor can order build after required configuration; omitted diagram microsteps do not authorize a stale build. Both local feasibility passes found the sequence implementable."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "title": "R8 login step delegated to setup, not the browser journey test",
+      "disposition": "merged",
+      "reason": "Retained: R8 explicitly requires a Chromium test spanning login through merge, while U5 reused stored state. A fresh login in U5 satisfies the existing Product Contract without changing scope. Local coherence independently supports the issue; Claude whole-document review corroborates it."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "kind": "residual_risk",
+      "claim": "Pinned Zitadel/Login images may not support the V2 bootstrap operations KTD3 relies on; the plan defers this to U2 execution-time checks, so a mismatch would stall U2–U6 with no fallback identity strategy defined.",
+      "disposition": "dismissed",
+      "reason": "KTD3 explicitly permits the pinned server supported equivalent and documents any deprecated API need; it does not require an unavailable V2 call. U2 verifies the actual handshake before downstream work."
+    },
+    {
+      "reviewer": "whole-doc-claude",
+      "kind": "residual_risk",
+      "claim": "A full Next production build per run (KTD2) plus two fresh runs for the B10 receipt (U6) may make the suite too slow for contributors to use routinely; the plan records duration but sets no budget.",
+      "disposition": "dismissed",
+      "reason": "No runtime target or measured usability failure supports a new timing threshold. The plan already records duration and separates future CI optimization."
+    }
+  ],
+  "fixes_applied": 1,
+  "applied": [
+    {
+      "section": "U5 — Browser write and merge journey",
+      "change": "The journey now starts in a fresh unauthenticated browser context and performs real UI sign-in before import, edit, review, merge and reload. U2 session reuse remains available for API fixtures.",
+      "reviewers": [
+        "coherence",
+        "whole-doc-claude"
+      ],
+      "confidence": 100,
+      "verification": "Re-read U5 approach/scenario and R8: no stored-session shortcut remains in the required browser workflow."
+    }
+  ],
+  "proposed_fixes_count": 0,
+  "decisions_count": 0,
+  "fyi_count": 0,
+  "remaining_findings": [],
+  "edit_authority": "Caller grants correction of draft implementation and verification needed to satisfy its established Product Contract; preserve outcomes, constraints and session-settled decisions. R8 supplies the concrete existing decision.",
+  "implementation_performed": false,
+  "tests_run": false,
+  "summary": {
+    "original_findings": 13,
+    "retained_groups": 1,
+    "dismissed_findings": 11,
+    "dismissed_residuals": 8,
+    "reviewers_completed": 10
+  }
+}

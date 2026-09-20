@@ -28,7 +28,9 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**D02: recovery verified; hosted identity access pending. Next independent deliverable D06: B10 full-stack test foundation (planning).**
+**D02: recovery verified; hosted identity access pending. Independent deliverable D06: B10 full-stack test foundation (implementing lifecycle isolation).**
+
+- D06's [reviewed implementation plan](2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) and [review receipt](../releases/d06-plan-review.json) are checkpointed as `db916292` on `feat/d06-full-stack-tests-20260920` in `.worktrees/web-d06-full-stack`. Ten review passes completed with no unresolved findings. U1 lifecycle implementation is active; no full-stack acceptance is claimed. This branch starts from merged web `ab903e14`, preserving the older documentation branch's unpublished history.
 
 - D01/D03 candidate merged into ALEA web `dev` through [PR48](https://github.com/alea-institute/ontokit-web/pull/48), revision `ab903e145e2a6ad30aefd915a83cb0bafbaa0678`, after all eight verification checks passed. No deployment occurred.
 - [D03 evidence](../releases/d03-image-readiness.md) supersedes D01’s required-auth image failure: all three images build and pass expanded runtime checks; 5,222 tests pass.
@@ -92,7 +94,7 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | D05 | B14 submission embedding errors | Merged | [API PR49](https://github.com/alea-institute/ontokit-api/pull/49) | Merge `c95991c7`; 3,260 tests, zero skips, 90% coverage; eight review lenses clear; six CI successes/six conditional skips; [receipt](../releases/d05-merged-readiness.md) |
 | D02 | B02–03 DEV runtime and persona acceptance | Awaiting identity access | [Reviewed plan](2026-09-20-1323-chore-dev-recovery-acceptance-plan.md) | [Plan review](../releases/d02-plan-review.json): six local and three independent Claude reviews resolved; [Recovery proof](../releases/d02-recovery-receipt.md) passed; hosted admin tokens invalid; local credential also rejected by hosted DEV after authorized validation. Return when supported DEV admin authority is available; no deployment or migration performed |
 
-| D06 | B10 isolated local full-stack foundation | Planning | Research in progress | Real local services and disposable identity; API/browser workflows and repeatable cleanup; B11–13 broader coverage remains separate |
+| D06 | B10 isolated local full-stack foundation | Implementing | [Reviewed plan](2026-09-20-1357-feat-isolated-full-stack-tests-plan.md); checkpoint `db916292` | U1 lifecycle isolation active; real local services and disposable identity, API/browser workflows and repeatable cleanup; B11–13 broader coverage remains separate |
 
 ## Decision record
 
@@ -118,7 +120,7 @@ The catalog owns the full requirement wording and source status. This ledger own
 | B07 | Complete PR Party external activation and its credentialed, degraded, and Q&A end-to-end flows | Queued | See catalog; assign a bounded deliverable when reached |
 | B08 | Finish CatholicOS delivery of the remaining feature tranches and documentation | Queued | See catalog; assign a bounded deliverable when reached |
 | B09 | Complete the parallel FOLIO PROD rehearsal, UAT, reversible cutover, and gated promotion proof | Queued | See catalog; assign a bounded deliverable when reached |
-| B10 | Establish repeatable full-stack API and browser tests with isolated projects, real backend state, setup and cleanup | Queued | See catalog; assign a bounded deliverable when reached |
+| B10 | Establish repeatable full-stack API and browser tests with isolated projects, real backend state, setup and cleanup | Implementing | D06 reviewed plan; lifecycle isolation first, then real authentication and all API/browser categories; acceptance pending |
 | B11 | Prove real OIDC login, logout, credential renewal, session expiry, anonymous/optional/required modes, Monaco editing, and save/submit/review/merge | Queued | See catalog; assign a bounded deliverable when reached |
 | B12 | Prove WebSocket authentication, presence, acknowledgments, sync, reconnect after server restart, multi-client behavior, and index notifications | Queued | See catalog; assign a bounded deliverable when reached |
 | B13 | Add browser CI, reproducible seed/cleanup, Chromium/Firefox coverage, failure traces, and frontend/backend response-contract checks | Queued | See catalog; assign a bounded deliverable when reached |
