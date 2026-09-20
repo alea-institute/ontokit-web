@@ -28,7 +28,7 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**Active deliverable D05: plan submission embedding-error handling and retry integrity (B14).**
+**Active deliverable D05: implement and verify submission embedding-error handling and retry integrity (B14).**
 
 - D01/D03 candidate merged into ALEA web `dev` through [PR48](https://github.com/alea-institute/ontokit-web/pull/48), revision `ab903e145e2a6ad30aefd915a83cb0bafbaa0678`, after all eight verification checks passed. No deployment occurred.
 - [D03 evidence](../releases/d03-image-readiness.md) supersedes D01’s required-auth image failure: all three images build and pass expanded runtime checks; 5,222 tests pass.
@@ -36,7 +36,7 @@ The accepted direction is to work through every area. Alternative storage archit
 - D01 local preparation is complete under [its reviewed plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md). The candidate incorporates current ALEA `dev`, the repair/test work and one dashboard fixture adaptation. Standing authorization in `AGENTS.md` now permits publication, merge and deployment after their verification gates.
 - D04 is implemented and independently reviewed: all six requirements met, no primary/actionable findings; 3,243 tests pass with no skips, Ruff/mypy/pyright pass in the locked Python 3.11 environment. All four save entry points have denial/persistence coverage.
 - [API PR48](https://github.com/alea-institute/ontokit-api/pull/48) publishes D04 at `a2b981f5128ff61676f7e64a75daa860a1bf7d08`; Merged into API `dev` as `c6e552c844f315987f4eb614d04527c4c4a5e5af` after all six verification checks passed; see [merged evidence](../releases/d04-merged-readiness.md). [Durable verification](https://github.com/alea-institute/ontokit-api/blob/fix/d04-individual-mint-20260920/docs/releases/d04-individual-mint-readiness.md) includes the plan and review links. The canonical checkout is `.worktrees/api-d04-mint`; the original API checkout is stale and contains unrelated work.
-- D05 follows: API submit/resubmit embedding-error contracts and retry/state behavior. B14 also retains a pre-existing schema-taxonomy gap for `owl:DeprecatedClass`, `owl:DeprecatedProperty` and `rdfs:ContainerMembershipProperty`; plan that bounded follow-up without altering submission billing/caps.
+- D05 is in implementation: API submit embedding-error contracts and retry/state behavior; resubmit retains no paid validation. B14 also retains a pre-existing schema-taxonomy gap for `owl:DeprecatedClass`, `owl:DeprecatedProperty` and `rdfs:ContainerMembershipProperty`; plan that bounded follow-up without altering submission billing/caps.
 - D02 remains authenticated DEV lifecycle acceptance (B02–03), after code prerequisites and authorized release activation. The old waiting workflow run pins an older pair and is not the release of this candidate.
 - If only external activation blocks, continue with the independent full-stack foundation in A02 (B10). Record the blocker owner, next action and return condition.
 
@@ -89,7 +89,7 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | D01 | B01; readiness portions of B02/B14 | Accepted: local preparation only | [Plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md) | [Release evidence](../releases/d01-release-readiness.md); candidate `3d45af5b`: 364 files / 5,188 tests pass; optional-auth image builds; authenticated activation blocked |
 | D03 | B14 configured-provider image fidelity | Integrated | [Plan](2026-09-20-0731-fix-configured-provider-image-plan.md) | [Image and review evidence](../releases/d03-image-readiness.md); [PR48](https://github.com/alea-institute/ontokit-web/pull/48) merged as `ab903e14`; eight CI checks passed |
 | D04 | B14 individual mint enforcement | Integrated | [API plan](https://github.com/alea-institute/ontokit-api/blob/fix/d04-individual-mint-20260920/docs/plans/2026-09-20-0839-fix-individual-mint-enforcement-plan.md) | [API PR48](https://github.com/alea-institute/ontokit-api/pull/48), merged `c6e552c8`; 3,243 tests pass; all six requirements met; no new actionable review findings |
-| D05 | B14 submission embedding errors | Scoping | Not yet created | Submit lacks explicit 402/503 mapping; resubmit makes no paid embedding call and must retain that behavior; prove failure/retry state |
+| D05 | B14 submission embedding errors | Implementing | [Reviewed API plan](../../.worktrees/api-d05-errors/docs/plans/2026-09-20-1224-fix-submission-embedding-errors-plan.md) | Plan checkpoint `64e81b94`; six local and three Claude reviews completed, two verification corrections applied; prove 402/503 responses, durable draft recovery and retained paid-call records |
 | D02 | B02–03 DEV runtime and persona acceptance | Awaiting prerequisites | Not yet created | D03–05 and authorized published pair/activation first |
 
 ## Decision record
