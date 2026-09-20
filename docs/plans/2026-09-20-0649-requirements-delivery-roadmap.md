@@ -28,10 +28,10 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**Next deliverable D03: repair configured-provider image build fidelity (B14).**
+**Active deliverable D03: repair configured-provider image build fidelity (B14).**
 
 - Start with [the D01 evidence packet](../releases/d01-release-readiness.md) and its required-auth Docker failure. The credential-free image builds; the required-auth image does not.
-- Create a focused ce-plan for build-time public provider configuration versus runtime secrets, retaining fail-closed runtime validation. Work from the local release candidate identified in that packet, not the older repair branch.
+- Execute [the reviewed D03 plan](2026-09-20-0731-fix-configured-provider-image-plan.md): build-time public provider configuration versus runtime secrets, retaining fail-closed runtime validation. Work from the local release candidate identified in that packet, not the older repair branch.
 - D01 local preparation is complete under [its reviewed plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md). The candidate incorporates current ALEA `dev`, the repair/test work and one dashboard fixture adaptation. Standing authorization in `AGENTS.md` now permits publication, merge and deployment after their verification gates.
 - D04 follows: API individual mint-capability enforcement. D05 follows: API submit/resubmit embedding error mapping. Both have source findings; reproduce them before repair. The API checkout is stale and must not be used as the source baseline.
 - D02 remains authenticated DEV lifecycle acceptance (B02–03), after code prerequisites and authorized release activation. The old waiting workflow run pins an older pair and is not the release of this candidate.
@@ -84,7 +84,7 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | ID | Scope | State | Plan | Evidence / remainder |
 |---|---|---|---|---|
 | D01 | B01; readiness portions of B02/B14 | Accepted: local preparation only | [Plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md) | [Release evidence](../releases/d01-release-readiness.md); candidate `3d45af5b`: 364 files / 5,188 tests pass; optional-auth image builds; authenticated activation blocked |
-| D03 | B14 configured-provider image fidelity | Next: ce-plan | Not yet created | Required-auth Docker failure reproduced; keep secrets out of images and preserve runtime validation |
+| D03 | B14 configured-provider image fidelity | Implementing | [Plan](2026-09-20-0731-fix-configured-provider-image-plan.md) | [Review receipt](../releases/d03-plan-review.json); six local and three Claude reviews completed; runtime initialization unit active |
 | D04 | B14 individual mint enforcement | Queued prerequisite | Not yet created | API declaration gate omits individuals; reproduce on current API dev before repair |
 | D05 | B14 submit/resubmit embedding errors | Queued prerequisite | Not yet created | API source lacks explicit 402/503 mapping; prove retry/state behavior |
 | D02 | B02–03 DEV runtime and persona acceptance | Awaiting prerequisites | Not yet created | D03–05 and authorized published pair/activation first |
