@@ -28,7 +28,7 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**Active deliverable D02: execute matched DEV recovery, activation and authenticated persona acceptance (B02–03).**
+**D02: recovery verified; hosted identity access pending. Next independent deliverable D06: B10 full-stack test foundation (planning).**
 
 - D01/D03 candidate merged into ALEA web `dev` through [PR48](https://github.com/alea-institute/ontokit-web/pull/48), revision `ab903e145e2a6ad30aefd915a83cb0bafbaa0678`, after all eight verification checks passed. No deployment occurred.
 - [D03 evidence](../releases/d03-image-readiness.md) supersedes D01’s required-auth image failure: all three images build and pass expanded runtime checks; 5,222 tests pass.
@@ -90,7 +90,9 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | D03 | B14 configured-provider image fidelity | Integrated | [Plan](2026-09-20-0731-fix-configured-provider-image-plan.md) | [Image and review evidence](../releases/d03-image-readiness.md); [PR48](https://github.com/alea-institute/ontokit-web/pull/48) merged as `ab903e14`; eight CI checks passed |
 | D04 | B14 individual mint enforcement | Integrated | [API plan](https://github.com/alea-institute/ontokit-api/blob/fix/d04-individual-mint-20260920/docs/plans/2026-09-20-0839-fix-individual-mint-enforcement-plan.md) | [API PR48](https://github.com/alea-institute/ontokit-api/pull/48), merged `c6e552c8`; 3,243 tests pass; all six requirements met; no new actionable review findings |
 | D05 | B14 submission embedding errors | Merged | [API PR49](https://github.com/alea-institute/ontokit-api/pull/49) | Merge `c95991c7`; 3,260 tests, zero skips, 90% coverage; eight review lenses clear; six CI successes/six conditional skips; [receipt](../releases/d05-merged-readiness.md) |
-| D02 | B02–03 DEV runtime and persona acceptance | Implementing U1 | [Reviewed plan](2026-09-20-1323-chore-dev-recovery-acceptance-plan.md) | [Plan review](../releases/d02-plan-review.json): six local and three independent Claude reviews resolved; U1 recovery/identity preflight in progress; matched deployment and natural-time UAT remain open |
+| D02 | B02–03 DEV runtime and persona acceptance | Awaiting identity access | [Reviewed plan](2026-09-20-1323-chore-dev-recovery-acceptance-plan.md) | [Plan review](../releases/d02-plan-review.json): six local and three independent Claude reviews resolved; [Recovery proof](../releases/d02-recovery-receipt.md) passed; hosted admin tokens invalid; local credential validation awaiting approval. Return when supported DEV admin authority is available; no deployment or migration performed |
+
+| D06 | B10 isolated local full-stack foundation | Planning | Research in progress | Real local services and disposable identity; API/browser workflows and repeatable cleanup; B11–13 broader coverage remains separate |
 
 ## Decision record
 
@@ -108,7 +110,7 @@ The catalog owns the full requirement wording and source status. This ledger own
 | ID | Outcome | Program state | Plan / evidence / next action |
 |---|---|---|---|
 | B01 | Integrate the September coverage-driven production repairs and their tests into the intended delivery branch, then ship the reviewed pair | Locally verified | [PR48](https://github.com/alea-institute/ontokit-web/pull/48) merged as `ab903e14`; matched deployment remains |
-| B02 | Complete the matched API/web DEV deployment and record running revisions, migration state, health, seeded project, write smoke, and rollback evidence | Scoping | D01 evidence; prerequisites and acceptance remain open |
+| B02 | Complete the matched API/web DEV deployment and record running revisions, migration state, health, seeded project, write smoke, and rollback evidence | Awaiting identity access | D02 backup/restore verified; hosted admin authority, deployment and acceptance remain open |
 | B03 | Finish authenticated persona UAT, including trust promotion, translation/audit, autosave, permissions, and the real submission/merge chain | Queued | See catalog; assign a bounded deliverable when reached |
 | B04 | Activate the two isolated demo repositories, scoped source/destination credentials, atomic refresh, cleanup and rollback | Queued | See catalog; assign a bounded deliverable when reached |
 | B05 | Close retired-demo redirect and retention acceptance | Queued | See catalog; assign a bounded deliverable when reached |

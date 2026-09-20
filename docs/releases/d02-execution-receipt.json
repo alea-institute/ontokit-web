@@ -1,0 +1,60 @@
+{
+  "status": "blocked",
+  "plan_path": "docs/plans/2026-09-20-1323-chore-dev-recovery-acceptance-plan.md",
+  "changed_files": [
+    "docs/releases/d02-recovery-receipt.md"
+  ],
+  "u_ids_attempted": [
+    "U1"
+  ],
+  "u_ids_completed": [],
+  "verification_results": [
+    "PROD_ENABLED repository value false",
+    "Coordinated backup and actual isolated restore passed",
+    "Original services resumed; stopped baseline isolated; deploy lock released",
+    "Hosted administrator/login/configured service credentials HTTP401",
+    "Local separate identity administrator credentials HTTP200; hosted validation approval pending"
+  ],
+  "verification_evidence": [
+    {
+      "unit": "U1",
+      "behavior_changed": false,
+      "existing_tests_inspected": [
+        "deploy locking and Compose source",
+        "ProjectService deletion and StorageService reference-preserving cleanup"
+      ],
+      "tests_added_or_changed": [],
+      "tests_used_unchanged": [],
+      "characterization": "Original API/worker restart failure, Login unhealthy, empty application schema with preserved Git/Minio data",
+      "verification": "Actual PostgreSQL restore: owners, extensions, table inventories and every row count matched; five archive comparisons and Redis RDB check passed; parent checked root0700 directory, baseline exited0/networknone/noports, originalservice health and free lock",
+      "exception_reason": "Operational recovery needs runtime restore evidence, not mocked product tests."
+    }
+  ],
+  "implementation_engine_binding": null,
+  "requested_route": "native",
+  "actual_route": "native/subagent",
+  "requested_model": null,
+  "actual_model": "inherited session model",
+  "requested_effort": null,
+  "fallback_reason": null,
+  "run_id": null,
+  "source_kind": "plan",
+  "source_digest": "e2f441567c832471271bb85e3def07793db0aa8bac69d5ae123a201d103c57ca",
+  "unit_receipts": [
+    {
+      "unit": "U1",
+      "worker": "d02_u1_recovery",
+      "state": "partial; recovery verified, identity prerequisite blocked",
+      "cleanup": "No fixtures; baseline stopped/isolated, durable operator-owned recovery retained, original services resumed",
+      "canonical_commit": null
+    }
+  ],
+  "plan_checkpoint": null,
+  "blockers": [
+    "A valid hosted DEV identity administrator path is not yet available; newly found local credential validation is awaiting specific egress approval."
+  ],
+  "recovery_path": "docs/releases/d02-recovery-receipt.md",
+  "settled_decision_conflicts": [],
+  "behavior_change": false,
+  "standalone_shipping_skipped": true
+}
