@@ -88,13 +88,17 @@ function isTestEnv(): boolean {
   return !!(process.env.VITEST || process.env.NODE_ENV === "test");
 }
 
-export const serverEnv: ServerEnv = isTestEnv()
-  ? (new Proxy({} as ServerEnv, {
-      get(_, prop: string) {
-        return validateServerEnv()[prop as keyof ServerEnv];
-      },
-    }))
-  : validateServerEnv();
+// Imports remain safe during compilation. Cache only successful runtime reads;
+// tests deliberately revalidate so each environment fixture remains independent.
+let cachedServerEnv: ServerEnv | undefined;
+export const serverEnv: ServerEnv = new Proxy({} as ServerEnv, {
+  get(_, prop: string) {
+    const values = isTestEnv()
+      ? validateServerEnv()
+      : (cachedServerEnv ??= validateServerEnv());
+    return values[prop as keyof ServerEnv];
+  },
+});
 
 export const clientEnv: ClientEnv = isTestEnv()
   ? (new Proxy({} as ClientEnv, {

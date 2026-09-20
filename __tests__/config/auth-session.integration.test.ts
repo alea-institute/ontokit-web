@@ -23,7 +23,8 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 async function session(token: JWT) {
-  const { authConfig } = await import('@/auth');
+  const { createAuthConfig } = await import('@/auth');
+    const authConfig = createAuthConfig();
   const cookie = await encode({ token, secret, salt: 'authjs.session-token' });
   return Auth(new Request('http://localhost/api/auth/session', { headers: { cookie: `authjs.session-token=${cookie}` } }), {
     ...authConfig, secret, trustHost: true, basePath: '/api/auth',
@@ -40,7 +41,8 @@ describe('authenticated sessions through encrypted cookies and real callbacks', 
     [{ sub: 'reviewer', name: 'Display name', preferred_username: 'handle', email: 'reviewer@example.invalid', picture: 'https://example.invalid/avatar' }, 'Display name'],
     [{ sub: 'reviewer', preferred_username: 'handle', email: 'reviewer@example.invalid' }, 'handle'],
   ])('maps the issuer profile and initial grant into a usable session: %j', async (profile, name) => {
-    const { authConfig } = await import('@/auth');
+    const { createAuthConfig } = await import('@/auth');
+    const authConfig = createAuthConfig();
     const provider = authConfig.providers[0] as OIDCConfig<Record<string, unknown>>;
     const signedInUser = await provider.profile!(profile, {});
     expect(signedInUser).toEqual({ id: 'reviewer', name, email: 'reviewer@example.invalid', image: "picture" in profile ? profile.picture : undefined });
@@ -109,7 +111,8 @@ describe('authenticated sessions through encrypted cookies and real callbacks', 
   });
 
   it('returns no session for a request without a session cookie', async () => {
-    const { authConfig } = await import('@/auth');
+    const { createAuthConfig } = await import('@/auth');
+    const authConfig = createAuthConfig();
     const response = await Auth(new Request('http://localhost/api/auth/session'), { ...authConfig, secret, trustHost: true, basePath: '/api/auth' });
     expect(response.status).toBe(200);
     expect(await response.json()).toBeNull();

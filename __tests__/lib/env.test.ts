@@ -1,9 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
-// We must import the validation functions without triggering the module-level
-// serverEnv/clientEnv calls (which would throw in a test environment).
-// We use vi.importActual to isolate just the functions we need.
-
 describe("validateServerEnv", () => {
   const originalEnv = process.env;
 
@@ -17,7 +13,6 @@ describe("validateServerEnv", () => {
   });
 
   async function loadValidateServerEnv() {
-    // Mock the module to prevent top-level calls from throwing
     const mod = await import("@/lib/env");
     return mod.validateServerEnv;
   }
@@ -163,7 +158,7 @@ describe("lazy environment exports with real validation and auth mode", () => {
   });
 });
 
-describe("eager startup validation with the real schema and authentication gate", () => {
+describe("production environment access with the real schema and authentication gate", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.stubEnv("VITEST", undefined);
@@ -189,9 +184,14 @@ describe("eager startup validation with the real schema and authentication gate"
     expect(clientEnv.NEXT_PUBLIC_API_URL).toBe("https://api.example.test");
   });
 
-  it("rejects module initialization when required session configuration is missing", async () => {
+  it("defers missing session validation to access and retries after failure", async () => {
     vi.stubEnv("NEXTAUTH_SECRET", undefined);
-    await expect(import("@/lib/env")).rejects.toThrow("NEXTAUTH_SECRET");
+    const { serverEnv } = await import("@/lib/env");
+    expect(() => serverEnv.NEXTAUTH_SECRET).toThrow("NEXTAUTH_SECRET");
+    vi.stubEnv("NEXTAUTH_SECRET", "corrected-session-secret");
+    expect(serverEnv.NEXTAUTH_SECRET).toBe("corrected-session-secret");
+    vi.stubEnv("NEXTAUTH_SECRET", undefined);
+    expect(serverEnv.NEXTAUTH_SECRET).toBe("corrected-session-secret");
   });
 
   it("rejects invalid client configuration even when server configuration is valid", async () => {
