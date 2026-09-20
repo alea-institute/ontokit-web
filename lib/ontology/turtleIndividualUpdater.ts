@@ -4,6 +4,13 @@
  * Generates and replaces individual blocks in Turtle source text.
  */
 
+import {
+  LABEL_IRI,
+  COMMENT_IRI,
+  DEFINITION_IRI,
+  SEE_ALSO_IRI,
+  IS_DEFINED_BY_IRI,
+} from "@/lib/ontology/annotationProperties";
 import type { LocalizedString, AnnotationUpdate } from "@/lib/api/client";
 import {
   parseDeclarations,
@@ -56,17 +63,17 @@ function genIndividualBlock(
 
   for (const l of data.labels) {
     if (!l.value.trim()) continue;
-    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#label", rev)} ${literal(l.value, l.lang)}`);
+    po.push(`${toTurtle(LABEL_IRI, rev)} ${literal(l.value, l.lang)}`);
   }
 
   for (const c of data.comments) {
     if (!c.value.trim()) continue;
-    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#comment", rev)} ${literal(c.value, c.lang)}`);
+    po.push(`${toTurtle(COMMENT_IRI, rev)} ${literal(c.value, c.lang)}`);
   }
 
   for (const d of data.definitions) {
     if (!d.value.trim()) continue;
-    po.push(`${toTurtle("http://www.w3.org/2004/02/skos/core#definition", rev)} ${literal(d.value, d.lang)}`);
+    po.push(`${toTurtle(DEFINITION_IRI, rev)} ${literal(d.value, d.lang)}`);
   }
 
   for (const s of data.sameAsIris) {
@@ -99,13 +106,13 @@ function genIndividualBlock(
 
   if (data.seeAlsoIris) {
     for (const s of data.seeAlsoIris) {
-      po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#seeAlso", rev)} ${toTurtle(s, rev)}`);
+      po.push(`${toTurtle(SEE_ALSO_IRI, rev)} ${toTurtle(s, rev)}`);
     }
   }
 
   if (data.isDefinedByIris) {
     for (const d of data.isDefinedByIris) {
-      po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#isDefinedBy", rev)} ${toTurtle(d, rev)}`);
+      po.push(`${toTurtle(IS_DEFINED_BY_IRI, rev)} ${toTurtle(d, rev)}`);
     }
   }
 
