@@ -45,6 +45,15 @@ describe("Docker release fidelity", () => {
     expect(dockerignore).toContain("*.key");
   });
 
+  it("passes public provider inputs to the builder without adding runtime credentials", () => {
+    const builder = dockerfile.split("FROM base AS builder")[1].split("FROM base AS runner")[0];
+    for (const variable of ["ZITADEL_ISSUER", "ZITADEL_CLIENT_ID"]) {
+      expect(builder).toContain(`ARG ${variable}`);
+      expect(builder).toContain(`ENV ${variable}=$${variable}`);
+    }
+    expect(builder).not.toMatch(/(?:ARG|ENV) (?:NEXTAUTH_SECRET|ZITADEL_CLIENT_SECRET)/);
+  });
+
   it("gates publication on a non-pushing build with identical build arguments", () => {
     const fidelityJob = workflowJob("docker-build");
     const publicationJob = workflowJob("publish_docker");
