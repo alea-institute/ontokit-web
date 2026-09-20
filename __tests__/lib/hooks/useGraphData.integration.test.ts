@@ -148,9 +148,10 @@ describe("graph loading with the real API client, graph builder and layout engin
     act(() => result.current.resetGraph());
     expect(result.current.graphData).toBeNull();
     expect(result.current.resolvedCount).toBe(0);
+    await waitFor(() => expect(result.current.resolvedCount).toBe(3));
   });
 
-  it("expands newly discovered neighbors without retrying failed class lookups", async () => {
+  it("retries a failed class lookup only on explicit expansion", async () => {
     const calls = serveGraph([
       detail("Focus"), detail("Expansion", { parent_iris: [iri("Root")], disjoint_iris: [iri("Missing")] }), detail("Root"),
     ]);
@@ -159,7 +160,7 @@ describe("graph loading with the real API client, graph builder and layout engin
     await act(async () => { await result.current.expandNode(iri("Expansion")); });
     expect(result.current.resolvedCount).toBe(3);
     await act(async () => { await result.current.expandNode(iri("Missing")); });
-    expect(calls.filter((url) => url.pathname.endsWith(`/classes/${encodeURIComponent(iri("Missing"))}`))).toHaveLength(1);
+    expect(calls.filter((url) => url.pathname.endsWith(`/classes/${encodeURIComponent(iri("Missing"))}`))).toHaveLength(2);
     expect(result.current.graphData?.edges).toContainEqual(expect.objectContaining({ source: iri("Expansion"), target: iri("Root"), edgeType: "subClassOf" }));
   });
 

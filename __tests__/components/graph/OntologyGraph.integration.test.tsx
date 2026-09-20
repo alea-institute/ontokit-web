@@ -84,3 +84,18 @@ describe("graph with real React Flow, ELK layout, nodes and API loading", () => 
     expect(fetchBoundary).not.toHaveBeenCalled();
   });
 });
+
+
+it("fits the viewport again after zooming with the real graph controls", async () => {
+  const { container } = render(<OntologyGraph {...props} />);
+  await screen.findByRole("button", { name: "Parent" });
+  const viewport = container.querySelector('.react-flow__viewport') as HTMLElement;
+  await waitFor(() => expect(viewport.style.transform).not.toBe('translate(0px,0px) scale(1)'));
+  const fitted = viewport.style.transform;
+  fireEvent.click(screen.getByRole('button', { name: 'Zoom In' }));
+  await waitFor(() => expect(viewport.style.transform).not.toBe(fitted));
+  const zoomed = viewport.style.transform;
+  const scale = (transform: string) => Number(transform.match(/scale\(([^)]+)\)/)![1]);
+  fireEvent.click(screen.getByRole('button', { name: 'Fit view' }));
+  await waitFor(() => expect(scale(viewport.style.transform)).toBeLessThan(scale(zoomed)));
+});

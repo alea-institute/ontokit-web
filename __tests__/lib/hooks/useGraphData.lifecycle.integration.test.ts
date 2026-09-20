@@ -56,3 +56,68 @@ describe('graph lifecycle through HTTP, neighbor resolution and graph constructi
     expect(fetcher).toHaveBeenCalledOnce();
   });
 });
+
+
+describe('graph recovery and request capacity', () => {
+  it('retries an explicitly expanded failed node and reloads after reset', async () => {
+    let available = false;
+    let focusCalls = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const path = decodeURIComponent(new URL(String(input)).pathname);
+      if (path.endsWith('/ancestors')) return Response.json({ nodes: [] });
+      if (path.endsWith('/search')) return Response.json({ results: [] });
+      const name = path.split('/').at(-1)!;
+      if (name === 'Focus') { focusCalls++; return Response.json(detail(name, [iri('Parent')])); }
+      return available ? Response.json(detail(name)) : Response.json({ detail: 'Missing' }, { status: 404 });
+    }));
+    const { result } = renderHook(() => useGraphData({ focusIri: iri('Focus'), projectId: 'project' }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.resolvedCount).toBe(1);
+    available = true;
+    await act(async () => { await result.current.expandNode(iri('Parent')); });
+    expect(result.current.resolvedCount).toBe(2);
+    act(() => result.current.resetGraph());
+    await waitFor(() => expect(focusCalls).toBe(2));
+    await waitFor(() => expect(result.current.resolvedCount).toBe(2));
+  });
+
+  it('reserves capacity for parallel requests and deduplicates repeated references', async () => {
+    let detailCalls = 0;
+    const parents = Array.from({ length: 150 }, (_, index) => iri(`Parent${index}`));
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const path = decodeURIComponent(new URL(String(input)).pathname);
+      if (path.endsWith('/ancestors')) return Response.json({ nodes: [] });
+      const name = path.split('/').at(-1)!;
+      detailCalls++;
+      return Response.json(detail(name, name === 'Focus' ? [...parents, ...parents] : []));
+    }));
+    const { result } = renderHook(() => useGraphData({ focusIri: iri('Focus'), projectId: 'project' }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.resolvedCount).toBe(100);
+    expect(detailCalls).toBe(100);
+  });
+
+  it('does not allow an old expansion to contaminate the new focus cache', async () => {
+    let release!: (response: Response) => void;
+    const pending = new Promise<Response>(resolve => { release = resolve; });
+    let paused = false;
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const path = decodeURIComponent(new URL(String(input)).pathname);
+      if (path.endsWith('/ancestors')) return Response.json({ nodes: [] });
+      const name = path.split('/').at(-1)!;
+      if (name === 'Expansion') { paused = true; return pending; }
+      return Response.json(detail(name));
+    }));
+    const { result, rerender } = renderHook(({ focus }) => useGraphData({ focusIri: iri(focus), projectId: 'project' }), { initialProps: { focus: 'Old' } });
+    await waitFor(() => expect(result.current.resolvedCount).toBe(1));
+    let expansion!: Promise<void>;
+    act(() => { expansion = result.current.expandNode(iri('Expansion')) as unknown as Promise<void>; });
+    await waitFor(() => expect(paused).toBe(true));
+    rerender({ focus: 'Current' });
+    await waitFor(() => expect(result.current.graphData?.nodes[0]?.id).toBe(iri('Current')));
+    await act(async () => { release(Response.json(detail('Expansion'))); await expansion; });
+    await act(async () => { await result.current.expandNode(iri('Current')); });
+    expect(result.current.graphData?.nodes.map(node => node.id)).toEqual([iri('Current')]);
+    expect(result.current.resolvedCount).toBe(1);
+  });
+});
