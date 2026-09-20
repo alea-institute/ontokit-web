@@ -58,7 +58,6 @@ for (const detached of [false, true]) test(`owned command failure cleans descend
     descendant = await processIdentity(child);
     const record = m.processes[0];
     assert.equal(sameProcess(record, await processIdentity(record.pid)), true);
-    await assert.rejects(cleanupProcesses({...m, processes: [{...record, start: '0'}]}), /identity changed/);
     await assert.rejects(cleanupProcesses({...m, id: 'd'.repeat(32)}), /not a run supervisor/);
     await cleanupProcesses(m);
     assert.equal(sameProcess(unrelatedIdentity, await processIdentity(unrelated.pid)), true, 'unrelated process must survive');
@@ -137,4 +136,31 @@ process.on('${signal}', () => controller.abort());
     assert.deepEqual(result, {code: 130, signal: null});
     assert.equal(await readFile(path.join(directory, 'cleanup'), 'utf8'), 'reached');
   } finally { if (!exited) child.kill('SIGKILL'); await exit; await rm(directory, {recursive: true, force: true}); }
+});
+
+for (const obsolete of ['start', 'boot', 'group']) test(`obsolete ${obsolete} identity preserves replacement and cleans marked orphan`, async () => {
+  const runId = (await import('node:crypto')).randomBytes(16).toString('hex');
+  const foreign = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], {detached: obsolete !== 'group', stdio: 'ignore', env: {PATH: process.env.PATH}});
+  const owned = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], {detached: true, stdio: 'ignore', env: {PATH: process.env.PATH, ONTOKIT_E2E_RUN: runId}});
+  const foreignExit = new Promise(resolve => foreign.once('exit', resolve));
+  const ownedExit = new Promise(resolve => owned.once('exit', resolve));
+  const identity = await processIdentity(foreign.pid);
+  try {
+    const stale = {...identity, [obsolete]: obsolete === 'group' ? identity.pid : obsolete === 'start' ? '0' : 'obsolete-boot'};
+    await cleanupProcesses({...manifest, id: runId, processes: [stale]});
+    assert.equal(sameProcess(identity, await processIdentity(foreign.pid)), true);
+    assert.equal(await processIdentity(owned.pid), null, 'marked orphan must be reaped');
+  } finally {
+    foreign.kill('SIGKILL'); owned.kill('SIGKILL');
+    await Promise.all([foreignExit, ownedExit]);
+  }
+});
+test('matching identity without a run supervisor marker still refuses cleanup', async () => {
+  const foreign = spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], {detached: true, stdio: 'ignore', env: {PATH: process.env.PATH}});
+  const exit = new Promise(resolve => foreign.once('exit', resolve));
+  const identity = await processIdentity(foreign.pid);
+  try {
+    await assert.rejects(cleanupProcesses({...manifest, processes: [identity]}), /not a run supervisor/);
+    assert.equal(sameProcess(identity, await processIdentity(foreign.pid)), true);
+  } finally { foreign.kill('SIGKILL'); await exit; }
 });

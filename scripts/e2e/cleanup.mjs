@@ -42,10 +42,13 @@ export async function cleanupProcesses(manifest) {
       try { process.kill(-record.pid, 0); } catch (e) { if (e.code === 'ESRCH') continue; throw e; }
       throw new Error('Process group remains without its verified leader; refusing cleanup');
     }
+    // An obsolete record cannot authorize signals to its replacement, but does not
+    // block cleanup of descendants and resources with independently verified ownership.
+    if (!sameProcess(record, current)) continue;
     const environment = await readFile(`/proc/${record.pid}/environ`, 'utf8');
     const command = await readFile(`/proc/${record.pid}/cmdline`, 'utf8');
     if (!environment.split('\0').includes(`ONTOKIT_E2E_RUN=${manifest.id}`) || !command.split('\0').includes(fileURLToPath(new URL('./supervisor.mjs', import.meta.url)))) throw new Error('Host process is not a run supervisor; refusing cleanup');
-    if (!sameProcess(record, current)) throw new Error('Process identity changed; refusing cleanup');
+    if (!sameProcess(record, await processIdentity(record.pid))) continue;
     process.kill(-record.pid, 'SIGTERM');
     await pause(500);
     if (sameProcess(record, await processIdentity(record.pid))) process.kill(-record.pid, 'SIGKILL');

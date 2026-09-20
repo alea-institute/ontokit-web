@@ -33,6 +33,9 @@ Do not delete the checkout or its recovery manifest until cleanup succeeds. Reco
 requires this harness at its original checkout path. Recovery never deletes resources
 unless both Compose project and run labels agree, verifies host supervisors with run
 markers plus PID/start time/boot identity, and fails closed when ownership is ambiguous.
+A proven obsolete PID/start/boot/group record is skipped without signaling its replacement;
+independently marked descendants and label-verified resources are still cleaned up.
+A matching process identity without the expected supervisor/marker still refuses cleanup.
 A missing manifest is not permission to adopt or delete Docker resources.
 
 U2 imports `run({apiSource, workflow})`; `workflow(ctx)` runs after migration/API startup.
@@ -55,7 +58,13 @@ For explicit failure investigation only, add `--retain-diagnostics`. On failure 
 last 8 MiB of `private.log` is copied to `/tmp/ontokit-e2e-diagnostics-<uid>/<id>/`
 (outside Git), with mode 0700 directories and 0600 files. A nonsecret `metadata.json`
 records run ID, phase, truncation and a one-hour expiry. Every later launcher invocation
-removes expired entries before prerequisites; there is no background deletion timer.
+removes verified expired entries before prerequisites; there is no background deletion timer.
+Retention writes both files in a private staging directory, then publishes the complete entry
+with an atomic rename. Hard interruption may leave a staging directory or an incomplete older
+entry. Such entries, unexpected files, and unsafe or symlinked entries are preserved and reported
+with only an escaped path for manual inspection and cleanup; they do not block later launches.
+Their expiry cannot be verified, so they are never automatically deleted. Private-root security
+failures and failures to delete verified expired entries still fail the launch.
 Delete the run's diagnostic directory immediately after diagnosis. Logs can contain
 credentials and must never be printed, uploaded, copied into the repository or committed.
 The default retains no diagnostics, and resource/runtime cleanup remains mandatory even
