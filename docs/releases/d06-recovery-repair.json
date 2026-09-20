@@ -1,0 +1,32 @@
+{
+  "status": "implementing",
+  "plan_path": "docs/plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md",
+  "unit": "U1 recovery follow-up",
+  "requirements": [
+    "R1",
+    "R2",
+    "R9"
+  ],
+  "review": "docs/releases/d06-web-review.json",
+  "review_run_id": "20260920-d06-final-c99b56f0",
+  "automatic_apply": "No eligible LFG step5 fixes: both confidence75/manual with one independent reviewer; validator confirmation and parent reproduction are not relabeled cross-persona agreement.",
+  "resolution_route": "Bounded CE-work return-to-caller under existing U1/R9 and plan requirement to resolve actionable findings before publication; no new product decision.",
+  "worker": "/root/d06_recovery_repair",
+  "ownership": [
+    "scripts/e2e/cleanup.mjs",
+    "scripts/e2e/diagnostics.mjs",
+    "scripts/e2e/ownership.test.mjs",
+    "scripts/e2e/diagnostics.test.mjs",
+    "scripts/e2e/README.md"
+  ],
+  "pre_fix_reproduction": {
+    "recycledIdentityCleanup": "Host process is not a run supervisor; refusing cleanup",
+    "unrelatedProcessPreserved": true,
+    "ownedDescendantStillAlive": true,
+    "incompleteDiagnosticStartup": "ENOENT",
+    "actual_os_pid_reuse_forced": false,
+    "incidence_measured": false
+  },
+  "post_fix_verification": "pending",
+  "publication": "not pushed; web PR not created"
+}

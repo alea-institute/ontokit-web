@@ -1,0 +1,358 @@
+{
+  "status": "complete",
+  "verdict": "Ready with fixes",
+  "verdict_reason": "Resolve #1 and #2 with ownership-preserving regressions before publication, as the explicit plan requires actionable review findings resolved. All planned requirements and units have implementation and supplied passing evidence; the two P2 recovery defects qualify acceptance. Final browser gate, publication and required merge checks remain caller-owned.",
+  "scope": {
+    "base": "ab903e145e2a6ad30aefd915a83cb0bafbaa0678",
+    "branch": "feat/d06-full-stack-tests-20260920",
+    "head_sha": "9e7681129072e64a6f7546d6be0093fd7433ec15",
+    "pr_url": null,
+    "files_changed": 62,
+    "working_tree_additions": "Includes unstaged run.mjs metadata-inspect consolidation and current tracked evidence docs; two untracked release receipts are supplemental evidence."
+  },
+  "intent": "Deliver disposable Linux full-stack API and Chromium verification with real OIDC, strict mandatory test evidence and exact owned-resource cleanup. Preserve broader B11-B13 and live DEV acceptance as deferred work.",
+  "intent_confidence": "explicit",
+  "reviewers": [
+    "correctness",
+    "project-standards",
+    "testing",
+    "maintainability",
+    "security",
+    "reliability",
+    "adversarial-claude"
+  ],
+  "findings": [
+    {
+      "#": 1,
+      "autofix_class": "manual",
+      "confidence": 75,
+      "evidence": [
+        "scripts/e2e/cleanup.mjs:47-48 `if (!environment.split('\\0').includes(`ONTOKIT_E2E_RUN=${manifest.id}`) || !command.split('\\0').includes(fileURLToPath(new URL('./supervisor.mjs', import.meta.url)))) throw new Error('Host process is not a run supervisor; refusing cleanup');` / `if (!sameProcess(record, current)) throw new Error('Process identity changed; refusing cleanup');`",
+        "Validator inspected the introduced path and confirmed the trigger is reachable; incidence was not measured.",
+        "Parent-reported controlled reproduction (/tmp/d06-review-repros.mjs): an unmarked live process with obsolete recorded start caused 'Host process is not a run supervisor'; unrelatedProcessPreserved=true and ownedDescendantStillAlive=true. This constructs the stale-identity condition; it does not force actual OS PID reuse."
+      ],
+      "file": "scripts/e2e/cleanup.mjs",
+      "first_evidence": "scripts/e2e/cleanup.mjs:47-48 `if (!environment.split('\\0').includes(`ONTOKIT_E2E_RUN=${manifest.id}`) || !command.split('\\0').includes(fileURLToPath(new URL('./supervisor.mjs', import.meta.url)))) throw new Error('Host process is not a run supervisor; refusing cleanup');` / `if (!sameProcess(record, current)) throw new Error('Process identity changed; refusing cleanup');`",
+      "independent_reviewers": [
+        "adversarial-claude"
+      ],
+      "line": 47,
+      "owner": "downstream-resolver",
+      "pre_existing": false,
+      "requires_verification": true,
+      "reviewers": [
+        "adversarial-claude"
+      ],
+      "severity": "P2",
+      "suggested_fix": "Check the recorded boot/start/group identity before reading or signaling its current PID. Skip only a proven obsolete identity, never signal its replacement, then clean verified marked descendants and independently label-checked Docker/runtime resources. Preserve refusal for ambiguous ownership or surviving owned processes. Add a regression that preserves an unrelated replacement process while completing owned cleanup.",
+      "title": "Recycled supervisor PID prevents explicit crash cleanup",
+      "why_it_matters": "After a hard interruption, a recorded supervisor PID can be reused by an unrelated process. cleanupProcesses then throws before Docker and private runtime removal, so the documented recovery command cannot reclaim owned resources while that unrelated process remains alive. The process must remain unsignalled, but an obsolete identity need not prevent cleanup of independently verified owned resources.",
+      "validation_status": "confirmed",
+      "validation_reason": "The new cleanup.mjs:40-48 throws when a same-boot recorded supervisor PID has been recycled, and cleanup.mjs:61 consequently prevents both marked-descendant cleanup and independently label-verified Docker/runtime cleanup; runtime.mjs:76-79 persists supervisor identities, so killing the launcher and supervisors before recovery makes this precondition reachable, while refusing to signal the unrelated process does not require abandoning separately verified resources (incidence was not measured).",
+      "protected_subject": "authorization-authentication"
+    },
+    {
+      "#": 2,
+      "autofix_class": "manual",
+      "confidence": 75,
+      "evidence": [
+        "scripts/e2e/diagnostics.mjs:11 `if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Unexpected private diagnostic entry');` and :15-18 `const stat = await lstat(file); ... throw new Error('Unsafe diagnostic metadata'); ... if (metadata.id !== id || ... metadata.expiresAt !== metadata.createdAt + RETENTION_MS) throw new Error('Invalid diagnostic expiry');`",
+        "Validator inspected the introduced path and confirmed the trigger is reachable; incidence was not measured.",
+        "Parent-reported controlled reproduction (/tmp/d06-review-repros.mjs): a private hex-named directory with synthetic log and no metadata.json caused ENOENT from expireDiagnostics. This constructs the interrupted-write state; it does not measure real interruption incidence."
+      ],
+      "file": "scripts/e2e/diagnostics.mjs",
+      "first_evidence": "scripts/e2e/diagnostics.mjs:11 `if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Unexpected private diagnostic entry');` and :15-18 `const stat = await lstat(file); ... throw new Error('Unsafe diagnostic metadata'); ... if (metadata.id !== id || ... metadata.expiresAt !== metadata.createdAt + RETENTION_MS) throw new Error('Invalid diagnostic expiry');`",
+      "independent_reviewers": [
+        "adversarial-claude"
+      ],
+      "line": 11,
+      "owner": "downstream-resolver",
+      "pre_existing": false,
+      "requires_verification": true,
+      "reviewers": [
+        "adversarial-claude"
+      ],
+      "severity": "P2",
+      "suggested_fix": "Write complete private diagnostic entries in a staging directory and publish atomically. Handle incomplete or unrecognized entries without deleting or traversing unverified data, and emit a sanitized path-only recovery notice instead of blocking subsequent startup. Keep permission/symlink checks. Test interrupted publication and a hex directory missing metadata.json.",
+      "title": "Incomplete retained diagnostics block subsequent harness launches",
+      "why_it_matters": "A hard interruption after creating a retention directory but before writing metadata.json leaves an entry that expireDiagnostics rejects on every subsequent launch. This occurs before a run manifest or phase is created; the CLI suppresses the actual error, leaving users unable to start another suite or identify the blocking directory.",
+      "validation_status": "confirmed",
+      "validation_reason": "The new diagnostics.mjs:35-40 publishes the retention directory before metadata.json, so a hard interruption in that interval leaves an own-created entry whose missing metadata throws at diagnostics.mjs:15 on every subsequent run.mjs:24 startup, before phase/manifest creation, and run.mjs:125-126 hides its cause; the exception cleanup at diagnostics.mjs:41-45 cannot run after SIGKILL, establishing the trigger without relying on malformed or foreign metadata (incidence was not measured).",
+      "protected_subject": "public-contract"
+    }
+  ],
+  "actionable_findings": [
+    {
+      "#": 1,
+      "autofix_class": "manual",
+      "confidence": 75,
+      "evidence": [
+        "scripts/e2e/cleanup.mjs:47-48 `if (!environment.split('\\0').includes(`ONTOKIT_E2E_RUN=${manifest.id}`) || !command.split('\\0').includes(fileURLToPath(new URL('./supervisor.mjs', import.meta.url)))) throw new Error('Host process is not a run supervisor; refusing cleanup');` / `if (!sameProcess(record, current)) throw new Error('Process identity changed; refusing cleanup');`",
+        "Validator inspected the introduced path and confirmed the trigger is reachable; incidence was not measured.",
+        "Parent-reported controlled reproduction (/tmp/d06-review-repros.mjs): an unmarked live process with obsolete recorded start caused 'Host process is not a run supervisor'; unrelatedProcessPreserved=true and ownedDescendantStillAlive=true. This constructs the stale-identity condition; it does not force actual OS PID reuse."
+      ],
+      "file": "scripts/e2e/cleanup.mjs",
+      "first_evidence": "scripts/e2e/cleanup.mjs:47-48 `if (!environment.split('\\0').includes(`ONTOKIT_E2E_RUN=${manifest.id}`) || !command.split('\\0').includes(fileURLToPath(new URL('./supervisor.mjs', import.meta.url)))) throw new Error('Host process is not a run supervisor; refusing cleanup');` / `if (!sameProcess(record, current)) throw new Error('Process identity changed; refusing cleanup');`",
+      "independent_reviewers": [
+        "adversarial-claude"
+      ],
+      "line": 47,
+      "owner": "downstream-resolver",
+      "pre_existing": false,
+      "requires_verification": true,
+      "reviewers": [
+        "adversarial-claude"
+      ],
+      "severity": "P2",
+      "suggested_fix": "Check the recorded boot/start/group identity before reading or signaling its current PID. Skip only a proven obsolete identity, never signal its replacement, then clean verified marked descendants and independently label-checked Docker/runtime resources. Preserve refusal for ambiguous ownership or surviving owned processes. Add a regression that preserves an unrelated replacement process while completing owned cleanup.",
+      "title": "Recycled supervisor PID prevents explicit crash cleanup",
+      "why_it_matters": "After a hard interruption, a recorded supervisor PID can be reused by an unrelated process. cleanupProcesses then throws before Docker and private runtime removal, so the documented recovery command cannot reclaim owned resources while that unrelated process remains alive. The process must remain unsignalled, but an obsolete identity need not prevent cleanup of independently verified owned resources.",
+      "validation_status": "confirmed",
+      "validation_reason": "The new cleanup.mjs:40-48 throws when a same-boot recorded supervisor PID has been recycled, and cleanup.mjs:61 consequently prevents both marked-descendant cleanup and independently label-verified Docker/runtime cleanup; runtime.mjs:76-79 persists supervisor identities, so killing the launcher and supervisors before recovery makes this precondition reachable, while refusing to signal the unrelated process does not require abandoning separately verified resources (incidence was not measured).",
+      "protected_subject": "authorization-authentication"
+    },
+    {
+      "#": 2,
+      "autofix_class": "manual",
+      "confidence": 75,
+      "evidence": [
+        "scripts/e2e/diagnostics.mjs:11 `if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Unexpected private diagnostic entry');` and :15-18 `const stat = await lstat(file); ... throw new Error('Unsafe diagnostic metadata'); ... if (metadata.id !== id || ... metadata.expiresAt !== metadata.createdAt + RETENTION_MS) throw new Error('Invalid diagnostic expiry');`",
+        "Validator inspected the introduced path and confirmed the trigger is reachable; incidence was not measured.",
+        "Parent-reported controlled reproduction (/tmp/d06-review-repros.mjs): a private hex-named directory with synthetic log and no metadata.json caused ENOENT from expireDiagnostics. This constructs the interrupted-write state; it does not measure real interruption incidence."
+      ],
+      "file": "scripts/e2e/diagnostics.mjs",
+      "first_evidence": "scripts/e2e/diagnostics.mjs:11 `if (!/^[a-f0-9]{32}$/.test(id)) throw new Error('Unexpected private diagnostic entry');` and :15-18 `const stat = await lstat(file); ... throw new Error('Unsafe diagnostic metadata'); ... if (metadata.id !== id || ... metadata.expiresAt !== metadata.createdAt + RETENTION_MS) throw new Error('Invalid diagnostic expiry');`",
+      "independent_reviewers": [
+        "adversarial-claude"
+      ],
+      "line": 11,
+      "owner": "downstream-resolver",
+      "pre_existing": false,
+      "requires_verification": true,
+      "reviewers": [
+        "adversarial-claude"
+      ],
+      "severity": "P2",
+      "suggested_fix": "Write complete private diagnostic entries in a staging directory and publish atomically. Handle incomplete or unrecognized entries without deleting or traversing unverified data, and emit a sanitized path-only recovery notice instead of blocking subsequent startup. Keep permission/symlink checks. Test interrupted publication and a hex directory missing metadata.json.",
+      "title": "Incomplete retained diagnostics block subsequent harness launches",
+      "why_it_matters": "A hard interruption after creating a retention directory but before writing metadata.json leaves an entry that expireDiagnostics rejects on every subsequent launch. This occurs before a run manifest or phase is created; the CLI suppresses the actual error, leaving users unable to start another suite or identify the blocking directory.",
+      "validation_status": "confirmed",
+      "validation_reason": "The new diagnostics.mjs:35-40 publishes the retention directory before metadata.json, so a hard interruption in that interval leaves an own-created entry whose missing metadata throws at diagnostics.mjs:15 on every subsequent run.mjs:24 startup, before phase/manifest creation, and run.mjs:125-126 hides its cause; the exception cleanup at diagnostics.mjs:41-45 cannot run after SIGKILL, establishing the trigger without relying on malformed or foreign metadata (incidence was not measured).",
+      "protected_subject": "public-contract"
+    }
+  ],
+  "triage_groups": [
+    {
+      "title": "Recovery after hard interruption",
+      "findings": [
+        1,
+        2
+      ],
+      "kind": "apply-queue",
+      "context": "A stale process record or incomplete diagnostics entry can stop later recovery or startup.",
+      "preferred_resolution": "Fix each ownership-preserving recovery path and add its targeted regression before rerunning lifecycle verification.",
+      "why": "Both are interruption edge cases in the disposable harness, with independent fixes."
+    }
+  ],
+  "pre_existing_findings": [],
+  "requirements_completeness": {
+    "plan_path": "docs/plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md",
+    "plan_source": "explicit",
+    "assessment_basis": "Corresponding implementation and supplied results, not historical completion flags. All R1-R10 and U1-U6 have work in the diff; recovery edge defects are retained as #1/#2 rather than misclassified as absent implementation. Final acceptance requires resolving review findings and caller-owned delivery gates.",
+    "requirements": [
+      {
+        "id": "R1",
+        "requirement": "R1. A documented local invocation provisions fresh real services and test identities without adopting, modifying or deleting another run's or developer's resources.",
+        "status": "met",
+        "evidence": "e2e/README.md; e2e/compose.yaml; scripts/e2e/ownership.mjs; bootstrap-identity.mjs. Fresh source/storage/identity isolation and unchanged neighboring resource identities are recorded in the supplied receipts."
+      },
+      {
+        "id": "R2",
+        "requirement": "R2. The suite hard-fails unmet prerequisites and bounded readiness failures; a missing backend or skipped full-stack test cannot count as success.",
+        "status": "met",
+        "evidence": "scripts/e2e/run.mjs; full-stack.mjs; evidence.mjs and evidence.test.mjs. Prerequisites/readiness fail closed; all 21 mandatory tests must pass with no skips, retries, flaky outcomes or runner errors."
+      },
+      {
+        "id": "R3",
+        "requirement": "R3. Genuine OIDC authentication supplies the browser session and API credentials used by the tests, without synthetic session injection or a production authentication bypass.",
+        "status": "met",
+        "evidence": "scripts/e2e/bootstrap-identity.mjs; e2e/stack.setup.ts; fixtures/auth.ts; auth-foundation.spec.ts. Genuine OIDC owner/unrelated sessions supply credentials, with a fresh UI session in the Chromium journey."
+      },
+      {
+        "id": "R4",
+        "requirement": "R4. API tests prove project creation, reading, updating and deletion, plus ontology import, class/property reads and persisted source changes.",
+        "status": "met",
+        "evidence": "e2e/api/projects.spec.ts and ontology.spec.ts cover CRUD, import, branch initialization, class/property labels and immutable persisted source revisions."
+      },
+      {
+        "id": "R5",
+        "requirement": "R5. API tests prove branch creation, revision-aware source saving, pull-request diff and merge, and persisted target-branch content.",
+        "status": "met",
+        "evidence": "e2e/api/branches.spec.ts and pull-requests.spec.ts cover branch isolation, stale revision rejection, diff review, ordinary-owner merge and persisted target content."
+      },
+      {
+        "id": "R6",
+        "requirement": "R6. API tests prove project-local lexical search and worker-backed lint completion against the imported ontology.",
+        "status": "met",
+        "evidence": "e2e/api/search-lint.spec.ts checks exact lexical search results and fresh, completed, persisted worker lint runs under bounded polling."
+      },
+      {
+        "id": "R7",
+        "requirement": "R7. API tests prove unauthorized, forbidden, absent-resource and invalid-input contracts, including absence of unintended mutation after a rejected write.",
+        "status": "met",
+        "evidence": "e2e/api/errors.spec.ts checks 401/403/404/422, malformed imports and independent no-mutation assertions after rejected writes."
+      },
+      {
+        "id": "R8",
+        "requirement": "R8. A Chromium test performs real login, ontology import, editor navigation, branch editing, saving, pull-request review and merge, then verifies the result after reloading.",
+        "status": "met",
+        "evidence": "e2e/browser/ontology-workflow.spec.ts drives fresh login, UI import, navigation, branch edit/save, PR review/merge and target reload assertions; mandatory fresh-run evidence is supplied."
+      },
+      {
+        "id": "R9",
+        "requirement": "R9. Success, setup failure, test failure and catchable interruption remove all run-owned resources and credentials; hard interruption leaves a narrowly scoped recovery record for explicit cleanup.",
+        "status": "met",
+        "evidence": "scripts/e2e/cleanup.mjs; ownership.mjs; supervisor.mjs; docs/releases/d06-lifecycle-readiness.md and d06-u6-verification.json address every lifecycle path and explicit recovery. Recovery implementation has the bounded defects #1/#2; this is implementation coverage, not unconditional acceptance."
+      },
+      {
+        "id": "R10",
+        "requirement": "R10. Completion evidence maps every B10 obligation to tests and results while retaining B11\u2013B13 and live DEV acceptance as separate unfinished requirements.",
+        "status": "met",
+        "evidence": "docs/releases/d06-full-stack-readiness.md, d06-u6-verification.json, durable run receipts and the requirements roadmap map B10 to tests and retain B11-B13/live DEV as unfinished."
+      }
+    ],
+    "implementation_units": [
+      {
+        "id": "U1",
+        "unit": "U1. Own the disposable stack lifecycle",
+        "status": "met",
+        "evidence": "R1/R2/R9: Compose, launcher, ownership/runtime/supervisor/cleanup modules, focused lifecycle tests and live failure/recovery receipts implement U1. Finding #1 qualifies crash-recovery reliability."
+      },
+      {
+        "id": "U2",
+        "unit": "U2. Bootstrap fresh identity and genuine sessions",
+        "status": "met",
+        "evidence": "R2/R3/R7: bootstrap-identity.mjs, setup/teardown, real auth fixtures and auth-foundation.spec.ts implement fresh identities and ordinary sessions."
+      },
+      {
+        "id": "U3",
+        "unit": "U3. Prove project and ontology API persistence",
+        "status": "met",
+        "evidence": "R4/R7: project and ontology HTTP tests plus errors.spec.ts implement persistence and rejection contracts."
+      },
+      {
+        "id": "U4",
+        "unit": "U4. Prove branches, pull requests, search and lint",
+        "status": "met",
+        "evidence": "R5/R6/R7: branch/PR/search-lint tests and bounded polling implement revision, merge and worker contracts."
+      },
+      {
+        "id": "U5",
+        "unit": "U5. Prove the browser write and merge journey",
+        "status": "met",
+        "evidence": "R3/R8: ontology-workflow.spec.ts and fixtures/editor.ts implement the UI journey; the editor preload fix has regression evidence."
+      },
+      {
+        "id": "U6",
+        "unit": "U6. Publish repeatability and coverage evidence",
+        "status": "met",
+        "evidence": "R1/R2/R9/R10: contributor docs, evidence gate, sanitized receipts, two fresh runs and lifecycle probes implement repeatability and coverage reporting. Finding #2 qualifies retained-diagnostics recovery. Final browser gate, publication and merge remain caller-owned delivery steps."
+      }
+    ],
+    "unaddressed": [],
+    "intentional_deferrals": [
+      "B11 broader authentication/editor/suggestions",
+      "B12 collaboration/WebSocket",
+      "B13 browser CI/Firefox/schema/retention",
+      "Hosted DEV activation and acceptance"
+    ]
+  },
+  "learnings": [],
+  "agent_native_gaps": [],
+  "deployment_notes": [],
+  "residual_risks": [],
+  "testing_gaps": [],
+  "coverage": {
+    "depth": "full",
+    "reviewer_selection": [
+      {
+        "reviewer": "correctness",
+        "tier": "session",
+        "reason": "always-on"
+      },
+      {
+        "reviewer": "project-standards",
+        "tier": "mid-tier",
+        "reason": "AGENTS.md and CLAUDE.md instruction fallback govern changed files"
+      },
+      {
+        "reviewer": "testing",
+        "tier": "mid-tier",
+        "reason": "Changed harness, evidence gate and real workflow assertions"
+      },
+      {
+        "reviewer": "maintainability",
+        "tier": "mid-tier",
+        "reason": "1268 executable non-test changed lines; new lifecycle abstractions"
+      },
+      {
+        "reviewer": "security",
+        "tier": "session",
+        "reason": "OIDC auth, credentials and ownership checks"
+      },
+      {
+        "reviewer": "reliability",
+        "tier": "mid-tier",
+        "reason": "External readiness, interruption, cleanup and false-pass guard"
+      }
+    ],
+    "notes": [
+      "Full review of working-tree diff against explicit base, including current unstaged metadata-inspect consolidation.",
+      "AGENTS.md and CLAUDE.md are instruction-file criteria fallback; no CODING_STANDARDS.md governs changed files.",
+      "Untracked d06-final-simplification.json and d06-work-return.json excluded from implementation diff but explicitly supplied and read as supplemental evidence.",
+      "Parent supplied two fresh21pass0skip0fail runs before metadata-only consolidation;5223unit tests/365files passed, lint0errors19existingwarnings, type-check passed,23evidence gate checks after consolidation. Review does not rerun broad tests, Docker, build or live browser. Prior evidence now supplemented by final-byte full-stack run below; separate CE-test-browser gate remains parent-owned.",
+      "API prerequisite PR50 merged d9272cc8 after review/all6CI checks; tested APIHEADf5f036b9 same code per supplied receipt.",
+      "No applicable agent-facing changes, institutional solutions/packs, migration/schema artifacts, public API definition changes, performance-sensitive algorithm changes or iOS changes; corresponding conditional lenses not selected.",
+      "All six local reviewer lenses dispatched fresh and completed. Third concurrent reviewer hit actual thread cap; successful terminal collection restored capacity, and all queued reviewers subsequently launched without degraded or reused-context coverage.",
+      "Parent reports post-consolidation fresh run42ff383a14c41ca17551be757780b8e4 passed:21passed/0skip/0failed,acceptedRuntrue,cleanupcomplete; all prior container/volume/network identities unchanged,zero ownedresources. Websnapshot6c25292de4f09a05e02513020264483832813bf0522476686f37e92ecbf4117e,APIc5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df. Receipt ignored .e2e-runs/receipts/42ff383a14c41ca17551be757780b8e4.json; no source edits. Final Docker inspect consolidation now live verified.",
+      "Cross-model adversarial review completed via claude; model_requested=claude-opus-5, effort_requested=high, receipt_supported=true, model_actual=claude-opus-5, effort_actual=unverified, independence_verified=true. Verified runner result consumed and job directory deleted.",
+      "First-evidence backfilled: 0; quote-gate demotions: 0; confidence suppression: 1 at anchor 50; malformed findings/returns: 0.",
+      "Rejected both port-reservation recommendations: plan line 189 explicitly allows abort on bind failure without terminating its occupant. Initial postgres/redis/minio startup publishes no host ports, so retrying that phase cannot remedy the proposed condition. No port risk is retained as a substitute finding.",
+      "Two source-grounded edge-case defects remain primary and actionable; neither has ordinary-reviewer plus cross-model corroboration. Validator shortcut-skipped: 0; selected: 2 in one deterministic batch.",
+      "Mode-aware demotions: 0. No settlement-preference suppression or semantic duplicates. Ancillary peer concerns based on other host topologies, unspecified slow identity responses, undeclared disk pressure, or hypothetical dirty-source deletion are omitted for lack of an established material condition in this supported Linux execution scope.",
+      "Peer test-gap notes about recycled PIDs and incomplete diagnostics are incorporated into the corresponding fixes; the parallel-run test request is outside the plan acceptance scope."
+    ],
+    "cross_model": "Cross-model adversarial review completed via claude; model_requested=claude-opus-5, effort_requested=high, receipt_supported=true, model_actual=claude-opus-5, effort_actual=unverified, independence_verified=true. Verified runner result consumed and job directory deleted.",
+    "validator": {
+      "outcome": "verdicts",
+      "batches": 1,
+      "selected": 2,
+      "confirmed": 2,
+      "rejected": 0,
+      "unresolved": 0,
+      "malformed": 0,
+      "failed": 0,
+      "shortcut_skipped": 0,
+      "bound_exceeded": false,
+      "protected_subject_reclassifications": 0,
+      "degraded_blockers": [],
+      "note": "Both confirmed on source-grounded reachable code paths. Confidence remains 75. The validator is not added to independent_reviewers and does not create ordinary-reviewer/cross-model corroboration. Parent controlled reproductions supplement the trigger evidence; real-world incidence remains unmeasured."
+    },
+    "suppressed_by_confidence": {
+      "50": 1
+    },
+    "mode_aware_demotions": 0,
+    "first_evidence_backfilled": 0,
+    "quote_gate_demotions": 0,
+    "failed_reviewers": [],
+    "compound_packs": {
+      "roots": [],
+      "errors": [],
+      "warnings": []
+    },
+    "apply": "Report only; no repository edits, commits, pushes or broad/live reruns by this leaf.",
+    "cost": "Report start/end and full-run cost recorded in stages.jsonl and metadata.json by run-log.py; token usage omitted where unavailable."
+  },
+  "artifact_path": "/tmp/compound-engineering-1000/ce-code-review/20260920-d06-final-c99b56f0",
+  "run_id": "20260920-d06-final-c99b56f0"
+}
