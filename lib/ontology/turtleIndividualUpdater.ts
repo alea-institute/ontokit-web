@@ -44,37 +44,37 @@ function genIndividualBlock(
   const po: string[] = [];
 
   // rdf:type — owl:NamedIndividual + user types on same line
-  const typeTokens = ["owl:NamedIndividual"];
+  const typeTokens = [toTurtle("http://www.w3.org/2002/07/owl#NamedIndividual", rev)];
   for (const t of data.typeIris) {
     typeTokens.push(toTurtle(t, rev));
   }
   po.push(`a ${typeTokens.join(", ")}`);
 
   if (data.deprecated) {
-    po.push("owl:deprecated true");
+    po.push(`${toTurtle("http://www.w3.org/2002/07/owl#deprecated", rev)} true`);
   }
 
   for (const l of data.labels) {
     if (!l.value.trim()) continue;
-    po.push(`rdfs:label ${literal(l.value, l.lang)}`);
+    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#label", rev)} ${literal(l.value, l.lang)}`);
   }
 
   for (const c of data.comments) {
     if (!c.value.trim()) continue;
-    po.push(`rdfs:comment ${literal(c.value, c.lang)}`);
+    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#comment", rev)} ${literal(c.value, c.lang)}`);
   }
 
   for (const d of data.definitions) {
     if (!d.value.trim()) continue;
-    po.push(`skos:definition ${literal(d.value, d.lang)}`);
+    po.push(`${toTurtle("http://www.w3.org/2004/02/skos/core#definition", rev)} ${literal(d.value, d.lang)}`);
   }
 
   for (const s of data.sameAsIris) {
-    po.push(`owl:sameAs ${toTurtle(s, rev)}`);
+    po.push(`${toTurtle("http://www.w3.org/2002/07/owl#sameAs", rev)} ${toTurtle(s, rev)}`);
   }
 
   for (const d of data.differentFromIris) {
-    po.push(`owl:differentFrom ${toTurtle(d, rev)}`);
+    po.push(`${toTurtle("http://www.w3.org/2002/07/owl#differentFrom", rev)} ${toTurtle(d, rev)}`);
   }
 
   // Object property assertions
@@ -99,13 +99,13 @@ function genIndividualBlock(
 
   if (data.seeAlsoIris) {
     for (const s of data.seeAlsoIris) {
-      po.push(`rdfs:seeAlso ${toTurtle(s, rev)}`);
+      po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#seeAlso", rev)} ${toTurtle(s, rev)}`);
     }
   }
 
   if (data.isDefinedByIris) {
     for (const d of data.isDefinedByIris) {
-      po.push(`rdfs:isDefinedBy ${toTurtle(d, rev)}`);
+      po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#isDefinedBy", rev)} ${toTurtle(d, rev)}`);
     }
   }
 
@@ -124,7 +124,7 @@ function genIndividualBlock(
   }
 
   if (po.length <= 1) {
-    return `${subject} ${po[0] || "a owl:NamedIndividual"} .`;
+    return `${subject} ${po[0]} .`;
   }
 
   const lines = [`${subject} ${po[0]} ;`];

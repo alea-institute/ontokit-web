@@ -336,20 +336,20 @@ describe("findBlock", () => {
     expect(block!.startLine).toBe(3);
   });
 
-  it("uses local name fallback for unrecognized prefix", () => {
+  it("does not guess a namespace for an unrecognized prefix", () => {
     const source = [
       "@prefix foo: <http://foo.org/> .",
       "foo:MyClass a owl:Class .",
     ].join("\n");
     const lines = source.split("\n");
-    // Pass no prefixes, but the IRI contains the local name
+    // A matching local name cannot establish the subject namespace.
     const block = findBlock(
       lines,
       "http://foo.org/MyClass",
       {},
       undefined,
     );
-    expect(block).not.toBeNull();
+    expect(block).toBeNull();
   });
 });
 

@@ -80,6 +80,20 @@ function parseLiteral(raw: string): ParsedObject {
   while (i < raw.length) {
     if (raw[i] === "\\") {
       const next = raw[i + 1];
+      if (next === "u" || next === "U") {
+        const length = next === "u" ? 4 : 8;
+        const digits = raw.slice(i + 2, i + 2 + length);
+        const codePoint = Number.parseInt(digits, 16);
+        if (
+          digits.length !== length || !/^[0-9a-f]+$/i.test(digits) ||
+          codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)
+        ) {
+          throw new Error("Invalid Unicode escape in Turtle literal");
+        }
+        value += String.fromCodePoint(codePoint);
+        i += 2 + length;
+        continue;
+      }
       switch (next) {
         case "n": value += "\n"; break;
         case "r": value += "\r"; break;
