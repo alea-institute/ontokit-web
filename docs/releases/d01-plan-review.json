@@ -1,0 +1,50 @@
+{
+  "plan": "docs/plans/2026-09-20-0659-chore-repaired-release-baseline-plan.md",
+  "date": "2026-09-20",
+  "mode": "non-interactive",
+  "reviewers": {
+    "coherence": {
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    "feasibility": {
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    "security-lens": {
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    "adversarial": {
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    "scope-guardian": {
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    "design-lens": {
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    }
+  },
+  "cross_model": {
+    "status": "not started",
+    "reason": "Automatic approval review rejected sending internal planning content to Anthropic without explicit disclosure authorization."
+  },
+  "resolved": {
+    "fixes_applied": 0,
+    "proposed_fixes_count": 0,
+    "decisions_count": 0,
+    "fyi_count": 0
+  },
+  "confidence_check": "Passed: local revision, integration, build configuration and gate evidence grounds the bounded preparation plan.",
+  "reviewed_document_sha256": "c7b045f1214eb10ba3b2b639e3c59f2e1d51733fac0e5c9cfadfe46c11cf7c45",
+  "post_review_correction": "API source inspection corrected production Compose reference to root compose.prod.yaml; no scope change."
+}

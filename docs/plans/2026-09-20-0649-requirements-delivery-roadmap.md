@@ -26,23 +26,22 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**Next deliverable D01: establish and prepare the release baseline for the existing repairs.**
+**Next deliverable D03: repair configured-provider image build fidelity (B14).**
 
-- Owning area: A01.
-- Scope: B01, plus the readiness assessment portion of B02 and relevant B14 seams.
-- State: queued for ce-plan; no new implementation plan has been written for D01.
-- Planning inputs: the September repair plan and production-fix results, the later deployment handoffs, the current frontend/backend branches and actual delivery state.
-- Intended planning result: exact changes to integrate, target branches and matching API/web revisions, verification required before delivery, and a concrete next deployment action. Reuse the completed repair plan rather than rewriting or reimplementing its units.
-- Carry forward: code repaired locally, merged upstream, deployed and accepted are distinct milestones. Historical approval/run status needs fresh evidence.
-- Next after D01: D02, authenticated DEV lifecycle acceptance (B02–03), scoped using D01's findings. If an external deployment dependency blocks progress, explicitly park that step and start the independent full-stack test foundation in A02 (B10).
+- Start with [the D01 evidence packet](../releases/d01-release-readiness.md) and its required-auth Docker failure. The credential-free image builds; the required-auth image does not.
+- Create a focused ce-plan for build-time public provider configuration versus runtime secrets, retaining fail-closed runtime validation. Work from the local release candidate identified in that packet, not the older repair branch.
+- D01 local preparation is complete under [its reviewed plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md). The candidate incorporates current ALEA `dev`, the repair/test work and one dashboard fixture adaptation. No publication or activation is authorized by this tracker.
+- D04 follows: API individual mint-capability enforcement. D05 follows: API submit/resubmit embedding error mapping. Both have source findings; reproduce them before repair. The API checkout is stale and must not be used as the source baseline.
+- D02 remains authenticated DEV lifecycle acceptance (B02–03), after code prerequisites and authorized release activation. The old waiting workflow run pins an older pair and is not the release of this candidate.
+- If only external activation blocks, continue with the independent full-stack foundation in A02 (B10). Record the blocker owner, next action and return condition.
 
-No production execution starts from this approach document. The next step is the focused D01 implementation/delivery plan. Existing external-action boundaries remain in effect; prepare concrete work before any necessary approval.
+Local verification, publication, deployment and authenticated acceptance remain distinct. All remaining B01–B75 obligations retain their ledger rows below.
 
 ## Area queue
 
 | Order / ID | Area | Backlog IDs | State | Dependency / next planning boundary |
 |---|---|---|---|---|
-| 1 / A01 | Deliver and validate existing work | B01–B09 | Next | Start D01; break deployment, demos, upstream delivery and PROD into separate deliverables |
+| 1 / A01 | Deliver and validate existing work | B01–B09 | Preparing release | Finish D01 evidence; B14 prerequisites precede activation, then D02 |
 | 2 / A02 | Full-stack proof and integrity | B10–B15 | Queued | Test foundation can proceed while A01 awaits external action; assess integrity seams before release |
 | 3 / A03 | Ontology batching and reviewer intelligence | B16–B23 | Queued | Verify API contracts; provenance/duplicate comparison can precede shard-dependent review |
 | 4 / A04 | Entity workspace and graph | B24–B27 | Queued | Reconcile historical graph port and current repairs; preserve all eleven Phase17 requirements |
@@ -82,7 +81,11 @@ This sequence does not require asking again for routine authorized work. Ask whe
 
 | ID | Scope | State | Plan | Evidence / remainder |
 |---|---|---|---|---|
-| D01 | B01; readiness portions of B02/B14 | Queued for planning | Not yet created | Existing repair code is recorded locally verified; integration/deployment state requires refresh |
+| D01 | B01; readiness portions of B02/B14 | Accepted: local preparation only | [Plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md) | [Release evidence](../releases/d01-release-readiness.md); candidate `3d45af5b`: 364 files / 5,188 tests pass; optional-auth image builds; authenticated activation blocked |
+| D03 | B14 configured-provider image fidelity | Next: ce-plan | Not yet created | Required-auth Docker failure reproduced; keep secrets out of images and preserve runtime validation |
+| D04 | B14 individual mint enforcement | Queued prerequisite | Not yet created | API declaration gate omits individuals; reproduce on current API dev before repair |
+| D05 | B14 submit/resubmit embedding errors | Queued prerequisite | Not yet created | API source lacks explicit 402/503 mapping; prove retry/state behavior |
+| D02 | B02–03 DEV runtime and persona acceptance | Awaiting prerequisites | Not yet created | D03–05 and authorized published pair/activation first |
 
 ## Decision record
 
@@ -91,6 +94,7 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | 2026-09-20 | Maintain a master roadmap; plan and execute bounded deliverables serially | User prefers Option2's thoroughness while keeping all twelve areas visible |
 | 2026-09-20 | Preserve B01–B75 as the traceability spine; retain CE/GSD provenance | Avoid losing deferred requirements or rebuilding superseded work |
 | 2026-09-20 | Use multiple plans within an area when independently useful | A broad area is too large to be an effective implementation unit |
+| 2026-09-20 | Sequence D03–05 before D02 | D01 reproduced required-auth image failure and identified API trust/error-contract gaps; prerequisites advance A02/B14 before A01 activation |
 
 ## Requirement ledger
 
@@ -98,8 +102,8 @@ The catalog owns the full requirement wording and source status. This ledger own
 
 | ID | Outcome | Program state | Plan / evidence / next action |
 |---|---|---|---|
-| B01 | Integrate the September coverage-driven production repairs and their tests into the intended delivery branch, then ship the reviewed pair | Queued | D01; integrate existing repairs |
-| B02 | Complete the matched API/web DEV deployment and record running revisions, migration state, health, seeded project, write smoke, and rollback evidence | Queued | D01 assesses readiness; remainder stays open |
+| B01 | Integrate the September coverage-driven production repairs and their tests into the intended delivery branch, then ship the reviewed pair | Locally verified | D01 candidate `3d45af5b`; publication and delivery remain |
+| B02 | Complete the matched API/web DEV deployment and record running revisions, migration state, health, seeded project, write smoke, and rollback evidence | Scoping | D01 evidence; prerequisites and acceptance remain open |
 | B03 | Finish authenticated persona UAT, including trust promotion, translation/audit, autosave, permissions, and the real submission/merge chain | Queued | See catalog; assign a bounded deliverable when reached |
 | B04 | Activate the two isolated demo repositories, scoped source/destination credentials, atomic refresh, cleanup and rollback | Queued | See catalog; assign a bounded deliverable when reached |
 | B05 | Close retired-demo redirect and retention acceptance | Queued | See catalog; assign a bounded deliverable when reached |
@@ -111,7 +115,7 @@ The catalog owns the full requirement wording and source status. This ledger own
 | B11 | Prove real OIDC login, logout, credential renewal, session expiry, anonymous/optional/required modes, Monaco editing, and save/submit/review/merge | Queued | See catalog; assign a bounded deliverable when reached |
 | B12 | Prove WebSocket authentication, presence, acknowledgments, sync, reconnect after server restart, multi-client behavior, and index notifications | Queued | See catalog; assign a bounded deliverable when reached |
 | B13 | Add browser CI, reproducible seed/cleanup, Chromium/Firefox coverage, failure traces, and frontend/backend response-contract checks | Queued | See catalog; assign a bounded deliverable when reached |
-| B14 | Reconcile known correctness/policy seams before declaring the workflow complete | Queued | D01 assesses readiness; remainder stays open |
+| B14 | Reconcile known correctness/policy seams before declaring the workflow complete | Scoping | D01 evidence; prerequisites and acceptance remain open |
 | B15 | Close demonstrated Turtle representational limits without losing existing source semantics | Queued | See catalog; assign a bounded deliverable when reached |
 | B16 | Organize session changes into ancestor-based shards, max 50/min 3, with miscellaneous and cross-cutting groups and exactly-one-shard membership | Queued | See catalog; assign a bounded deliverable when reached |
 | B17 | Let contributors preview and merge/split/rename/move shard contents with accessible alternatives to dragging | Queued | See catalog; assign a bounded deliverable when reached |
