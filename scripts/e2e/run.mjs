@@ -1,10 +1,11 @@
 import { randomBytes } from 'node:crypto';
-import { copyFile } from 'node:fs/promises';
+import { copyFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, RUNTIME_ROOT, privateDirectory, saveManifest } from './ownership.mjs';
-import { prerequisites, copySource, reservePorts, compose, composeArgs, ownedCommand, baseEnv, getDockerEndpoint } from './runtime.mjs';
+import { prerequisites, copySource, reservePorts, compose, composeArgs, ownedCommand, baseEnv, getDockerEndpoint, docker } from './runtime.mjs';
 import { expireDiagnostics, recordFailure, retainDiagnostics as retainFailureDiagnostics } from './diagnostics.mjs';
+import { sanitizedEvidence } from './evidence.mjs';
 import { cleanup } from './cleanup.mjs';
 import { freshIdentityValues, writeRuntimeEnv } from './bootstrap-identity.mjs';
 export function waitForAbort(signal) {
@@ -36,6 +37,8 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
   const controller = new AbortController();
   const ctx = {failAt, signal: controller.signal, dir, manifestDir, manifest, env: {...baseEnv(), HOME: dir, TMPDIR: dir}};
   const file = path.join(manifestDir, 'manifest.json');
+  const startedAt = new Date().toISOString();
+  let workflowPassed = false;
   let reservation;
   let cleaning;
   let interrupted = false;
@@ -67,6 +70,8 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
     await compose(ctx, 'run', '--no-deps', 'migrate');
     // Verify database revision set equals the selected source's complete heads.
     await compose(ctx, 'run', '--no-deps', 'migrate', 'python', '-c', 'import asyncio,asyncpg,os; from alembic.config import Config; from alembic.script import ScriptDirectory\nasync def verify():\n c=await asyncpg.connect(os.environ["DATABASE_URL"].replace("+asyncpg","")); rows=await c.fetch("select version_num from alembic_version"); assert {r[0] for r in rows} == set(ScriptDirectory.from_config(Config("alembic.ini")).get_heads()); await c.close()\nasyncio.run(verify())');
+    manifest.migrationHeads = docker(composeArgs(ctx, 'exec', '-T', 'postgres', 'psql', '-U', 'ontokit', '-d', 'ontokit', '-At', '-c', 'select version_num from alembic_version order by version_num')).split('\n').filter(Boolean);
+    if (!manifest.migrationHeads.length || manifest.migrationHeads.some(h => !/^[a-zA-Z0-9_]{1,100}$/.test(h))) throw new Error('Invalid migration evidence');
     await compose(ctx, 'up', '-d', '--no-deps', 'api', 'worker');
     manifest.status = 'dependencies-migrated'; await saveManifest(manifestDir, manifest);
     console.log('Dependencies provisioned; migrations verified; API and worker started (authentication readiness is a separate gate)');
@@ -74,6 +79,14 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
     if (hold) await waitForAbort(controller.signal);
     if (workflow) await workflow(ctx);
     if (failAt === 'after-workflow') throw new Error('Injected workflow failure');
+    const containers = docker(['ps', '-aq', '--filter', `label=io.ontokit.e2e.run=${id}`]).split('\n').filter(Boolean);
+    manifest.evidenceImages = containers.map(container => {
+      const labels = JSON.parse(docker(['inspect', '--format', '{{json .Config.Labels}}', container]));
+      if (labels['com.docker.compose.project'] !== manifest.project) throw new Error('Invalid image evidence ownership');
+      return {service: labels['com.docker.compose.service'], id: docker(['inspect', '--format', '{{.Image}}', container]), reference: docker(['inspect', '--format', '{{.Config.Image}}', container])};
+    });
+    workflowPassed = !!manifest.tests;
+    await saveManifest(manifestDir, manifest);
   } catch (error) {
     try { await recordFailure(ctx, error); } catch { console.error('Private failure capture failed; cleanup will continue'); }
     console.error(`Run ${id} failed during ${manifest.status}; private artifacts will be removed`);
@@ -87,9 +100,19 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
     throw error;
   } finally {
     if (reservation) await reservation.release();
-    try { await teardown(); console.log(`Cleanup complete for ${id}`); }
+    let cleanupResult = 'failed';
+    try { await teardown(); cleanupResult = 'complete'; console.log(`Cleanup complete for ${id}`); }
     catch { console.error(`Cleanup failed; recovery: node scripts/e2e/cleanup.mjs ${file}`); throw new Error('Cleanup failed'); }
-    finally { process.off('SIGINT', signal); process.off('SIGTERM', signal); }
+    finally {
+      process.off('SIGINT', signal); process.off('SIGTERM', signal);
+      // Allowlist data in memory before cleanup removes the recovery manifest and private reports.
+      const receipt = sanitizedEvidence(manifest, {cleanup: cleanupResult, workflowPassed: workflowPassed && !interrupted, startedAt, finishedAt: new Date().toISOString()});
+      const receipts = path.join(ROOT, 'receipts');
+      await privateDirectory(receipts);
+      await writeFile(path.join(receipts, `${id}.json`), JSON.stringify(receipt, null, 2) + '\n', {mode: 0o600, flag: 'wx'});
+      console.log(`Sanitized run receipt: ${path.join(receipts, `${id}.json`)}`);
+      if (workflowPassed && !interrupted && cleanupResult === 'complete' && !receipt.acceptedRun) throw new Error('Full-stack evidence incomplete');
+    }
   }
   if (interrupted) throw new Error('Interrupted');
 }

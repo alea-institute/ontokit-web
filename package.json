@@ -16,6 +16,7 @@
     "test:coverage": "vitest --coverage",
     "test:e2e:lifecycle": "node scripts/e2e/run.mjs --lifecycle-probe",
     "test:e2e:ownership": "node --test scripts/e2e/ownership.test.mjs scripts/e2e/diagnostics.test.mjs",
+    "test:e2e:evidence": "node scripts/e2e/evidence.test.mjs",
     "test:e2e": "node scripts/e2e/run.mjs",
     "test:e2e:identity": "node scripts/e2e/identity.test.mjs"
   },

@@ -3,6 +3,7 @@ import { writeFile, mkdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { bootstrapIdentity, readyHttp } from './bootstrap-identity.mjs';
 import { ownedCommand } from './runtime.mjs';
+import { validateReport } from './evidence.mjs';
 import { saveManifest } from './ownership.mjs';
 
 export async function fullStack(ctx) {
@@ -38,8 +39,7 @@ export async function fullStack(ctx) {
     cwd: webSource, env: {...env, ONTOKIT_E2E_CONFIG: runFile}, timeout: 900_000,
   })]);
   const report = JSON.parse(await readFile(path.join(ctx.dir, 'playwright-report.json'), 'utf8'));
-  if (!report.stats || report.stats.expected < 4 || report.stats.skipped !== 0 || report.stats.unexpected !== 0 || report.stats.flaky !== 0) throw new Error('Full-stack runner did not pass every mandatory test');
-  ctx.manifest.tests = {passed: report.stats.expected, skipped: report.stats.skipped, failed: report.stats.unexpected};
+  ctx.manifest.tests = validateReport(report);
   console.log(`Verified browser tests: ${report.stats.expected} passed, ${report.stats.skipped} skipped, ${report.stats.unexpected} failed`);
   await phase('workflow-verified');
 }
