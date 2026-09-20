@@ -20,6 +20,23 @@ beforeEach(() => { vi.useFakeTimers(); Socket.instances = []; vi.stubGlobal('Web
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('collaboration socket lifecycle', () => {
+  it('ignores obsolete socket events after replacing credentials', () => {
+    const { result, rerender } = renderHook(({ token }) => useCollaborationStatus({ projectId: 'project', token }), { initialProps: { token: 'first' } });
+    act(() => vi.advanceTimersByTime(100));
+    const previous = latest();
+    rerender({ token: 'second' });
+    act(() => vi.advanceTimersByTime(100));
+    const current = latest();
+    act(() => previous.onopen?.());
+    expect(result.current.status).toBe('connecting');
+    act(() => current.onopen?.());
+    act(() => previous.deliverClose());
+    expect(result.current.isConnected).toBe(true);
+    act(() => vi.advanceTimersByTime(60000));
+    expect(Socket.instances).toHaveLength(2);
+    expect(current.close).not.toHaveBeenCalled();
+  });
+
   it('updates the real status indicator through disconnect and manual reconnection', () => {
     function Consumer() {
       const connection = useCollaborationStatus({ projectId: 'project' });
@@ -36,6 +53,9 @@ describe('collaboration socket lifecycle', () => {
     act(() => latest().onopen?.());
     expect(screen.getByText('Connected')).toBeDefined();
     expect(screen.getByTitle(/Endpoint: \/api\/v1\/projects\/project\/lint\/ws/)).toBeDefined();
+    act(() => vi.advanceTimersByTime(60000));
+    expect(Socket.instances).toHaveLength(2);
+    expect(screen.getByText('Connected')).toBeDefined();
   });
   it('uses the real URL resolver and safely encodes credentials', () => {
     vi.stubEnv('NEXT_PUBLIC_WS_URL', 'wss://socket.example.test');
