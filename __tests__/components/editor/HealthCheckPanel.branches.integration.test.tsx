@@ -56,6 +56,51 @@ const qualityCases = [
 ];
 
 describe("health panel filters and asynchronous branch boundaries", () => {
+  it('ignores a delayed lint response after switching projects', async () => {
+    const pending = deferred();
+    route = url => url.pathname.includes('/branch-health/') && url.pathname.endsWith('/lint/issues') ? pending.promise : undefined;
+    const view = render(<HealthCheckPanel {...props} />);
+    view.rerender(<HealthCheckPanel {...props} projectId="current-project" />);
+    await screen.findByText('error finding');
+    await act(async () => pending.resolve(json({ items: [{ ...makeIssue('error'), message: 'Obsolete lint finding' }] })));
+    expect(screen.queryByText('Obsolete lint finding')).toBeNull();
+    expect(screen.getByText('error finding')).toBeDefined();
+  });
+
+  it.each(qualityCases)('reloads the active $tab tab when the branch changes', async ({ tab, path, result, empty }) => {
+    route = url => url.pathname.endsWith(path) && url.searchParams.get('branch') === 'review' ? json(result) : undefined;
+    const view = render(<HealthCheckPanel {...props} />);
+    await screen.findByText('error finding');
+    fireEvent.click(screen.getByRole('button', { name: tab }));
+    await screen.findByText('Obsolete branch finding');
+    view.rerender(<HealthCheckPanel {...props} branch="current" />);
+    await waitFor(() => expect(request.mock.calls.some(([url]) => new URL(url).pathname.endsWith(path) && new URL(url).searchParams.get('branch') === 'current')).toBe(true));
+    expect(await screen.findByText(empty)).toBeDefined();
+  });
+
+  it.each(qualityCases)('ignores old $tab poll results after a branch change', async ({ tab, result }) => {
+    const pending = deferred();
+    const jobPath = tab === 'Consistency' ? '/quality/jobs/job-1' : '/quality/duplicates/jobs/job-1';
+    route = url => url.pathname.endsWith(jobPath) ? pending.promise : undefined;
+    const view = render(<HealthCheckPanel {...props} />);
+    await qualitySocket();
+    fireEvent.click(screen.getByRole('button', { name: tab }));
+    await screen.findByText(tab === 'Consistency' ? 'No consistency issues' : 'No duplicates detected');
+    vi.useFakeTimers();
+    const run = tab === 'Consistency' ? 'Run Check' : 'Find Duplicates';
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: run })));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(request.mock.calls.some(([url]) => new URL(url).pathname.endsWith(jobPath))).toBe(true);
+    view.rerender(<HealthCheckPanel {...props} branch="current" />);
+    route = url => url.pathname.endsWith(jobPath) ? json(tab === 'Consistency' ? { issues: [] } : { clusters: [] }) : undefined;
+    await act(async () => { await vi.advanceTimersByTimeAsync(50); });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: run })));
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    await act(async () => { pending.resolve(json(result)); await vi.advanceTimersByTimeAsync(50); });
+    expect(screen.queryByText('Obsolete branch finding')).toBeNull();
+    expect((screen.getByRole('button', { name: run }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("navigates duplicate findings with missing labels using their actual entity types", async () => {
     const entities = [
       { iri: "https://example.org#Person", label: "Person class", entity_type: "class" },
@@ -147,7 +192,7 @@ describe("health panel filters and asynchronous branch boundaries", () => {
     await waitFor(() => expect(request.mock.calls.some(([url]) => new URL(url).pathname.endsWith(path))).toBe(true));
     await screen.findByText(empty);
     const pending = deferred();
-    route = url => url.pathname.endsWith(path) ? pending.promise : undefined;
+    route = url => url.pathname.endsWith(path) && url.searchParams.get('branch') === 'review' ? pending.promise : undefined;
     act(() => ws.emit({ type: event, project_id: props.projectId, branch: "review" }));
     await waitFor(() => expect(request.mock.calls.filter(([url]) => new URL(url).pathname.endsWith(path))).toHaveLength(2));
     view.rerender(<HealthCheckPanel {...props} branch="new-branch" />);
