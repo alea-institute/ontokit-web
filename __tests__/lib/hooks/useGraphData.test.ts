@@ -193,7 +193,7 @@ describe("useGraphData", () => {
     expect(mockedBuildGraph).toHaveBeenCalled();
   });
 
-  it("resetGraph clears the graph data", async () => {
+  it("resetGraph clears and reloads the graph data", async () => {
     mockedGetClassDetail.mockResolvedValue(
       makeDetail("http://example.org/A"),
     );
@@ -215,6 +215,8 @@ describe("useGraphData", () => {
 
     expect(result.current.graphData).toBeNull();
     expect(result.current.resolvedCount).toBe(0);
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.graphData).not.toBeNull();
   });
 
   it("passes branch to API calls", async () => {

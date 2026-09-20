@@ -172,6 +172,8 @@ export function useTreeDragDrop({
     autoExpandIriRef.current = null;
   }, []);
 
+  useEffect(() => cancelAutoExpand, [cancelAutoExpand]);
+
   const handleDragEnterNode = useCallback(
     (iri: string) => {
       if (!dragState.isDragActive) return;
@@ -282,7 +284,7 @@ export function useTreeDragDrop({
       const targetIri = isRootDrop ? null : targetId;
 
       // Validate
-      if (!isRootDrop && !validateDrop(draggedIri, targetIri)) {
+      if (!canEdit || editingIri === draggedIri || (!isRootDrop && !validateDrop(draggedIri, targetIri))) {
         setDragState({
           draggedIri: null,
           draggedLabel: null,
@@ -335,11 +337,12 @@ export function useTreeDragDrop({
         oldParentIris,
         newParentIris,
       };
-      setUndoAction(undoInfo);
+
 
       // Execute reparent
       try {
         await onReparent(draggedIri, oldParentIris, newParentIris, mode);
+        setUndoAction(undoInfo);
         const targetNode = targetIri ? findNode(nodes, targetIri) : null;
         const targetLabel = targetNode?.label ?? (targetIri ? "root" : "root");
         onAnnounce?.(`Moved ${undoInfo.classLabel} under ${targetLabel}`);
@@ -348,7 +351,7 @@ export function useTreeDragDrop({
         setUndoAction(null);
       }
     },
-    [dragState.draggedIri, dragState.dragMode, nodes, validateDrop, cancelAutoExpand, onReparent, onAnnounce],
+    [canEdit, editingIri, dragState.draggedIri, dragState.dragMode, nodes, validateDrop, cancelAutoExpand, onReparent, onAnnounce],
   );
 
   const handleDragCancel = useCallback(() => {

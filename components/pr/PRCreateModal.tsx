@@ -26,7 +26,8 @@ export function PRCreateModal({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [sourceBranch, setSourceBranch] = useState(currentBranch);
-  const [targetBranch, setTargetBranch] = useState(defaultBranch);
+  const [selectedTargetBranch, setTargetBranch] = useState<string | null>(null);
+  const targetBranch = selectedTargetBranch ?? defaultBranch;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

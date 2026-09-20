@@ -124,3 +124,78 @@ describe("validateClientEnv", () => {
     expect(() => validateClientEnv()).toThrow("Invalid client environment variables");
   });
 });
+
+describe("lazy environment exports with real validation and auth mode", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("AUTH_MODE", "disabled");
+    for (const name of ["ZITADEL_ISSUER", "ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "NEXTAUTH_SECRET", "NEXTAUTH_URL", "NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_WS_URL"]) {
+      vi.stubEnv(name, undefined);
+    }
+  });
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it("validates the server export on access and follows the real authentication gate", async () => {
+    const { serverEnv } = await import("@/lib/env");
+    expect(serverEnv.ZITADEL_ISSUER).toBeUndefined();
+    vi.stubEnv("AUTH_MODE", "optional");
+    vi.stubEnv("ZITADEL_ISSUER", "https://identity.example.test");
+    vi.stubEnv("ZITADEL_CLIENT_ID", "fixture-client");
+    expect(() => serverEnv.ZITADEL_ISSUER).toThrow("NEXTAUTH_SECRET");
+    vi.stubEnv("ZITADEL_CLIENT_SECRET", "fixture-provider-secret");
+    vi.stubEnv("NEXTAUTH_SECRET", "fixture-session-secret");
+    expect(serverEnv.ZITADEL_ISSUER).toBe("https://identity.example.test");
+    expect(serverEnv.ZITADEL_CLIENT_ID).toBe("fixture-client");
+  });
+
+  it("revalidates client values after an invalid URL is corrected", async () => {
+    const { clientEnv } = await import("@/lib/env");
+    expect(clientEnv.NEXT_PUBLIC_API_URL).toBe("http://localhost:8000");
+    expect(clientEnv.NEXT_PUBLIC_WS_URL).toBeUndefined();
+    vi.stubEnv("NEXT_PUBLIC_WS_URL", "invalid websocket address");
+    expect(() => clientEnv.NEXT_PUBLIC_API_URL).toThrow("NEXT_PUBLIC_WS_URL");
+    vi.stubEnv("NEXT_PUBLIC_WS_URL", "wss://api.example.test/events");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.example.test");
+    expect(clientEnv.NEXT_PUBLIC_API_URL).toBe("https://api.example.test");
+    expect(clientEnv.NEXT_PUBLIC_WS_URL).toBe("wss://api.example.test/events");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    expect(clientEnv.NEXT_PUBLIC_API_URL).toBe("http://localhost:8000");
+  });
+});
+
+describe("eager startup validation with the real schema and authentication gate", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("VITEST", undefined);
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("AUTH_MODE", "required");
+    vi.stubEnv("ZITADEL_ISSUER", "https://identity.example.test");
+    vi.stubEnv("ZITADEL_CLIENT_ID", "fixture-client");
+    vi.stubEnv("ZITADEL_CLIENT_SECRET", "fixture-provider-secret");
+    vi.stubEnv("NEXTAUTH_SECRET", "fixture-session-secret");
+    vi.stubEnv("NEXTAUTH_URL", "https://app.example.test");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "https://api.example.test");
+    vi.stubEnv("NEXT_PUBLIC_WS_URL", "wss://api.example.test/events");
+  });
+  afterEach(() => { vi.unstubAllEnvs(); vi.resetModules(); });
+
+  it("captures validated startup configuration instead of rereading changed process values", async () => {
+    const { serverEnv, clientEnv } = await import("@/lib/env");
+    expect(serverEnv.ZITADEL_ISSUER).toBe("https://identity.example.test");
+    expect(clientEnv.NEXT_PUBLIC_WS_URL).toBe("wss://api.example.test/events");
+    vi.stubEnv("ZITADEL_ISSUER", "invalid");
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "invalid");
+    expect(serverEnv.ZITADEL_ISSUER).toBe("https://identity.example.test");
+    expect(clientEnv.NEXT_PUBLIC_API_URL).toBe("https://api.example.test");
+  });
+
+  it("rejects module initialization when required session configuration is missing", async () => {
+    vi.stubEnv("NEXTAUTH_SECRET", undefined);
+    await expect(import("@/lib/env")).rejects.toThrow("NEXTAUTH_SECRET");
+  });
+
+  it("rejects invalid client configuration even when server configuration is valid", async () => {
+    vi.stubEnv("NEXT_PUBLIC_WS_URL", "invalid");
+    await expect(import("@/lib/env")).rejects.toThrow("NEXT_PUBLIC_WS_URL");
+  });
+});

@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Requirements delivery program
+
+When continuing the recovered CE/GSD requirements work, read
+`docs/plans/2026-09-20-0649-requirements-delivery-roadmap.md` first. Its “Resume here”
+section identifies the next deliverable; its ledger preserves all B01–B75 requirements.
+Plan and execute one coherent deliverable at a time using the relevant CE workflow.
+Update the tracker with plan links, completion evidence, remaining blockers and the
+next action before ending work. Preserve the catalog's superseded/deferred distinctions;
+do not treat historical GSD completion flags as proof of current delivery.
+
 ## Build & Development Commands
 
 ```bash

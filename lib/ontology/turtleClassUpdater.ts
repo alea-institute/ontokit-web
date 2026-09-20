@@ -178,35 +178,35 @@ function genBlock(
 ): string {
   const po: string[] = [];
 
-  po.push("a owl:Class");
+  po.push(`a ${toTurtle("http://www.w3.org/2002/07/owl#Class", rev)}`);
 
   if (data.deprecated) {
-    po.push("owl:deprecated true");
+    po.push(`${toTurtle(OWL_DEPRECATED_IRI, rev)} true`);
   }
 
   for (const l of data.labels) {
     if (!l.value.trim()) continue;
-    po.push(`rdfs:label ${literal(l.value, l.lang)}`);
+    po.push(`${toTurtle(RDFS_LABEL_IRI, rev)} ${literal(l.value, l.lang)}`);
   }
 
   for (const c of data.comments) {
     if (!c.value.trim()) continue;
-    po.push(`rdfs:comment ${literal(c.value, c.lang)}`);
+    po.push(`${toTurtle(RDFS_COMMENT_IRI, rev)} ${literal(c.value, c.lang)}`);
   }
 
   for (const p of data.parent_iris) {
-    po.push(`rdfs:subClassOf ${toTurtle(p, rev)}`);
+    po.push(`${toTurtle(RDFS_SUBCLASS_IRI, rev)} ${toTurtle(p, rev)}`);
   }
 
   if (data.equivalent_iris) {
     for (const e of data.equivalent_iris) {
-      po.push(`owl:equivalentClass ${toTurtle(e, rev)}`);
+      po.push(`${toTurtle(OWL_EQUIVALENT_CLASS_IRI, rev)} ${toTurtle(e, rev)}`);
     }
   }
 
   if (data.disjoint_iris) {
     for (const d of data.disjoint_iris) {
-      po.push(`owl:disjointWith ${toTurtle(d, rev)}`);
+      po.push(`${toTurtle(OWL_DISJOINT_WITH_IRI, rev)} ${toTurtle(d, rev)}`);
     }
   }
 
@@ -227,7 +227,7 @@ function genBlock(
   po.push(...carriedPredicateObjects);
 
   if (po.length <= 1) {
-    return `${subject} ${po[0] || "a owl:Class"} .`;
+    return `${subject} ${po[0]} .`;
   }
 
   const lines = [`${subject} ${po[0]} ;`];

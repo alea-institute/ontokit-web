@@ -26,6 +26,7 @@ import { useTreeDragDrop, type DragMode } from "@/lib/hooks/useTreeDragDrop";
 import { useToast } from "@/lib/context/ToastContext";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { PendingSuggestionBadge } from "@/components/editor/PendingSuggestionBadge";
+import { useAutoSuggestNavigation } from "@/lib/hooks/useAutoSuggestNavigation";
 import { BranchNavigator } from "@/components/editor/BranchNavigator";
 import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
@@ -195,20 +196,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     (firstCard as HTMLElement)?.focus();
   }, []);
 
-  // D-09: State to trigger auto-suggest annotations on navigate
-  const [isAutoSuggesting, setIsAutoSuggesting] = useState(false);
-
-  const handleAutoSuggest = useCallback((_iri: string) => {
-    setIsAutoSuggesting(true);
-  }, []);
-
-  // Reset auto-suggest flag after ClassDetailPanel has consumed it
-  useEffect(() => {
-    if (isAutoSuggesting) {
-      const timer = setTimeout(() => setIsAutoSuggesting(false), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [isAutoSuggesting]);
+  const { schedule: handleAutoSuggest, shouldSuggest: isAutoSuggesting } = useAutoSuggestNavigation(
+    selectedIri, llmGate.canUseLLM, `${projectId}\0${activeBranch ?? ""}`,
+  );
 
   // Draft badges
   const getDraftIris = useDraftStore((s) => s.getDraftIris);
@@ -245,6 +235,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         "Failed to reparent class",
         err instanceof Error ? err.message : "Unknown error",
       );
+      throw err;
     }
   }, [onReparentClass, reparentOptimistic, rollbackReparent, toast]);
 
@@ -595,7 +586,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                   selectedIri={selectedIri}
                   onNavigate={(iri) => selectNode(iri)}
                   autoSuggestOnNavigate={true}
-                  onAutoSuggest={handleAutoSuggest}
+                  scheduleAutoSuggest={handleAutoSuggest}
                 />
                 <button
                   onClick={() => setShowGraph(true)}
@@ -632,7 +623,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                 selectedIri={selectedPropertyIri}
                 onNavigate={(iri) => setSelectedPropertyIri(iri)}
                 autoSuggestOnNavigate={true}
-                onAutoSuggest={handleAutoSuggest}
+                scheduleAutoSuggest={handleAutoSuggest}
               />
             ) : undefined}
           />

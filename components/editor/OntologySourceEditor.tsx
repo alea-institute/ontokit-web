@@ -550,8 +550,9 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
               })
               .slice(0, 50)
               .map((issue) => (
+              <div key={issue.id}>
               <button
-                key={issue.id}
+                type="button"
                 onClick={() => handleProblemClick(issue)}
                 className="flex w-full items-start gap-3 px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
               >
@@ -582,8 +583,14 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                       </span>
                     )}
                   </div>
+
+                </div>
+                <span className="flex-shrink-0 rounded-sm bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
+                  {issue.rule_id}
+                </span>
+              </button>
                   {issue.details?.duplicate_iris && issue.details.duplicate_iris.length > 0 && (
-                    <div className="mt-0.5 flex flex-wrap items-center gap-x-1 text-xs text-slate-400 dark:text-slate-500">
+                    <div className="px-9 pb-2 flex flex-wrap items-center gap-x-1 text-xs text-slate-400 dark:text-slate-500">
                       <span>Also:</span>
                       {issue.details.duplicate_iris.slice(0, 3).map((iri) => {
                         const pos = iriIndex.get(iri);
@@ -606,11 +613,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
                       )}
                     </div>
                   )}
-                </div>
-                <span className="flex-shrink-0 rounded-sm bg-slate-200 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-400">
-                  {issue.rule_id}
-                </span>
-              </button>
+              </div>
             ))}
             {lintIssues.length > 50 && (
               <div className="px-4 py-2 text-center text-xs text-slate-500">

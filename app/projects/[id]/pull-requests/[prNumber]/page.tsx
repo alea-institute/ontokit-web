@@ -1,5 +1,6 @@
 "use client";
 
+import { ApiError } from "@/lib/api/client";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useParams } from "next/navigation";
@@ -29,9 +30,9 @@ export default function PullRequestDetailPage() {
         const data = await projectApi.get(projectId, session?.accessToken);
         setProject(data);
       } catch (err) {
-        if (err instanceof Error && err.message.includes("403")) {
+        if (err instanceof ApiError && err.status === 403) {
           setError("You don't have access to this project");
-        } else if (err instanceof Error && err.message.includes("404")) {
+        } else if (err instanceof ApiError && err.status === 404) {
           setError("Project not found");
         } else {
           setError(err instanceof Error ? err.message : "Failed to load project");

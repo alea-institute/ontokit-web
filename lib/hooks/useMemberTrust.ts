@@ -2,7 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { trustApi, type MemberTrust } from "@/lib/api/trust";
 
 export const memberTrustQueryKeys = {
-  list: (projectId: string) => ["member-trust", projectId] as const,
+  list: (projectId: string, viewerId?: string) => viewerId
+    ? ["member-trust", projectId, viewerId] as const
+    : ["member-trust", projectId] as const,
 };
 
 /**
@@ -13,13 +15,16 @@ export const memberTrustQueryKeys = {
  */
 export function useMemberTrust(
   projectId: string,
-  accessToken?: string,
-  enabled = true,
+  accessToken: string | undefined,
+  enabled: boolean,
+  viewerId: string | undefined,
 ) {
-  return useQuery<MemberTrust[]>({
-    queryKey: memberTrustQueryKeys.list(projectId),
+  const canRead = !!projectId && !!accessToken && !!viewerId && enabled;
+  const query = useQuery<MemberTrust[]>({
+    queryKey: memberTrustQueryKeys.list(projectId, viewerId),
     queryFn: () => trustApi.listMemberTrust(projectId, accessToken!),
-    enabled: !!projectId && !!accessToken && enabled,
+    enabled: canRead,
     staleTime: 30_000,
   });
+  return { ...query, data: canRead ? query.data : undefined };
 }

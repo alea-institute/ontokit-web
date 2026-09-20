@@ -203,7 +203,9 @@ export function PropertyDetailPanel({
         .filter((a) => a.values.length > 0);
 
       const relationshipAnnotations: AnnotationUpdate[] = draft.relationships
-        .filter((g) => g.targets.length > 0)
+        // Built-in relationships are written only through their dedicated arrays.
+        .filter((g) => g.property_iri !== SEE_ALSO_IRI
+          && g.property_iri !== "http://www.w3.org/2000/01/rdf-schema#isDefinedBy")
         .map((g) => ({
           property_iri: g.property_iri,
           values: g.targets.map((t) => ({ value: t.iri, lang: "" })),
@@ -223,8 +225,12 @@ export function PropertyDetailPanel({
         deprecated: draft.deprecated,
         equivalentIris: draft.equivalentIris,
         disjointIris: draft.disjointIris,
-        seeAlsoIris: detail?.seeAlsoIris,
-        isDefinedByIris: detail?.isDefinedByIris,
+        seeAlsoIris: draft.relationships
+          .filter((g) => g.property_iri === SEE_ALSO_IRI)
+          .flatMap((g) => g.targets.map((t) => t.iri)),
+        isDefinedByIris: draft.relationships
+          .filter((g) => g.property_iri === "http://www.w3.org/2000/01/rdf-schema#isDefinedBy")
+          .flatMap((g) => g.targets.map((t) => t.iri)),
       });
     } : undefined,
     onError: (msg) => toast.error(msg),

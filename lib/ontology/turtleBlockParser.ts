@@ -80,6 +80,20 @@ function parseLiteral(raw: string): ParsedObject {
   while (i < raw.length) {
     if (raw[i] === "\\") {
       const next = raw[i + 1];
+      if (next === "u" || next === "U") {
+        const length = next === "u" ? 4 : 8;
+        const digits = raw.slice(i + 2, i + 2 + length);
+        const codePoint = Number.parseInt(digits, 16);
+        if (
+          digits.length !== length || !/^[0-9a-f]+$/i.test(digits) ||
+          codePoint > 0x10ffff || (codePoint >= 0xd800 && codePoint <= 0xdfff)
+        ) {
+          throw new Error("Invalid Unicode escape in Turtle literal");
+        }
+        value += String.fromCodePoint(codePoint);
+        i += 2 + length;
+        continue;
+      }
       switch (next) {
         case "n": value += "\n"; break;
         case "r": value += "\r"; break;
@@ -134,6 +148,14 @@ function tokenizeBlock(text: string): string[] {
     // Comment
     if (c === "#") {
       while (i < text.length && text[i] !== "\n") i++;
+      continue;
+    }
+
+    // Read numeric tokens before punctuation so decimal points stay in the value.
+    const numeric = /^[+-]?(?:(?:[0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)[eE][+-]?[0-9]+|[0-9]*\.[0-9]+|[0-9]+)(?=$|[\s;,\]().#])/.exec(text.slice(i));
+    if (numeric) {
+      tokens.push(numeric[0]);
+      i += numeric[0].length;
       continue;
     }
 
@@ -221,7 +243,12 @@ function tokenizeBlock(text: string): string[] {
 
     // Prefixed name, keyword, or bare value
     let end = i;
-    while (end < text.length && !/[\s;,.#"'<[\](]/.test(text[end])) end++;
+    while (end < text.length && !/[\s;,#"'<[\](]/.test(text[end])) {
+      // A dot can occur inside a prefixed name, but its final dot belongs
+      // to the statement (including when a comment starts immediately).
+      if (text[end] === "." && (end + 1 === text.length || /[\s;,#"'<[\](]/.test(text[end + 1]))) break;
+      end++;
+    }
     if (end > i) {
       tokens.push(text.slice(i, end));
       i = end;
@@ -309,8 +336,12 @@ export function parseBlockTriples(
       } else if (tok.startsWith("<") || tok.includes(":")) {
         obj = { type: "iri", value: resolveIri(tok, prefixes, base) };
       } else {
-        // Bare number or unrecognized
-        obj = { type: "literal", value: tok };
+        const numericType = /^[+-]?[0-9]+$/.test(tok) ? "integer"
+          : /^[+-]?[0-9]*\.[0-9]+$/.test(tok) ? "decimal"
+          : /^[+-]?(?:[0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)[eE][+-]?[0-9]+$/.test(tok) ? "double" : null;
+        obj = numericType
+          ? { type: "literal", value: tok, datatype: `http://www.w3.org/2001/XMLSchema#${numericType}` }
+          : { type: "literal", value: tok };
       }
 
       triples.push({ predicate: currentPredicate, object: obj });

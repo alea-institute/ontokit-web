@@ -36,10 +36,16 @@ export function useCollaborationStatus({
   const connect = useCallback(() => {
     if (!enabled || !projectId || isClosingRef.current) return;
 
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
     // Clean up existing connection
     if (wsRef.current) {
-      wsRef.current.close();
+      const previous = wsRef.current;
       wsRef.current = null;
+      previous.close();
     }
 
     setStatus("connecting");
@@ -49,15 +55,13 @@ export function useCollaborationStatus({
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (wsRef.current !== ws || isClosingRef.current) return;
         reconnectAttemptsRef.current = 0;
         setStatus("connected");
       };
 
       ws.onclose = () => {
-        if (isClosingRef.current) {
-          setStatus("disconnected");
-          return;
-        }
+        if (wsRef.current !== ws || isClosingRef.current) return;
 
         setStatus("disconnected");
 
@@ -67,6 +71,8 @@ export function useCollaborationStatus({
           reconnectAttemptsRef.current++;
 
           reconnectTimeoutRef.current = setTimeout(() => {
+            reconnectTimeoutRef.current = null;
+            if (wsRef.current !== ws || isClosingRef.current) return;
             setStatus("connecting");
             connectRef.current();
           }, delay);
@@ -79,6 +85,7 @@ export function useCollaborationStatus({
 
       // Handle messages from the lint WebSocket
       ws.onmessage = (event) => {
+        if (wsRef.current !== ws || isClosingRef.current) return;
         try {
           const data = JSON.parse(event.data);
           // Lint WebSocket sends messages about lint run status
@@ -108,8 +115,9 @@ export function useCollaborationStatus({
     }
 
     if (wsRef.current) {
-      wsRef.current.close();
+      const previous = wsRef.current;
       wsRef.current = null;
+      previous.close();
     }
 
     setStatus("disconnected");

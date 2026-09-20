@@ -39,7 +39,7 @@ console.log(`Updated package.json to ${devVersion}`);
 
 // Git commit
 execFileSync("git", ["add", packagePath], { stdio: "inherit" });
-execFileSync("git", ["commit", "-m", `chore: setting version to ${devVersion}`], {
+execFileSync("git", ["commit", "-m", `chore: setting version to ${devVersion}`, "--", packagePath], {
   stdio: "inherit",
 });
 console.log(`Created commit: chore: setting version to ${devVersion}`);

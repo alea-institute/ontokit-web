@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { ArrowLeft, Check, AlertCircle, LayoutGrid, Code, Sun, Moon, Monitor, Pencil, Save } from "lucide-react";
@@ -22,6 +22,9 @@ export default function UserSettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [isSavingIdentity, setIsSavingIdentity] = useState(false);
+
+  const successTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (successTimer.current) clearTimeout(successTimer.current); }, []);
 
   const isAuthenticated = status === "authenticated";
 
@@ -51,6 +54,7 @@ export default function UserSettingsPage() {
 
   const handleToggleVerifiedEmail = async (useVerified: boolean) => {
     if (!session?.accessToken) return;
+    if (successTimer.current) clearTimeout(successTimer.current);
     setIsSavingIdentity(true);
     setError(null);
     setSuccessMessage(null);
@@ -62,7 +66,7 @@ export default function UserSettingsPage() {
         ),
       );
       setSuccessMessage("Credit settings updated");
-      setTimeout(() => setSuccessMessage(null), 3000);
+      successTimer.current = setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't update credit settings");
     } finally {

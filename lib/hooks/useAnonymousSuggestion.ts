@@ -76,36 +76,50 @@ export function useAnonymousSuggestion({
   const sessionIdRef = useRef<string | null>(null);
   const branchRef = useRef<string | null>(null);
   const anonymousTokenRef = useRef<string | null>(null);
-  const restoredRef = useRef(false);
+  const scopeRef = useRef({ projectId, live: true });
+  if (scopeRef.current.projectId !== projectId) {
+    scopeRef.current = { projectId, live: true };
+  }
+  const scope = scopeRef.current;
+  const isCurrent = useCallback(() => scopeRef.current === scope && scope.live, [scope]);
 
-  // Restore any unexpired active session from sessionStorage on mount
+  // A mounted hook can navigate between projects. Restore each project's own
+  // session and invalidate completions from the previous visit, even on A→B→A.
   useEffect(() => {
-    if (restoredRef.current) return;
-    restoredRef.current = true;
-
-    const entry = tokenStore.getToken(projectId);
-    if (entry) {
-      sessionIdRef.current = entry.sessionId;
-      branchRef.current = entry.branch;
-      anonymousTokenRef.current = entry.token;
-      setSessionId(entry.sessionId);
-      setBranch(entry.branch);
-      setAnonymousToken(entry.token);
-      setStatus("active");
-    }
-  // Only run once on mount — tokenStore.getToken is stable
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId]);
+    scope.live = true;
+    savingRef.current = false;
+    submittingRef.current = false;
+    startingRef.current = null;
+    const entry = useAnonymousTokenStore.getState().getToken(projectId);
+    sessionIdRef.current = entry?.sessionId ?? null;
+    branchRef.current = entry?.branch ?? null;
+    anonymousTokenRef.current = entry?.token ?? null;
+    setSessionId(entry?.sessionId ?? null);
+    setBranch(entry?.branch ?? null);
+    setAnonymousToken(entry?.token ?? null);
+    setStatus(entry ? "active" : "idle");
+    setError(null);
+    setChangesCount(0);
+    setEntitiesModified([]);
+    setIsStarting(false);
+    return () => { scope.live = false; };
+  }, [projectId, scope]);
 
   const startSession = useCallback((): Promise<string | null> => {
     // Don't create a duplicate session if one already exists
-    if (sessionIdRef.current) return Promise.resolve(branchRef.current);
+    if (!isCurrent()) return Promise.resolve(null);
+    if (sessionIdRef.current) {
+      setStatus("active");
+      setError(null);
+      return Promise.resolve(branchRef.current);
+    }
     if (startingRef.current) return startingRef.current;
 
     const startPromise = (async () => {
       setIsStarting(true);
       try {
         const session = await anonymousSuggestionsApi.createSession(projectId);
+        if (!isCurrent()) return null;
 
         // Persist the 24-hour token lifetime before updating state. The server's
         // created_at is authoritative when valid; Date.now is the safe fallback.
@@ -128,20 +142,23 @@ export function useAnonymousSuggestion({
         setError(null);
         return session.branch;
       } catch (err) {
+        if (!isCurrent()) return null;
         const msg = err instanceof Error ? err.message : "Failed to start anonymous suggestion session";
         setStatus("error");
         setError(msg);
         onError?.(msg);
         return null;
       } finally {
-        setIsStarting(false);
-        startingRef.current = null;
+        if (isCurrent()) {
+          setIsStarting(false);
+          startingRef.current = null;
+        }
       }
     })();
 
     startingRef.current = startPromise;
     return startPromise;
-  }, [projectId, tokenStore, onError]);
+  }, [projectId, tokenStore, onError, isCurrent]);
 
   const saveToSession = useCallback(async (
     content: string,
@@ -153,7 +170,7 @@ export function useAnonymousSuggestion({
     // save was in flight, the session is missing, or the request failed).
     const currentSessionId = sessionIdRef.current;
     const currentAnonymousToken = anonymousTokenRef.current;
-    if (!currentSessionId || !currentAnonymousToken || savingRef.current) return false;
+    if (!isCurrent() || !currentSessionId || !currentAnonymousToken || savingRef.current) return false;
 
     savingRef.current = true;
     setStatus("saving");
@@ -171,6 +188,7 @@ export function useAnonymousSuggestion({
         payload,
         currentAnonymousToken,
       );
+      if (!isCurrent() || sessionIdRef.current !== currentSessionId) return false;
       setChangesCount(result.changes_count);
 
       // Track modified entities (deduplicated by label)
@@ -182,15 +200,16 @@ export function useAnonymousSuggestion({
       setStatus("active");
       return true;
     } catch (err) {
+      if (!isCurrent() || sessionIdRef.current !== currentSessionId) return false;
       const msg = err instanceof Error ? err.message : "Failed to save anonymous suggestion";
       setStatus("error");
       setError(msg);
       onError?.(msg);
       return false;
     } finally {
-      savingRef.current = false;
+      if (isCurrent()) savingRef.current = false;
     }
-  }, [projectId, onError]);
+  }, [projectId, onError, isCurrent]);
 
   const submitSession = useCallback(async (
     summary?: string,
@@ -200,7 +219,7 @@ export function useAnonymousSuggestion({
   ) => {
     // Double-submit guard: a fast second click while the first submit is in
     // flight must not open two PRs for the same session.
-    if (!sessionId || !anonymousToken || submittingRef.current) return;
+    if (!isCurrent() || !sessionId || !anonymousToken || submittingRef.current) return;
     submittingRef.current = true;
 
     setStatus("submitting");
@@ -222,6 +241,8 @@ export function useAnonymousSuggestion({
         anonymousToken,
       );
 
+      if (!isCurrent() || sessionIdRef.current !== sessionId) return;
+
       // Clear persisted token on successful submit
       tokenStore.clearToken(projectId);
 
@@ -238,23 +259,26 @@ export function useAnonymousSuggestion({
       setChangesCount(0);
       setEntitiesModified([]);
     } catch (err) {
+      if (!isCurrent() || sessionIdRef.current !== sessionId) return;
       const msg = err instanceof Error ? err.message : "Failed to submit anonymous suggestions";
       setStatus("error");
       setError(msg);
       onError?.(msg);
     } finally {
-      submittingRef.current = false;
+      if (isCurrent()) submittingRef.current = false;
     }
-  }, [sessionId, anonymousToken, projectId, tokenStore, onSubmitted, onError]);
+  }, [sessionId, anonymousToken, projectId, tokenStore, onSubmitted, onError, isCurrent]);
 
   const discardSession = useCallback(async () => {
-    if (!sessionId || !anonymousToken) return;
+    if (!isCurrent() || !sessionId || !anonymousToken) return;
 
     try {
       await anonymousSuggestionsApi.discard(projectId, sessionId, anonymousToken);
     } catch {
       // Best-effort discard — don't block UX on network failure
     }
+
+    if (!isCurrent() || sessionIdRef.current !== sessionId) return;
 
     // Clear persisted token regardless of API success
     tokenStore.clearToken(projectId);
@@ -269,7 +293,7 @@ export function useAnonymousSuggestion({
     setEntitiesModified([]);
     setStatus("idle");
     setError(null);
-  }, [sessionId, anonymousToken, projectId, tokenStore]);
+  }, [sessionId, anonymousToken, projectId, tokenStore, isCurrent]);
 
   return {
     sessionId,
@@ -279,7 +303,7 @@ export function useAnonymousSuggestion({
     status,
     error,
     entitiesModified,
-    isActive: status === "active" || status === "saving",
+    isActive: status === "active" || status === "saving" || (status === "error" && sessionId !== null),
     isStarting,
     startSession,
     saveToSession,
