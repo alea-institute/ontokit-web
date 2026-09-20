@@ -96,3 +96,34 @@ it('verifies a new resume selection and ignores the previous selection response'
   await act(async () => { old.resolve(json({ items: [{ session_id: 'old', status: 'changes-requested' }] })); });
   expect(result.current.sessionId).toBe('current');
 });
+
+it.each(['submit', 'resubmit', 'discard'])('completes authenticated %s across same-viewer credential renewal', async operation => {
+  const gate = deferred(); vi.stubGlobal('fetch', vi.fn(() => gate.promise)); const onSubmitted = vi.fn();
+  const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken, onSubmitted }), { initialProps: { accessToken: 'old' } });
+  act(() => result.current.resumeSession('session', 'branch'));
+  let pending!: Promise<void>;
+  act(() => { pending = operation === 'submit' ? result.current.submitSession() : operation === 'resubmit' ? result.current.resubmitSession() : result.current.discardSession(); });
+  rerender({ accessToken: 'renewed' });
+  if (operation !== 'discard') expect(result.current.status).toBe('submitting');
+  await act(async () => { gate.resolve(json({ pr_number: 9, pr_url: null })); await pending; });
+  expect(result.current.sessionId).toBeNull();
+  expect(result.current.status).toBe(operation === 'discard' ? 'idle' : 'submitted');
+  if (operation !== 'discard') expect(onSubmitted).toHaveBeenCalledExactlyOnceWith(9, null);
+});
+
+it.each(['submit', 'resubmit'])('unlocks a renewed credential retry after an older %s is denied', async operation => {
+  const gate = deferred(); const onError = vi.fn(); const onSubmitted = vi.fn();
+  const fetcher = vi.fn().mockReturnValueOnce(gate.promise).mockResolvedValueOnce(json({ pr_number: 10, pr_url: null })); vi.stubGlobal('fetch', fetcher);
+  const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken, onError, onSubmitted }), { initialProps: { accessToken: 'old' } });
+  act(() => result.current.resumeSession('session', 'branch'));
+  let pending!: Promise<void>;
+  act(() => { pending = operation === 'submit' ? result.current.submitSession() : result.current.resubmitSession(); });
+  rerender({ accessToken: 'renewed' });
+  await act(async () => { gate.resolve(json({ detail: 'Expired' }, 401)); await pending; });
+  expect(onError).not.toHaveBeenCalled();
+  expect(result.current.status).toBe('active');
+  await act(() => operation === 'submit' ? result.current.submitSession() : result.current.resubmitSession());
+  expect(result.current.status).toBe('submitted');
+  expect(onSubmitted).toHaveBeenCalledExactlyOnceWith(10, null);
+  expect(fetcher.mock.calls[1][1].headers.get('Authorization')).toBe('Bearer renewed');
+});

@@ -50,3 +50,16 @@ it('finds a numeric prefixed subject without matching an earlier reference to it
   const input = '@prefix ex: <https://example.test/> .\nex:Other ex:ref ex:43 .\nex:43 ex:note "numeric subject" .';
   expect(parseBlockTriples(input, iri('43'))).toEqual([{ predicate: iri('note'), object: { type: 'literal', value: 'numeric subject' } }]);
 });
+
+it.each(['Person', 'Foo.Bar', 'Café'])('finds and updates %s after a comment-adjacent statement terminator', name => {
+  const input = `@prefix ex: <https://example.test/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+ex:Other a owl:NamedIndividual .# retained comment
+ex:${name} a owl:NamedIndividual ; ex:note "Original" .
+`;
+  const parsed = extractIndividualDetail(input, iri(name));
+  expect(parsed).not.toBeNull();
+  const output = updateIndividualInTurtle(input, iri(name), { ...parsed!, annotations: [{ property_iri: iri('note'), values: [{ value: 'Updated', lang: '' }] }] });
+  expect(output).toContain('ex:Other a owl:NamedIndividual .# retained comment');
+  expect(extractIndividualDetail(output, iri(name))?.annotations).toEqual([{ property_iri: iri('note'), values: [{ value: 'Updated', lang: '' }] }]);
+});
