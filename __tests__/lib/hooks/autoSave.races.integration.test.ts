@@ -55,7 +55,7 @@ describe.each(["class", "property", "individual"] as const)("%s save ownership",
     }, { initialProps: { branch: "main", entityIri: iri } });
     const edit = (value: string) => act(() => {
       entry = { ...entry, labels: [{ value, lang: "en" }] };
-      if ("editStateRef" in view.result.current) view.result.current.editStateRef.current = entry as DraftEntry;
+      if (kind === "class") (view.result.current as ReturnType<typeof useAutoSave>).editStateRef.current = entry as DraftEntry;
       view.result.current.triggerSave();
     });
     return { ...view, edit, pending, onError, onFirstAutoSave, get source() { return source; } };
