@@ -1,0 +1,64 @@
+{
+  "unit": "U4",
+  "status": "complete",
+  "requirements": [
+    "R5",
+    "R6",
+    "R7"
+  ],
+  "behavior_changed": true,
+  "api_prerequisite_commit": "f5f036b9",
+  "api_base_image_fix": "4d17d949",
+  "run": {
+    "id": "551ff82d72b7adf237055532141e6249",
+    "exit_code": 0,
+    "passed": 20,
+    "new_u4_tests": 5,
+    "skipped": 0,
+    "failed": 0,
+    "cleanup_verified": true,
+    "neighbor_identities_preserved": true
+  },
+  "sources": {
+    "api": {
+      "revision": "4d17d9496378ff7602c9ae3ee4c3419f2c065da0",
+      "sha256": "c5dbe6f8d0e7c91267349020b1870a589d69a9a3ca3e3e4fc608992e025d83df"
+    },
+    "web": {
+      "revision": "13b10944a9c32c17b2f143fdcee13537168f1c8e",
+      "sha256": "7a816e86c55db45e84f37ac2f93531188e2719184c63b84bc2d4ce97c6287126"
+    }
+  },
+  "source_note": "Snapshot captured working bytes of the serializer fix before its f5f036b9 commit and staged U4 tests before their commit; hashes identify exact tested contents.",
+  "red_run": {
+    "id": "be5c3cf550b7fa59d1f0bf1d9f34787b",
+    "passed": 19,
+    "failed": 1,
+    "failure": "Merged PR GET omitted stored revision hashes",
+    "cleanup_verified": true,
+    "neighbor_identities_preserved": true
+  },
+  "verification": {
+    "web_type_check": "passed",
+    "web_focused_eslint": "passed",
+    "api_tests": 3261,
+    "api_coverage_percent": 90,
+    "api_ruff": "passed",
+    "api_mypy": "193 source files, no issues",
+    "api_pyright": "0 errors after binding verified Python3.11 environment",
+    "production_build": "passed in fresh private source copy"
+  },
+  "regression_evidence": "Strengthened existing TestToPrResponse before production fix: merged hash assertion failed, null open case passed. After3field serializer fix,71service tests and full3261suite pass.",
+  "contracts": [
+    "Branch save leaves target and historical commit unchanged",
+    "Stale base409 preserves branch and target bytes/revisions",
+    "Ordinary owner PRdiff and merge persist commit and target source",
+    "Index readiness is correlated to exact target revision; lexical result has exact IRI/new label and excludes old/nonmatching terms",
+    "Two enqueue operations each yield a fresh persisted lint run, terminalsuccess and deterministic missing-comment issue; prior results cannot satisfy readiness"
+  ],
+  "limitations": [
+    "U5 browser edit/import/merge and U6 final repeatability remain incomplete",
+    "API PR-response repair review/publication remains pending",
+    "Hosted DEV and B11-B13 remain separate"
+  ]
+}
