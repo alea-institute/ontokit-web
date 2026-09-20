@@ -31,6 +31,7 @@ The accepted direction is to work through every area. Alternative storage archit
 **D02: recovery verified; hosted identity access pending. Independent deliverable D06: B10 full-stack test foundation (implementing lifecycle isolation).**
 
 - D06's [reviewed implementation plan](2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) and [review receipt](../releases/d06-plan-review.json) are checkpointed as `db916292` on `feat/d06-full-stack-tests-20260920` in `.worktrees/web-d06-full-stack`. Ten review passes completed with no unresolved findings. U1 lifecycle implementation is active; no full-stack acceptance is claimed. This branch starts from merged web `ab903e14`, preserving the older documentation branch's unpublished history.
+- D06's first real probes found a default API Dockerfile defect: the package directory is root-owned `0644`, preventing non-root imports and migrations. [Lifecycle evidence](../releases/d06-lifecycle-readiness.md) records the reproduced failure and successful cleanup. Repair is isolated in `.worktrees/api-d06-image`; verify and integrate it before completing U1 or activating the DEV candidate.
 
 - D01/D03 candidate merged into ALEA web `dev` through [PR48](https://github.com/alea-institute/ontokit-web/pull/48), revision `ab903e145e2a6ad30aefd915a83cb0bafbaa0678`, after all eight verification checks passed. No deployment occurred.
 - [D03 evidence](../releases/d03-image-readiness.md) supersedes D01’s required-auth image failure: all three images build and pass expanded runtime checks; 5,222 tests pass.
