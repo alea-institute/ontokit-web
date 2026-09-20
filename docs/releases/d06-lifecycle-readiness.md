@@ -1,6 +1,6 @@
 # D06 lifecycle verification
 
-Status: **U1–U4 verified; U5 browser import/edit/merge implementation is active.** No full-stack acceptance, publication or deployment is claimed.
+Status: **U1–U5 verified; U6 final repeatability and crash recovery is active.** No full-stack acceptance, publication or deployment is claimed.
 
 The [reviewed D06 plan](../plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) is checkpointed as `db916292`. Web implementation is in `.worktrees/web-d06-full-stack`, branch `feat/d06-full-stack-tests-20260920`. The API repair is isolated in `.worktrees/api-d06-image`, branch `fix/d06-runtime-package-permissions-20260920`, based on merged `c95991c7`.
 
@@ -23,7 +23,7 @@ The repair is committed locally as API `4d17d949` (not yet reviewed or published
 
 Normal completion, setup failure, late workflow failure, SIGINT, SIGTERM, and SIGKILL recovery all passed real Docker probes. Every probe removed all owned resources and preserved all pre-existing identities. Hard recovery also succeeded after removing only the run-private temporary directory. The hold-mode premature exit was fixed after two failing signal regressions; both now pass. Sanitized detailed evidence is committed in the implementation checkout at `docs/releases/d06-u1-verification.json`.
 
-U2 real identity and browser setup is committed as `19c40e86`, following production session fix `6f1d9687`. API repair publication, PR serializer review/publication and U5–U6 remain required. B10, B11–B13 and hosted DEV acceptance remain unfinished.
+U2 real identity and browser setup is committed as `19c40e86`, following production session fix `6f1d9687`. API repair publication, PR serializer review/publication and U6 remain required. B10, B11–B13 and hosted DEV acceptance remain unfinished.
 
 ## U2 live verification findings
 
@@ -42,3 +42,5 @@ Fresh run `be5c3cf550b7fa59d1f0bf1d9f34787b` passed 19 of 20 tests, including br
 The API image repair received a completed focused correctness/Claude adversarial review, recorded in `docs/releases/d06-api-image-review.json`. No current-scope actionable finding remains. Broader production-image and entrypoint smoke coverage suggestions remain explicit limitations; actual default entrypoint/migrations are already exercised by full-stack runs. Publication and required remote checks remain pending.
 
 U4 is now verified and committed as web `715c86b6`. API serializer fix `f5f036b9` passed a strengthened pre-fix red regression, all 3,261 API tests (90% coverage), Ruff, mypy (193 files) and pyright (zero errors). Pyright initially selected a missing worktree `.venv`; binding the existing verified Python3.11 test environment resolved the tool configuration. Fresh run `551ff82d72b7adf237055532141e6249` passed all 20 full-stack tests with zero skips/failures, including the unchanged merge-hash assertion. Cleanup and neighboring-resource checks passed. Exact source fingerprints and detailed results are in implementation `docs/releases/d06-u4-verification.json`. U5 is assigned to a fresh worker; full browser acceptance and final repeatability remain incomplete.
+
+U5 is verified and committed as `48db779c`. Fresh run `34fb576c7bbe9f397b033e94d462dafe` passed all 21 tests with zero skips/failures, including real fresh login, UI import, Monaco keyboard editing, PR diff and merge, target selection and reload. Cleanup removed all owned resources and preserved neighboring identities. Two earlier helper failures characterized tree selection and Monaco focus without weakening persistence assertions; their private diagnostics were consumed and deleted. Static typing and focused ESLint pass. The U5 receipt records exact test-file hashes; final U6 runs will capture full source fingerprints before manifest cleanup.
