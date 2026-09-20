@@ -148,11 +148,9 @@ describe('TurtleEditor production language providers', () => {
     expect(links(textModel(''))).toEqual([]);
   });
 
-  // Characterize the existing error path: malformed URLs currently propagate
-  // from the provider rather than being returned as editor diagnostics.
-  it.each(['<https://[invalid]>'])('surfaces invalid external URL errors for %s', source => {
-    const { model } = mount(source);
-    expect(() => links(model!)).toThrow(TypeError);
+  it.each(['<https://[invalid]>'])('ignores invalid external URLs while retaining valid links: %s', source => {
+    const { model } = mount(source + ' <https://example.org/valid>');
+    expect(links(model!).map(link => link.url)).toEqual(['https://example.org/valid']);
   });
 
   it('resolves the hovered token among several IRIs and prefixed names', () => {
@@ -263,6 +261,20 @@ describe('TurtleEditor navigation and diagnostics', () => {
     view.click(5, 1, { ctrlKey: false, type: 2 });
     view.click(3, 1, { ctrlKey: false, type: 2, missingPosition: true });
     expect(onDiagnosticClick).toHaveBeenCalledOnce();
+  });
+
+  it('uses diagnostics and the callback received after Monaco mounted', () => {
+    const oldCallback = vi.fn();
+    const currentCallback = vi.fn();
+    const item = diagnostic('warning');
+    const view = mount('', { diagnostics: [], onDiagnosticClick: oldCallback });
+    view.rerender(<TurtleEditor value="" diagnostics={[item]} onDiagnosticClick={currentCallback} />);
+    view.click(3, 1, { ctrlKey: false, type: 2 });
+    expect(currentCallback).toHaveBeenCalledExactlyOnceWith(item);
+    expect(oldCallback).not.toHaveBeenCalled();
+    view.rerender(<TurtleEditor value="" diagnostics={[]} onDiagnosticClick={currentCallback} />);
+    view.click(3, 1, { ctrlKey: false, type: 2 });
+    expect(currentCallback).toHaveBeenCalledOnce();
   });
 
   it('defers severity-correct markers and clears them when diagnostics are removed', () => {

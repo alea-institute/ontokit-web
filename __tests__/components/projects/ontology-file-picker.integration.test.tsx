@@ -15,6 +15,24 @@ function scan(items: GitHubRepoFileInfo[]) {
 }
 
 describe('OntologyFilePicker real scan and path selection', () => {
+  it.each([false, true])('clears old source and output selections on repository change (single file: %s)', async single => {
+    const fetch = scan([file('old.owl'), file('old-output.ttl')]);
+    const selected = vi.fn();
+    const view = render(picker(selected));
+    fireEvent.click(await screen.findByRole('button', { name: /old.owl/ }));
+    fetch.mockResolvedValueOnce(response(single ? [file('current.owl')] : [file('one.owl'), file('two.owl')]));
+    view.rerender(picker(selected, 'current'));
+    await screen.findByText(single ? 'current.owl' : 'one.owl');
+    if (single) {
+      expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('current.ttl');
+      fireEvent.click(screen.getByRole('button', { name: 'Confirm Turtle output path' }));
+      expect(selected).toHaveBeenCalledExactlyOnceWith(file('current.owl'), 'current.ttl');
+    } else {
+      expect(screen.queryByRole('button', { name: 'Confirm Turtle output path' })).toBeNull();
+      expect(selected).not.toHaveBeenCalled();
+    }
+  });
+
   it('scans with encoded query parameters and bearer authentication then auto-selects uppercase Turtle', async () => {
     const input = file('nested/model.TTL');
     const fetch = scan([input]);

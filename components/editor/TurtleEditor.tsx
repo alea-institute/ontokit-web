@@ -87,6 +87,10 @@ export function TurtleEditor({
   const monacoRef = useRef<typeof import("monaco-editor") | null>(null);
   const [isReady, setIsReady] = useState(false);
   const onInternalLinkClickRef = useRef(onInternalLinkClick);
+  const diagnosticClickRef = useRef({ diagnostics, onDiagnosticClick });
+  useEffect(() => {
+    diagnosticClickRef.current = { diagnostics, onDiagnosticClick };
+  }, [diagnostics, onDiagnosticClick]);
 
   // Keep ref updated
   useEffect(() => {
@@ -344,6 +348,13 @@ export function TurtleEditor({
             const isInternal = [...internalNs].some(ns => url.startsWith(ns));
             if (isInternal) continue;
 
+            let hostname: string;
+            try {
+              hostname = new URL(url).hostname;
+            } catch {
+              continue;
+            }
+
             const startCol = match.index! + 2; // After '<'
             const endCol = startCol + url.length;
             links.push({
@@ -354,7 +365,7 @@ export function TurtleEditor({
                 endColumn: endCol,
               },
               url: url,
-              tooltip: `Ctrl+Click to open ${new URL(url).hostname}`,
+              tooltip: `Ctrl+Click to open ${hostname}`,
             });
           }
         }
@@ -492,6 +503,7 @@ export function TurtleEditor({
         }
 
         // Handle diagnostic gutter click
+        const { diagnostics, onDiagnosticClick } = diagnosticClickRef.current;
         if (onDiagnosticClick && e.target.type === monaco.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) {
           const lineNumber = e.target.position?.lineNumber;
           if (lineNumber) {
@@ -507,7 +519,7 @@ export function TurtleEditor({
         }
       });
     },
-    [onReady, onDiagnosticClick, diagnostics]
+    [onReady]
   );
 
   // Update diagnostics as markers (deferred to not block rendering)

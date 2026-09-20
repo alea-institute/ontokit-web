@@ -168,7 +168,9 @@ export function IndividualDetailPanel({
         .filter((a) => a.values.length > 0);
 
       const relationshipAnnotations: AnnotationUpdate[] = draft.relationships
-        .filter((g) => g.targets.length > 0)
+        // Built-in relationships are written only through their dedicated arrays.
+        .filter((g) => g.property_iri !== SEE_ALSO_IRI
+          && g.property_iri !== "http://www.w3.org/2000/01/rdf-schema#isDefinedBy")
         .map((g) => ({
           property_iri: g.property_iri,
           values: g.targets.map((t) => ({ value: t.iri, lang: "" })),

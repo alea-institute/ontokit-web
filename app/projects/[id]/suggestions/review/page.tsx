@@ -176,6 +176,8 @@ export default function SuggestionReviewPage() {
   const [activeTab, setActiveTab] = useState<DetailTab>("summary");
   const [diff, setDiff] = useState<PRDiffResponse | null>(null);
   const [isDiffLoading, setIsDiffLoading] = useState(false);
+  const [diffError, setDiffError] = useState<string | null>(null);
+  const [diffAttempt, setDiffAttempt] = useState(0);
 
   // Action dialogs
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
@@ -229,7 +231,10 @@ export default function SuggestionReviewPage() {
 
   // Load diff when selecting a session and switching to files tab
   useEffect(() => {
-    if (!selectedSession?.pr_number || activeTab !== "files" || diff || isDiffLoading) return;
+    setDiff(null);
+    setDiffError(null);
+    setIsDiffLoading(false);
+    if (!selectedSession?.pr_number || activeTab !== "files") return;
     if (!session?.accessToken) return;
 
     let cancelled = false;
@@ -238,11 +243,11 @@ export default function SuggestionReviewPage() {
       .getDiff(projectId, selectedSession.pr_number, session.accessToken)
       .then((data) => { if (!cancelled) setDiff(data); })
       .catch(() => {
-        // Diff may not be available
+        if (!cancelled) setDiffError("Could not load the suggestion diff.");
       })
       .finally(() => { if (!cancelled) setIsDiffLoading(false); });
     return () => { cancelled = true; };
-  }, [selectedSession, activeTab, diff, isDiffLoading, projectId, session?.accessToken]);
+  }, [selectedSession?.session_id, selectedSession?.pr_number, activeTab, diffAttempt, projectId, session?.accessToken]);
 
   // Switching queues starts a fresh selection: ids that are no longer on
   // screen must not ride along into the next bulk call.
@@ -814,6 +819,11 @@ export default function SuggestionReviewPage() {
                               {isDiffLoading ? (
                                 <div className="flex items-center justify-center py-8">
                                   <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+                                </div>
+                              ) : diffError ? (
+                                <div role="alert" className="py-8 text-center text-sm">
+                                  <p>{diffError}</p>
+                                  <Button variant="outline" onClick={() => setDiffAttempt((attempt) => attempt + 1)}>Retry diff</Button>
                                 </div>
                               ) : diff ? (
                                 <DiffView diff={diff} />

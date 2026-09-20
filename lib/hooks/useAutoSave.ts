@@ -4,6 +4,7 @@ import type { LocalizedString, AnnotationUpdate, ClassUpdatePayload } from "@/li
 import type { RelationshipGroup } from "@/components/editor/standard/RelationshipSection";
 import type { OWLClassDetail } from "@/lib/api/client";
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
+import { RELATIONSHIP_PROPERTY_IRIS } from "@/lib/ontology/annotationProperties";
 import type { SaveOrigin } from "@/lib/editor/autoSave";
 
 export type SaveStatus = "idle" | "draft" | "saving" | "saved" | "error";
@@ -197,13 +198,20 @@ export function useAutoSave({
         }))
         .filter((a) => a.values.length > 0);
 
-      // Convert relationships back to annotation format
+      // Explicit empty updates remove managed predicates after a group is
+      // cleared or changes property. Omitted unrelated annotations stay intact.
       const relationshipAnnotations: AnnotationUpdate[] = draft.relationships
-        .filter((g) => g.targets.length > 0)
         .map((g) => ({
           property_iri: g.property_iri,
           values: g.targets.map((t) => ({ value: t.iri, lang: "" })),
         }));
+
+      for (const annotation of detail?.annotations ?? []) {
+        if (RELATIONSHIP_PROPERTY_IRIS.has(annotation.property_iri)
+          && !relationshipAnnotations.some((group) => group.property_iri === annotation.property_iri)) {
+          relationshipAnnotations.push({ property_iri: annotation.property_iri, values: [] });
+        }
+      }
 
       const validLabels = draft.labels.filter((l) => l.value.trim());
 

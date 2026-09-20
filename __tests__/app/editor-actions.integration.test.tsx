@@ -73,7 +73,7 @@ let resumableSessions: object[];
 let sessionListStatus: number;
 let suggestionSubmissions: unknown[];
 let suggestionBodies: { content: string; entity_iri: string; entity_label: string }[];
-let anonymousFailure: "create" | "save" | "discard" | null;
+let anonymousFailure: "create" | "save" | "submit" | "discard" | null;
 let anonymousSubmissions: unknown[];
 let savedBodies: unknown[];
 let unexpected: string[];
@@ -1226,4 +1226,27 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(savedBodies).toEqual([]);
   });
 
+});
+
+it("retains anonymous proposal source and retry/discard controls after submission is denied", async () => {
+  await saveAnonymousProposal();
+  const sourceBeforeSubmit = suggestionBodies[0].content;
+  anonymousFailure = "submit";
+  fireEvent.click(screen.getByRole("button", { name: /Submit Proposal/ }));
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Want credit for your suggestions?" })).getByRole("button", { name: "Skip" }));
+  await screen.findByText("Proposal error");
+  expect(screen.getByRole("button", { name: /Submit Proposal/ })).toBeDefined();
+  expect(screen.getByRole("button", { name: "Discard" })).toBeDefined();
+  expect(useAnonymousTokenStore.getState().getToken("route-project")?.sessionId).toBe("anonymous-session");
+  expect(screen.queryByRole("dialog", { name: "Thank you — your proposal is in" })).toBeNull();
+  anonymousFailure = null;
+  fireEvent.click(screen.getByRole("button", { name: /Submit Proposal/ }));
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Want credit for your suggestions?" })).getByRole("button", { name: "Skip" }));
+  await screen.findByRole("dialog", { name: "Thank you — your proposal is in" });
+  expect(anonymousSubmissions).toHaveLength(2);
+  expect(requests.filter(r => r.path.endsWith("/anonymous/sessions"))).toHaveLength(1);
+  expect(requests.filter(r => r.path.endsWith("/anonymous-session/submit"))).toHaveLength(2);
+  expect(suggestionBodies).toHaveLength(1);
+  expect(suggestionBodies[0].content).toBe(sourceBeforeSubmit);
+  expect(savedBodies).toEqual([]);
 });

@@ -109,6 +109,7 @@ describe("source editor integration through real TurtleEditor and lint API", () 
     indexed.iriIndex.push([duplicateIri, duplicate]);
     act(() => IndexWorker.instances.at(-1)!.onmessage?.({ data: indexed } as MessageEvent<IndexWorkerResult>));
     editor.setPosition.mockClear();
+    expect(screen.getByRole("button", { name: "Other" }).parentElement?.closest('button')).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Other" }));
     expect(editor.setPosition).toHaveBeenCalledExactlyOnceWith({ lineNumber: 3, column: 2 });
     expect(editor.revealLineInCenter).toHaveBeenLastCalledWith(3);

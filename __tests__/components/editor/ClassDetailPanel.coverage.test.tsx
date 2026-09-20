@@ -263,7 +263,8 @@ describe("class detail real editing and suggestion chains", () => {
     await screen.findByDisplayValue("Restored person"); unmount();
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1));
     expect(parseBlockTriples(output, iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: "Restored person", lang: "en" } });
-    expect(useEditorModeStore.getState().hasSeenAutoSaveToast).toBe(true);
+    // A completed navigation save must not claim an announcement for an unmounted panel.
+    expect(useEditorModeStore.getState().hasSeenAutoSaveToast).toBe(false);
   });
   it("leaves server data read-only when edit permission is absent", async () => {
     const { save, unmount } = mount({ canEdit: false, canUseLLM: false });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { ClassDetailPanel } from "@/components/editor/ClassDetailPanel";
@@ -61,6 +61,32 @@ async function savePanel() {
   await screen.findByText("Saved");
 }
 describe("class panel remaining real acceptance and request boundaries", () => {
+  it.each(["remove", "change predicate"])("persists relationship %s while preserving another relationship and annotation", async action => {
+    const seeAlso = "http://www.w3.org/2000/01/rdf-schema#seeAlso";
+    const definedBy = "http://www.w3.org/2000/01/rdf-schema#isDefinedBy";
+    output = source.replace('skos:definition "Existing definition"@en .', 'skos:definition "Existing definition"@en ; rdfs:seeAlso :Reference ; rdfs:isDefinedBy :Ontology ; skos:note "Preserved unseen annotation" .');
+    currentDetail.annotations!.push(
+      { property_iri: seeAlso, property_label: "See Also", values: [{ value: "https://example.test/Reference", lang: "" }] },
+      { property_iri: definedBy, property_label: "Defined By", values: [{ value: "https://example.test/Ontology", lang: "" }] },
+    );
+    const original = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation((input, init) => String(input).includes("/search") ? Promise.resolve(jsonResponse({ results: [{ iri: "https://example.test/custom", label: "Custom relation", entity_type: "property", deprecated: false }], total: 1 })) : original(input, init));
+    mount();
+    await screen.findByDisplayValue("Person");
+    if (action === "remove") fireEvent.click(within(screen.getByTitle("https://example.test/Reference").parentElement!).getByTitle("Remove"));
+    else {
+      fireEvent.click(screen.getByRole("button", { name: "See Also" }));
+      fireEvent.change(screen.getByPlaceholderText("Search properties..."), { target: { value: "custom" } });
+      fireEvent.click(await screen.findByRole("button", { name: "Custom relation" }));
+    }
+    await savePanel();
+    const triples = parseBlockTriples(output, iri)!;
+    expect(triples.filter(t => t.predicate === seeAlso)).toEqual([]);
+    expect(triples.filter(t => t.predicate === definedBy).map(t => t.object)).toEqual([{ type: "iri", value: "https://example.test/Ontology" }]);
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2004/02/skos/core#note", object: { type: "literal", value: "Preserved unseen annotation" } });
+    expect(triples.filter(t => t.predicate === "https://example.test/custom").map(t => t.object)).toEqual(action === "change predicate" ? [{ type: "iri", value: "https://example.test/Reference" }] : []);
+  });
+
   it.each(["success", "failure"] as const)("keeps the newly selected class visible after a late previous-class %s", async outcome => {
     const nextIri = "https://example.test/Next";
     let complete!: (response: Response) => void;

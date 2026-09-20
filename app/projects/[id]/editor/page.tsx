@@ -336,6 +336,7 @@ export default function EditorPage() {
 
   const suggestionSession = useSuggestionSession({
     projectId,
+    viewerId: session?.user?.id,
     accessToken: session?.accessToken,
     resumeSessionId: isSuggestionMode ? resumeSessionParam : undefined,
     resumeBranch: isSuggestionMode ? resumeBranchParam : undefined,

@@ -25,6 +25,27 @@ function submit() { return screen.getByRole("button", { name: "Save & Commit" })
 afterEach(() => vi.unstubAllGlobals());
 
 describe("CommitMessageDialog workflow", () => {
+  it('keeps a pending commit locked when the suggested message changes', async () => {
+    let finish!: () => void;
+    const confirm = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const close = vi.fn();
+    const view = render(<CommitMessageDialog open onOpenChange={close} onConfirm={confirm} defaultMessage="Original" />);
+    await userEvent.click(submit());
+    view.rerender(<CommitMessageDialog open onOpenChange={close} onConfirm={confirm} defaultMessage="New suggestion" />);
+    expect(input().disabled).toBe(true);
+    expect(input().value).toBe('Original');
+    await act(async () => finish());
+    expect(confirm).toHaveBeenCalledExactlyOnceWith('Original');
+  });
+
+  it('shows the readable server detail for a rejected commit', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ detail: 'Revision conflict; reload before saving' }), { status: 409, headers: { 'Content-Type': 'application/json' } })));
+    render(<SaveWorkflow />);
+    await userEvent.click(submit());
+    expect(await screen.findByText('Revision conflict; reload before saving')).toBeDefined();
+    expect(input().value).toBe('Edit labels');
+  });
+
   it("trims a keyboard commit, sends source and revision through the API client, and closes", async () => {
     const fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ revision: "next123" }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetch);
@@ -69,6 +90,8 @@ describe("CommitMessageDialog workflow", () => {
     const cancel = screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement;
     expect(cancel.disabled).toBe(true);
     await userEvent.click(cancel);
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onOpenChange).not.toHaveBeenCalled();
     await act(async () => resolve());
     expect(onOpenChange).toHaveBeenCalledExactlyOnceWith(false);

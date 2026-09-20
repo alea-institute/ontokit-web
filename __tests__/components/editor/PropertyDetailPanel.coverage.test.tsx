@@ -1,3 +1,4 @@
+import { parseBlockTriples } from "@/lib/ontology/turtleBlockParser";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { PropertyDetailPanel } from "@/components/editor/PropertyDetailPanel";
@@ -44,6 +45,28 @@ afterEach(() => {
 });
 
 describe("property panel real editing chain", () => {
+  it.each(["remove", "unchanged", "change predicate"])("persists relationship %s exactly once through the real writer", async action => {
+    let output = source;
+    mount(vi.fn(async (entity, data) => { output = updatePropertyInTurtle(output, entity, data); }));
+    if (action === "remove") {
+      fireEvent.click(within(screen.getByTitle(ns + "reference").parentElement!).getByTitle("Remove"));
+    } else if (action === "change predicate") {
+      vi.mocked(projectOntologyApi.searchEntities).mockResolvedValue({ results: [{ iri: ns + "custom", label: "Custom relation", entity_type: "property", deprecated: false }], total: 1 });
+      fireEvent.click(screen.getByRole("button", { name: "See Also" }));
+      fireEvent.change(screen.getByPlaceholderText("Search properties..."), { target: { value: "custom" } });
+      fireEvent.click(await screen.findByRole("button", { name: "Custom relation" }));
+    } else editLabel("Changed label");
+    await waitFor(() => expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText("Saved");
+    const parsed = extractPropertyDetail(output, iri)!;
+    expect(parsed.seeAlsoIris).toEqual(action === "unchanged" ? [ns + "reference"] : []);
+    expect(parsed.isDefinedByIris).toEqual([ns + "ontology"]);
+    expect(parsed.annotations.find(a => a.property_iri.endsWith("#example"))?.values).toEqual([{ value: "Original example", lang: "en" }]);
+    const triples = parseBlockTriples(output, iri)!;
+    expect(triples.filter(t => t.predicate === ns + "custom").map(t => t.object)).toEqual(action === "change predicate" ? [{ type: "iri", value: ns + "reference" }] : []);
+  });
+
   it.each(["edit", "remove"])("can %s one annotation value without losing sibling values or other predicates", async action => {
     const inputSource = source.replace('skos:example "Original example"@en', 'skos:example "Original example"@en, "Sibling example"@en ; skos:note "Retained note"@en');
     let output = inputSource;

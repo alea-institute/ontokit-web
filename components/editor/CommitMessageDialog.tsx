@@ -11,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { getApiErrorMessage } from "@/lib/api/client";
 
 interface CommitMessageDialogProps {
   open: boolean;
@@ -29,26 +30,30 @@ export function CommitMessageDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const submittingRef = useRef(false);
 
   // Reset state when dialog opens
   useEffect(() => {
-    if (open) {
+    if (open && !submittingRef.current) {
       setMessage(defaultMessage);
       setError(null);
       setIsSubmitting(false);
       // Focus input after a short delay to ensure dialog is rendered
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
     }
   }, [open, defaultMessage]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
 
     if (!message.trim()) {
       setError("Commit message is required");
       return;
     }
 
+    submittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
 
@@ -56,8 +61,9 @@ export function CommitMessageDialog({
       await onConfirm(message.trim());
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      setError(getApiErrorMessage(err, "Failed to save"));
     } finally {
+      submittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -70,7 +76,7 @@ export function CommitMessageDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!submittingRef.current) onOpenChange(nextOpen); }}>
       <DialogContent className="sm:max-w-md">
         <form onSubmit={handleSubmit}>
           <DialogHeader>

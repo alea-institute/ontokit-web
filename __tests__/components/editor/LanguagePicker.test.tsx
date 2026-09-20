@@ -225,8 +225,8 @@ describe("LanguagePicker", () => {
       expect(screen.getByText(/Use custom code/)).toBeDefined();
     });
 
-    const customItem = screen.getByText(/Use custom code/).closest("[cmdk-item]");
-    if (customItem) fireEvent.click(customItem);
+    const customItem = screen.getByRole("option", { name: /Use custom code/ });
+    await user.click(customItem);
 
     expect(onChange).toHaveBeenCalledWith("cu");
   });

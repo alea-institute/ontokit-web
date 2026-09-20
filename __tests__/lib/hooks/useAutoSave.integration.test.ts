@@ -34,6 +34,43 @@ beforeEach(() => {
 afterEach(() => { cleanup(); useDraftStore.setState({ drafts: {} }); localStorage.clear(); vi.useRealTimers(); });
 
 describe("class auto-save with real persistent drafts and Turtle writes", () => {
+  it.each(["commit", "suggest"] as const)("removes cleared relationship predicates through %s and preserves omitted annotations after retry", async saveMode => {
+    const seeAlso = "http://www.w3.org/2000/01/rdf-schema#seeAlso";
+    const definedBy = "http://www.w3.org/2000/01/rdf-schema#isDefinedBy";
+    let source = `@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+<${iri}> a owl:Class ; rdfs:label "Dog"@en ; rdfs:seeAlso <https://example.test/reference> ; rdfs:isDefinedBy <https://example.test/ontology> ; <https://example.test/note> "Untouched" .`;
+    const initial = source;
+    let reject = true;
+    const save = async (target: string, payload: ClassUpdatePayload) => {
+      if (reject) throw new Error("Write rejected");
+      source = updateClassInTurtle(source, target, { ...payload, labels: payload.labels ?? [], comments: payload.comments ?? [], parent_iris: payload.parent_iris ?? [] });
+    };
+    const { result } = renderHook(() => useAutoSave({ ...options, canEdit: saveMode === "commit", saveMode,
+      classDetail: { ...detail, annotations: [
+        { property_iri: seeAlso, property_label: "See Also", values: [{ value: "https://example.test/reference", lang: "" }] },
+        { property_iri: definedBy, property_label: "Defined By", values: [{ value: "https://example.test/ontology", lang: "" }] },
+      ] }, onUpdateClass: save, onSuggestSave: save,
+    }));
+    act(() => {
+      result.current.editStateRef.current = { ...draft(), relationships: [
+        { property_iri: seeAlso, property_label: "See Also", targets: [] },
+        { property_iri: definedBy, property_label: "Defined By", targets: [{ iri: "https://example.test/ontology", label: "Ontology" }] },
+      ] };
+      result.current.triggerSave();
+    });
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(false); });
+    expect(source).toBe(initial);
+    expect(useDraftStore.getState().hasDraft(key)).toBe(true);
+    reject = false;
+    await act(async () => { expect(await result.current.flushToGit("manual")).toBe(true); });
+    const triples = parseBlockTriples(source, iri)!;
+    expect(triples.filter(t => t.predicate === seeAlso)).toEqual([]);
+    expect(triples.filter(t => t.predicate === definedBy).map(t => t.object)).toEqual([{ type: "iri", value: "https://example.test/ontology" }]);
+    expect(triples).toContainEqual({ predicate: "https://example.test/note", object: { type: "literal", value: "Untouched" } });
+    expect(useDraftStore.getState().hasDraft(key)).toBe(false);
+  });
+
   it("clears the saved indicator after two seconds without changing the persisted ontology", async () => {
     vi.useFakeTimers();
     const writer = sourceWriter();

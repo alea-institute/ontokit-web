@@ -23,6 +23,7 @@ let actionStatus: number;
 let actionGate: Promise<void> | undefined;
 let fetchMock: ReturnType<typeof vi.fn>;
 let client: QueryClient;
+let diffResponse: (url: URL) => Response | Promise<Response>;
 
 function mount() {
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
@@ -32,11 +33,13 @@ async function ready() { await screen.findByRole("heading", { name: "Review Sugg
 function posted() { return fetchMock.mock.calls.filter(([, init]) => init?.method === "POST"); }
 beforeEach(() => {
   auth.token = "review-token"; actionGate = undefined;
+  diffResponse = () => json({ files_changed: 1, total_additions: 1, total_deletions: 0, files: [{ path: "ontology.ttl", change_type: "modified", additions: 1, deletions: 0, patch: "+:Person a owl:Class ." }] });
   items = [suggestion("Ada"), suggestion("Bea")]; role = "editor"; projectStatus = 200; pendingStatus = 200; actionStatus = 200;
   bulk = () => { items = []; return json({ succeeded: ["Ada", "Bea"], failed: [] }); };
   fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(input);
     if (url.pathname === "/api/v1/projects/project-review") return json(projectStatus === 200 ? { id: "project-review", name: "Review project", user_role: role } : { detail: "Missing" }, projectStatus);
+    if (url.pathname.endsWith("/diff")) return diffResponse(url);
     if (url.pathname.endsWith("/pending")) return json(pendingStatus === 200 ? { items } : { detail: "Queue unavailable" }, pendingStatus);
     if (url.pathname.endsWith("/bulk-review")) return bulk(JSON.parse(init?.body as string));
     if (/\/sessions\/[^/]+\/(approve|dismiss|reject|request-changes)$/.test(url.pathname)) {
@@ -283,4 +286,32 @@ describe("Suggestion review page through real project hook, API client and revie
     expect(posted()).toHaveLength(1);
   });
 
+});
+
+it("renders a linked PR diff and retries its visible HTTP failure", async () => {
+  items[0].pr_number = 19;
+  diffResponse = () => json({ detail: "Diff unavailable" }, 404);
+  mount(); await ready();
+  fireEvent.click(screen.getByRole("button", { name: /Ada.*Update Ada/ }));
+  fireEvent.click(screen.getByRole("tab", { name: "Files" }));
+  await screen.findByRole("alert");
+  diffResponse = () => json({ files_changed: 1, total_additions: 1, total_deletions: 0, files: [{ path: "ontology.ttl", change_type: "modified", additions: 1, deletions: 0, patch: "+:Person a owl:Class ." }] });
+  fireEvent.click(screen.getByRole("button", { name: "Retry diff" }));
+  await screen.findByText("ontology.ttl");
+  expect(screen.getByText("+:Person a owl:Class .")).toBeDefined();
+});
+it("renders the current session diff when an old session response arrives last", async () => {
+  items[0].pr_number = 19; items[1].pr_number = 20;
+  let release!: (r: Response) => void;
+  const old = new Promise<Response>(r => { release = r; });
+  diffResponse = url => url.pathname.includes('/19/') ? old : json({ files_changed: 1, total_additions: 0, total_deletions: 0, files: [{ path: "current.ttl", change_type: "modified", additions: 0, deletions: 0 }] });
+  mount(); await ready();
+  fireEvent.click(screen.getByRole("button", { name: /Ada.*Update Ada/ }));
+  fireEvent.click(screen.getByRole("tab", { name: "Files" }));
+  fireEvent.click(screen.getByRole("button", { name: /Bea.*Update Bea/ }));
+  fireEvent.click(screen.getByRole("tab", { name: "Files" }));
+  await screen.findByText("current.ttl");
+  await act(async () => { release(json({ files_changed: 1, total_additions: 0, total_deletions: 0, files: [{ path: "obsolete.ttl", change_type: "modified", additions: 0, deletions: 0 }] })); });
+  expect(screen.queryByText("obsolete.ttl")).toBeNull();
+  expect(screen.getByText("current.ttl")).toBeDefined();
 });
