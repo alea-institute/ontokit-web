@@ -1,0 +1,112 @@
+{
+  "status": "complete",
+  "verdict": "Ready to merge",
+  "scope": {
+    "base": "c95991c7",
+    "branch": "fix/d06-pr-revision-responses-20260920",
+    "head_sha": "f5f036b9f630e21c9332496e4fd4fced2269e7a9",
+    "pr_url": null,
+    "files_changed": 5
+  },
+  "intent": "Restore non-root source-tree imports and readable migration artifacts in the default development image. Preserve stored merge/base/head revision hashes in existing PR responses for GET/list without schema changes.",
+  "intent_confidence": "explicit",
+  "reviewers": [
+    "correctness",
+    "testing",
+    "project-standards",
+    "api-contract",
+    "adversarial-claude"
+  ],
+  "findings": [],
+  "actionable_findings": [],
+  "triage_groups": [],
+  "pre_existing_findings": [],
+  "requirements_completeness": null,
+  "learnings": [],
+  "agent_native_gaps": [],
+  "deployment_notes": [],
+  "residual_risks": [],
+  "testing_gaps": [
+    "The new CI smoke build uses the runner checkout's ordinary file modes, while deploy/RUNBOOK.md documents a restrictive-umask DEV-host checkout that motivated the explicit COPY modes. Build a deliberately restrictive copied context before the development-image build so the smoke gate continues to cover the original non-root traversal regression class."
+  ],
+  "coverage": {
+    "depth": "full",
+    "reviewer_selection": [
+      {
+        "reviewer": "correctness",
+        "tier": "session",
+        "reason": "always-on"
+      },
+      {
+        "reviewer": "testing",
+        "tier": "mid",
+        "reason": "changed regression tests and runtime smoke guard; followup primitive cannot override model"
+      },
+      {
+        "reviewer": "project-standards",
+        "tier": "mid",
+        "reason": "AGENTS.md instruction fallback; inline capacity fallback"
+      },
+      {
+        "reviewer": "api-contract",
+        "tier": "mid",
+        "reason": "public PR serialization; inline capacity fallback"
+      }
+    ],
+    "notes": [
+      "Full depth selected for public PR response contract and silent-pass CI guard.",
+      "AGENTS.md governs all changed files as instruction fallback; no CODING_STANDARDS.md found.",
+      "Thread-limit backpressure persisted after completed reviewers. Correctness and testing used fresh task scopes on completed unrelated handles. API-contract and project-standards were performed inline in dispatch context, losing independent coverage; exclude these two from independent_reviewers and agreement promotion. No reviewer failed for capacity.",
+      "No API plan matched branch keywords in docs/plans; requirements completeness is null.",
+      "Parent reports full 3261-test API suite at 90%, Ruff/mypy193 files/pyright0 pass; strengthened serializer test failed before three-field fix; real20-test fullstack with strictPRmergehash pass and cleanup/neighbors pass; tinyimage failure then fullimage success and actual migrations. These validations were not rerun by review.",
+      "Peer soft-bucket claims need normal admission filtering; user scoped this repair to default development image and serializer, with production Dockerfile explicitly outside scope.",
+      "Independent Claude adversarial review completed: cross_model_route claude, model_requested claude-opus-5, effort_requested high, receipt_supported true, model_actual claude-opus-5, effort_actual unverified, independence_verified true; no primary findings.",
+      "Correctness and testing produced empty structured findings. API-contract and project-standards were performed inline in dispatch context because capacity backpressure prevented independent launch; neither counts for agreement promotion.",
+      "The peer's future-environment and production-image claims were not admitted: production Dockerfile changes are explicitly out of scope, and the remaining claims depend on unproven future configuration or repository ruleset state.",
+      "No primary findings survived synthesis; no validator shortcut or batch is required.",
+      "Quote evidence backfilled: 0; missing-evidence demotions: 0; malformed findings: 0; malformed returns: 0; mode-aware demotions: 0.",
+      "No API plan was found; settlement suppression was not evaluated.",
+      "Parent-reported validation was not rerun by this merge leaf: full 3261-test API suite, Ruff, mypy, pyright, strict PR-hash full-stack run, and runtime-image/migration checks passed.",
+      "Independent cross-model adversarial review completed: cross_model_route claude, model_requested claude-opus-5, effort_requested high, receipt_supported true, model_actual claude-opus-5, effort_actual unverified, independence_verified true; no primary findings."
+    ],
+    "cross_model_outcome": "folded",
+    "validator": {
+      "outcome": "empty-batch",
+      "reason": "Merge leaf selected zero findings for validation.",
+      "selected": 0,
+      "confirmed": 0,
+      "rejected": 0,
+      "unresolved": 0,
+      "malformed": 0,
+      "failed": 0,
+      "shortcut_skipped": 0
+    },
+    "suppressed_by_confidence": {},
+    "first_evidence_backfilled": 0,
+    "missing_evidence_demotions": 0,
+    "mode_aware_demotions": 0,
+    "protected_subject_reclassifications": 0,
+    "degraded_blockers": 0,
+    "failed_reviewers": [],
+    "timed_out_reviewers": [],
+    "compound_packs": {
+      "roots": [],
+      "errors": [],
+      "warnings": []
+    },
+    "apply": "Skipped: agent report-only mode.",
+    "not_assessed": [
+      "Dedicated learnings, agent-native, and deployment reviewer lenses were not dispatched."
+    ]
+  },
+  "artifact_path": "/tmp/compound-engineering-1000/ce-code-review/d06-api-f5f036b9-f5474415",
+  "run_id": "d06-api-f5f036b9-f5474415",
+  "verdict_reason": "No primary findings or unresolved verification gates remain. One nonblocking testing gap recommends exercising a restrictive build context in the CI image smoke test.",
+  "delivery": {
+    "pr": "https://github.com/alea-institute/ontokit-api/pull/50",
+    "pushed": true,
+    "merged": false,
+    "ci": "pending",
+    "testing_gap_disposition": "Optional coverage extension. The reproduced nested COPY parent mode defect is independent of checkout modes and covered by the current smoke test."
+  }
+}
