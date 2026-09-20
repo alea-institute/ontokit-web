@@ -1,0 +1,98 @@
+{
+  "status": "complete",
+  "completion_boundary": "D01 local preparation with blocked activation verdict; B01/B02/B14 remain open",
+  "plan_path": "docs/plans/2026-09-20-0659-chore-repaired-release-baseline-plan.md",
+  "changed_files": [
+    "docs/releases/d01-release-readiness.md",
+    "docs/releases/d01-path-inventory.md",
+    "docs/plans/2026-09-20-0649-requirements-delivery-roadmap.md",
+    "docs/releases/d01-plan-review.json",
+    "docs/releases/d01-execution-receipt.json",
+    "docs/plans/2026-09-20-0659-chore-repaired-release-baseline-plan.md"
+  ],
+  "candidate_commit": "3d45af5b8f66a90079c0169d1bf1a8821c970d79",
+  "u_ids_attempted": [
+    "U1",
+    "U2",
+    "U3",
+    "U4"
+  ],
+  "u_ids_completed": [
+    "U1",
+    "U2",
+    "U3",
+    "U4"
+  ],
+  "verification_results": {
+    "tests": {
+      "files": 364,
+      "passed": 5188,
+      "failed": 0,
+      "skipped": 0
+    },
+    "types": "pass",
+    "lint": "0 errors / 19 existing warnings",
+    "optional_image": "pass",
+    "required_image": "failed: build-time auth environment undefined",
+    "live_acceptance": "not run",
+    "optional_image_digest": "sha256:f5dbd38bf0a4aa3bfd7c82a20e348e24459a1f580702f860a6280a630f331512"
+  },
+  "verification_evidence": [
+    {
+      "unit": "U1",
+      "behavior_changed": false,
+      "exception_reason": "Inventory documentation; every source path classified."
+    },
+    {
+      "unit": "U2",
+      "behavior_changed": true,
+      "existing_tests_inspected": [
+        "__tests__/app/project-dashboard.integration.test.tsx",
+        "__tests__/app/projects/project-shell-redirect.test.tsx"
+      ],
+      "tests_added_or_changed": [
+        "__tests__/app/project-dashboard.integration.test.tsx navigation boundary only"
+      ],
+      "tests_used_unchanged": "Remaining existing suite, including upstream redirect and September repair regressions",
+      "red_failure": "19 dashboard assertions failed before fixture adaptation; missing useSearchParams export",
+      "verification": "Focused30/30 then full5188/5188; all assertions preserved."
+    },
+    {
+      "unit": "U3",
+      "behavior_changed": false,
+      "exception_reason": "Existing verification plus Docker builds; source assessment is not a live API test."
+    },
+    {
+      "unit": "U4",
+      "behavior_changed": false,
+      "exception_reason": "Documentation link, SHA, and75-ID coverage checks."
+    }
+  ],
+  "implementation_engine_binding": null,
+  "requested_route": "native inline",
+  "actual_route": "native inline with read-only subagent checks",
+  "requested_model": null,
+  "actual_model": "session model; no external implementation route",
+  "requested_effort": null,
+  "fallback_reason": null,
+  "run_id": null,
+  "source_kind": "plan",
+  "source_digest": "c7b045f1214eb10ba3b2b639e3c59f2e1d51733fac0e5c9cfadfe46c11cf7c45",
+  "unit_receipts": {
+    "U1": "223 source paths classified",
+    "U2": "220 substantive paths committed on isolated branch; bounded independent preservation and fixture checks passed",
+    "U3": "Fresh verification results recorded; temporary config removed; candidate branch clean",
+    "U4": "Roadmap nextD03; all75 IDs retained"
+  },
+  "plan_checkpoint": null,
+  "blockers": [
+    "Authenticated activation blocked by required-auth image failure",
+    "API individual mint/error-contract source gaps require reproduction/repair",
+    "Operator receipts required for effective PROD gate, installed script, credentials and rollback"
+  ],
+  "recovery_path": ".worktrees/d01-release-candidate; local branch release/d01-repaired-dev-20260920",
+  "settled_decision_conflicts": [],
+  "behavior_change": true,
+  "standalone_shipping_skipped": true,
+  "candidate_changed_paths_inventory": "docs/releases/d01-path-inventory.md"
+}
