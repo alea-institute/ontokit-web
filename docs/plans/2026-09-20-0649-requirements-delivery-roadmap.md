@@ -28,7 +28,7 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**Active deliverable D05: implement and verify submission embedding-error handling and retry integrity (B14).**
+**Active deliverable D05: review and publish verified submission embedding-error recovery (B14).**
 
 - D01/D03 candidate merged into ALEA web `dev` through [PR48](https://github.com/alea-institute/ontokit-web/pull/48), revision `ab903e145e2a6ad30aefd915a83cb0bafbaa0678`, after all eight verification checks passed. No deployment occurred.
 - [D03 evidence](../releases/d03-image-readiness.md) supersedes D01’s required-auth image failure: all three images build and pass expanded runtime checks; 5,222 tests pass.
@@ -89,7 +89,7 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | D01 | B01; readiness portions of B02/B14 | Accepted: local preparation only | [Plan](2026-09-20-0659-chore-repaired-release-baseline-plan.md) | [Release evidence](../releases/d01-release-readiness.md); candidate `3d45af5b`: 364 files / 5,188 tests pass; optional-auth image builds; authenticated activation blocked |
 | D03 | B14 configured-provider image fidelity | Integrated | [Plan](2026-09-20-0731-fix-configured-provider-image-plan.md) | [Image and review evidence](../releases/d03-image-readiness.md); [PR48](https://github.com/alea-institute/ontokit-web/pull/48) merged as `ab903e14`; eight CI checks passed |
 | D04 | B14 individual mint enforcement | Integrated | [API plan](https://github.com/alea-institute/ontokit-api/blob/fix/d04-individual-mint-20260920/docs/plans/2026-09-20-0839-fix-individual-mint-enforcement-plan.md) | [API PR48](https://github.com/alea-institute/ontokit-api/pull/48), merged `c6e552c8`; 3,243 tests pass; all six requirements met; no new actionable review findings |
-| D05 | B14 submission embedding errors | Implementing | [Reviewed API plan](../../.worktrees/api-d05-errors/docs/plans/2026-09-20-1224-fix-submission-embedding-errors-plan.md) | Plan checkpoint `64e81b94`; six local and three Claude reviews completed, two verification corrections applied; prove 402/503 responses, durable draft recovery and retained paid-call records |
+| D05 | B14 submission embedding errors | Locally verified | [Reviewed API plan](../../.worktrees/api-d05-errors/docs/plans/2026-09-20-1224-fix-submission-embedding-errors-plan.md) | Implementation `1e708049`, integration tests `ab7b0c5f`; 3,260 tests pass with no skips, 90% coverage; all static checks pass; simplification/review/publication pending |
 | D02 | B02–03 DEV runtime and persona acceptance | Awaiting prerequisites | Not yet created | D03–05 and authorized published pair/activation first |
 
 ## Decision record
