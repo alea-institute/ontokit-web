@@ -49,8 +49,8 @@ Local verification, publication, deployment and authenticated acceptance remain 
 
 | Order / ID | Area | Backlog IDs | State | Dependency / next planning boundary |
 |---|---|---|---|---|
-| 1 / A01 | Deliver and validate existing work | B01–B09 | Preparing release | Finish D01 evidence; B14 prerequisites precede activation, then D02 |
-| 2 / A02 | Full-stack proof and integrity | B10–B15 | Queued | Test foundation can proceed while A01 awaits external action; assess integrity seams before release |
+| 1 / A01 | Deliver and validate existing work | B01–B09 | Awaiting hosted identity access | D03–05 and API prerequisites merged; D02 recovery proved; supported DEV administrator authority still required |
+| 2 / A02 | Full-stack proof and integrity | B10–B15 | Final D06 review | B10 locally verified; finish review/publication, then bounded B11–B15 work while A01 awaits hosted identity access |
 | 3 / A03 | Ontology batching and reviewer intelligence | B16–B23 | Queued | Verify API contracts; provenance/duplicate comparison can precede shard-dependent review |
 | 4 / A04 | Entity workspace and graph | B24–B27 | Queued | Reconcile historical graph port and current repairs; preserve all eleven Phase17 requirements |
 | 5 / A05 | Ecosystem suggestion import loop | B28–B34 | Queued | Prove one producer-to-reviewed-change pilot before scaling feeder volume |

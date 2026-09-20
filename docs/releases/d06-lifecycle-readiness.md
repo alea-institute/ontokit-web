@@ -1,6 +1,6 @@
 # D06 lifecycle verification
 
-Status: **U1–U5 verified; U6 final repeatability and crash recovery is active.** No full-stack acceptance, publication or deployment is claimed.
+Status: **U1–U6 locally verified; final review and publication remain pending.** No full-stack acceptance, publication or deployment is claimed.
 
 The [reviewed D06 plan](../plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) is checkpointed as `db916292`. Web implementation is in `.worktrees/web-d06-full-stack`, branch `feat/d06-full-stack-tests-20260920`. The API repair is isolated in `.worktrees/api-d06-image`, branch `fix/d06-runtime-package-permissions-20260920`, based on merged `c95991c7`.
 
@@ -46,3 +46,5 @@ U4 is now verified and committed as web `715c86b6`. API serializer fix `f5f036b9
 U5 is verified and committed as `48db779c`. Fresh run `34fb576c7bbe9f397b033e94d462dafe` passed all 21 tests with zero skips/failures, including real fresh login, UI import, Monaco keyboard editing, PR diff and merge, target selection and reload. Cleanup removed all owned resources and preserved neighboring identities. Two earlier helper failures characterized tree selection and Monaco focus without weakening persistence assertions; their private diagnostics were consumed and deleted. Static typing and focused ESLint pass. The U5 receipt records exact test-file hashes; final U6 runs will capture full source fingerprints before manifest cleanup.
 
 U6 current-launcher setup-failure, SIGINT and SIGTERM probes passed, with nonzero exits and no owned leftovers. Run `c1c978b099037f5a2752748c735e128d` reached real Chromium before SIGKILL; exact-manifest recovery removed its browser/Next processes, Docker resources and private runtime while preserving neighbors. The first repeatability run (`cfc0970c585c19abfdfd82a35dbbc87e`) exposed a real source-tab hover preload race: Monaco mounted with empty initial state while background loading continued. A deferred-request integration regression failed before the one-line mount-gate repair and passes afterward; web commit `9e559bdd` carries the repair and evidence. Two fresh complete passes remain required. API prerequisites are published as [PR50](https://github.com/alea-institute/ontokit-api/pull/50), with independent review complete and CI pending.
+
+Final fresh runs `ecc14e55bdb8135416e568ee36e3f35a` and `ce831e0704737a0dc8297a2810d9bfd9` each passed all21mandatorytests with identical API/web source fingerprints, successful cleanup and unchanged neighbors. Implementation receipts retain actual image IDs/pins and migration head `i7j8k9l0m1n2`. Web unit suite:5223passed/365files; lint0errors19existingwarnings; typecheckpassed. Final review/publication remains required.
