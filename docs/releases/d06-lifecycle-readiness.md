@@ -1,6 +1,6 @@
 # D06 lifecycle verification
 
-Status: **U1 verified and committed as web `a5800e49`; U2 fresh identity implementation is active.** No full-stack acceptance, publication or deployment is claimed.
+Status: **U1 and U2 verified; U3 project/ontology persistence implementation is active.** No full-stack acceptance, publication or deployment is claimed.
 
 The [reviewed D06 plan](../plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) is checkpointed as `db916292`. Web implementation is in `.worktrees/web-d06-full-stack`, branch `feat/d06-full-stack-tests-20260920`. The API repair is isolated in `.worktrees/api-d06-image`, branch `fix/d06-runtime-package-permissions-20260920`, based on merged `c95991c7`.
 
@@ -23,4 +23,8 @@ The repair is committed locally as API `4d17d949` (not yet reviewed or published
 
 Normal completion, setup failure, late workflow failure, SIGINT, SIGTERM, and SIGKILL recovery all passed real Docker probes. Every probe removed all owned resources and preserved all pre-existing identities. Hard recovery also succeeded after removing only the run-private temporary directory. The hold-mode premature exit was fixed after two failing signal regressions; both now pass. Sanitized detailed evidence is committed in the implementation checkout at `docs/releases/d06-u1-verification.json`.
 
-U2 real identity and browser setup is active. API repair review/publication and U2–U6 remain required. B10, B11–B13 and hosted DEV acceptance remain unfinished.
+U2 real identity and browser setup is committed as `19c40e86`, following production session fix `6f1d9687`. API repair review/publication and U3–U6 remain required. B10, B11–B13 and hosted DEV acceptance remain unfinished.
+
+## U2 live verification findings
+
+Fresh identity bootstrap and the production web build now run. Browser validation exposed a production identity mismatch: the installed Auth.js OAuth callback replaces the provider profile ID with a generated application ID, while OntoKit UI membership/reviewer comparisons use Zitadel subjects. The initial JWT callback must preserve the trusted provider account ID. The strengthened session regression reproduced the mismatch before a scoped `auth.ts` fix; all 5,222 frontend tests, repository lint and type checking pass. A subsequent real callback passed the strict Zitadel subject assertion. The production fix is committed as web `6f1d9687`. Disposable client profile/email claims now match the existing setup script. Fresh run `b0de0c9e0180654e206ee73c341ca356` passed all four browser tests: two genuine ordinary-user callbacks, protected API reads for each, and anonymous 401 rejection. Wrong issuer, invalid bootstrap PAT and wrong callback probes all rejected setup as intended and cleaned up. Detailed sanitized U2 evidence is committed in the implementation checkout at `docs/releases/d06-u2-verification.json`. Existing sessions created before the identity fix require a new sign-in to receive the corrected subject. All failed probes cleaned their owned resources and preserved existing Docker identities.
