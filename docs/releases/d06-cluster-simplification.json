@@ -1,0 +1,55 @@
+{
+  "stage": "U1-U3 phase-boundary simplification",
+  "scope_base": "ab903e14",
+  "scope_head": "f09738e5",
+  "reviewers": [
+    {
+      "lens": "reuse",
+      "model": "gpt-5.6-terra",
+      "status": "complete"
+    },
+    {
+      "lens": "quality",
+      "model": "gpt-5.6-terra",
+      "status": "complete"
+    },
+    {
+      "lens": "efficiency",
+      "model": "gpt-5.6-terra",
+      "status": "complete",
+      "dispatch": "initial capacity rejection; retried successfully after a reviewer completed"
+    }
+  ],
+  "applied": {
+    "reuse": 1,
+    "quality": 0,
+    "efficiency": 0
+  },
+  "deduplicated_findings": 1,
+  "skipped": [
+    {
+      "finding": "Provider ID constant for two local Zitadel literals",
+      "reason": "Low-value churn at the production authentication boundary; both values remain explicit and regression-covered."
+    },
+    {
+      "finding": "Parallel browser installation and Next build",
+      "reason": "ownedCommand calls serialize through one shared manifest.next file; concurrent writes require behavior-bearing ownership synchronization outside simplification."
+    },
+    {
+      "finding": "Concurrent ordinary identity creation",
+      "reason": "Changes mutation and failure ordering; single-shot sequential provisioning stays explicit."
+    },
+    {
+      "finding": "Cache tiny fixture read",
+      "reason": "Negligible I/O for a ten-line fixture; caching changes read/error timing and is unnecessary."
+    }
+  ],
+  "change": "Initial runtime.env writing calls existing writeRuntimeEnv with identical entry ordering, contents and mode0600",
+  "verification": {
+    "ownership_and_diagnostics": "two test files passed",
+    "identity": "8 tests passed",
+    "lint": "passed; 0 errors, 19 existing warnings",
+    "type_check": "passed"
+  },
+  "standalone_shipping_entered": false
+}

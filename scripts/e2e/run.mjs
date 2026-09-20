@@ -1,12 +1,12 @@
 import { randomBytes } from 'node:crypto';
-import { copyFile, writeFile } from 'node:fs/promises';
+import { copyFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, RUNTIME_ROOT, privateDirectory, saveManifest } from './ownership.mjs';
 import { prerequisites, copySource, reservePorts, compose, composeArgs, ownedCommand, baseEnv, getDockerEndpoint } from './runtime.mjs';
 import { expireDiagnostics, recordFailure, retainDiagnostics as retainFailureDiagnostics } from './diagnostics.mjs';
 import { cleanup } from './cleanup.mjs';
-import { freshIdentityValues } from './bootstrap-identity.mjs';
+import { freshIdentityValues, writeRuntimeEnv } from './bootstrap-identity.mjs';
 export function waitForAbort(signal) {
   if (signal.aborted) return Promise.reject(new Error('Interrupted'));
   return new Promise((_, reject) => {
@@ -54,7 +54,7 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
     reservation = await reservePorts(); manifest.ports = reservation.ports;
     const secret = () => randomBytes(24).toString('hex');
     ctx.values = {...freshIdentityValues(), RUN_ID: id, PROJECT: manifest.project, API_PORT: manifest.ports.api, IDENTITY_PORT: manifest.ports.identity, LOGIN_PORT: manifest.ports.login, WEB_PORT: manifest.ports.web, POSTGRES_PASSWORD: secret(), APP_DB_PASSWORD: secret(), IDENTITY_DB_PASSWORD: secret(), APP_SECRET: secret(), MINIO_USER: secret(), MINIO_PASSWORD: secret()};
-    await writeFile(path.join(dir, 'runtime.env'), Object.entries(ctx.values).map(([k,v]) => `${k}=${v}\n`).join(''), {mode: 0o600});
+    await writeRuntimeEnv(ctx);
     await saveManifest(manifestDir, manifest);
     manifest.status = 'building'; await saveManifest(manifestDir, manifest);
     await compose(ctx, 'build', 'api');
