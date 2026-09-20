@@ -52,6 +52,24 @@ beforeEach(async () => {
 afterEach(async () => { await rm(directory, { recursive: true, force: true }); });
 
 describe('version commands in disposable Git repositories', () => {
+  it.each([
+    { script: 'set-version.mjs', args: ['0.5.0'] },
+    { script: 'prepare-release.mjs', args: [] },
+  ])('$script leaves unrelated staged changes out of its commit', async ({ script, args }) => {
+    await seed('0.4.0-dev');
+    await writeFile(join(directory, 'unrelated.txt'), 'user work\n');
+    await git('add', 'unrelated.txt');
+    const stagedBlob = await git('rev-parse', ':unrelated.txt');
+
+    const result = await run(process.execPath, [`scripts/${script}`, ...args]);
+
+    expect(result.code, JSON.stringify(result)).toBe(0);
+    expect(await git('diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD')).toBe('package.json');
+    expect(await git('diff', '--cached', '--name-only')).toBe('unrelated.txt');
+    expect(await git('rev-parse', ':unrelated.txt')).toBe(stagedBlob);
+    expect(await readFile(join(directory, 'unrelated.txt'), 'utf8')).toBe('user work\n');
+  });
+
   it('sets a development version and commits the actual package change', async () => {
     await seed('0.3.0');
     const result = await run(process.execPath, ['scripts/set-version.mjs', '0.4.0']);
