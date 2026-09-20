@@ -1,0 +1,10 @@
+@prefix ex: <https://example.org/ontokit-e2e#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://example.org/ontokit-e2e> a owl:Ontology ; rdfs:label "Tiny test ontology"@en .
+ex:Person a owl:Class ; rdfs:label "Test Person"@en .
+ex:Researcher a owl:Class ; rdfs:subClassOf ex:Person ; rdfs:label "Test Researcher"@en .
+ex:knows a owl:ObjectProperty ; rdfs:label "Knows person"@en ; rdfs:domain ex:Person ; rdfs:range ex:Person .
+ex:age a owl:DatatypeProperty ; rdfs:label "Age in years"@en ; rdfs:domain ex:Person ; rdfs:range xsd:integer .
