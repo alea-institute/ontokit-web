@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isAuthActive, isAuthRequired } from "./auth-mode";
+import { getAuthMode, isAuthActive, isAuthRequired, isZitadelConfigured } from "./auth-mode";
 
 // Base schema: all auth vars optional so the inferred ServerEnv type honestly
 // reflects that they can be absent (disabled/optional mode without Zitadel).
@@ -24,6 +24,25 @@ export type ServerEnv = z.infer<typeof serverSchema>;
 export type ClientEnv = z.infer<typeof clientSchema>;
 
 function validateServerEnv(): ServerEnv {
+  // Next replaces these direct public-env references with the browser build's
+  // constants. Runtime overrides cannot disguise a different authentication
+  // contract. Unbundled tools without a compiled mode retain schema validation.
+  const compiledMode = process.env.NEXT_PUBLIC_AUTH_MODE;
+  if (compiledMode !== undefined) {
+    const compiledConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
+    const compiledIssuer = process.env.NEXT_PUBLIC_ZITADEL_ISSUER || "";
+    if (
+      compiledMode !== getAuthMode() ||
+      compiledConfigured !== isZitadelConfigured() ||
+      compiledIssuer !== (process.env.ZITADEL_ISSUER || "")
+    ) {
+      throw new Error(
+        "Runtime authentication settings disagree with the compiled authentication configuration. " +
+          "Use matching runtime settings or rebuild the image."
+      );
+    }
+  }
+
   // Zitadel vars + a real NEXTAUTH_SECRET are mandatory whenever auth is required
   // OR Zitadel is active. The active-provider case matters even in "optional"
   // mode: it still mints real authenticated sessions, so a missing

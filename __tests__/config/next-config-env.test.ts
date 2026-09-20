@@ -22,7 +22,7 @@ describe('Next configuration through the real internationalization wrapper', () 
     expect(value.env?.NEXT_PUBLIC_ZITADEL_CONFIGURED).toBe(expected);
     expect(value.env?.NEXT_PUBLIC_ZITADEL_CONFIGURED).toBe(String(isZitadelConfigured()));
     expect(value.env?.NEXT_PUBLIC_AUTH_MODE).toBe('required');
-    expect(value.env?.NEXT_PUBLIC_ZITADEL_ISSUER).toBe(issuer);
+    expect(value.env?.NEXT_PUBLIC_ZITADEL_ISSUER).toBe(issuer || "");
     expect(value.output).toBe('standalone');
     expect(value.reactStrictMode).toBe(true);
   });

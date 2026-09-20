@@ -18,6 +18,7 @@ trap 'exit 143' TERM
 provider_canary=d03-runtime-only-provider-canary
 session_canary=d03-runtime-only-session-canary-32-characters
 runtime=(-e "AUTH_MODE=$mode" -e HOSTNAME=127.0.0.1 -e NEXTAUTH_URL=http://localhost:3000 -e AUTH_TRUST_HOST=true)
+anonymous_runtime=("${runtime[@]}")
 if [[ "$profile" == configured ]]; then
   runtime+=(-e ZITADEL_ISSUER=https://identity.example.invalid -e ZITADEL_CLIENT_ID=d03-public-client -e NEXT_PUBLIC_API_URL=https://api.example.invalid -e NEXT_PUBLIC_WS_URL=wss://api.example.invalid)
 fi
@@ -37,7 +38,7 @@ expect_rejection() {
       code=$(docker inspect --format '{{.State.ExitCode}}' "$current")
       [[ "$code" != 0 ]] || { echo "Unexpected successful exit: $missing" >&2; exit 1; }
       docker logs "$current" 2>&1 | grep -q "Server startup aborted: missing or invalid server environment configuration." || { echo "Exit lacked the configuration rejection marker for $missing" >&2; exit 1; }
-      echo "PASS: startup rejects missing $missing ($mode)"
+      echo "PASS: startup rejects $missing ($mode)"
       return
     fi
     # Any successful application response before exit violates fail-closed startup.
@@ -46,13 +47,23 @@ expect_rejection() {
     fi
     sleep 0.5
   done
-  echo "Startup did not reject missing $missing within deadline" >&2; exit 1
+  echo "Startup did not reject $missing within deadline" >&2; exit 1
 }
 if [[ "$profile" == configured ]]; then
   expect_rejection ZITADEL_CLIENT_SECRET -e "NEXTAUTH_SECRET=$session_canary"
   expect_rejection NEXTAUTH_SECRET -e "ZITADEL_CLIENT_SECRET=$provider_canary"
+  expect_rejection changed-issuer -e ZITADEL_ISSUER=https://other.example.invalid -e NEXT_PUBLIC_ZITADEL_ISSUER=https://other.example.invalid -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
+  expect_rejection changed-mode -e AUTH_MODE=disabled -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
+  configured_runtime=("${runtime[@]}")
+  runtime=("${anonymous_runtime[@]}")
+  # Truly omit both provider variables; empty strings would exercise only Zod.
+  expect_rejection missing-provider -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
+  runtime=("${configured_runtime[@]}")
   start -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
 else
+  expect_rejection unexpected-issuer -e ZITADEL_ISSUER=https://identity.example.invalid -e NEXT_PUBLIC_ZITADEL_ISSUER=https://identity.example.invalid -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
+  expect_rejection unexpected-provider -e ZITADEL_ISSUER=https://identity.example.invalid -e ZITADEL_CLIENT_ID=d03-public-client -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
+  expect_rejection changed-mode -e AUTH_MODE=disabled -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
   start
 fi
 # Fetch through loopback inside the network-isolated container, with a bounded deadline.

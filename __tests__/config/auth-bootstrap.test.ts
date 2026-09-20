@@ -101,3 +101,18 @@ describe("runtime auth mode policy", () => {
     expect(() => (initializer as () => unknown)()).toThrow("NEXTAUTH_SECRET");
   });
 });
+
+describe("direct auth entry compiled contract", () => {
+  it("rejects provider drift through the NextAuth initializer", async () => {
+    process.env.AUTH_MODE = "optional";
+    process.env.NEXT_PUBLIC_AUTH_MODE = "optional";
+    process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED = "true";
+    process.env.NEXT_PUBLIC_ZITADEL_ISSUER = "https://identity.example.invalid";
+    process.env.ZITADEL_CLIENT_SECRET = "synthetic-provider-secret";
+    process.env.NEXTAUTH_SECRET = "synthetic-session-secret";
+    await import("@/auth");
+    const { default: nextAuth } = await import("next-auth");
+    const initializer = vi.mocked(nextAuth).mock.calls[0][0];
+    expect(() => (initializer as () => unknown)()).toThrow("compiled authentication configuration");
+  });
+});

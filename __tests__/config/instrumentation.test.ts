@@ -71,3 +71,18 @@ describe("Node startup validation", () => {
     expect(console.error).not.toHaveBeenCalled();
   });
 });
+
+describe("compiled optional provider startup", () => {
+  it("exits before serving when runtime loses its advertised provider", async () => {
+    vi.stubEnv("AUTH_MODE", "optional");
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_ISSUER", "https://identity.example.invalid");
+    vi.stubEnv("ZITADEL_ISSUER", undefined);
+    vi.stubEnv("ZITADEL_CLIENT_ID", undefined);
+    const { register } = await import("@/instrumentation");
+    await expect(register()).rejects.toBe(fatalExit);
+    expect(process.exit).toHaveBeenCalledWith(1);
+    expect(console.error).toHaveBeenCalledWith("Server startup aborted: missing or invalid server environment configuration.");
+  });
+});
