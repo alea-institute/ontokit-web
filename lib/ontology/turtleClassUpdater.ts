@@ -181,32 +181,32 @@ function genBlock(
   po.push(`a ${toTurtle("http://www.w3.org/2002/07/owl#Class", rev)}`);
 
   if (data.deprecated) {
-    po.push(`${toTurtle("http://www.w3.org/2002/07/owl#deprecated", rev)} true`);
+    po.push(`${toTurtle(OWL_DEPRECATED_IRI, rev)} true`);
   }
 
   for (const l of data.labels) {
     if (!l.value.trim()) continue;
-    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#label", rev)} ${literal(l.value, l.lang)}`);
+    po.push(`${toTurtle(RDFS_LABEL_IRI, rev)} ${literal(l.value, l.lang)}`);
   }
 
   for (const c of data.comments) {
     if (!c.value.trim()) continue;
-    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#comment", rev)} ${literal(c.value, c.lang)}`);
+    po.push(`${toTurtle(RDFS_COMMENT_IRI, rev)} ${literal(c.value, c.lang)}`);
   }
 
   for (const p of data.parent_iris) {
-    po.push(`${toTurtle("http://www.w3.org/2000/01/rdf-schema#subClassOf", rev)} ${toTurtle(p, rev)}`);
+    po.push(`${toTurtle(RDFS_SUBCLASS_IRI, rev)} ${toTurtle(p, rev)}`);
   }
 
   if (data.equivalent_iris) {
     for (const e of data.equivalent_iris) {
-      po.push(`${toTurtle("http://www.w3.org/2002/07/owl#equivalentClass", rev)} ${toTurtle(e, rev)}`);
+      po.push(`${toTurtle(OWL_EQUIVALENT_CLASS_IRI, rev)} ${toTurtle(e, rev)}`);
     }
   }
 
   if (data.disjoint_iris) {
     for (const d of data.disjoint_iris) {
-      po.push(`${toTurtle("http://www.w3.org/2002/07/owl#disjointWith", rev)} ${toTurtle(d, rev)}`);
+      po.push(`${toTurtle(OWL_DISJOINT_WITH_IRI, rev)} ${toTurtle(d, rev)}`);
     }
   }
 
