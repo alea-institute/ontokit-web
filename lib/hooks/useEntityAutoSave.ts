@@ -1,8 +1,7 @@
 /**
  * Generic auto-save hook for properties and individuals.
  *
- * Similar to useAutoSave but works with any entity type. The existing
- * useAutoSave hook remains untouched (no regressions for classes).
+ * Uses the same draft and completion ownership rules as class auto-save.
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
@@ -66,22 +65,27 @@ export function useEntityAutoSave({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [restoredDraft, setRestoredDraft] = useState<AnyDraftEntry | null>(null);
 
-  const flushingRef = useRef(false);
+  const scopeKey = JSON.stringify([projectId, branch, entityIri]);
+  const scopeRef = useRef({ key: scopeKey });
+  if (scopeRef.current.key !== scopeKey) scopeRef.current = { key: scopeKey };
+  const mountedRef = useRef(true);
+  const editGenerationRef = useRef(0);
+  const flushingRef = useRef<object | null>(null);
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Check for restored draft on entity change
   useEffect(() => {
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    setRestoredDraft(null);
+    setSaveStatus("idle");
+    setSaveError(null);
+    setValidationError(null);
     if (!entityIri || !branch) return;
     const key = draftKey(projectId, branch, entityIri);
     const draft = getDraft(key);
     if (draft) {
       setRestoredDraft(draft);
-    } else {
-      setRestoredDraft(null);
     }
-    setSaveStatus("idle");
-    setSaveError(null);
-    setValidationError(null);
   }, [entityIri, branch, projectId, getDraft]);
 
   const clearRestoredDraft = useCallback(() => {
@@ -89,6 +93,8 @@ export function useEntityAutoSave({
   }, []);
 
   const discardDraft = useCallback(() => {
+    editGenerationRef.current++;
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     if (!entityIri || !branch) return;
     const key = draftKey(projectId, branch, entityIri);
     clearDraft(key);
@@ -100,6 +106,7 @@ export function useEntityAutoSave({
 
   // Save edit state to draft store (Tier 1: instant, local)
   const triggerSave = useCallback(() => {
+    editGenerationRef.current++;
     if (!entityIri || !branch || !canEdit) return;
 
     // Validate
@@ -124,7 +131,7 @@ export function useEntityAutoSave({
   // Flush draft to git (Tier 2: commit on navigate away)
   // Returns true on success, false on error or no-op
   const flushToGit = useCallback(async (origin: SaveOrigin = "auto"): Promise<boolean> => {
-    if (flushingRef.current) return false;
+    if (flushingRef.current === scopeRef.current) return false;
     if (!entityIri || !branch || !canEdit || !onFlushRef.current) return false;
 
     // Re-validate current edit state to prevent flushing a stale draft
@@ -140,38 +147,54 @@ export function useEntityAutoSave({
     const draft = getDraft(key);
     if (!draft) return false;
 
-    flushingRef.current = true;
+    const scope = scopeRef.current;
+    const generation = editGenerationRef.current;
+    const isCurrent = () => mountedRef.current && scopeRef.current === scope
+      && editGenerationRef.current === generation;
+    flushingRef.current = scope;
     setSaveStatus("saving");
     setSaveError(null);
 
     try {
       await onFlushRef.current(entityIri);
-      clearDraft(key);
+      // A successful write owns only the exact draft it submitted. A timestamp
+      // cannot distinguish edits made in the same clock tick.
+      const ownsDraft = getDraft(key) === draft;
+      if (ownsDraft) clearDraft(key);
+      if (!isCurrent() || !ownsDraft) return true;
       setSaveStatus("saved");
 
-      if (
-        origin === "auto" &&
-        await useEditorModeStore.getState().claimAutoSaveTeachingToast()
-      ) {
-        onFirstAutoSaveRef.current?.();
+      if (origin === "auto") {
+        const claimed = await useEditorModeStore.getState().claimAutoSaveTeachingToast();
+        if (!isCurrent() || getDraft(key)) return true;
+        if (claimed) onFirstAutoSaveRef.current?.();
       }
 
-      savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 2000);
+      // The teaching announcement can itself cause navigation or another edit.
+      if (isCurrent() && !getDraft(key)) {
+        savedTimerRef.current = setTimeout(() => {
+          if (isCurrent() && !getDraft(key)) setSaveStatus("idle");
+        }, 2000);
+      }
       return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to save";
-      setSaveStatus("error");
-      setSaveError(msg);
-      onErrorRef.current?.(msg);
+      if (isCurrent() && getDraft(key) === draft) {
+        setSaveStatus("error");
+        setSaveError(msg);
+        onErrorRef.current?.(msg);
+      }
       return false;
     } finally {
-      flushingRef.current = false;
+      if (flushingRef.current === scope) flushingRef.current = null;
     }
   }, [entityIri, branch, projectId, canEdit, getDraft, clearDraft]);
 
   // Cleanup timer on unmount
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
     };
   }, []);
