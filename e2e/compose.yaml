@@ -20,6 +20,8 @@ x-api: &api
     GIT_REPOS_BASE_PATH: /data/repos
     ZITADEL_ISSUER: http://localhost:${IDENTITY_PORT:?}
     ZITADEL_INTERNAL_URL: http://zitadel:${IDENTITY_PORT:?}
+    ZITADEL_CLIENT_ID: ${OIDC_CLIENT_ID:-unconfigured}
+    SUPERADMIN_USER_IDS: ""
     CORS_ORIGINS: '["http://localhost:${WEB_PORT:?}"]'
     FRONTEND_URL: http://localhost:${WEB_PORT:?}
   volumes: [git:/data/repos]
@@ -63,6 +65,62 @@ services:
       interval: 2s
       timeout: 3s
       retries: 60
+  zitadel:
+    image: ghcr.io/zitadel/zitadel@sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64
+    labels: *labels
+    user: "0"
+    command: [start-from-init, --masterkey, "${IDENTITY_MASTERKEY:?}", --tlsMode, disabled]
+    environment:
+      ZITADEL_PORT: ${IDENTITY_PORT:?}
+      ZITADEL_EXTERNALDOMAIN: localhost
+      ZITADEL_EXTERNALPORT: ${IDENTITY_PORT:?}
+      ZITADEL_EXTERNALSECURE: "false"
+      ZITADEL_TLS_ENABLED: "false"
+      ZITADEL_DATABASE_POSTGRES_HOST: postgres
+      ZITADEL_DATABASE_POSTGRES_PORT: 5432
+      ZITADEL_DATABASE_POSTGRES_DATABASE: zitadel
+      ZITADEL_DATABASE_POSTGRES_ADMIN_USERNAME: postgres
+      ZITADEL_DATABASE_POSTGRES_ADMIN_PASSWORD: ${POSTGRES_PASSWORD:?}
+      ZITADEL_DATABASE_POSTGRES_ADMIN_SSL_MODE: disable
+      ZITADEL_DATABASE_POSTGRES_USER_USERNAME: zitadel
+      ZITADEL_DATABASE_POSTGRES_USER_PASSWORD: ${IDENTITY_DB_PASSWORD:?}
+      ZITADEL_DATABASE_POSTGRES_USER_SSL_MODE: disable
+      ZITADEL_FIRSTINSTANCE_PATPATH: /zitadel-data/admin.pat
+      ZITADEL_FIRSTINSTANCE_ORG_NAME: OntoKit isolated tests
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: bootstrap-admin
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: Disposable bootstrap administrator
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: ${IDENTITY_PAT_EXPIRY:?}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: bootstrap-human
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${IDENTITY_ADMIN_PASSWORD:?}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_ADDRESS: bootstrap@example.test
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL_VERIFIED: "true"
+      ZITADEL_FIRSTINSTANCE_LOGINCLIENTPATPATH: /zitadel-data/login-client.pat
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_USERNAME: login-client
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_MACHINE_NAME: Disposable Login client
+      ZITADEL_FIRSTINSTANCE_ORG_LOGINCLIENT_PAT_EXPIRATIONDATE: ${IDENTITY_PAT_EXPIRY:?}
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_REQUIRED: "true"
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI: http://localhost:${LOGIN_PORT:?}/ui/v2/login
+      ZITADEL_OIDC_DEFAULTLOGINURLV2: http://localhost:${LOGIN_PORT:?}/ui/v2/login/login?authRequest=
+      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: http://localhost:${LOGIN_PORT:?}/ui/v2/login/logout?post_logout_redirect=
+      ZITADEL_SAML_DEFAULTLOGINURLV2: http://localhost:${LOGIN_PORT:?}/ui/v2/login/login?samlRequest=
+    ports: ["127.0.0.1:${IDENTITY_PORT:?}:${IDENTITY_PORT:?}", "127.0.0.1:${LOGIN_PORT:?}:${LOGIN_PORT:?}"]
+    volumes: [identity:/zitadel-data]
+    networks: [data, ingress]
+  login:
+    image: ghcr.io/zitadel/zitadel-login@sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648
+    labels: *labels
+    user: "0"
+    # This pinned Login image requires the token VALUE, not a _FILE setting.
+    entrypoint: [/bin/sh, -c, 'export ZITADEL_SERVICE_USER_TOKEN=$$(cat /zitadel-data/login-client.pat) && exec /app/entrypoint.sh node apps/login/server.js']
+    environment:
+      ZITADEL_API_URL: http://localhost:${IDENTITY_PORT:?}
+      NEXT_PUBLIC_BASE_PATH: /ui/v2/login
+      PORT: ${LOGIN_PORT:?}
+      HOSTNAME: 0.0.0.0
+      EMAIL_VERIFICATION: "true"
+    network_mode: service:zitadel
+    volumes: [identity:/zitadel-data:ro]
   api:
     <<: *api
     build:
@@ -94,4 +152,6 @@ volumes:
   minio:
     labels: *labels
   git:
+    labels: *labels
+  identity:
     labels: *labels

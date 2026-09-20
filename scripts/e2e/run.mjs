@@ -3,9 +3,10 @@ import { copyFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, RUNTIME_ROOT, privateDirectory, saveManifest } from './ownership.mjs';
-import { prerequisites, copySource, reservePorts, compose, ownedCommand, baseEnv, getDockerEndpoint } from './runtime.mjs';
-import { expireDiagnostics, retainDiagnostics as retainFailureDiagnostics } from './diagnostics.mjs';
+import { prerequisites, copySource, reservePorts, compose, composeArgs, ownedCommand, baseEnv, getDockerEndpoint } from './runtime.mjs';
+import { expireDiagnostics, recordFailure, retainDiagnostics as retainFailureDiagnostics } from './diagnostics.mjs';
 import { cleanup } from './cleanup.mjs';
+import { freshIdentityValues } from './bootstrap-identity.mjs';
 export function waitForAbort(signal) {
   if (signal.aborted) return Promise.reject(new Error('Interrupted'));
   return new Promise((_, reject) => {
@@ -33,7 +34,7 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
   const manifest = {version: 1, id, project: `ontokit-e2e-${id}`, uid: process.getuid(), processes: [], sources: {}, status: 'preparing', dockerEndpoint: getDockerEndpoint()};
   await saveManifest(manifestDir, manifest);
   const controller = new AbortController();
-  const ctx = {signal: controller.signal, dir, manifestDir, manifest, env: {...baseEnv(), HOME: dir, TMPDIR: dir}};
+  const ctx = {failAt, signal: controller.signal, dir, manifestDir, manifest, env: {...baseEnv(), HOME: dir, TMPDIR: dir}};
   const file = path.join(manifestDir, 'manifest.json');
   let reservation;
   let cleaning;
@@ -52,7 +53,7 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
     if (ctx.stopping) throw new Error('Interrupted');
     reservation = await reservePorts(); manifest.ports = reservation.ports;
     const secret = () => randomBytes(24).toString('hex');
-    ctx.values = {RUN_ID: id, PROJECT: manifest.project, API_PORT: manifest.ports.api, IDENTITY_PORT: manifest.ports.identity, LOGIN_PORT: manifest.ports.login, WEB_PORT: manifest.ports.web, POSTGRES_PASSWORD: secret(), APP_DB_PASSWORD: secret(), IDENTITY_DB_PASSWORD: secret(), APP_SECRET: secret(), MINIO_USER: secret(), MINIO_PASSWORD: secret()};
+    ctx.values = {...freshIdentityValues(), RUN_ID: id, PROJECT: manifest.project, API_PORT: manifest.ports.api, IDENTITY_PORT: manifest.ports.identity, LOGIN_PORT: manifest.ports.login, WEB_PORT: manifest.ports.web, POSTGRES_PASSWORD: secret(), APP_DB_PASSWORD: secret(), IDENTITY_DB_PASSWORD: secret(), APP_SECRET: secret(), MINIO_USER: secret(), MINIO_PASSWORD: secret()};
     await writeFile(path.join(dir, 'runtime.env'), Object.entries(ctx.values).map(([k,v]) => `${k}=${v}\n`).join(''), {mode: 0o600});
     await saveManifest(manifestDir, manifest);
     manifest.status = 'building'; await saveManifest(manifestDir, manifest);
@@ -74,8 +75,13 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
     if (workflow) await workflow(ctx);
     if (failAt === 'after-workflow') throw new Error('Injected workflow failure');
   } catch (error) {
+    try { await recordFailure(ctx, error); } catch { console.error('Private failure capture failed; cleanup will continue'); }
     console.error(`Run ${id} failed during ${manifest.status}; private artifacts will be removed`);
     if (retainDiagnostics) {
+      if (!ctx.stopping) {
+        try { await ownedCommand(ctx, 'docker', composeArgs(ctx, 'logs', '--no-color', '--tail=80', 'zitadel', 'login', 'api', 'worker'), {timeout: 15_000}); }
+        catch { console.error('Private service log capture failed; cleanup will continue'); }
+      }
       try { await retainFailureDiagnostics(ctx); } catch { console.error('Private diagnostic retention failed; cleanup will continue'); }
     }
     throw error;
@@ -90,7 +96,8 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const value = flag => args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined;
-  run({apiSource: value('--api-source'), lifecycleProbe: args.includes('--lifecycle-probe'), failAt: value('--fail-at'), hold: args.includes('--hold'), retainDiagnostics: args.includes('--retain-diagnostics')}).catch(error => {
+  const workflow = args.includes('--lifecycle-probe') ? undefined : (await import('./full-stack.mjs')).fullStack;
+  run({workflow, apiSource: value('--api-source'), lifecycleProbe: args.includes('--lifecycle-probe'), failAt: value('--fail-at'), hold: args.includes('--hold'), retainDiagnostics: args.includes('--retain-diagnostics')}).catch(error => {
     const known = /^(An explicit|Required source file missing:|Local Docker|Only a local|At least 8|Full-stack workflow|Owned command|Injected |Cleanup failed|Interrupted)/.test(error.message);
     console.error(known ? error.message : 'Isolated lifecycle failed; inspect the sanitized phase above.');
     console.error('No full-stack acceptance claimed.'); process.exitCode ||= 1;});

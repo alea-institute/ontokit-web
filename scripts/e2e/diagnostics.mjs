@@ -44,3 +44,17 @@ export async function retainDiagnostics(ctx, {root = DIAGNOSTICS_ROOT, now = Dat
     throw error;
   } finally { await source.close(); }
 }
+
+// Never send raw JavaScript errors to the terminal: fetch/build failures may carry
+// credentials. Keep their bounded stack beside owned-command output so opt-in
+// retention can explain failures in orchestration code as well as child commands.
+export async function recordFailure(ctx, error) {
+  await privateDirectory(ctx.dir);
+  const file = await open(path.join(ctx.dir, 'private.log'), constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
+  try {
+    const stat = await file.stat();
+    if (!stat.isFile() || stat.uid !== process.getuid() || (stat.mode & 0o077)) throw new Error('Unsafe diagnostic log');
+    const detail = error instanceof Error ? error.stack || error.message : 'Non-Error orchestration failure';
+    await file.write(`\nJavaScript orchestration failure:\n${detail.slice(0, 65536)}\n`);
+  } finally { await file.close(); }
+}
