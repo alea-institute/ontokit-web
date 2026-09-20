@@ -127,3 +127,100 @@ it.each(['submit', 'resubmit'])('unlocks a renewed credential retry after an old
   expect(onSubmitted).toHaveBeenCalledExactlyOnceWith(10, null);
   expect(fetcher.mock.calls[1][1].headers.get('Authorization')).toBe('Bearer renewed');
 });
+
+it.each(['submit', 'resubmit', 'discard'])('blocks duplicate terminal actions and saves while %s settles across renewal', async operation => {
+  const gate = deferred(); const fetcher = vi.fn(() => gate.promise); vi.stubGlobal('fetch', fetcher);
+  const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken }), { initialProps: { accessToken: 'old' } });
+  act(() => result.current.resumeSession('session', 'branch'));
+  let pending!: Promise<void>;
+  act(() => { pending = operation === 'submit' ? result.current.submitSession() : operation === 'resubmit' ? result.current.resubmitSession() : result.current.discardSession(); });
+  rerender({ accessToken: 'renewed' });
+  await act(async () => {
+    await result.current.submitSession(); await result.current.resubmitSession(); await result.current.discardSession();
+    expect(await result.current.saveToSession('duplicate', 'iri', 'Label')).toBe(false);
+    expect(await result.current.startSession()).toBeNull();
+  });
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  await act(async () => { gate.resolve(json({ pr_number: 9, pr_url: null })); await pending; });
+  expect(result.current.sessionId).toBeNull();
+});
+
+it.each(['viewer', 'project', 'session', 'unmount'])('rejects terminal completion after a %s ownership round trip', async transition => {
+  const gate = deferred(); vi.stubGlobal('fetch', vi.fn(() => gate.promise)); const onSubmitted = vi.fn();
+  const initial = { projectId: 'a', viewerId: 'viewer' };
+  const { result, rerender, unmount } = renderHook(props => useSuggestionSession({ ...props, accessToken: 'token', onSubmitted }), { initialProps: initial });
+  act(() => result.current.resumeSession('session', 'branch'));
+  let pending!: Promise<void>; act(() => { pending = result.current.submitSession(); });
+  if (transition === 'unmount') unmount();
+  else {
+    if (transition === 'session') act(() => result.current.resumeSession('other', 'other-branch'));
+    else { rerender({ ...initial, ...(transition === 'viewer' ? { viewerId: 'other' } : { projectId: 'b' }) }); rerender(initial); }
+    act(() => result.current.resumeSession('session', 'branch'));
+  }
+  await act(async () => { gate.resolve(json({ pr_number: 9, pr_url: null })); await pending; });
+  expect(onSubmitted).not.toHaveBeenCalled();
+  if (transition !== 'unmount') expect(result.current).toMatchObject({ sessionId: 'session', status: 'active' });
+});
+
+it('does not reverify and reopen a resumed session during credential renewal and submission', async () => {
+  const gate = deferred(); const fetcher = vi.fn().mockResolvedValueOnce(json({ items: [{ session_id: 'session', status: 'changes-requested' }] })).mockReturnValueOnce(gate.promise); vi.stubGlobal('fetch', fetcher);
+  const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken, resumeSessionId: 'session', resumeBranch: 'branch', onError: () => {} }), { initialProps: { accessToken: 'old' } });
+  await act(async () => {});
+  expect(result.current.sessionId).toBe('session');
+  let pending!: Promise<void>; act(() => { pending = result.current.resubmitSession(); });
+  rerender({ accessToken: 'renewed' });
+  expect(result.current.status).toBe('submitting');
+  await act(async () => { gate.resolve(json({ pr_number: 9, pr_url: null })); await pending; });
+  expect(result.current).toMatchObject({ sessionId: null, status: 'submitted' });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it('ignores verification that began before the same session was submitted', async () => {
+  const verification = deferred(); const submission = deferred();
+  vi.stubGlobal('fetch', vi.fn().mockReturnValueOnce(verification.promise).mockReturnValueOnce(submission.promise));
+  const { result } = renderHook(() => useSuggestionSession({ projectId: 'a', accessToken: 'token', resumeSessionId: 'session', resumeBranch: 'branch' }));
+  act(() => result.current.resumeSession('session', 'branch'));
+  let pending!: Promise<void>; act(() => { pending = result.current.submitSession(); });
+  await act(async () => { submission.resolve(json({ pr_number: 9, pr_url: null })); await pending; });
+  await act(async () => { verification.resolve(json({ items: [{ session_id: 'session', status: 'changes-requested' }] })); });
+  expect(result.current).toMatchObject({ sessionId: null, status: 'submitted' });
+});
+
+it('finishes cleanup before a submission callback selects the next session', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ pr_number: 9, pr_url: null })));
+  const onSubmitted = vi.fn(() => result.current.resumeSession('next-session', 'next-branch'));
+  const { result } = renderHook(() => useSuggestionSession({ projectId: 'a', accessToken: 'token', onSubmitted }));
+  act(() => result.current.resumeSession('session', 'branch'));
+  await act(() => result.current.submitSession());
+  expect(result.current).toMatchObject({ sessionId: 'next-session', branch: 'next-branch', status: 'active' });
+  expect(onSubmitted).toHaveBeenCalledExactlyOnceWith(9, null);
+});
+
+it('retains discard recovery after an obsolete credential is rejected', async () => {
+  const gate = deferred(); const fetcher = vi.fn().mockReturnValueOnce(gate.promise).mockResolvedValueOnce(json({})); vi.stubGlobal('fetch', fetcher);
+  const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken }), { initialProps: { accessToken: 'old' } });
+  act(() => result.current.resumeSession('session', 'branch'));
+  let pending!: Promise<void>; act(() => { pending = result.current.discardSession(); });
+  rerender({ accessToken: 'renewed' });
+  await act(async () => { gate.resolve(json({ detail: 'Expired' }, 401)); await pending; });
+  expect(result.current).toMatchObject({ sessionId: 'session', status: 'active', error: null });
+  await act(() => result.current.discardSession());
+  expect(result.current.sessionId).toBeNull(); expect(fetcher).toHaveBeenCalledTimes(2);
+});
+
+it.each(['save-first', 'discard-first'])('closes a session discarded during autosave (%s)', async order => {
+  const save = deferred(); const discard = deferred(); const fetcher = vi.fn().mockReturnValueOnce(save.promise).mockReturnValueOnce(discard.promise); vi.stubGlobal('fetch', fetcher);
+  const { result } = renderHook(() => useSuggestionSession({ projectId: 'a', accessToken: 'token' }));
+  act(() => result.current.resumeSession('session', 'branch'));
+  let saving!: Promise<boolean>; let discarding!: Promise<void>;
+  act(() => { saving = result.current.saveToSession('source', 'iri', 'Label'); });
+  await act(() => result.current.submitSession());
+  expect(fetcher).toHaveBeenCalledTimes(1);
+  act(() => { discarding = result.current.discardSession(); });
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  const finishSave = () => act(async () => { save.resolve(json({ changes_count: 5 })); expect(await saving).toBe(false); });
+  const finishDiscard = () => act(async () => { discard.resolve(json({})); await discarding; });
+  if (order === 'save-first') { await finishSave(); await finishDiscard(); }
+  else { await finishDiscard(); await finishSave(); }
+  expect(result.current).toMatchObject({ sessionId: null, branch: null, status: 'idle', changesCount: 0, entitiesModified: [] });
+});
