@@ -13,7 +13,7 @@
     "Coordinated backup and actual isolated restore passed",
     "Original services resumed; stopped baseline isolated; deploy lock released",
     "Hosted administrator/login/configured service credentials HTTP401",
-    "Local separate identity administrator credentials HTTP200; hosted validation approval pending"
+    "Local separate identity administrator credential HTTP200 locally; explicit user-approved hosted DEV validation HTTP401; local service token is identical."
   ],
   "verification_evidence": [
     {
@@ -51,7 +51,7 @@
   ],
   "plan_checkpoint": null,
   "blockers": [
-    "A valid hosted DEV identity administrator path is not yet available; newly found local credential validation is awaiting specific egress approval."
+    "No working hosted DEV identity administrator token or usable supported administrator sign-in path has been verified."
   ],
   "recovery_path": "docs/releases/d02-recovery-receipt.md",
   "settled_decision_conflicts": [],

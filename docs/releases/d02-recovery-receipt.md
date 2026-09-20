@@ -11,7 +11,7 @@ Evidence collected 2026-09-20 UTC for [D02 plan](../plans/2026-09-20-1323-chore-
 - An administrator password is configured; its presence is not proof of a valid supported administrative session. No password reset, direct identity-database change or replacement token was attempted. Root SSH access does not establish identity authority.
 - Parent browser inspection found no existing DEV identity tab and encountered `ERR_BLOCKED_BY_CLIENT` opening the console. Browser protections were not disabled. A supported valid administrator session or credential remains necessary before identity repair and persona setup.
 
-Local-machine follow-up found working administrator credentials for the separate local Zitadel instance. They have not been tested against hosted DEV: automatic approval review rejected that transmission pending specific user authorization. No token value is retained here. This does not change the hosted DEV credential failure above.
+Local-machine follow-up found working administrator credentials for the separate local Zitadel instance. After explicit user authorization, the local administrator PAT was tested against hosted DEV and returned HTTP401. The local API service token is identical to that PAT, so it is not a second independent candidate. No token value is retained here. A configured hosted administrator password exists, but no usable supported sign-in path has been verified.
 
 ## Coordinated recovery set
 
