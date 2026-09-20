@@ -1,6 +1,6 @@
 # D06 lifecycle verification
 
-Status: **U1–U3 verified; phase-boundary simplification precedes U4 branch/PR/search/lint tests.** No full-stack acceptance, publication or deployment is claimed.
+Status: **U1–U3 verified; U4 branch/PR/search/lint implementation is active.** No full-stack acceptance, publication or deployment is claimed.
 
 The [reviewed D06 plan](../plans/2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) is checkpointed as `db916292`. Web implementation is in `.worktrees/web-d06-full-stack`, branch `feat/d06-full-stack-tests-20260920`. The API repair is isolated in `.worktrees/api-d06-image`, branch `fix/d06-runtime-package-permissions-20260920`, based on merged `c95991c7`.
 
@@ -32,3 +32,5 @@ Fresh identity bootstrap and the production web build now run. Browser validatio
 ## U3 persistence verification
 
 Fresh run `e2a9b56af512d7a2bae80b5f12143ee6` passed all 15 tests with zero skips/failures: the authentication foundation plus 11 real HTTP persistence and rejection tests. These cover project CRUD, imported Git source/main branch, class hierarchy and typed property labels, source revision persistence, 401/403/422 rejected-write state preservation, and 404/422 absence of partial projects. Cleanup removed all owned resources and preserved every neighboring resource identity. Type checking, targeted ESLint and whitespace checks pass. Tests and sanitized source fingerprints are committed as `f09738e5`, with `docs/releases/d06-u3-verification.json` in the implementation checkout. No production changes were needed for U3.
+
+The U1–U3 simplification review completed all three lenses. Commit `13b10944` reuses the private environment writer with identical serialization and permissions; no auth/ownership guards were removed. Focused ownership/diagnostics and eight identity tests, full lint and type checking passed. U4 is assigned to a fresh worker from this committed baseline.
