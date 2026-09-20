@@ -1,0 +1,31 @@
+{
+  "status": "complete",
+  "review_type": "bounded independent finding-resolution review",
+  "reviewed_base": "a365aa8d3ffc298a4d40632a20555c50bee13e0b",
+  "reviewed_head": "30b8ecb2c128f82ff067b6f3e444edc5f7f04ed3",
+  "original_review": "d03-code-review.json",
+  "finding": {
+    "number": 1,
+    "status": "resolved in source; final image verification pending",
+    "evidence": [
+      "validateServerEnv compares compiled mode, provider availability and issuer before schema validation.",
+      "Both Node instrumentation and direct Auth.js initialization validate configuration.",
+      "Anonymous issuer compiles as an explicit empty string; runtime public overrides cannot disguise mismatches.",
+      "Expanded harness covers truly omitted provider settings, issuer/mode changes, and anonymous provider/issuer additions.",
+      "Regression tests cover matching required, optional and disabled settings and both validation entry points."
+    ]
+  },
+  "new_findings": [],
+  "remaining_concerns": [],
+  "verification_limits": [
+    "Independent source and regression-test inspection only; caller must verify rebuilt images at reviewed hash.",
+    "Live OIDC and deployment acceptance remain outside this review."
+  ],
+  "repository_changes_made": false,
+  "original_receipt_preserved": true,
+  "caller_verification": {
+    "source_revision": "30b8ecb2c128f82ff067b6f3e444edc5f7f04ed3",
+    "result": "All three rebuilt images pass expanded harness; 13 rejection cases and 3 positive profiles; full suite 5222 passed; types/lint passed.",
+    "finding_status": "resolved with source review and image verification"
+  }
+}

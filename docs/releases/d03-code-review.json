@@ -1,0 +1,218 @@
+{
+  "status": "complete",
+  "verdict": "Ready with fixes",
+  "scope": {
+    "base": "7c153e47",
+    "branch": "release/d01-repaired-dev-20260920",
+    "head_sha": "a365aa8d3ffc298a4d40632a20555c50bee13e0b",
+    "pr_url": null,
+    "files_changed": 12
+  },
+  "intent": "Build configured-provider images without private credentials while validating runtime startup and Auth.js operations; preserve mode/session behavior and gate publication on faithful smoke checks.",
+  "intent_confidence": "explicit",
+  "reviewers": [
+    "correctness",
+    "security",
+    "testing",
+    "project-standards",
+    "maintainability",
+    "reliability",
+    "adversarial-claude"
+  ],
+  "findings": [
+    {
+      "#": 1,
+      "autofix_class": "manual",
+      "confidence": 75,
+      "evidence": [
+        "Dockerfile:41-43: `ARG AUTH_MODE` / `ENV AUTH_MODE=$AUTH_MODE`; provider issuer/client ID are builder-only at lines 25-32.",
+        "next.config.ts:32-34 freezes browser provider availability and issuer, while lib/auth-mode.ts:22-38 reads runtime settings and lib/env.ts:33 permits optional anonymous startup. instrumentation.ts:3-15 has no parity guard.",
+        "scripts/verify-auth-image.sh:21-23 supplies the same public settings at runtime, so its positive configuration assertion does not exercise missing or mismatched runtime settings.",
+        "Reproduction on reviewed a365aa8d image ontokit/d03-web:optional-configured (81a85a5aa31c), Node 22.23.2, network none: optional mode with both synthetic secrets but no runtime issuer/client ID returned HTTP 200 {} from /api/auth/providers, despite compiled NEXT_PUBLIC_ZITADEL_CONFIGURED=true and issuer=https://identity.example.invalid. The temporary container was removed."
+      ],
+      "file": "Dockerfile",
+      "first_evidence": "Dockerfile:41-43: `ARG AUTH_MODE` / `ENV AUTH_MODE=$AUTH_MODE`; provider issuer/client ID are builder-only at lines 25-32.",
+      "independent_reviewers": [
+        "adversarial-claude"
+      ],
+      "line": 41,
+      "owner": "downstream-resolver",
+      "pre_existing": false,
+      "protected_subject": "authorization-authentication",
+      "requires_verification": true,
+      "reviewers": [
+        "adversarial-claude"
+      ],
+      "severity": "P2",
+      "suggested_fix": "At Node startup compare the compiled public auth mode, provider availability and issuer with the runtime effective mode/provider/issuer; reject mismatches with the existing generic startup marker. Keep a matching optional anonymous image valid, and preserve disabled mode when build and runtime match. Keep private credentials runtime-only; do not default a missing runtime public provider to anonymous for a configured image. Add network-isolated smoke cases for missing runtime issuer/client ID and mismatched issuer/mode, plus positive matching configured/anonymous cases. If comparing client ID too, retain nonsecret build metadata for that value without inventing a browser API contract.",
+      "title": "Configured image drifts: baked client flag vs unset runtime provider",
+      "why_it_matters": "An optional configured image can start healthy while advertising sign-in for a server with no provider. A different runtime issuer can also send sign-in to issuer B while browser logout targets baked issuer A. The existing green smoke tests inject matching values and miss this trigger.",
+      "validation_status": "confirmed",
+      "validation_reason": "At reviewed a365aa8d, newly added Dockerfile:25\u201332 bakes provider identity into next.config.ts:32\u201334 browser flags without carrying it into the runner; when this optional/configured image is launched with both secrets but omitted runtime issuer/client ID, lib/env.ts:33 and lib/auth-mode.ts:22\u201338 accept anonymous configuration and auth.ts:43 returns no providers while lib/auth-mode.ts:47\u201350 still advertises sign-in, with no startup parity guard in instrumentation.ts:3\u201315; the supplied Node 22.23.2 network-isolated image reproduction exercised this exact precondition and observed HTTP 200 {} with compiled provider flag true, establishing the newly reachable R2 mismatch (live deployment incidence was not measured)."
+    }
+  ],
+  "actionable_findings": [
+    {
+      "#": 1,
+      "autofix_class": "manual",
+      "confidence": 75,
+      "evidence": [
+        "Dockerfile:41-43: `ARG AUTH_MODE` / `ENV AUTH_MODE=$AUTH_MODE`; provider issuer/client ID are builder-only at lines 25-32.",
+        "next.config.ts:32-34 freezes browser provider availability and issuer, while lib/auth-mode.ts:22-38 reads runtime settings and lib/env.ts:33 permits optional anonymous startup. instrumentation.ts:3-15 has no parity guard.",
+        "scripts/verify-auth-image.sh:21-23 supplies the same public settings at runtime, so its positive configuration assertion does not exercise missing or mismatched runtime settings.",
+        "Reproduction on reviewed a365aa8d image ontokit/d03-web:optional-configured (81a85a5aa31c), Node 22.23.2, network none: optional mode with both synthetic secrets but no runtime issuer/client ID returned HTTP 200 {} from /api/auth/providers, despite compiled NEXT_PUBLIC_ZITADEL_CONFIGURED=true and issuer=https://identity.example.invalid. The temporary container was removed."
+      ],
+      "file": "Dockerfile",
+      "first_evidence": "Dockerfile:41-43: `ARG AUTH_MODE` / `ENV AUTH_MODE=$AUTH_MODE`; provider issuer/client ID are builder-only at lines 25-32.",
+      "independent_reviewers": [
+        "adversarial-claude"
+      ],
+      "line": 41,
+      "owner": "downstream-resolver",
+      "pre_existing": false,
+      "protected_subject": "authorization-authentication",
+      "requires_verification": true,
+      "reviewers": [
+        "adversarial-claude"
+      ],
+      "severity": "P2",
+      "suggested_fix": "At Node startup compare the compiled public auth mode, provider availability and issuer with the runtime effective mode/provider/issuer; reject mismatches with the existing generic startup marker. Keep a matching optional anonymous image valid, and preserve disabled mode when build and runtime match. Keep private credentials runtime-only; do not default a missing runtime public provider to anonymous for a configured image. Add network-isolated smoke cases for missing runtime issuer/client ID and mismatched issuer/mode, plus positive matching configured/anonymous cases. If comparing client ID too, retain nonsecret build metadata for that value without inventing a browser API contract.",
+      "title": "Configured image drifts: baked client flag vs unset runtime provider",
+      "why_it_matters": "An optional configured image can start healthy while advertising sign-in for a server with no provider. A different runtime issuer can also send sign-in to issuer B while browser logout targets baked issuer A. The existing green smoke tests inject matching values and miss this trigger.",
+      "validation_status": "confirmed",
+      "validation_reason": "At reviewed a365aa8d, newly added Dockerfile:25\u201332 bakes provider identity into next.config.ts:32\u201334 browser flags without carrying it into the runner; when this optional/configured image is launched with both secrets but omitted runtime issuer/client ID, lib/env.ts:33 and lib/auth-mode.ts:22\u201338 accept anonymous configuration and auth.ts:43 returns no providers while lib/auth-mode.ts:47\u201350 still advertises sign-in, with no startup parity guard in instrumentation.ts:3\u201315; the supplied Node 22.23.2 network-isolated image reproduction exercised this exact precondition and observed HTTP 200 {} with compiled provider flag true, establishing the newly reachable R2 mismatch (live deployment incidence was not measured)."
+    }
+  ],
+  "triage_groups": [],
+  "pre_existing_findings": [],
+  "requirements_completeness": {
+    "plan_source": "explicit",
+    "requirements": [
+      {
+        "id": "R1",
+        "status": "met",
+        "evidence": "Configured images build without private credentials."
+      },
+      {
+        "id": "R2",
+        "status": "partially addressed",
+        "evidence": "Public configuration is baked; runtime agreement is not enforced. Finding #1."
+      },
+      {
+        "id": "R3",
+        "status": "met",
+        "evidence": "Private credentials remain runtime-only; build guards and response canaries are present."
+      },
+      {
+        "id": "R4",
+        "status": "met",
+        "evidence": "Runtime startup and direct Auth.js configuration validate required or runtime-active providers; build/runtime drift is tracked under R2."
+      },
+      {
+        "id": "R5",
+        "status": "met",
+        "evidence": "Existing auth modes, fallback, refresh and session behavior have regression coverage; drift exception is finding #1."
+      },
+      {
+        "id": "R6",
+        "status": "partially addressed",
+        "evidence": "CI smoke harness exists and passed; missing/mismatched runtime public settings need coverage with #1."
+      }
+    ],
+    "implementation_units": [
+      {
+        "id": "U1",
+        "status": "met",
+        "evidence": "Build imports separated from runtime validation."
+      },
+      {
+        "id": "U2",
+        "status": "partially addressed",
+        "evidence": "Builder public arguments added; runtime parity requires #1."
+      },
+      {
+        "id": "U3",
+        "status": "partially addressed",
+        "evidence": "CI smoke implemented. Caller is completing durable evidence and publication outside this frozen code review; that sequencing is intentional, not a missing implementation finding."
+      }
+    ]
+  },
+  "learnings": [],
+  "agent_native_gaps": [],
+  "deployment_notes": [],
+  "residual_risks": [],
+  "testing_gaps": [],
+  "coverage": {
+    "depth": "full",
+    "reviewer_selection": [
+      {
+        "reviewer": "correctness",
+        "tier": "session",
+        "reason": "changed runtime/test/structural/standards surface"
+      },
+      {
+        "reviewer": "security",
+        "tier": "session",
+        "reason": "auth correctness"
+      },
+      {
+        "reviewer": "testing",
+        "tier": "mid",
+        "reason": "changed runtime/test/structural/standards surface"
+      },
+      {
+        "reviewer": "project-standards",
+        "tier": "mid",
+        "reason": "changed runtime/test/structural/standards surface"
+      },
+      {
+        "reviewer": "maintainability",
+        "tier": "mid",
+        "reason": "changed runtime/test/structural/standards surface"
+      },
+      {
+        "reviewer": "reliability",
+        "tier": "mid",
+        "reason": "changed runtime/test/structural/standards surface"
+      }
+    ],
+    "local_reviewers_clean": 6,
+    "cross_model_outcome": "folded",
+    "cross_model": "Independent Claude cross-model adversarial review: route claude; requested/actual claude-opus-5; effort requested high, actual unverified; receipt_supported true; independence_verified true. Job terminal and consumed directory deleted.",
+    "validation": {
+      "batch_outcome": "verdicts",
+      "selected": 1,
+      "confirmed": 1,
+      "rejected": 0,
+      "unresolved": 0,
+      "malformed": 0,
+      "failed": 0,
+      "shortcut_skipped": 0,
+      "bound_exceeded": false,
+      "protected_subject_reclassifications": 0,
+      "reason": "One independently validated auth defect. No ordinary reviewer corroborated the peer, so no validator shortcut applied."
+    },
+    "suppressed_by_confidence": {},
+    "first_evidence_backfilled": 0,
+    "quote_evidence_demotions": 0,
+    "mode_aware_demotions": 0,
+    "malformed_candidates": 0,
+    "failed_reviewers": [],
+    "compound_packs": {
+      "roots": [],
+      "warnings": [],
+      "errors": []
+    },
+    "notes": [
+      "Root AGENTS.md supplies instruction-file standards fallback; CLAUDE.md links to it.",
+      "Caller reports 365 files and 5208 tests passed without failures or skips, types passed, lint had zero errors and 19 existing warnings. These checks missed finding #1.",
+      "Caller reports three Docker builds and existing positive/negative smoke checks passed without leftover containers.",
+      "This report covers frozen a365aa8d only. Subsequent fixes and untracked evidence documents are outside its scope.",
+      "No production OIDC, deployment acceptance, or live incidence is claimed. D04/D05/D02 remain.",
+      "No learnings, agent-native, or deployment-verification specialist was dispatched; empty arrays do not claim those assessments."
+    ]
+  },
+  "artifact_path": "/tmp/compound-engineering-1000/ce-code-review/d03-a365aa8d",
+  "run_id": "d03-a365aa8d",
+  "verdict_reason": "Fix #1 with startup comparison of built and runtime public auth settings, then verify mismatched and matching configurations. Complete the caller-owned evidence/publication steps; this is not deployment approval."
+}
