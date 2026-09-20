@@ -13,7 +13,11 @@ head: "4f6eeed3c63306e5d0404ce2013e47b574ebd6dc"
 
 # OntoKit-web Codex pickup
 
-## STANDING GATE — read this before anything else
+## Superseded publication restriction
+
+**2026-09-20 update:** Damien granted standing permission to push, open PRs, merge, deploy, and send repository content to Claude. See `AGENTS.md` for the current authorization. The prior restrictions below are historical and no longer govern publication or deployment. Destructive-history and unbacked-data safeguards are separate.
+
+### Historical gate (superseded)
 
 **OntoKit is a CatholicOS project.** Damien's standing rule: pushes to CatholicOS
 projects (this repo and its sibling `ontokit-api`) always require his explicit
