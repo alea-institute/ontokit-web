@@ -67,4 +67,22 @@ describe("Docker release fidelity", () => {
     expect(dockerBuildArgs(publicationJob)).toEqual(dockerBuildArgs(fidelityJob));
     expect(publicationJob).toMatch(/needs: \[[^\]]*docker-build[^\]]*\]/);
   });
+
+  it("requires configured and anonymous image smoke gates before publishing", () => {
+    const configured = workflowJob("docker-auth-smoke");
+    expect(configured).toContain("mode: [required, optional]");
+    expect(configured).toContain("push: false");
+    expect(configured).toContain("load: true");
+    expect(dockerBuildArgs(configured)).toEqual([
+      "AUTH_MODE=${{ matrix.mode }}",
+      "ZITADEL_ISSUER=https://identity.example.invalid",
+      "ZITADEL_CLIENT_ID=d03-public-client",
+      "NEXT_PUBLIC_API_URL=https://api.example.invalid",
+      "NEXT_PUBLIC_WS_URL=wss://api.example.invalid",
+    ]);
+    expect(configured).toContain("bash scripts/verify-auth-image.sh ontokit/auth-smoke:configured ${{ matrix.mode }} configured");
+    expect(workflowJob("docker-build")).toContain("bash scripts/verify-auth-image.sh ontokit/auth-smoke:optional optional anonymous");
+    expect(workflowJob("publish_docker")).toMatch(/needs: \[[^\]]*docker-auth-smoke[^\]]*\]/);
+  });
+
 });

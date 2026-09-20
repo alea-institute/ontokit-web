@@ -67,10 +67,38 @@ jobs:
         with:
           context: .
           push: false
+          load: true
+          tags: ontokit/auth-smoke:optional
           build-args: |
             AUTH_MODE=optional
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - run: bash scripts/verify-auth-image.sh ontokit/auth-smoke:optional optional anonymous
+
+  docker-auth-smoke:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mode: [required, optional]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
+      - uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ontokit/auth-smoke:configured
+          build-args: |
+            AUTH_MODE=${{ matrix.mode }}
+            ZITADEL_ISSUER=https://identity.example.invalid
+            ZITADEL_CLIENT_ID=d03-public-client
+            NEXT_PUBLIC_API_URL=https://api.example.invalid
+            NEXT_PUBLIC_WS_URL=wss://api.example.invalid
+          cache-from: type=gha,scope=auth-${{ matrix.mode }}
+          cache-to: type=gha,mode=max,scope=auth-${{ matrix.mode }}
+      - run: bash scripts/verify-auth-image.sh ontokit/auth-smoke:configured ${{ matrix.mode }} configured
 
   publish_github:
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/ontokit-web-')
@@ -85,7 +113,7 @@ jobs:
 
   publish_docker:
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/ontokit-web-')
-    needs: [lint, type-check, test, build, docker-build]
+    needs: [lint, type-check, test, build, docker-build, docker-auth-smoke]
     runs-on: ubuntu-latest
     permissions:
       contents: read
