@@ -64,7 +64,7 @@ export function useSuggestionSession({
   const [isResumed, setIsResumed] = useState(false);
 
   const savingRef = useRef(false);
-  const resumeAttemptedRef = useRef(false);
+  const resumeAttemptedRef = useRef<{ sessionId: string; branch: string } | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const branchRef = useRef<string | null>(null);
   const startingRef = useRef<Promise<string | null> | null>(null);
@@ -80,7 +80,7 @@ export function useSuggestionSession({
     scope.live = true;
     savingRef.current = false;
     startingRef.current = null;
-    resumeAttemptedRef.current = false;
+    resumeAttemptedRef.current = null;
     setStatus((current) => current === "saving" || current === "submitting"
       ? (sessionIdRef.current ? "active" : "idle") : current);
     return () => { scope.live = false; };
@@ -288,16 +288,20 @@ export function useSuggestionSession({
 
   // Auto-resume on mount if resumeSessionId/resumeBranch are provided
   useEffect(() => {
-    if (resumeAttemptedRef.current) return;
-    if (!resumeSessionId || !resumeBranch || !accessToken) return;
-
-    resumeAttemptedRef.current = true;
+    if (!resumeSessionId || !resumeBranch || !accessToken) {
+      resumeAttemptedRef.current = null;
+      return;
+    }
+    if (resumeAttemptedRef.current?.sessionId === resumeSessionId
+      && resumeAttemptedRef.current.branch === resumeBranch) return;
+    const attempt = { sessionId: resumeSessionId, branch: resumeBranch };
+    resumeAttemptedRef.current = attempt;
 
     // Verify the session is still in changes-requested state before resuming
     suggestionsApi
       .listSessions(projectId, accessToken)
       .then((response) => {
-        if (!isCurrent()) return;
+        if (!isCurrent() || resumeAttemptedRef.current !== attempt) return;
         const session = response.items.find(
           (s) => s.session_id === resumeSessionId,
         );
@@ -308,7 +312,7 @@ export function useSuggestionSession({
         }
       })
       .catch(() => {
-        if (!isCurrent()) return;
+        if (!isCurrent() || resumeAttemptedRef.current !== attempt) return;
         onError?.("Failed to verify suggestion session status.");
       });
   }, [resumeSessionId, resumeBranch, accessToken, projectId, resumeSession, onError, isCurrent]);

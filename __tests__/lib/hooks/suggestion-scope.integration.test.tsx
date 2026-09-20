@@ -87,3 +87,12 @@ it('clears authenticated session ownership when the viewer changes without signi
   rerender({ viewerId: 'second-user' });
   expect(result.current).toMatchObject({ sessionId: null, branch: null, beaconToken: null, status: 'idle', isResumed: false });
 });
+it('verifies a new resume selection and ignores the previous selection response', async () => {
+  const old = deferred(); const next = deferred(); vi.stubGlobal('fetch', vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(next.promise));
+  const { result, rerender } = renderHook(({ resumeSessionId }) => useSuggestionSession({ projectId: 'a', accessToken: 'token', resumeSessionId, resumeBranch: `branch-${resumeSessionId}` }), { initialProps: { resumeSessionId: 'old' } });
+  rerender({ resumeSessionId: 'current' });
+  await act(async () => { next.resolve(json({ items: [{ session_id: 'current', status: 'changes-requested' }] })); });
+  expect(result.current.sessionId).toBe('current');
+  await act(async () => { old.resolve(json({ items: [{ session_id: 'old', status: 'changes-requested' }] })); });
+  expect(result.current.sessionId).toBe('current');
+});
