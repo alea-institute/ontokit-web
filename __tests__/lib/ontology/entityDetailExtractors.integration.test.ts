@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { extractIndividualDetail } from '@/lib/ontology/entityDetailExtractors';
 import { updateIndividualInTurtle } from '@/lib/ontology/turtleIndividualUpdater';
 import { parseBlockTriples } from '@/lib/ontology/turtleBlockParser';
+import { parseExistingTurtleBlock } from '@/lib/ontology/turtleUtils';
 
 const iri = (name: string) => `https://example.test/${name}`;
 const source = `@prefix ex: <https://example.test/> .
@@ -51,15 +52,41 @@ it('finds a numeric prefixed subject without matching an earlier reference to it
   expect(parseBlockTriples(input, iri('43'))).toEqual([{ predicate: iri('note'), object: { type: 'literal', value: 'numeric subject' } }]);
 });
 
-it.each(['Person', 'Foo.Bar', 'Café'])('finds and updates %s after a comment-adjacent statement terminator', name => {
+it.each(['Person', 'Foo.Bar', 'Foo..Bar', 'Café', '東京', 'part:one'].flatMap(name => [' .', ' .# retained comment'].map(terminator => [name, terminator])))('finds and updates %s following terminator %s', (name, terminator) => {
   const input = `@prefix ex: <https://example.test/> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
-ex:Other a owl:NamedIndividual .# retained comment
+ex:Other a owl:NamedIndividual${terminator}
 ex:${name} a owl:NamedIndividual ; ex:note "Original" .
 `;
   const parsed = extractIndividualDetail(input, iri(name));
-  expect(parsed).not.toBeNull();
+  expect(parsed?.annotations).toEqual([{ property_iri: iri('note'), values: [{ value: 'Original', lang: '' }] }]);
   const output = updateIndividualInTurtle(input, iri(name), { ...parsed!, annotations: [{ property_iri: iri('note'), values: [{ value: 'Updated', lang: '' }] }] });
-  expect(output).toContain('ex:Other a owl:NamedIndividual .# retained comment');
+  expect(output).toContain(`ex:Other a owl:NamedIndividual${terminator}`);
   expect(extractIndividualDetail(output, iri(name))?.annotations).toEqual([{ property_iri: iri('note'), values: [{ value: 'Updated', lang: '' }] }]);
+});
+
+it.each(['Foo.Bar', 'Café'])('never replaces %s in another namespace or an object-only occurrence', name => {
+  const input = `@prefix ex: <https://example.test/> .
+@prefix other: <https://other.test/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+other:${name} a owl:NamedIndividual .# unrelated subject
+ex:Ref ex:target
+# object starts on its own line
+ex:${name} .
+`;
+  expect(extractIndividualDetail(input, iri(name))).toBeNull();
+  const unrelated = extractIndividualDetail(input, `https://other.test/${name}`)!;
+  expect(() => updateIndividualInTurtle(input, iri(name), unrelated)).toThrow('Could not find individual');
+});
+
+it('parses dotted predicates and objects without absorbing a comment-adjacent terminator', () => {
+  const input = '@prefix ex: <https://example.test/> .\nex:Subject ex:has.value ex:Foo.Bar.# retained comment';
+  expect(parseBlockTriples(input, iri('Subject'))).toEqual([{ predicate: iri('has.value'), object: { type: 'iri', value: iri('Foo.Bar') } }]);
+});
+
+it.each(['Foo.Bar', 'Café', '東京'])('preserves the complete %s subject when splitting its existing predicates', name => {
+  expect(parseExistingTurtleBlock(`ex:${name} ex:note "Keep" ; ex:target ex:Other .`)).toEqual({
+    subject: `ex:${name}`,
+    predicateObjects: [{ predicate: 'ex:note', text: 'ex:note "Keep"' }, { predicate: 'ex:target', text: 'ex:target ex:Other' }],
+  });
 });

@@ -243,7 +243,12 @@ function tokenizeBlock(text: string): string[] {
 
     // Prefixed name, keyword, or bare value
     let end = i;
-    while (end < text.length && !/[\s;,.#"'<[\](]/.test(text[end])) end++;
+    while (end < text.length && !/[\s;,#"'<[\](]/.test(text[end])) {
+      // A dot can occur inside a prefixed name, but its final dot belongs
+      // to the statement (including when a comment starts immediately).
+      if (text[end] === "." && (end + 1 === text.length || /[\s;,#"'<[\](]/.test(text[end + 1]))) break;
+      end++;
+    }
     if (end > i) {
       tokens.push(text.slice(i, end));
       i = end;

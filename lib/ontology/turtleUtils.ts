@@ -27,7 +27,7 @@ export interface ExistingTurtleBlock {
 }
 
 export function parseExistingTurtleBlock(block: string): ExistingTurtleBlock {
-  const subjectMatch = block.match(/^\s*(<[^>]+>|(?:[A-Za-z_][\w-]*)?:[\w-]+)/u);
+  const subjectMatch = block.match(/^\s*(<[^>]+>|[^\s:<>]*:[^\s]+)/u);
   if (!subjectMatch) {
     throw new Error("Could not parse the subject from its Turtle block");
   }
@@ -147,6 +147,12 @@ export function toTurtle(iri: string, rev: Map<string, string>): string {
   return `<${iri}>`;
 }
 
+// Turtle PN_CHARS_BASE / PN_CHARS, used for existing unescaped local names.
+// Escaped spellings are not synthesized from an IRI here.
+const PN_CHARS_BASE = "A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u02FF\\u0370-\\u037D\\u037F-\\u1FFF\\u200C-\\u200D\\u2070-\\u218F\\u2C00-\\u2FEF\\u3001-\\uD7FF\\uF900-\\uFDCF\\uFDF0-\\uFFFD\\u{10000}-\\u{EFFFF}";
+const PN_CHARS = `${PN_CHARS_BASE}_0-9\\-\\u00B7\\u0300-\\u036F\\u203F-\\u2040`;
+const UNESCAPED_LOCAL_NAME = new RegExp(`^[${PN_CHARS_BASE}_:0-9](?:[${PN_CHARS}.:]*[${PN_CHARS}:])?$`, "u");
+
 /**
  * Get all possible Turtle representations of an IRI.
  *
@@ -166,7 +172,7 @@ export function iriTurtleForms(
   for (const [alias, ns] of Object.entries(prefixes)) {
     if (iri.startsWith(ns)) {
       const local = iri.slice(ns.length);
-      if (local && /^[A-Za-z_0-9][\w-]*$/.test(local)) {
+      if (local && UNESCAPED_LOCAL_NAME.test(local)) {
         forms.push(alias === "" ? `:${local}` : `${alias}:${local}`);
       }
     }
@@ -251,7 +257,7 @@ export function scanToBlockEnd(lines: string[], start: number): number {
 
       if (c === "." && depth === 0) {
         const next = k + 1 < line.length ? line[k + 1] : "";
-        if (!next || /\s/.test(next)) {
+        if (!next || /[\s#]/.test(next)) {
           return j;
         }
       }
