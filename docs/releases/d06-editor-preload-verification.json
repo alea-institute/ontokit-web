@@ -1,0 +1,17 @@
+{
+  "status": "locally_verified",
+  "behavior_changed": true,
+  "cause": "Hover preload sets isPreloading while source mount gate checked only isLoadingSource; editor captures initialValue at mount, preserving empty source after request completion.",
+  "fix": "Wait for both foreground and background source loading before mounting editor.",
+  "files": [
+    "components/editor/developer/DeveloperEditorLayout.tsx",
+    "__tests__/components/editor/DeveloperEditorLayout.integration.test.tsx"
+  ],
+  "evidence": {
+    "red_before_fix": "Deferred hover/click/resolve scenario expected Loaded branch source but received empty text",
+    "focused_tests": 131,
+    "focused_result": "passed",
+    "no_helper_workaround": true
+  },
+  "browser_repeatability": "pending final U6 runs"
+}

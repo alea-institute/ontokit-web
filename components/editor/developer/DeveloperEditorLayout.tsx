@@ -744,7 +744,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
         ) : (
           /* Source View */
           <div className="flex-1 bg-white dark:bg-slate-800">
-            {isLoadingSource ? (
+            {isLoadingSource || isPreloading ? (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center">
                   <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
