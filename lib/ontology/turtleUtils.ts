@@ -166,7 +166,7 @@ export function iriTurtleForms(
   for (const [alias, ns] of Object.entries(prefixes)) {
     if (iri.startsWith(ns)) {
       const local = iri.slice(ns.length);
-      if (local && /^[A-Za-z_][\w-]*$/.test(local)) {
+      if (local && /^[A-Za-z_0-9][\w-]*$/.test(local)) {
         forms.push(alias === "" ? `:${local}` : `${alias}:${local}`);
       }
     }

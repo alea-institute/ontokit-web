@@ -226,75 +226,52 @@ export function extractIndividualDetail(
   const allTypeIris = extractIris(triples, RDF_TYPE);
   const typeIris = allTypeIris.filter((iri) => iri !== OWL_NAMED_INDIVIDUAL);
 
-  // Property assertions: any predicate NOT in the known metadata set
   const objectPropertyAssertions: PropertyAssertion[] = [];
   const dataPropertyAssertions: PropertyAssertion[] = [];
+  const dataPropertyIris = new Set<string>();
+  const checkedPredicates = new Set<string>();
 
   for (const t of triples) {
     if (INDIVIDUAL_METADATA_IRIS.has(t.predicate)) continue;
-    // Skip annotation properties (literal-valued predicates in known annotation vocabs)
-    // These are handled by groupAnnotations
-
     if (t.object.type === "iri") {
-      objectPropertyAssertions.push({
-        propertyIri: t.predicate,
-        targetIri: t.object.value,
-      });
-    } else if (t.object.type === "literal") {
-      const obj = t.object as { type: "literal"; value: string; lang?: string; datatype?: string };
-      // Check if this is a known annotation property (literal-valued)
-      // If so, it'll be grouped in annotations instead
-      const isKnownAnnotation = !INDIVIDUAL_METADATA_IRIS.has(t.predicate) &&
-        groupAnnotations([t], INDIVIDUAL_METADATA_IRIS).length > 0;
-      if (!isKnownAnnotation) {
-        dataPropertyAssertions.push({
-          propertyIri: t.predicate,
-          value: obj.value,
-          lang: obj.lang,
-          datatype: obj.datatype,
-        });
+      objectPropertyAssertions.push({ propertyIri: t.predicate, targetIri: t.object.value });
+      continue;
+    }
+
+    // A declaration provides an unambiguous classification. Keep the existing
+    // annotation fallback for undeclared predicates (including imported terms).
+    if (!checkedPredicates.has(t.predicate)) {
+      checkedPredicates.add(t.predicate);
+      const declaration = parseBlockTriples(source, t.predicate) ?? [];
+      const types = extractIris(declaration, RDF_TYPE);
+      if (types.includes(OWL_DATATYPE_PROPERTY) && !types.includes(OWL_ANNOTATION_PROPERTY)) {
+        dataPropertyIris.add(t.predicate);
       }
     }
-  }
-
-  // For annotations, we need to separate literal predicates that are "annotation-like"
-  // from data property assertions. We consider predicates from known annotation vocabularies
-  // as annotations, and everything else as property assertions.
-  const knownAnnotationPrefixes = [
-    "http://www.w3.org/2004/02/skos/core#",
-    "http://purl.org/dc/elements/1.1/",
-    "http://purl.org/dc/terms/",
-  ];
-
-  const annotationTriples: ParsedTriple[] = [];
-  const pureDataAssertions: PropertyAssertion[] = [];
-
-  for (const da of dataPropertyAssertions) {
-    const isAnnotation = knownAnnotationPrefixes.some((p) => da.propertyIri.startsWith(p));
-    if (isAnnotation) {
-      annotationTriples.push({
-        predicate: da.propertyIri,
-        object: { type: "literal", value: da.value || "", lang: da.lang, datatype: da.datatype },
-      });
-    } else {
-      pureDataAssertions.push(da);
-    }
+    if (!dataPropertyIris.has(t.predicate)) continue;
+    dataPropertyAssertions.push(t.object.type === "boolean" ? {
+      propertyIri: t.predicate,
+      value: String(t.object.value),
+      datatype: "http://www.w3.org/2001/XMLSchema#boolean",
+    } : {
+      propertyIri: t.predicate,
+      value: t.object.value,
+      lang: t.object.lang,
+      datatype: t.object.datatype,
+    });
   }
 
   return {
     labels: extractLiterals(triples, LABEL_IRI),
     comments: extractLiterals(triples, COMMENT_IRI),
     definitions: extractLiterals(triples, DEFINITION_IRI),
-    annotations: [
-      ...groupAnnotations(triples, INDIVIDUAL_METADATA_IRIS),
-      // Remove duplicates from annotationTriples that groupAnnotations already caught
-    ].filter((a, i, arr) => arr.findIndex((b) => b.property_iri === a.property_iri) === i),
+    annotations: groupAnnotations(triples, new Set([...INDIVIDUAL_METADATA_IRIS, ...dataPropertyIris])),
     typeIris,
     sameAsIris: extractIris(triples, OWL_SAME_AS),
     differentFromIris: extractIris(triples, OWL_DIFFERENT_FROM),
     deprecated: isDeprecated(triples),
     objectPropertyAssertions,
-    dataPropertyAssertions: pureDataAssertions,
+    dataPropertyAssertions,
     seeAlsoIris: extractIris(triples, SEE_ALSO_IRI),
     isDefinedByIris: extractIris(triples, IS_DEFINED_BY_IRI),
   };

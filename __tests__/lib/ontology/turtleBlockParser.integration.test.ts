@@ -31,8 +31,8 @@ describe("Turtle literal and declaration integration", () => {
     expect(parseObject("'bonjour'@fr-CA")).toEqual({ type: "literal", value: "bonjour", lang: "fr-CA" });
   });
 
-  it("reads bare integers as lexical values", () => {
-    expect(parseObject("42")).toEqual({ type: "literal", value: "42" });
+  it("reads bare integers with their lexical value and implicit datatype", () => {
+    expect(parseObject("42")).toEqual({ type: "literal", value: "42", datatype: "http://www.w3.org/2001/XMLSchema#integer" });
   });
 
   it("ignores comments between predicates while retaining hash characters in literals", () => {

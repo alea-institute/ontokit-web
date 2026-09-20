@@ -151,6 +151,14 @@ function tokenizeBlock(text: string): string[] {
       continue;
     }
 
+    // Read numeric tokens before punctuation so decimal points stay in the value.
+    const numeric = /^[+-]?(?:(?:[0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)[eE][+-]?[0-9]+|[0-9]*\.[0-9]+|[0-9]+)(?=$|[\s;,\]().#])/.exec(text.slice(i));
+    if (numeric) {
+      tokens.push(numeric[0]);
+      i += numeric[0].length;
+      continue;
+    }
+
     // Statement terminators
     if (c === ";") { tokens.push(";"); i++; continue; }
     if (c === ",") { tokens.push(","); i++; continue; }
@@ -323,8 +331,12 @@ export function parseBlockTriples(
       } else if (tok.startsWith("<") || tok.includes(":")) {
         obj = { type: "iri", value: resolveIri(tok, prefixes, base) };
       } else {
-        // Bare number or unrecognized
-        obj = { type: "literal", value: tok };
+        const numericType = /^[+-]?[0-9]+$/.test(tok) ? "integer"
+          : /^[+-]?[0-9]*\.[0-9]+$/.test(tok) ? "decimal"
+          : /^[+-]?(?:[0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)[eE][+-]?[0-9]+$/.test(tok) ? "double" : null;
+        obj = numericType
+          ? { type: "literal", value: tok, datatype: `http://www.w3.org/2001/XMLSchema#${numericType}` }
+          : { type: "literal", value: tok };
       }
 
       triples.push({ predicate: currentPredicate, object: obj });

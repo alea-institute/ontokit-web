@@ -255,16 +255,16 @@ describe("individual panel real editing chain", () => {
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => {
       const draft = useDraftStore.getState().getDraft(key);
-      expect(draft?.entityType === "individual" && draft.dataPropertyAssertions).toEqual([{ propertyIri: ns + "nickname", value: "Ami", lang: "fr" }]);
+      expect(draft?.entityType === "individual" && draft.dataPropertyAssertions).toEqual([expect.objectContaining({ propertyIri: ns + "age", value: "42" }), { propertyIri: ns + "nickname", value: "Ami", lang: "fr" }]);
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText("Saved");
-    expect(onUpdateIndividual.mock.calls[0][1].dataPropertyAssertions).toEqual([{ propertyIri: ns + "nickname", value: "Ami", lang: "fr" }]);
+    expect(onUpdateIndividual.mock.calls[0][1].dataPropertyAssertions).toEqual([expect.objectContaining({ propertyIri: ns + "age", value: "42" }), { propertyIri: ns + "nickname", value: "Ami", lang: "fr" }]);
     fireEvent.click(within(screen.getByText("Ami").parentElement!).getByTitle("Remove"));
     await screen.findByText("Draft saved");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await screen.findByText("Saved");
-    expect(onUpdateIndividual.mock.calls[1][1].dataPropertyAssertions).toEqual([]);
+    expect(onUpdateIndividual.mock.calls[1][1].dataPropertyAssertions).toEqual([expect.objectContaining({ propertyIri: ns + "age", value: "42" })]);
   });
 
 });
