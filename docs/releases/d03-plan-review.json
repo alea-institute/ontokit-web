@@ -1,0 +1,366 @@
+{
+  "document": "docs/plans/2026-09-20-0731-fix-configured-provider-image-plan.md",
+  "sha256": "b4e21ba883cd1a0ab7b535b78d9bc9137dd6c4702353358ee4442d254fc6a852",
+  "date": "2026-09-20",
+  "mode": "non-interactive",
+  "status": "complete",
+  "confidence": {
+    "depth": "standard",
+    "risk": "authentication and public deployment contract",
+    "targeted_sections": [
+      "Key Technical Decisions",
+      "Verification and runtime risks"
+    ],
+    "targeted_pass": "clean",
+    "source_checks": [
+      "Next 16.3.1 instrumentation skipped during production build and awaited during runtime initialization",
+      "Auth.js 5.0.0-beta.32 lazy initializer defers config creation",
+      "Next startup Ready log precedes initialization; HTTP and exit code are required oracles"
+    ]
+  },
+  "coverage": [
+    {
+      "reviewer": "coherence",
+      "status": "complete",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "feasibility",
+      "status": "complete",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "security-lens",
+      "status": "complete",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "adversarial",
+      "status": "complete",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "design-lens",
+      "status": "complete",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "scope-guardian",
+      "status": "complete",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    },
+    {
+      "reviewer": "feasibility-independent-followup",
+      "status": "complete",
+      "findings": [],
+      "residual_risks": [],
+      "deferred_questions": []
+    }
+  ],
+  "cross_model": {
+    "route": "claude",
+    "requested_model": "claude-opus-5",
+    "effort": "high",
+    "authorization": "Explicit user standing permission on 2026-09-20; tool-less provider calls approved",
+    "jobs": [
+      "20260920T123245Z-99e91371",
+      "20260920T123258Z-338da808",
+      "20260920T123300Z-33143a6e"
+    ],
+    "results": [
+      {
+        "reviewer": "security-lens-claude",
+        "cross_model_route": "claude",
+        "cross_model_target": "claude",
+        "cross_model_harness": "claude",
+        "serving_family": "claude",
+        "independence_verified": true,
+        "model_requested": "claude-opus-5",
+        "model_actual": "claude-opus-5",
+        "effort_requested": "high",
+        "findings": [
+          {
+            "title": "No runtime check that deployed settings match baked public config",
+            "severity": "P2",
+            "section": "R2 \u2014 build-vs-runtime public configuration match (Product Contract, Requirements)",
+            "why_it_matters": "R2 (the rule that deployed runtime settings must match the image's baked public configuration) is stated as a must but no unit enforces it in a deployed container, so a stale or wrong issuer/client ID baked at build time is undetectable until users are redirected to the wrong identity provider and logins fail. U3's smoke harness only compares served assets against build inputs it supplied itself, so the mismatch case is never exercised. KTD3 (public settings frozen at build) makes this drift a normal operational hazard because operators must rebuild whenever public settings change. An instrumentation-time equality assertion is cheap, fits the fail-closed startup path U1 already introduces, and turns a silent misconfiguration into a startup failure.",
+            "finding_type": "omission",
+            "autofix_class": "gated_auto",
+            "suggested_fix": "In U1's instrumentation validation, add a startup assertion that the runtime issuer and client ID equal the values compiled into the image's public configuration and fail startup on mismatch, with a U1 test scenario covering the mismatch case; reference this check under R2 so the requirement has an owning mechanism rather than relying on the deployment contract alone.",
+            "confidence": 50,
+            "evidence": [
+              "R2. Browser assets retain the build's authentication mode, issuer, provider availability and API/WebSocket settings; deployed runtime settings must match that public configuration.",
+              "The existing deployment contract supplies matching public build settings and runtime settings; D02 verifies the actual environment.",
+              "Served client assets reflect configured mode/issuer/API/WS and provider availability; server provider configuration agrees with the build inputs."
+            ]
+          },
+          {
+            "title": "Startup validation failures may print credential values to logs",
+            "severity": "P2",
+            "section": "U1 \u2014 Separate build imports from validated runtime auth (and R3, the secret-exclusion requirement)",
+            "why_it_matters": "The new Node instrumentation validates the provider secret and session secret at startup and reports failures, but nothing constrains what that failure output contains, so a schema error that echoes the received value writes credential material into container logs and into CI output for U3's deliberately-failing startup runs. R3 enumerates build inputs, image layers, browser assets and verification artifacts as the no-secret surfaces and omits logs entirely, so no gate would catch the leak. Constraining validation errors to variable names closes the gap at the one place the plan newly introduces credential-aware error reporting.",
+            "finding_type": "omission",
+            "autofix_class": "gated_auto",
+            "suggested_fix": "State in U1's Approach that environment validation failures report only the names of missing or invalid variables and never their values, extend R3's exclusion surface to include container and CI logs, and add a U1 test scenario asserting that a failed required-mode validation message contains no credential value.",
+            "confidence": 50,
+            "evidence": [
+              "R3. Secrets and private environment files remain excluded from Docker build inputs, image layers, browser assets and verification artifacts.",
+              "Node instrumentation rejects missing issuer, ID, provider secret or session secret in required mode, and either missing secret in configured optional mode.",
+              "Required image fails startup without each required runtime secret independently"
+            ]
+          }
+        ],
+        "residual_risks": [
+          "The fail-closed guarantee after removing import-time validation rests on two layers only \u2014 Node instrumentation at startup (KTD2) and the lazy Auth.js factory (KTD1). The plan states non-Node instrumentation must not import the Node-only validation, so any Edge-runtime code path that reads authentication settings directly would run unvalidated; U3's container startup gate is what keeps this from being reachable, and that gate must remain a hard publication blocker.",
+          "Caching a successful production validation snapshot means rotated provider or session secrets take effect only after a process restart. That is a deliberate choice in the plan, but the plan does not record it, so operators may assume rotation is live."
+        ],
+        "deferred_questions": [
+          "Where do U3's synthetic runtime secrets originate, and what prevents the configured-image gate from being run in CI with real provider or session credentials?",
+          "Does the release workflow's new configured-image gate run in any context reachable by untrusted contributors, and if so what registry or repository credentials are exposed to the smoke step?"
+        ]
+      },
+      {
+        "reviewer": "whole-doc-claude",
+        "cross_model_route": "claude",
+        "cross_model_target": "claude",
+        "cross_model_harness": "claude",
+        "serving_family": "claude",
+        "independence_verified": true,
+        "model_requested": "claude-opus-5",
+        "model_actual": "claude-opus-5",
+        "effort_requested": "high",
+        "findings": [
+          {
+            "title": "Focused Vitest gate omits U3 though U3 edits a Vitest file",
+            "severity": "P3",
+            "section": "Verification Contract (gate table) vs U3 - Gate configured images on runtime smoke evidence",
+            "why_it_matters": "An implementer finishing U3 (the smoke-harness/CI gate unit) will read the gate table as saying the focused Vitest run does not apply to their unit, yet U3's Files list names `__tests__/config/docker-release-fidelity.test.ts`, so the fidelity test edited in U3 has no focused gate until the full-suite run on the integrated change. The mismatch is mechanical: the Vitest row says `U1\u2013U2` while U3 lists a Vitest file. Extending the row to `U1\u2013U3` aligns the Verification Contract with the Implementation Units.",
+            "finding_type": "error",
+            "autofix_class": "gated_auto",
+            "suggested_fix": "In the Verification Contract table, change the `Focused Vitest run of named test files` row's `Applies to` value from `U1\u2013U2` to `U1\u2013U3`.",
+            "confidence": 75,
+            "evidence": [
+              "| Focused Vitest run of named test files | U1\u2013U2 | Auth modes, startup validation, cache semantics and callback/session regressions pass |",
+              "**Files:** New `scripts/verify-auth-image.sh` or equivalent focused repository smoke harness; `.github/workflows/release.yml`; `__tests__/config/docker-release-fidelity.test.ts`"
+            ]
+          },
+          {
+            "title": "U2 runtime canary check needs the U3 smoke harness",
+            "severity": "P3",
+            "section": "U2 - Build the intended public provider configuration, test scenario 4",
+            "why_it_matters": "U2 is a build-only unit (its verification is that images build and static inspection passes), but scenario 4 asks that synthetic runtime canary secrets not appear in `client responses`, which requires starting the container with runtime secrets \u2014 the harness that U3 introduces and that depends on U2. An implementer either spins up an ad-hoc container that U3 then re-implements, or skips the check. Moving the served-response half of the canary check into U3 scenario 3 (which already inspects served client assets) keeps U2 static and puts the runtime assertion where the harness exists; U2 retains the image-history/compiled-asset inspection.",
+            "finding_type": "error",
+            "autofix_class": "gated_auto",
+            "suggested_fix": "In U2 scenario 4, keep: `Image metadata/history and compiled client assets contain no private build credentials.` Move the clause `synthetic runtime canary secrets do not appear in client responses/assets` into U3 scenario 3, e.g. append: `Synthetic runtime canary secrets supplied to the container do not appear in served client responses or assets.`",
+            "confidence": 75,
+            "evidence": [
+              "4. Image metadata/history and compiled client assets contain no private build credentials; synthetic runtime canary secrets do not appear in client responses/assets.",
+              "**Verification:** Both configured-provider and generic optional images build successfully; inspection confirms the public values and existing exclusion rules.",
+              "**Dependencies:** U1, U2."
+            ]
+          },
+          {
+            "title": "R2 'deployed runtime settings' reads as a DEV claim D03 disclaims",
+            "severity": "P3",
+            "section": "Product Contract - Requirements R2 (browser/runtime configuration agreement)",
+            "why_it_matters": "Readers can take R2's second clause as a requirement that the actual deployed environment's runtime settings match the build, but Scope Boundaries say D03 does not establish DEV acceptance and Assumptions hand environment verification to D02; within D03 the only place agreement is checked is the smoke container (U3 scenario 3). Naming the smoke-verified container as the subject of that clause keeps R2 verifiable by the D03 gates and avoids a later reviewer treating D03 evidence as proof of DEV configuration fidelity.",
+            "finding_type": "error",
+            "autofix_class": "gated_auto",
+            "suggested_fix": "Rewrite R2 as: `R2. Browser assets retain the build's authentication mode, issuer, provider availability and API/WebSocket settings; the server's runtime provider configuration in the verified container must agree with that public configuration (actual DEV environment agreement is D02's responsibility).`",
+            "confidence": 50,
+            "evidence": [
+              "R2. Browser assets retain the build's authentication mode, issuer, provider availability and API/WebSocket settings; deployed runtime settings must match that public configuration.",
+              "It does not establish actual login, provider reachability, credential validity or DEV acceptance.",
+              "The existing deployment contract supplies matching public build settings and runtime settings; D02 verifies the actual environment."
+            ]
+          }
+        ],
+        "residual_risks": [
+          "AE2 and U3 scenario 1 require the container to exit unsuccessfully when instrumentation validation fails, but the plan does not confirm that the Next 16.3.1 standalone `server.js` propagates a thrown `register()` error to a nonzero process exit; if the server logs and keeps a listener open, the harness's HTTP-unavailability check must be the deciding signal rather than exit status.",
+          "KTD1 assumes only import-time validation reaches the build; any page or route that invokes the lazy Auth.js factory during `next build` static prerendering (rather than bailing to dynamic rendering first) would still trigger runtime validation without secrets and reproduce the D01 build failure.",
+          "U3 verifies runtime/build public-configuration agreement only for the matching synthetic case; a runtime issuer/client ID that is present but different from the build inputs passes strict validation and silently disagrees with the frozen browser assets, which R2 requires to match."
+        ],
+        "deferred_questions": []
+      },
+      {
+        "reviewer": "adversarial-claude",
+        "cross_model_route": "claude",
+        "cross_model_target": "claude",
+        "cross_model_harness": "claude",
+        "serving_family": "claude",
+        "independence_verified": true,
+        "model_requested": "claude-opus-5",
+        "model_actual": "claude-opus-5",
+        "effort_requested": "high",
+        "findings": [
+          {
+            "title": "R2 runtime-match clause is assumed, never enforced",
+            "severity": "P2",
+            "section": "Product Contract \u2014 Requirements (R2, browser/runtime settings agreement) and Planning Contract \u2014 Assumptions",
+            "why_it_matters": "A deployment that starts the image with a runtime mode, issuer or client ID different from the ones compiled into the browser bundle will silently run with the browser showing one authentication posture (e.g. provider button present, required mode) while the server enforces another (e.g. optional with empty provider list) \u2014 and nothing in D03 detects it. R2 states runtime settings 'must match' the public configuration, but the Planning Contract converts that into an assumption ('the existing deployment contract supplies matching public build settings and runtime settings; D02 verifies') and U3 only checks agreement in a harness where the two are equal by construction. Because Next inlines NEXT_PUBLIC_* values into the server bundle as well, the instrumentation validation added by KTD2 (server-init validation) already has both sides available and can fail startup on drift, turning R2 from a hope into a gate.",
+            "finding_type": "omission",
+            "autofix_class": "gated_auto",
+            "suggested_fix": "Extend KTD2 and U1: the Node instrumentation validation also compares the build-inlined public auth mode, issuer and client ID against the runtime-supplied server values and fails startup on any mismatch. Add a U1 test scenario (mismatched runtime mode/issuer rejected at startup) and a U3 smoke case that starts the configured image with a deliberately different runtime issuer and expects a nonzero exit. Reword the Assumptions paragraph so D02 verifies the real environment values rather than being the only place the match is checked.",
+            "confidence": 75,
+            "evidence": [
+              "R2. Browser assets retain the build's authentication mode, issuer, provider availability and API/WebSocket settings; deployed runtime settings must match that public configuration.",
+              "The existing deployment contract supplies matching public build settings and runtime settings; D02 verifies the actual environment.",
+              "Served client assets reflect configured mode/issuer/API/WS and provider availability; server provider configuration agrees with the build inputs."
+            ]
+          },
+          {
+            "title": "No gate that Dockerfile ARG names match Compose build args",
+            "severity": "P1",
+            "section": "U2 \u2014 Build the intended public provider configuration (test scenarios) and Planning Contract \u2014 KTD3 (public settings as build inputs)",
+            "why_it_matters": "AE1 can pass in CI with synthetic arguments using whatever ARG names the implementer declares, while `deploy/compose.dev.yaml` in the API repository keeps supplying differently named build arguments that the Dockerfile ignores \u2014 which is exactly the defect the Problem Frame describes ('the Dockerfile ignores the public provider arguments already supplied by DEV Compose'). The plan pins the API revision that defines those arguments but no unit or acceptance example asserts that the new builder-stage ARG names equal the names Compose passes, so the original failure can recur unchanged at DEV with every D03 gate green. The existing `docker-release-fidelity` test already pins publication arguments to the Dockerfile; the same pattern closes this cross-repository seam.",
+            "finding_type": "omission",
+            "autofix_class": "gated_auto",
+            "suggested_fix": "Add a U2 test scenario: the Dockerfile's public provider ARG names (issuer, client ID, API/WS endpoints, mode) equal the exact build-arg names supplied by `deploy/compose.dev.yaml` at API revision 24242ea0\u2026, with the expected names recorded as a constant in `docker-release-fidelity.test.ts` alongside a comment citing that revision. Make AE1's synthetic build use those same names so the acceptance evidence exercises the real contract.",
+            "confidence": 75,
+            "evidence": [
+              "the Dockerfile ignores the public provider arguments already supplied by DEV Compose",
+              "Declare issuer/client ID arguments in the Docker builder stage alongside existing public endpoint arguments.",
+              "OntoKit API revision `24242ea04114ea5a757ca34462d92795a557f4a8`, `deploy/compose.dev.yaml`: public provider build arguments and separate runtime environment. No API edit is needed for D03."
+            ]
+          },
+          {
+            "title": "Verified configured image is never the deployable artifact",
+            "severity": "P2",
+            "section": "Planning Contract \u2014 KTD3 (public settings frozen at build) and KTD4 (non-publishing configured-image gate); U3 evidence recording",
+            "why_it_matters": "Because KTD3 bakes issuer and client ID into the image and KTD4 deliberately does not publish the configured image, the artifact D03 smoke-tests (synthetic issuer, ephemeral digest) is by construction not the artifact any environment will run; every environment with its own Zitadel issuer/client ID must rebuild from source at deploy time. U3 then records an 'image digest' in durable evidence that no deployment can ever match, and D02's 'immutable release pairing' has nothing immutable to pair against for the authenticated web image \u2014 build-once-promote-many is ruled out without the plan saying so. This is a foundational decision with high reversal cost (CI, evidence format and D02 all build on it), and the document neither names the consequence nor the rejected alternative (runtime-served public configuration, or publishing per-environment configured images).",
+            "finding_type": "omission",
+            "autofix_class": "manual",
+            "suggested_fix": "Decide and record in KTD3/KTD4 whether configured images are published per environment (so the CI-verified digest is what D02 deploys) or whether D03 evidence pairs by source revision plus the exact public build-arg set only; in the latter case drop 'image digest' from the U3 evidence contract and state explicitly that per-environment images are rebuilt and that build-once promotion is out of scope for B14.",
+            "confidence": 75,
+            "evidence": [
+              "Add a non-publishing configured-provider image check, including startup rejection and provider discovery, as a dependency of image publication (R6).",
+              "operators rebuild when public settings change (R2\u2013R3)",
+              "Load the non-pushed image for runtime checks. Record full source revision, image digest, exact nonsecret settings",
+              "D02 handles immutable release pairing, activation and live persona/OIDC acceptance."
+            ]
+          },
+          {
+            "title": "Startup exit relies on undocumented register() error handling",
+            "severity": "P2",
+            "section": "Planning Contract \u2014 KTD2 (validate at server initialization via instrumentation.ts)",
+            "why_it_matters": "AE2 requires that a misconfigured container 'exits unsuccessfully', but KTD2 obtains that outcome only if Next turns a rejection from `register()` into process termination \u2014 behaviour the linked instrumentation docs do not specify and which the plan already observes to be version-sensitive (the 'Ready' line printing before initialization completes). If the installed or a future Next instead logs the error and keeps the listener open returning 500s, the container stays 'running' for Compose/healthchecks, R4's rejection degrades to a request-time failure, and the U3 negative case fails late in the pipeline with a framework-behaviour root cause. Terminating explicitly inside the instrumentation removes the dependency on framework propagation and makes the negative smoke case deterministic.",
+            "finding_type": "omission",
+            "autofix_class": "gated_auto",
+            "suggested_fix": "Amend KTD2: on validation failure the Node-runtime branch of `instrumentation.ts` logs the schema errors and calls `process.exit(1)` itself rather than relying on Next to propagate the thrown error; add a U1 instrumentation test asserting the exit path is invoked on failure and not on success.",
+            "confidence": 50,
+            "evidence": [
+              "Next's runtime initialization awaits registration; installed Next 16.3.1 skips registration during production build. This preserves R4's startup rejection while allowing build imports. Do not depend on the printed \u201cReady\u201d line: installed Next prints it before initialization completes.",
+              "AE2. Covers R4. Starting that image without either runtime secret exits unsuccessfully and does not serve a successful application response."
+            ]
+          }
+        ],
+        "residual_risks": [
+          "KTD1 depends on a pre-release Auth.js (5.0.0-beta.32) lazy-initializer API; a beta bump before D02 could change factory signature or callback timing and silently invalidate the U1 runtime-initialization tests that replace the eager `authConfig` consumers.",
+          "The instrumentation gate only runs when the standalone Next server starts; any future path that serves the authentication route outside that process (custom server, Edge-only middleware calling `auth()`) inherits only the lazy Auth.js validation and loses startup rejection."
+        ],
+        "deferred_questions": [
+          "Do the target environments (DEV, any staging, production) use distinct Zitadel issuers/client IDs? If so, D02 must decide whether it deploys per-environment configured images or requires runtime-served public configuration, since KTD3 makes a single promoted web image impossible.",
+          "Does D02's 'immutable release pairing' expect to pair a CI-published web image digest? If yes, the KTD4 non-publishing gate must be revisited before D03 evidence is treated as pairing input."
+        ]
+      }
+    ],
+    "status": "complete",
+    "served_model": "claude-opus-5",
+    "independence_verified": true
+  },
+  "fixes_applied": 0,
+  "proposed_fixes_count": 0,
+  "decisions_count": 0,
+  "fyi_count": 0,
+  "dispositions": [
+    {
+      "source": "security-lens-claude",
+      "title": "No runtime check that deployed settings match baked public config",
+      "disposition": "dismissed",
+      "reason": "R2 establishes the matching deployment contract, assumptions assign actual environment verification to D02, and U3 checks matching image/runtime configuration. Automatic rejection of every mismatch is additional policy, not needed to repair the observed build defect."
+    },
+    {
+      "source": "security-lens-claude",
+      "title": "Startup validation failures may print credential values to logs",
+      "disposition": "dismissed",
+      "reason": "Existing lib/env.ts constructs failures from variable names and Zod messages, not environment values; U1 explicitly preserves that schema. No new credential-echo path is demonstrated."
+    },
+    {
+      "source": "whole-doc-claude",
+      "title": "Focused Vitest gate omits U3 though U3 edits a Vitest file",
+      "disposition": "dismissed",
+      "reason": "Integrated full-suite verification covers all modified tests and U3 explicitly verifies CI publication behavior. Extending the focused-run table would add a useful convenience, but omission cannot allow the fidelity test to escape required verification; independent local followup also found no consequential defect."
+    },
+    {
+      "source": "whole-doc-claude",
+      "title": "U2 runtime canary check needs the U3 smoke harness",
+      "disposition": "dismissed",
+      "reason": "U2 may inspect a built container directly; the plan does not prohibit this or make its checks depend on a not-yet-existing harness. U3 makes the same evidence repeatable in CI. Independent local execution-order review found no execution-blocking dependency."
+    },
+    {
+      "source": "whole-doc-claude",
+      "title": "R2 'deployed runtime settings' reads as a DEV claim D03 disclaims",
+      "disposition": "dismissed",
+      "reason": "The scope, assumptions, U3 verification and final verification paragraph consistently reserve live DEV agreement for D02. R2 is a deployment constraint, not a claim D03 deployed anything."
+    },
+    {
+      "source": "adversarial-claude",
+      "title": "R2 runtime-match clause is assumed, never enforced",
+      "disposition": "dismissed",
+      "reason": "Same deployment-contract proposal as security-lens. The plan intentionally preserves immutable build settings and requires matching deployment inputs; U3 checks the supported pair and D02 verifies actual environment agreement. Runtime mismatch rejection is an additional mechanism, not an omitted repair prerequisite."
+    },
+    {
+      "source": "adversarial-claude",
+      "title": "No gate that Dockerfile ARG names match Compose build args",
+      "disposition": "dismissed",
+      "reason": "KTD3 names the existing Docker/Next configuration contract and the Sources pin the exact API Compose revision. A competent implementer must use those existing names to implement that instruction; inventing different names would violate the cited contract. An extra source-text constant test is not necessary to make the plan executable."
+    },
+    {
+      "source": "adversarial-claude",
+      "title": "Verified configured image is never the deployable artifact",
+      "disposition": "dismissed",
+      "reason": "D03 explicitly uses synthetic public settings and disclaims actual deployment. D01 readiness already defines immutable release pairing by full fetchable source SHAs and separately requires D02 running image digest evidence. Recording the local smoke image digest is truthful reproducibility evidence, not a promise to deploy it. Removing that digest would weaken provenance."
+    },
+    {
+      "source": "adversarial-claude",
+      "title": "Startup exit relies on undocumented register() error handling",
+      "disposition": "dismissed",
+      "reason": "Installed Next source was independently verified: start-server.js catches initialization errors and calls process.exit(1). The plan names the installed version and requires real negative container verification. Future changed framework behavior is caught by that gate; forced process exit inside instrumentation is unnecessary."
+    }
+  ],
+  "residual_dispositions": [
+    {
+      "source": "security-lens-claude",
+      "reason": "No Edge authentication entry exists in this scope; Node-gated instrumentation plus auth factory cover current paths. Snapshot/restart behavior is explicitly preserved, not introduced. Synthetic credentials and least-privilege CI follow existing workflow and U3; no real credential exposure is proposed."
+    },
+    {
+      "source": "whole-doc-claude",
+      "reason": "Installed start-server.js catches initialization errors and exits 1. Current auth import is only the API route handler, not prerendered pages. Config mismatch concern duplicates the dismissed R2 proposal."
+    },
+    {
+      "source": "adversarial-claude",
+      "reason": "Future dependency or hosting changes are outside D03; current lockfile/source and real container gates cover the chosen environment. Public settings are explicitly per build, and D01/D02 already pair immutable source revisions then record the actual runtime digest. No essential input remains unresolved."
+    }
+  ],
+  "resolved_result": {
+    "fixes_applied": 0,
+    "proposed_fixes_count": 0,
+    "decisions_count": 0,
+    "fyi_count": 0,
+    "residual_concerns": [],
+    "deferred_questions": [],
+    "summary": "Review complete; no consequential defect retained after checking source and existing release contracts."
+  }
+}
