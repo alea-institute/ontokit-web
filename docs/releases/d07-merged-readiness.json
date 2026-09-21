@@ -1,0 +1,148 @@
+{
+  "headRefOid": "c7992100dd8c2d341d0e22497115b7868ddb3621",
+  "mergeCommit": {
+    "oid": "13ad2f35d55196274c5fec313bfb254a7cc80226"
+  },
+  "mergedAt": "2026-09-21T00:19:52Z",
+  "state": "MERGED",
+  "statusCheckRollup": [
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:14:20Z",
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047781/job/106174718895",
+      "name": "auto-merge",
+      "startedAt": "2026-09-21T00:14:21Z",
+      "status": "COMPLETED",
+      "workflowName": "Auto-merge Dependabot PRs"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:14:21Z",
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547048234/job/106174737298",
+      "name": "scan-pr",
+      "startedAt": "2026-09-21T00:14:27Z",
+      "status": "COMPLETED",
+      "workflowName": "OSV-Scanner"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:15:56Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047806/job/106174718070",
+      "name": "lint",
+      "startedAt": "2026-09-21T00:14:22Z",
+      "status": "COMPLETED",
+      "workflowName": "Distribution"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:15:01Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047780/job/106174717968",
+      "name": "Static analysis",
+      "startedAt": "2026-09-21T00:14:22Z",
+      "status": "COMPLETED",
+      "workflowName": "Semgrep"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:14:21Z",
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547048234/job/106174746300",
+      "name": "scan-full",
+      "startedAt": "2026-09-21T00:14:31Z",
+      "status": "COMPLETED",
+      "workflowName": "OSV-Scanner"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:15:10Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047806/job/106174718118",
+      "name": "pyright",
+      "startedAt": "2026-09-21T00:14:23Z",
+      "status": "COMPLETED",
+      "workflowName": "Distribution"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:16:27Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047806/job/106174717928",
+      "name": "test",
+      "startedAt": "2026-09-21T00:14:23Z",
+      "status": "COMPLETED",
+      "workflowName": "Distribution"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:14:32Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047806/job/106174718153",
+      "name": "build",
+      "startedAt": "2026-09-21T00:14:22Z",
+      "status": "COMPLETED",
+      "workflowName": "Distribution"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:19:22Z",
+      "conclusion": "SUCCESS",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047806/job/106174718164",
+      "name": "docker_preflight",
+      "startedAt": "2026-09-21T00:14:22Z",
+      "status": "COMPLETED",
+      "workflowName": "Distribution"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:19:22Z",
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047806/job/106175497627",
+      "name": "publish_docker",
+      "startedAt": "2026-09-21T00:19:23Z",
+      "status": "COMPLETED",
+      "workflowName": "Distribution"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:19:22Z",
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047806/job/106175497890",
+      "name": "publish_pypi",
+      "startedAt": "2026-09-21T00:19:23Z",
+      "status": "COMPLETED",
+      "workflowName": "Distribution"
+    },
+    {
+      "__typename": "CheckRun",
+      "completedAt": "2026-09-21T00:19:22Z",
+      "conclusion": "SKIPPED",
+      "detailsUrl": "https://github.com/alea-institute/ontokit-api/actions/runs/35547047806/job/106175497852",
+      "name": "publish_github",
+      "startedAt": "2026-09-21T00:19:23Z",
+      "status": "COMPLETED",
+      "workflowName": "Distribution"
+    }
+  ],
+  "url": "https://github.com/alea-institute/ontokit-api/pull/51",
+  "local_verification": {
+    "full_suite_passed": 3478,
+    "skipped": 0,
+    "coverage_percent": 90,
+    "after_test_only_simplification_affected_passed": 94,
+    "static_checks": "Ruff/format/mypy/pyright pass",
+    "owned_resource_cleanup": "complete; preexisting resources preserved"
+  },
+  "review": {
+    "run_id": "d07-schema-mint-20260920",
+    "requirements_met": 6,
+    "runtime_findings": 0,
+    "documentation_findings_corrected": 1,
+    "receipt": "https://github.com/alea-institute/ontokit-api/blob/13ad2f35d55196274c5fec313bfb254a7cc80226/docs/releases/d07-review-resolution.json"
+  },
+  "deployment": "Not performed; D02 hosted identity access remains blocked.",
+  "remaining_scope": "B14 namespace/untyped policy, historical branch reconciliation and other ledger seams remain open. B11-B13 remain separate."
+}
