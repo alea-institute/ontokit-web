@@ -28,10 +28,10 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**D02: hosted identity authority pending. D06 is merged. D07: implement the reviewed B14 schema-mint authorization plan.**
+**D02: hosted identity authority pending. D06 is merged. D07: API PR51 published; CI and merge pending.**
 
 - D06 completed U1–U6 and merged through [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49) as `83eaf9574315b71a165b80370dd964572d2ccac9` after all eight verification checks passed. One CI assertion finding was repaired; two final fresh runs passed all 21 mandatory tests with identical source fingerprints, complete cleanup and preserved neighboring resources. [Merged evidence](../releases/d06-merged-readiness.json) and [local acceptance](../releases/d06-full-stack-readiness.md) preserve the limits. No deployment occurred. B10 is accepted as a local regression foundation; B11–B13 remain open.
-- D07 research is underway in `.worktrees/api-d07-schema-mint`, branch `fix/d07-schema-mint-20260920`, based on merged API `d9272cc8`. Close the three-type schema authorization gap retained by D04 (`owl:DeprecatedClass`, `owl:DeprecatedProperty`, `rdfs:ContainerMembershipProperty`), preserving existing-entity edit compatibility and submission billing/caps. The reviewed API plan is `docs/plans/2026-09-20-1820-fix-schema-mint-authorization-plan.md`, checkpoint `e24864bc`; five local and three Claude document reviews are resolved with no remaining findings. Native ce-work is implementing U1 then U2, beginning with failing recognition regressions.
+- D07 is locally verified and published as [API PR51](https://github.com/alea-institute/ontokit-api/pull/51), head `c7992100dd8c2d341d0e22497115b7868ddb3621`, in `.worktrees/api-d07-schema-mint`. All six requirements and both units passed review. The full API suite passed 3,478 tests with zero skips and 90% coverage; after final test-only simplification, 94 affected integration tests and static checks passed. One documentation rationale was corrected. CI and merge remain pending; no deployment is claimed. [Durable API evidence](https://github.com/alea-institute/ontokit-api/blob/fix/d07-schema-mint-20260920/docs/releases/d07-schema-mint-readiness.md) retains the wider B14 remainder.
 
 - D06's first real probes found a default API Dockerfile defect: the package directory is root-owned `0644`, preventing non-root imports and migrations. [Lifecycle evidence](../releases/d06-lifecycle-readiness.md) records the reproduced failure and successful cleanup. The repair in `.worktrees/api-d06-image` is locally committed as `4d17d949`; its full-image non-root smoke and fresh migrations pass. Image and PR serializer repairs merged through [API PR50](https://github.com/alea-institute/ontokit-api/pull/50) as `d9272cc8` after all six verification checks passed; hosted DEV acceptance remains separate. U1 normal/setup-failure/late-failure/INT/TERM/crash-recovery probes all pass, with no owned leftovers and unchanged neighboring resource identities.
 
@@ -52,7 +52,7 @@ Local verification, publication, deployment and authenticated acceptance remain 
 | Order / ID | Area | Backlog IDs | State | Dependency / next planning boundary |
 |---|---|---|---|---|
 | 1 / A01 | Deliver and validate existing work | B01–B09 | Awaiting hosted identity access | D03–05 and API prerequisites merged; D02 recovery proved; supported DEV administrator authority still required |
-| 2 / A02 | Full-stack proof and integrity | B10–B15 | D07 planning | B10 accepted locally; bounded B14 schema authorization next, with B11–B13 and B15 retained |
+| 2 / A02 | Full-stack proof and integrity | B10–B15 | D07 awaiting CI | B10 accepted locally; bounded B14 schema authorization next, with B11–B13 and B15 retained |
 | 3 / A03 | Ontology batching and reviewer intelligence | B16–B23 | Queued | Verify API contracts; provenance/duplicate comparison can precede shard-dependent review |
 | 4 / A04 | Entity workspace and graph | B24–B27 | Queued | Reconcile historical graph port and current repairs; preserve all eleven Phase17 requirements |
 | 5 / A05 | Ecosystem suggestion import loop | B28–B34 | Queued | Prove one producer-to-reviewed-change pilot before scaling feeder volume |
@@ -98,7 +98,7 @@ This sequence does not require asking again for routine authorized work. Ask whe
 | D02 | B02–03 DEV runtime and persona acceptance | Awaiting identity access | [Reviewed plan](2026-09-20-1323-chore-dev-recovery-acceptance-plan.md) | [Plan review](../releases/d02-plan-review.json): six local and three independent Claude reviews resolved; [Recovery proof](../releases/d02-recovery-receipt.md) passed; hosted admin tokens invalid; local credential also rejected by hosted DEV after authorized validation. Return when supported DEV admin authority is available; no deployment or migration performed |
 
 | D06 | B10 isolated local full-stack foundation | Accepted: local foundation | [Plan](2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) | [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49), merge `83eaf957`; eight CI checks passed, final two runs 21 tests each; [evidence](../releases/d06-merged-readiness.json) |
-| D07 | B14 schema mint authorization | Implementing | API `docs/plans/2026-09-20-1820-fix-schema-mint-authorization-plan.md` | Reviewed checkpoint `e24864bc` in isolated API branch `fix/d07-schema-mint-20260920`; U1 recognition and U2 persisted authorization proof |
+| D07 | B14 schema mint authorization | Locally verified; PR open | [API plan](https://github.com/alea-institute/ontokit-api/blob/fix/d07-schema-mint-20260920/docs/plans/2026-09-20-1820-fix-schema-mint-authorization-plan.md) | [API PR51](https://github.com/alea-institute/ontokit-api/pull/51), head `c7992100`; 3,478 tests plus 94 affected after simplification, review complete; CI/merge pending |
 
 ## Decision record
 
@@ -128,7 +128,7 @@ The catalog owns the full requirement wording and source status. This ledger own
 | B11 | Prove real OIDC login, logout, credential renewal, session expiry, anonymous/optional/required modes, Monaco editing, and save/submit/review/merge | Queued | See catalog; assign a bounded deliverable when reached |
 | B12 | Prove WebSocket authentication, presence, acknowledgments, sync, reconnect after server restart, multi-client behavior, and index notifications | Queued | See catalog; assign a bounded deliverable when reached |
 | B13 | Add browser CI, reproducible seed/cleanup, Chromium/Firefox coverage, failure traces, and frontend/backend response-contract checks | Queued | See catalog; assign a bounded deliverable when reached |
-| B14 | Reconcile known correctness/policy seams before declaring the workflow complete | Partially locally verified | D03 image repair verified; D04/D05 API prerequisites and D02 acceptance remain open |
+| B14 | Reconcile known correctness/policy seams before declaring the workflow complete | Partially integrated | D03 image, D04 individual mint and D05 submission errors merged; D07 three-schema mint repair published in API PR51. Namespace/untyped policy, historical branches, auth-disabled routing, review/self-merge, deployment configuration/drift and D02 hosted acceptance remain to reconcile |
 | B15 | Close demonstrated Turtle representational limits without losing existing source semantics | Queued | See catalog; assign a bounded deliverable when reached |
 | B16 | Organize session changes into ancestor-based shards, max 50/min 3, with miscellaneous and cross-cutting groups and exactly-one-shard membership | Queued | See catalog; assign a bounded deliverable when reached |
 | B17 | Let contributors preview and merge/split/rename/move shard contents with accessible alternatives to dragging | Queued | See catalog; assign a bounded deliverable when reached |
