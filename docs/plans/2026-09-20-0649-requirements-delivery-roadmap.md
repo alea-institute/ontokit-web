@@ -28,11 +28,11 @@ The accepted direction is to work through every area. Alternative storage archit
 
 ## Resume here
 
-**D02: hosted identity authority pending. D06 and D07 are merged. Next: scope B11 authentication lifecycle regression coverage on the D06 foundation.**
+**D02: hosted identity authority pending. D06 and D07 are merged. D08: research B11 authentication lifecycle regression coverage on the D06 foundation.**
 
 - D06 completed U1–U6 and merged through [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49) as `83eaf9574315b71a165b80370dd964572d2ccac9` after all eight verification checks passed. One CI assertion finding was repaired; two final fresh runs passed all 21 mandatory tests with identical source fingerprints, complete cleanup and preserved neighboring resources. [Merged evidence](../releases/d06-merged-readiness.json) and [local acceptance](../releases/d06-full-stack-readiness.md) preserve the limits. No deployment occurred. B10 is accepted as a local regression foundation; B11–B13 remain open.
 - D07 merged through [API PR51](https://github.com/alea-institute/ontokit-api/pull/51) as `13ad2f35d55196274c5fec313bfb254a7cc80226` after all six verification checks passed. All six requirements and both units passed review. The full API suite passed 3,478 tests with zero skips and 90% coverage; after final test-only simplification, 94 affected integration tests and static checks passed. One documentation rationale was corrected. [Merged receipt](../releases/d07-merged-readiness.json) retains the wider B14 remainder. No deployment occurred.
-- Next eligible boundary: B11 authentication lifecycle and auth-mode regression proof using the merged D06 isolated stack. Reconcile existing login/editor/merge tests before drafting a bounded plan; retain the separate suggestion-review chain and B12/B13 work. Hosted credentials are unnecessary for isolated regression coverage.
+- D08 research is active in `.worktrees/web-d08-auth-lifecycle`, branch `test/d08-auth-lifecycle-20260920`, based on merged Web `83eaf957`. Scope B11 authentication lifecycle and auth-mode regression proof using the D06 isolated stack; reconcile existing login/editor/merge tests before drafting a bounded plan. Research must decide whether the mode matrix belongs in this slice or a subsequent bounded plan. The suggestion-review chain and B12/B13 remain separate. Hosted credentials are unnecessary for isolated regression coverage. No implementation has begun.
 
 - D06's first real probes found a default API Dockerfile defect: the package directory is root-owned `0644`, preventing non-root imports and migrations. [Lifecycle evidence](../releases/d06-lifecycle-readiness.md) records the reproduced failure and successful cleanup. The repair in `.worktrees/api-d06-image` is locally committed as `4d17d949`; its full-image non-root smoke and fresh migrations pass. Image and PR serializer repairs merged through [API PR50](https://github.com/alea-institute/ontokit-api/pull/50) as `d9272cc8` after all six verification checks passed; hosted DEV acceptance remains separate. U1 normal/setup-failure/late-failure/INT/TERM/crash-recovery probes all pass, with no owned leftovers and unchanged neighboring resource identities.
 
@@ -100,6 +100,8 @@ This sequence does not require asking again for routine authorized work. Ask whe
 
 | D06 | B10 isolated local full-stack foundation | Accepted: local foundation | [Plan](2026-09-20-1357-feat-isolated-full-stack-tests-plan.md) | [Web PR49](https://github.com/alea-institute/ontokit-web/pull/49), merge `83eaf957`; eight CI checks passed, final two runs 21 tests each; [evidence](../releases/d06-merged-readiness.json) |
 | D07 | B14 schema mint authorization | Integrated | [API plan](https://github.com/alea-institute/ontokit-api/blob/fix/d07-schema-mint-20260920/docs/plans/2026-09-20-1820-fix-schema-mint-authorization-plan.md) | [API PR51](https://github.com/alea-institute/ontokit-api/pull/51), merge `13ad2f35`; six CI successes, 3,478 local tests plus 94 affected after simplification; [receipt](../releases/d07-merged-readiness.json) |
+
+| D08 | B11 authentication lifecycle regression proof | Scoping | Not yet written | Isolated Web branch `test/d08-auth-lifecycle-20260920`; read-only research of existing D06 proof, current auth contracts and official lifecycle guidance |
 
 ## Decision record
 
