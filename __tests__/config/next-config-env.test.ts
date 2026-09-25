@@ -23,6 +23,8 @@ describe('Next configuration through the real internationalization wrapper', () 
     expect(value.env?.NEXT_PUBLIC_ZITADEL_CONFIGURED).toBe(String(isZitadelConfigured()));
     expect(value.env?.NEXT_PUBLIC_AUTH_MODE).toBe('required');
     expect(value.env?.NEXT_PUBLIC_ZITADEL_ISSUER).toBe(issuer || "");
+    // Federated logout in the browser names the public OIDC client at end_session.
+    expect(value.env?.NEXT_PUBLIC_ZITADEL_CLIENT_ID).toBe(client || "");
     expect(value.output).toBe('standalone');
     expect(value.reactStrictMode).toBe(true);
   });

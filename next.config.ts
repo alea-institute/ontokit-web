@@ -31,6 +31,10 @@ const nextConfig: NextConfig = {
     // has no provider, and clicking it dead-ends.
     // A string even when absent ensures Next inlines the runtime parity guard.
     NEXT_PUBLIC_ZITADEL_ISSUER: process.env.ZITADEL_ISSUER || "",
+    // Public OIDC client identifier for federated logout (end_session client_id).
+    // Derived from the same build input as the server so logout names the client
+    // the session was issued to. Never the client secret.
+    NEXT_PUBLIC_ZITADEL_CLIENT_ID: process.env.ZITADEL_CLIENT_ID || "",
     NEXT_PUBLIC_ZITADEL_CONFIGURED:
       process.env.ZITADEL_ISSUER && process.env.ZITADEL_CLIENT_ID ? "true" : "false",
   },
