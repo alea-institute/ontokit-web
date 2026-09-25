@@ -138,5 +138,13 @@
     "commit": "30b8ecb2c128f82ff067b6f3e444edc5f7f04ed3",
     "red_evidence": "Parity regressions: 8 failed / 39 passed before guard; anonymous empty-issuer regression: 2 failed / 9 passed before correction; final focused 59/59.",
     "final_evidence": "All three rebuilt images at reviewed hash pass expanded real-container harness."
+  },
+  "publication": {
+    "pr": "https://github.com/alea-institute/ontokit-web/pull/48",
+    "head": "29ba0d5b96cac2cd0aba54ef08fa868798db4028",
+    "merged_revision": "ab903e145e2a6ad30aefd915a83cb0bafbaa0678",
+    "target": "dev",
+    "checks": "all eight verification jobs passed",
+    "deployment": "not performed; D04/D05 and D02 remain"
   }
 }

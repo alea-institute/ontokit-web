@@ -1,0 +1,26 @@
+{
+  "status": "complete",
+  "mode": "pipeline",
+  "posture": "target",
+  "pr_url": "https://github.com/alea-institute/ontokit-web/pull/49",
+  "head_sha": "15d19edaea14167bdc2a2150e57969f5f1546936",
+  "checks_terminal": true,
+  "all_checks_ok": true,
+  "fixes_applied": [
+    {
+      "check": "Semgrep/scan",
+      "commit": "15d19edaea14167bdc2a2150e57969f5f1546936",
+      "invariant_key": "browser-pr-url-literal-project-prefix-numeric-id",
+      "summary": "Literal project path and fixed numeric suffix replace dynamic regex."
+    }
+  ],
+  "residuals": [],
+  "invocation_elapsed_seconds": 833,
+  "merge_authority": "Separate explicit standing user authorization; merge occurs after babysit returns.",
+  "merged": true,
+  "merge_commit": "83eaf9574315b71a165b80370dd964572d2ccac9",
+  "merged_at": "2026-09-20T23:16:00Z",
+  "verification_checks_passed": 8,
+  "conditional_jobs_skipped": 3,
+  "deployed": false
+}

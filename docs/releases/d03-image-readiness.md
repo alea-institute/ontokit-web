@@ -1,6 +1,6 @@
 # D03 configured-provider image readiness — 2026-09-20
 
-D03 implementation and local verification are complete. Independent review found one build/runtime authentication mismatch; the correction passed an independent source review and the expanded real-image checks. Publication remains pending. API trust/error prerequisites and D02 deployment/OIDC acceptance remain open.
+D03 implementation and local verification are complete. Independent review found one build/runtime authentication mismatch; the correction passed an independent source review and the expanded real-image checks. Merged into ALEA web `dev` through [PR48](https://github.com/alea-institute/ontokit-web/pull/48) at `ab903e145e2a6ad30aefd915a83cb0bafbaa0678` on 2026-09-20 13:27:53 UTC. All eight CI checks passed: scan, lint, types, coverage tests, build, generic Docker, required-auth Docker and optional-auth Docker. No deployment occurred. API trust/error prerequisites and D02 deployment/OIDC acceptance remain open.
 
 Source verified: `30b8ecb2c128f82ff067b6f3e444edc5f7f04ed3`, branch `release/d01-repaired-dev-20260920`. [Plan](../plans/2026-09-20-0731-fix-configured-provider-image-plan.md), [plan review](d03-plan-review.json), [execution receipt](d03-execution-receipt.json).
 
@@ -46,3 +46,7 @@ The harness supplies only synthetic runtime credentials and removes its containe
 ## Remaining delivery obligations
 
 D04: reproduce and repair API individual mint-capability enforcement. D05: preserve submit/resubmit state and map embedding budget/unavailability failures. D02: publish and pin the immutable matched pair, verify deployment prerequisites and rollback evidence, deploy, then prove real OIDC/persona workflows. D03 does not establish identity-provider reachability or real credential validity.
+
+## Published identity
+
+PR head `29ba0d5b96cac2cd0aba54ef08fa868798db4028` contains verified code `30b8ecb2` plus evidence-only documents. GitHub verified that exact head before squash merge. The merged revision above is the fetchable web candidate for D02; local image digests here identify pre-merge verification images, not deployed artifacts. Build and verify the immutable matched pair during activation.
