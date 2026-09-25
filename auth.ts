@@ -98,8 +98,11 @@ export function createAuthConfig(): NextAuthConfig {
 
             if (!response.ok) throw tokens;
 
+            // A successful retry supersedes any earlier failure; a retained error
+            // would force re-authentication despite valid renewed credentials.
+            const { error: _previousError, ...renewable } = token;
             return {
-              ...token,
+              ...renewable,
               accessToken: tokens.access_token,
               expiresAt: Math.floor(Date.now() / 1000 + tokens.expires_in),
               refreshToken: tokens.refresh_token ?? token.refreshToken,
@@ -110,7 +113,10 @@ export function createAuthConfig(): NextAuthConfig {
           }
         }
 
-        return token;
+        // Expired without a refresh credential: nothing can renew it, so surface
+        // the same error that makes SessionGuard force a fresh sign-in rather than
+        // presenting the expired access token as usable.
+        return { ...token, error: "RefreshAccessTokenError" };
       },
       async session({ session, token }) {
         session.accessToken = token.accessToken as string;

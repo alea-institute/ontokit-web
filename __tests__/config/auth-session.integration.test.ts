@@ -90,9 +90,9 @@ describe('authenticated sessions through encrypted cookies and real callbacks', 
     expect(fetcher).not.toHaveBeenCalled();
   });
 
-  it('preserves the session without a refresh token instead of sending an invalid grant', async () => {
+  it('flags rather than drops an expired session without a refresh token and sends no invalid grant', async () => {
     const response = await session({ user, accessToken: 'old-access', expiresAt: 1 });
-    expect(await response.json()).toMatchObject({ user, accessToken: 'old-access' });
+    expect(await response.json()).toMatchObject({ user, accessToken: 'old-access', error: 'RefreshAccessTokenError' });
     expect(fetcher).not.toHaveBeenCalled();
   });
 
@@ -111,6 +111,63 @@ describe('authenticated sessions through encrypted cookies and real callbacks', 
     expect(body).toMatchObject({ user, accessToken: 'old-access', error: 'RefreshAccessTokenError' });
     expect(body.refreshToken).toBeUndefined();
     expect(fetcher).toHaveBeenCalledOnce();
+  });
+
+  it('clears a stale refresh failure once a retried renewal succeeds across cookie transitions', async () => {
+    fetcher.mockResolvedValueOnce(Response.json({ error: 'temporarily_unavailable' }, { status: 503 }));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failed = await session({ user, accessToken: 'old-access', refreshToken: 'refresh-original', expiresAt: 1 });
+    expect(await failed.json()).toMatchObject({ error: 'RefreshAccessTokenError' });
+    const failedToken = (await cookieToken(failed))!;
+    expect(failedToken).toMatchObject({ error: 'RefreshAccessTokenError', refreshToken: 'refresh-original' });
+
+    const retried = await session(failedToken);
+    const body = await retried.json();
+    expect(body).toMatchObject({ user, accessToken: 'renewed-access' });
+    expect(body.error).toBeUndefined();
+    const recovered = await cookieToken(retried);
+    expect(recovered).toMatchObject({ accessToken: 'renewed-access', refreshToken: 'rotated-refresh' });
+    expect(recovered?.error).toBeUndefined();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('flags an expired grant issued without a refresh token instead of presenting it as usable', async () => {
+    const { createAuthConfig } = await import('@/auth');
+    const authConfig = createAuthConfig();
+    // An issuer may omit the refresh credential (for example when offline access
+    // is not granted). The initial grant is reachable through the real callback.
+    const initial = await authConfig.callbacks!.jwt!({ token: { sub: 'authjs-generated-user-id' }, user: { ...user, id: 'authjs-generated-user-id' }, account: { provider: 'zitadel', type: 'oidc', providerAccountId: 'reviewer', access_token: 'short-lived-access', expires_at: Math.floor(Date.now() / 1000) + 600 } });
+    expect(initial).toMatchObject({ sub: 'reviewer', user: { id: 'reviewer' }, accessToken: 'short-lived-access' });
+    expect(initial?.refreshToken).toBeUndefined();
+    const usable = await session(initial!);
+    expect((await usable.json()).error).toBeUndefined();
+
+    const response = await session({ ...initial!, expiresAt: 1 });
+    expect(await response.json()).toMatchObject({ user: { id: 'reviewer' }, error: 'RefreshAccessTokenError' });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each(['disabled', 'optional'])('does not flag or refresh an expired grant without a refresh token when the provider is inactive (%s)', async mode => {
+    vi.stubEnv('AUTH_MODE', mode);
+    if (mode === 'optional') { vi.stubEnv('ZITADEL_ISSUER', undefined); vi.stubEnv('ZITADEL_CLIENT_ID', undefined); vi.stubEnv('ZITADEL_CLIENT_SECRET', undefined); }
+    const response = await session({ user, accessToken: 'old-access', expiresAt: 1 });
+    const body = await response.json();
+    expect(body).toMatchObject({ user, accessToken: 'old-access' });
+    expect(body.error).toBeUndefined();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each(['rejected grant', 'network failure', 'malformed response'])('keeps credential values out of console output on %s', async failure => {
+    if (failure === 'rejected grant') fetcher.mockResolvedValue(Response.json({ error: 'invalid_grant', error_description: 'Errors.User.RefreshToken.Invalid' }, { status: 400 }));
+    if (failure === 'network failure') fetcher.mockRejectedValue(new TypeError('fetch failed'));
+    if (failure === 'malformed response') fetcher.mockResolvedValue(new Response('<html>gateway error</html>', { status: 502 }));
+    const logged: unknown[][] = [];
+    for (const method of ['error', 'warn', 'log', 'info', 'debug'] as const) vi.spyOn(console, method).mockImplementation((...args: unknown[]) => { logged.push(args); });
+    const response = await session({ user, accessToken: 'old-access-value', refreshToken: 'refresh-credential-value', expiresAt: 1 });
+    expect(await response.json()).toMatchObject({ error: 'RefreshAccessTokenError' });
+    expect(logged.length).toBeGreaterThan(0);
+    const output = logged.map(args => args.map(arg => arg instanceof Error ? `${arg.name}: ${arg.message} ${arg.stack}` : typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ')).join('\n');
+    for (const credential of ['old-access-value', 'refresh-credential-value', 'synthetic-client-secret', secret]) expect(output).not.toContain(credential);
   });
 
   it('returns no session for a request without a session cookie', async () => {
