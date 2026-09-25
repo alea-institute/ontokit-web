@@ -1,0 +1,266 @@
+{
+  "target-restore-proof.json": {
+    "ontokit": {
+      "tables": 0,
+      "rows_owners_extensions_match": true
+    },
+    "zitadel": {
+      "tables": 143,
+      "rows_owners_extensions_match": true
+    }
+  },
+  "build-capacity.json": {
+    "utc": "2026-09-21T12:19:26.969959+00:00",
+    "api_sha": "13ad2f35d55196274c5fec313bfb254a7cc80226",
+    "web_sha": "83eaf9574315b71a165b80370dd964572d2ccac9",
+    "exit_code": 0,
+    "duration_seconds": 508.5,
+    "samples": 255,
+    "minimum_available_memory_fraction": 0.5538918290300359,
+    "minimum_free_disk_fraction": 0.7759285464078103,
+    "compose_sha256": "9b36e25498542b779ad161c84d7ba142413cdf88ac231c5dd0586b2b25e8a0ee"
+  },
+  "migration-proof.json": {
+    "api_sha": "13ad2f35d55196274c5fec313bfb254a7cc80226",
+    "utc": "2026-09-21T12:20:25.743420+00:00",
+    "ontokit_eu_rehearsal_20260921": {
+      "head": "i7j8k9l0m1n2",
+      "tables": 43
+    },
+    "ontokit": {
+      "head": "i7j8k9l0m1n2",
+      "tables": 43
+    },
+    "rehearsal_database_removed": true
+  },
+  "installed-assets-proof.json": {
+    "deploy/ontokit-deploy.sh": {
+      "sha256": "e85425100bd4ae99a0648b43d93379c9a9d1549a0d36b3a0b7fdcb0d0db38fa4",
+      "installed_path": "/usr/local/sbin/ontokit-deploy",
+      "match": true,
+      "reviewed_commit": "4d8b79d36abce7170f413b44dbab7555e8aec1fa",
+      "merge_commit": "a2d483624e472883151c01ea2d4862a5860ed31b"
+    },
+    "deploy/firewall/ontokit-firewall.sh": {
+      "sha256": "cd3154f4dbac69f61f46bc5f73b67771f76b49b0cc3364ade1ed82f0c95ad5d5",
+      "installed_path": "/usr/local/sbin/ontokit-firewall.sh",
+      "match": true
+    },
+    "deploy/firewall/ontokit-firewall.service": {
+      "sha256": "912e6d51d4bf38a439ada5816b996f99fa34d1031f9cb9896ea952688051f920",
+      "installed_path": "/etc/systemd/system/ontokit-firewall.service",
+      "match": true
+    }
+  },
+  "public-probes": {
+    "web": {
+      "http_status": 200,
+      "seconds": 0.649,
+      "bytes": 24404
+    },
+    "api_health": {
+      "http_status": 200,
+      "seconds": 0.458,
+      "bytes": 20
+    },
+    "oidc": {
+      "http_status": 200,
+      "seconds": 0.466,
+      "bytes": 2472
+    },
+    "login": {
+      "http_status": 200,
+      "seconds": 0.636,
+      "bytes": 33142
+    },
+    "direct_3000": "blocked",
+    "direct_8000": "blocked",
+    "direct_8080": "blocked",
+    "direct_8081": "blocked"
+  },
+  "scope": {
+    "hosted_acceptance": false,
+    "login_health": "healthy; all healthchecked services healthy after recovery and checkpoint restart",
+    "github_deployment": "disabled; runner ingress unresolved",
+    "us_source_deleted": 160440821,
+    "eu_server": 166772379,
+    "eu_firewall": 11656413,
+    "shared_proxy_preserved": 126068458,
+    "receipt": "eu-hosting-migration-receipt.md"
+  },
+  "dev-deploy-branch-policy": {
+    "required_reviewers_preserved": true,
+    "prevent_self_review_preserved": true,
+    "deployment_branch_policy": {
+      "protected_branches": false,
+      "custom_branch_policies": true
+    },
+    "allowed_refs": [
+      {
+        "name": "dev",
+        "type": "branch"
+      }
+    ]
+  },
+  "restricted-deploy-key": {
+    "public_key_matches_preserved_restricted_key": true,
+    "strict_pinned_host_key": true,
+    "status_authenticated": true,
+    "status_exit": 0,
+    "status_reason": "all services ready; API/worker/web runtime revisions match checkouts; no drift",
+    "arbitrary_command_exit": 64,
+    "arbitrary_command_refused": true,
+    "network_scope": "operator only; not GitHub runner proof"
+  },
+  "candidate-images-backup": {
+    "utc": "2026-09-21T12:50:40.857305+00:00",
+    "file": "eu-candidate-images.tar.gz.age",
+    "bytes": 3446559255,
+    "sha256": "8300294e6dec4a43940dc65d35bcb0c8891c8fa8fbd42a678c1d267f18c309b1",
+    "images": [
+      {
+        "id": "sha256:47ea8498bd4a69d0df98d005fdc0e6048f7fbc971781e40e5bb2047c09bc855e",
+        "revision": "13ad2f35d55196274c5fec313bfb254a7cc80226"
+      },
+      {
+        "id": "sha256:77a04df54a5ddcffd9830b35533c51ae9874f84094a066d0e16171e4b742b669",
+        "revision": "83eaf9574315b71a165b80370dd964572d2ccac9"
+      }
+    ],
+    "scope": "Exact EU candidate API/web images; supporting images remain in source recovery archive"
+  },
+  "candidate-images-validation": {
+    "encrypted_archive_authenticated": true,
+    "archive_sha256_verified": true,
+    "image_index_ids_and_revision_labels_verified": true,
+    "all_descriptor_layers_present": true,
+    "content_addressed_blobs_verified": 41,
+    "image_indexes": 2,
+    "scope": "Streaming OCI graph validation, not Docker load or application acceptance",
+    "docker_compat_manifest_entries": 2
+  },
+  "identity-recovery": {
+    "utc": "2026-09-21T14:30:31.150361+00:00",
+    "method": "temporary instance-scoped supported SystemAPIUsers IAM_OWNER",
+    "pat_expiry": "2026-12-20T00:00:00Z",
+    "no_identity_reset": true,
+    "explicit_user_authorization": true,
+    "temporary_principal_check": 200,
+    "replacement_pats_created": 2,
+    "temporary_runtime_config_removed": true,
+    "removed_principal_http_status": 401,
+    "temporary_principal_revoked": true,
+    "api-admin_pat_http_status": 200,
+    "login-client_pat_http_status": 200
+  },
+  "post-identity-backup": {
+    "utc": "2026-09-21T14:44:54.490661+00:00",
+    "file": "eu-post-identity.tar.age",
+    "bytes": 234553448,
+    "sha256": "23101a54943acbb747ba7ce740a63a95f2d0043e887fb649162283b13f24b6d9",
+    "scope": "Quiesced EU databases, five volumes, host configuration and current identity credentials; includes run-owned smoke fixture pending cleanup; images archived separately"
+  },
+  "post-identity-independent-restore": {
+    "status": "passed",
+    "encrypted_recovery_checksums": 15,
+    "databases": {
+      "ontokit": {
+        "tables": 43,
+        "owners_extensions_rows_match": true
+      },
+      "zitadel": {
+        "tables": 143,
+        "owners_extensions_rows_match": true
+      }
+    },
+    "volumes": {
+      "ontokit_git_repos": {
+        "files": 62,
+        "bytes": 41814195,
+        "content_matches": true
+      },
+      "ontokit_minio_data": {
+        "files": 45,
+        "bytes": 21095458,
+        "content_matches": true
+      },
+      "ontokit_postgres_data": {
+        "files": 2591,
+        "bytes": 136369891,
+        "content_matches": true
+      },
+      "ontokit_redis_data": {
+        "files": 1,
+        "bytes": 89,
+        "content_matches": true
+      },
+      "ontokit_zitadel_data": {
+        "files": 2,
+        "bytes": 556,
+        "content_matches": true
+      }
+    },
+    "source_independent": true,
+    "postgres_network": "none",
+    "published_ports": 0,
+    "proof_container_removed": true,
+    "original_images_retained_encrypted": true
+  },
+  "browser-smoke": {
+    "date": "2026-09-21",
+    "driver": "Browser runtime Chrome extension",
+    "account": "fresh ordinary run-owned acceptance persona; no elevated role",
+    "real_oidc_login": "passed",
+    "private_project_create": "passed",
+    "full_page_reload_metadata_persistence": "passed",
+    "app_logout": "passed",
+    "provider_logout": "passed; Logout successful screen",
+    "signed_out_app_reload": "passed; Sign in header",
+    "project_id": "b241dbb2-840d-4b56-8106-8a1854acf752",
+    "project_cleanup": "pending fresh inline approval after automatic review rejected deletion; account and project preserved",
+    "scope": "metadata write smoke only; not full persona, ontology editing, workload or rollback acceptance"
+  },
+  "acknowledged-write-independent-restore": {
+    "status": "passed",
+    "encrypted_recovery_checksums": 15,
+    "databases": {
+      "ontokit": {
+        "tables": 43,
+        "owners_extensions_rows_match": true,
+        "acknowledged_project_metadata_and_owner_restored": true
+      }
+    },
+    "volumes": {
+      "ontokit_git_repos": {
+        "files": 62,
+        "bytes": 41814195,
+        "content_matches": true
+      },
+      "ontokit_minio_data": {
+        "files": 45,
+        "bytes": 21095458,
+        "content_matches": true
+      },
+      "ontokit_postgres_data": {
+        "files": 2591,
+        "bytes": 136369891,
+        "content_matches": true
+      },
+      "ontokit_redis_data": {
+        "files": 1,
+        "bytes": 89,
+        "content_matches": true
+      },
+      "ontokit_zitadel_data": {
+        "files": 2,
+        "bytes": 556,
+        "content_matches": true
+      }
+    },
+    "source_independent": true,
+    "postgres_network": "none",
+    "published_ports": 0,
+    "proof_container_removed": true,
+    "original_images_retained_encrypted": true
+  }
+}
