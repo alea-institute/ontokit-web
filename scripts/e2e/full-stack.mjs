@@ -49,9 +49,21 @@ export async function fullStack(ctx) {
   const runConfig = {profile, id: ctx.manifest.id, dir: ctx.dir, issuer: identity.issuer, login: identity.login, web: identity.web, api: identity.api, users: identity.users, ordinaryUserPolicyVerified: true};
   if (profile === 'lifecycle') {
     await Promise.race([server, lifecyclePreflight(ctx, {identity, env, webSource, runFile, runConfig, phase})]);
-    // U1 stops here: browser lifecycle cases (U3) and their mandatory inventory (U4)
-    // are not installed, so no lifecycle acceptance is claimed.
-    console.log('Lifecycle profile prepared and clock preflight verified; no browser lifecycle acceptance claimed');
+    // U3: the lifecycle project runs only auth-lifecycle.spec.ts against this stack.
+    // Playwright never receives the clock preload; the spec writes the private control.
+    await phase('testing-lifecycle');
+    await Promise.race([server, ownedCommand(ctx, process.execPath, ['node_modules/@playwright/test/cli.js', 'test'], {
+      cwd: webSource, env: {...assertNoClockOverride(env), ONTOKIT_E2E_CONFIG: runFile}, timeout: 1_800_000,
+    })]);
+    const report = JSON.parse(await readFile(path.join(ctx.dir, 'playwright-report.json'), 'utf8'));
+    const stats = report?.stats ?? {};
+    if (!Array.isArray(report?.errors) || report.errors.length || stats.unexpected !== 0 || stats.skipped !== 0 || stats.flaky !== 0 || !(stats.expected > 0)) {
+      throw new Error('Lifecycle browser cases did not all pass');
+    }
+    // The mandatory lifecycle inventory and its sanitized receipt belong to U4; until
+    // then no lifecycle acceptance is claimed even when every case passes.
+    console.log(`Lifecycle browser cases: ${stats.expected} passed, ${stats.skipped} skipped, ${stats.unexpected} failed; mandatory lifecycle inventory not yet enforced, no acceptance claimed`);
+    await phase('lifecycle-browser-verified');
     return;
   }
   await writeFile(runFile, JSON.stringify(runConfig), {mode: 0o600});
