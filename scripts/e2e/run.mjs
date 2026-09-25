@@ -7,7 +7,7 @@ import { prerequisites, copySource, reservePorts, compose, composeArgs, ownedCom
 import { expireDiagnostics, recordFailure, retainDiagnostics as retainFailureDiagnostics } from './diagnostics.mjs';
 import { sanitizedEvidence } from './evidence.mjs';
 import { cleanup } from './cleanup.mjs';
-import { freshIdentityValues, writeRuntimeEnv } from './bootstrap-identity.mjs';
+import { freshIdentityValues, writeRuntimeEnv, assertProfile } from './bootstrap-identity.mjs';
 export function waitForAbort(signal) {
   if (signal.aborted) return Promise.reject(new Error('Interrupted'));
   return new Promise((_, reject) => {
@@ -19,7 +19,10 @@ export function waitForAbort(signal) {
     }, {once: true});
   });
 }
-export async function run({apiSource, lifecycleProbe = false, failAt, hold = false, retainDiagnostics = false, workflow} = {}) {
+export async function run({apiSource, lifecycleProbe = false, failAt, hold = false, retainDiagnostics = false, workflow, profile = 'baseline'} = {}) {
+  // Each profile is a separate fresh stack (KTD1); the default remains the D06 baseline.
+  assertProfile(profile);
+  if (lifecycleProbe && profile !== 'baseline') throw new Error('Unknown E2E profile combination');
   process.umask(0o077);
   await expireDiagnostics();
   const webSource = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -32,10 +35,10 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
   const manifestDir = path.join(ROOT, id);
   await privateDirectory(manifestDir);
   await privateDirectory(dir);
-  const manifest = {version: 1, id, project: `ontokit-e2e-${id}`, uid: process.getuid(), processes: [], sources: {}, status: 'preparing', dockerEndpoint: getDockerEndpoint()};
+  const manifest = {version: 1, id, project: `ontokit-e2e-${id}`, uid: process.getuid(), processes: [], sources: {}, status: 'preparing', dockerEndpoint: getDockerEndpoint(), profile};
   await saveManifest(manifestDir, manifest);
   const controller = new AbortController();
-  const ctx = {failAt, signal: controller.signal, dir, manifestDir, manifest, env: {...baseEnv(), HOME: dir, TMPDIR: dir}};
+  const ctx = {profile, failAt, signal: controller.signal, dir, manifestDir, manifest, env: {...baseEnv(), HOME: dir, TMPDIR: dir}};
   const file = path.join(manifestDir, 'manifest.json');
   const startedAt = new Date().toISOString();
   let workflowPassed = false;
@@ -121,8 +124,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const value = flag => args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined;
   const workflow = args.includes('--lifecycle-probe') ? undefined : (await import('./full-stack.mjs')).fullStack;
-  run({workflow, apiSource: value('--api-source'), lifecycleProbe: args.includes('--lifecycle-probe'), failAt: value('--fail-at'), hold: args.includes('--hold'), retainDiagnostics: args.includes('--retain-diagnostics')}).catch(error => {
-    const known = /^(An explicit|Required source file missing:|Local Docker|Only a local|At least 8|Full-stack workflow|Owned command|Injected |Cleanup failed|Interrupted)/.test(error.message);
+  run({workflow, profile: args.includes('--profile') ? value('--profile') : 'baseline', apiSource: value('--api-source'), lifecycleProbe: args.includes('--lifecycle-probe'), failAt: value('--fail-at'), hold: args.includes('--hold'), retainDiagnostics: args.includes('--retain-diagnostics')}).catch(error => {
+    const known = /^(An explicit|Required source file missing:|Local Docker|Only a local|At least 8|Full-stack workflow|Owned command|Injected |Cleanup failed|Interrupted|Unknown E2E profile|Lifecycle |Clock override|Auth clock control rejected)/.test(error.message);
     console.error(known ? error.message : 'Isolated lifecycle failed; inspect the sanitized phase above.');
     console.error('No full-stack acceptance claimed.'); process.exitCode ||= 1;});
 }

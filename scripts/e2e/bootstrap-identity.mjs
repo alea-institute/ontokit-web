@@ -4,6 +4,13 @@ import { setTimeout as delay } from 'node:timers/promises';
 import path from 'node:path';
 import { compose } from './runtime.mjs';
 import { recordFailure } from './diagnostics.mjs';
+import { configureLifecycleLifetimes, verifyOrdinaryPersona, LIFECYCLE_LIFETIMES } from './auth-lifecycle.mjs';
+
+export const PROFILES = Object.freeze({baseline: ['owner', 'unrelated'], lifecycle: ['lifecycle']});
+export function assertProfile(profile) {
+  if (!Object.hasOwn(PROFILES, profile)) throw new Error('Unknown E2E profile');
+  return profile;
+}
 
 export function freshIdentityValues(now = Date.now()) {
   return {
@@ -40,14 +47,15 @@ export async function writeRuntimeEnv(ctx) {
 // Read-only discovery can become reachable before the administrative service has
 // finished startup. Mutations are deliberately single-shot: an ambiguous failure
 // must never create duplicate projects, applications or users.
-export async function identityRequest({issuer, pat, endpoint, body, signal, readOnly = false, timeout = 120_000, interval = 500, fetcher = fetch, diagnose = async () => {}}) {
+export async function identityRequest({issuer, pat, endpoint, body, method = 'POST', signal, readOnly = false, timeout = 120_000, interval = 500, fetcher = fetch, diagnose = async () => {}}) {
+  if (!['GET', 'POST', 'PUT'].includes(method) || (method === 'GET' && body !== undefined)) throw new Error('Invalid identity request');
   let result;
   const request = async () => {
     let response;
     try {
       response = await fetcher(`${issuer}${endpoint}`, {
-        method: 'POST', headers: {Authorization: `Bearer ${pat}`, 'Content-Type': 'application/json', 'Connect-Protocol-Version': '1'},
-        body: JSON.stringify(body), signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(5000)]), redirect: 'error',
+        method, headers: {Authorization: `Bearer ${pat}`, ...(method === 'GET' ? {} : {'Content-Type': 'application/json', 'Connect-Protocol-Version': '1'})},
+        ...(method === 'GET' ? {} : {body: JSON.stringify(body)}), signal: AbortSignal.any([signal ?? new AbortController().signal, AbortSignal.timeout(5000)]), redirect: 'error',
       });
     } catch (error) {
       if (signal?.aborted) throw new Error('Interrupted');
@@ -98,8 +106,8 @@ export async function bootstrapIdentity(ctx) {
   const pat = ctx.failAt === 'identity-pat' ? 'deliberately-invalid-disposable-test-pat' : (await readFile(patFile, 'utf8')).trim();
   if (!pat) throw new Error('Empty disposable identity bootstrap PAT');
   // Only this fresh run's canonical loopback issuer receives its bootstrap token.
-  const call = (endpoint, body, readOnly = false) => identityRequest({
-    issuer, pat, endpoint, body, signal: ctx.signal, readOnly,
+  const call = (endpoint, body, readOnly = false, method = 'POST') => identityRequest({
+    issuer, pat, endpoint, body, method, signal: ctx.signal, readOnly,
     diagnose: detail => recordFailure(ctx, new Error(detail)),
   });
   const organizations = await call('/v2/organizations/_search', {queries: [{defaultQuery: {}}]}, true);
@@ -122,9 +130,31 @@ export async function bootstrapIdentity(ctx) {
   });
   const {clientId, clientSecret} = application.oidcConfiguration ?? {};
   if (!clientId || !clientSecret) throw new Error('Disposable OIDC client credentials missing');
+  const {users, lifetimes} = await provisionPersonas(call, {profile: ctx.profile ?? 'baseline', organizationId, runId: ctx.manifest.id, failAt: ctx.failAt, signal: ctx.signal});
+  await compose(ctx, 'up', '-d', '--no-deps', 'login');
+  await readyHttp(`${login}/loginname`, {signal: ctx.signal, validate: async response => response.ok && (await response.text()).includes('data-testid="username-text-input"')});
+  ctx.values.OIDC_CLIENT_ID = clientId;
+  await writeRuntimeEnv(ctx);
+  await compose(ctx, 'up', '-d', '--no-deps', '--force-recreate', 'api', 'worker');
+  await compose(ctx, 'exec', '-T', 'api', 'python', '-c', 'from ontokit.core.config import settings; assert settings.auth_mode == "required"; assert not settings.superadmin_ids; print("Required authentication and ordinary-user policy verified")');
+  return {issuer, login, web, api: `http://localhost:${ctx.manifest.ports.api}`, clientId, clientSecret, users, lifetimes};
+}
+
+// Baseline keeps the D06 sequence exactly: two ordinary humans and no provider policy
+// change. The lifecycle profile first shortens the instance-wide OIDC lifetimes on its
+// own fresh instance and reads them back (KTD2), then creates one ordinary persona that
+// is verified distinct from bootstrap administration. Any failure aborts before a
+// browser runs; the outer launcher still owns cleanup.
+export async function provisionPersonas(call, {profile = 'baseline', organizationId, runId, failAt, signal, readbackTimeout} = {}) {
+  assertProfile(profile);
+  let lifetimes = null;
+  if (profile === 'lifecycle') {
+    const expected = failAt === 'lifecycle-readback' ? {...LIFECYCLE_LIFETIMES, accessTokenLifetime: LIFECYCLE_LIFETIMES.accessTokenLifetime + 1} : LIFECYCLE_LIFETIMES;
+    lifetimes = await configureLifecycleLifetimes(call, {apply: LIFECYCLE_LIFETIMES, expected, signal, ...(readbackTimeout ? {timeout: readbackTimeout, interval: 1} : {})});
+  }
   const users = {};
-  for (const role of ['owner', 'unrelated']) {
-    const email = `${role}-${ctx.manifest.id}@example.test`;
+  for (const role of PROFILES[profile]) {
+    const email = `${role}-${runId}@example.test`;
     const password = `Aa1!${randomBytes(24).toString('hex')}`;
     const created = await call('/v2/users/new', {
       organizationId, username: email, human: {
@@ -132,15 +162,11 @@ export async function bootstrapIdentity(ctx) {
         email: {email, isVerified: true}, password: {password, changeRequired: false},
       },
     });
-    if (!created.id) throw new Error('Disposable ordinary user ID missing');
+    if (!created?.id) throw new Error('Disposable ordinary user ID missing');
     users[role] = {id: created.id, email, password};
   }
-  if (users.owner.id === users.unrelated.id) throw new Error('Disposable identities must be distinct');
-  await compose(ctx, 'up', '-d', '--no-deps', 'login');
-  await readyHttp(`${login}/loginname`, {signal: ctx.signal, validate: async response => response.ok && (await response.text()).includes('data-testid="username-text-input"')});
-  ctx.values.OIDC_CLIENT_ID = clientId;
-  await writeRuntimeEnv(ctx);
-  await compose(ctx, 'up', '-d', '--no-deps', '--force-recreate', 'api', 'worker');
-  await compose(ctx, 'exec', '-T', 'api', 'python', '-c', 'from ontokit.core.config import settings; assert settings.auth_mode == "required"; assert not settings.superadmin_ids; print("Required authentication and ordinary-user policy verified")');
-  return {issuer, login, web, api: `http://localhost:${ctx.manifest.ports.api}`, clientId, clientSecret, users};
+  const ids = Object.values(users).map(user => user.id);
+  if (new Set(ids).size !== ids.length) throw new Error('Disposable identities must be distinct');
+  if (profile === 'lifecycle') await verifyOrdinaryPersona(call, users.lifecycle.id);
+  return {users, lifetimes};
 }
