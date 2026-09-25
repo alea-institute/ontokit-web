@@ -31,10 +31,12 @@ function validateServerEnv(): ServerEnv {
   if (compiledMode !== undefined) {
     const compiledConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
     const compiledIssuer = process.env.NEXT_PUBLIC_ZITADEL_ISSUER || "";
+    const compiledClientId = process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID || "";
     if (
       compiledMode !== getAuthMode() ||
       compiledConfigured !== isZitadelConfigured() ||
-      compiledIssuer !== (process.env.ZITADEL_ISSUER || "")
+      compiledIssuer !== (process.env.ZITADEL_ISSUER || "") ||
+      compiledClientId !== (process.env.ZITADEL_CLIENT_ID || "")
     ) {
       throw new Error(
         "Runtime authentication settings disagree with the compiled authentication configuration. " +
