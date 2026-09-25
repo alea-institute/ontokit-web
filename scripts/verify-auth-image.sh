@@ -111,7 +111,7 @@ const noSecrets = text => { for (const secret of canaries) assert(!text.includes
   // each public URL. Minification can fold boolean/mode branches, so those values
   // are checked against the compiled Next configuration above.
   const files = fs.readdirSync('.next/static', {recursive: true}).filter(file => file.endsWith('.js'));
-  const needed = new Set(configured ? [env.NEXT_PUBLIC_ZITADEL_ISSUER, env.NEXT_PUBLIC_API_URL, env.NEXT_PUBLIC_WS_URL] : []);
+  const needed = new Set(configured ? [env.NEXT_PUBLIC_ZITADEL_ISSUER, env.NEXT_PUBLIC_ZITADEL_CLIENT_ID, env.NEXT_PUBLIC_API_URL, env.NEXT_PUBLIC_WS_URL] : []);
   for (const file of files) {
     const content = fs.readFileSync(path.join('.next/static', file), 'utf8');
     noSecrets(content);

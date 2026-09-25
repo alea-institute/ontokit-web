@@ -36,7 +36,9 @@ function validateServerEnv(): ServerEnv {
       compiledMode !== getAuthMode() ||
       compiledConfigured !== isZitadelConfigured() ||
       compiledIssuer !== (process.env.ZITADEL_ISSUER || "") ||
-      compiledClientId !== (process.env.ZITADEL_CLIENT_ID || "")
+      // The client ID is used only by an active provider (sign-in and federated
+      // logout); a stale value in an anonymous deployment cannot cause drift.
+      (compiledConfigured && compiledClientId !== (process.env.ZITADEL_CLIENT_ID || ""))
     ) {
       throw new Error(
         "Runtime authentication settings disagree with the compiled authentication configuration. " +

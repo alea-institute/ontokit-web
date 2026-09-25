@@ -237,6 +237,18 @@ describe("compiled authentication contract", () => {
     expect(() => validateServerEnv()).toThrow("compiled authentication configuration");
   });
 
+  it("accepts a stale client ID left in an anonymous build's runtime settings", async () => {
+    // Without an issuer the provider is inactive and the client ID is never used
+    // for sign-in or logout, so it cannot cause client drift.
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "false");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_ISSUER", "");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CLIENT_ID", "");
+    vi.stubEnv("ZITADEL_ISSUER", undefined);
+    vi.stubEnv("ZITADEL_CLIENT_ID", "stale-client");
+    const { validateServerEnv } = await import("@/lib/env");
+    expect(() => validateServerEnv()).not.toThrow();
+  });
+
   it.each([
     ["required", true], ["optional", true], ["optional", false],
     ["disabled", false], ["disabled", true],
