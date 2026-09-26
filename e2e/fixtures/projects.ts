@@ -4,6 +4,7 @@ import path from "node:path";
 import type { APIRequestContext } from "@playwright/test";
 import type { Project, ProjectCreate, ProjectImportResponse } from "../../lib/api/projects";
 import { test as authenticatedTest, expect } from "./auth";
+import type { ModeRunConfig, OptionalConfiguredRunConfig } from "./run";
 
 export const projectsPath = "/api/v1/projects";
 export const ontologyNamespace = "https://example.org/ontokit-e2e#";
@@ -29,6 +30,19 @@ export async function projectIds(api: APIRequestContext): Promise<string[]> {
     if (ids.length >= page.total) return ids.sort();
     expect(page.items.length).toBeGreaterThan(0);
   }
+}
+/**
+ * D09 run-tagged projects seeded inside the API container before any browser case (KTD4).
+ * `publicProject` and `foreignPrivateProject` belong to a synthetic foreign user;
+ * `personaPrivateProject` (optional-configured only) belongs to `run.users.owner`.
+ * Outer run cleanup deletes them by exact ID; specs must not delete them.
+ */
+export function seededProject(run: ModeRunConfig, key: "publicProject" | "foreignPrivateProject"): string;
+export function seededProject(run: OptionalConfiguredRunConfig, key: "personaPrivateProject"): string;
+export function seededProject(run: ModeRunConfig, key: string): string {
+  const id = (run.fixtures as unknown as Record<string, unknown>)[key];
+  if (typeof id !== "string" || !/^[0-9a-f-]{36}$/.test(id)) throw new Error(`Seeded project ${key} is not available in the ${run.profile} profile`);
+  return id;
 }
 interface ProjectFixtures {
   projects: {

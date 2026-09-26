@@ -7,7 +7,8 @@ import { prerequisites, copySource, reservePorts, compose, composeArgs, ownedCom
 import { expireDiagnostics, recordFailure, retainDiagnostics as retainFailureDiagnostics } from './diagnostics.mjs';
 import { sanitizedEvidence } from './evidence.mjs';
 import { cleanup } from './cleanup.mjs';
-import { freshIdentityValues, writeRuntimeEnv, assertProfile } from './bootstrap-identity.mjs';
+import { freshIdentityValues, writeRuntimeEnv } from './bootstrap-identity.mjs';
+import { assertLaunch, apiModeFor, profileSpec, IDENTITY_SERVICES } from './auth-modes.mjs';
 export function waitForAbort(signal) {
   if (signal.aborted) return Promise.reject(new Error('Interrupted'));
   return new Promise((_, reject) => {
@@ -21,8 +22,7 @@ export function waitForAbort(signal) {
 }
 export async function run({apiSource, lifecycleProbe = false, failAt, hold = false, retainDiagnostics = false, workflow, profile = 'baseline'} = {}) {
   // Each profile is a separate fresh stack (KTD1); the default remains the D06 baseline.
-  assertProfile(profile);
-  if (lifecycleProbe && profile !== 'baseline') throw new Error('Unknown E2E profile combination');
+  assertLaunch({profile, failAt, lifecycleProbe});
   process.umask(0o077);
   await expireDiagnostics();
   const webSource = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -59,7 +59,9 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
     if (ctx.stopping) throw new Error('Interrupted');
     reservation = await reservePorts(); manifest.ports = reservation.ports;
     const secret = () => randomBytes(24).toString('hex');
-    ctx.values = {...freshIdentityValues(), RUN_ID: id, PROJECT: manifest.project, API_PORT: manifest.ports.api, IDENTITY_PORT: manifest.ports.identity, LOGIN_PORT: manifest.ports.login, WEB_PORT: manifest.ports.web, POSTGRES_PASSWORD: secret(), APP_DB_PASSWORD: secret(), IDENTITY_DB_PASSWORD: secret(), APP_SECRET: secret(), MINIO_USER: secret(), MINIO_PASSWORD: secret()};
+    ctx.values = {...freshIdentityValues(), RUN_ID: id, PROJECT: manifest.project, API_PORT: manifest.ports.api, IDENTITY_PORT: manifest.ports.identity, LOGIN_PORT: manifest.ports.login, WEB_PORT: manifest.ports.web, POSTGRES_PASSWORD: secret(), APP_DB_PASSWORD: secret(), IDENTITY_DB_PASSWORD: secret(), APP_SECRET: secret(), MINIO_USER: secret(), MINIO_PASSWORD: secret(),
+      // KTD2: the API mode is a per-profile input; the gate later reads what actually runs.
+      API_AUTH_MODE: apiModeFor(profile, failAt)};
     await writeRuntimeEnv(ctx);
     await saveManifest(manifestDir, manifest);
     manifest.status = 'building'; await saveManifest(manifestDir, manifest);
@@ -96,7 +98,8 @@ export async function run({apiSource, lifecycleProbe = false, failAt, hold = fal
     console.error(`Run ${id} failed during ${manifest.status}; private artifacts will be removed`);
     if (retainDiagnostics) {
       if (!ctx.stopping) {
-        try { await ownedCommand(ctx, 'docker', composeArgs(ctx, 'logs', '--no-color', '--tail=80', 'zitadel', 'login', 'api', 'worker'), {timeout: 15_000}); }
+        const services = [...(profileSpec(profile).identity ? IDENTITY_SERVICES : []), 'api', 'worker'];
+        try { await ownedCommand(ctx, 'docker', composeArgs(ctx, 'logs', '--no-color', '--tail=80', ...services), {timeout: 15_000}); }
         catch { console.error('Private service log capture failed; cleanup will continue'); }
       }
       try { await retainFailureDiagnostics(ctx); } catch { console.error('Private diagnostic retention failed; cleanup will continue'); }
@@ -125,7 +128,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const value = flag => args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined;
   const workflow = args.includes('--lifecycle-probe') ? undefined : (await import('./full-stack.mjs')).fullStack;
   run({workflow, profile: args.includes('--profile') ? value('--profile') : 'baseline', apiSource: value('--api-source'), lifecycleProbe: args.includes('--lifecycle-probe'), failAt: value('--fail-at'), hold: args.includes('--hold'), retainDiagnostics: args.includes('--retain-diagnostics')}).catch(error => {
-    const known = /^(An explicit|Required source file missing:|Local Docker|Only a local|At least 8|Full-stack workflow|Owned command|Injected |Cleanup failed|Interrupted|Unknown E2E profile|Lifecycle |Clock override|Auth clock control rejected)/.test(error.message);
+    const known = /^(An explicit|Required source file missing:|Local Docker|Only a local|At least 8|Full-stack workflow|Owned command|Injected |Cleanup failed|Interrupted|Unknown E2E profile|Lifecycle |Clock override|Auth clock control rejected|Authentication mode disagreement|Seed fixture|Provider-less)/.test(error.message);
     console.error(known ? error.message : 'Isolated lifecycle failed; inspect the sanitized phase above.');
     console.error('No full-stack acceptance claimed.'); process.exitCode ||= 1;});
 }

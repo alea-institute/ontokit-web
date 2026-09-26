@@ -8,7 +8,8 @@ x-api: &api
     APP_ENV: staging
     DEBUG: "false"
     RUN_MIGRATIONS: "0"
-    AUTH_MODE: required
+    # Per-profile API mode (KTD2); the launcher's registry writes it into runtime.env.
+    AUTH_MODE: ${API_AUTH_MODE:?}
     SECRET_KEY: ${APP_SECRET:?}
     DATABASE_URL: postgresql+asyncpg://ontokit:${APP_DB_PASSWORD:?}@postgres:5432/ontokit
     REDIS_URL: redis://redis:6379/0
