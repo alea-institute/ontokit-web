@@ -648,11 +648,11 @@ export const projectOntologyApi = {
     projectId: string,
     classIri: string,
     commitMessage: string,
-    token: string,
+    token: string | undefined,
     branch?: string
   ) =>
     api.delete(`/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
       params: { commit_message: commitMessage, branch },
     }),
 
@@ -690,7 +690,9 @@ export const projectOntologyApi = {
     projectId: string,
     content: string,
     commitMessage: string,
-    token: string,
+    // Undefined only in auth-disabled mode; the API then saves as its
+    // anonymous identity.
+    token: string | undefined,
     branch: string | undefined,
     baseRevision: string,
   ) =>
@@ -698,7 +700,7 @@ export const projectOntologyApi = {
       `/api/v1/projects/${projectId}/source`,
       { content, commit_message: commitMessage, base_revision: baseRevision },
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         params: { branch },
       }
     ),

@@ -22,7 +22,7 @@ import {
 import type { GitHubRepoInfo } from "@/lib/api/userSettings";
 import type { UploadProgress } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
-import { shouldShowAuthUI } from "@/lib/auth-mode";
+import { isClientAuthDisabled, shouldShowAuthUI } from "@/lib/auth-mode";
 
 type TabType = "create" | "import" | "github";
 
@@ -68,19 +68,24 @@ export default function NewProjectPage() {
 
   const isAuthenticated = status === "authenticated";
   const isLoading = status === "loading";
+  // Auth-disabled mode is a single-user workspace: the API creates and imports
+  // projects as its anonymous identity without a token, so Create Empty and
+  // Import from File work signed out. GitHub clone stays unavailable there
+  // because it needs the user's stored GitHub credential.
+  const authDisabled = isClientAuthDisabled();
 
   const handleCreateSubmit = async (data: {
     name: string;
     description?: string;
     is_public: boolean;
   }) => {
-    if (!session?.accessToken) {
+    if (!session?.accessToken && !authDisabled) {
       throw new Error("You must be signed in to create a project");
     }
 
     setIsSubmitting(true);
     try {
-      const project = await projectApi.create(data as ProjectCreate, session.accessToken);
+      const project = await projectApi.create(data as ProjectCreate, session?.accessToken);
       router.push(`/projects/${project.id}`);
     } finally {
       setIsSubmitting(false);
@@ -92,7 +97,7 @@ export default function NewProjectPage() {
     description?: string;
     is_public: boolean;
   }) => {
-    if (!session?.accessToken) {
+    if (!session?.accessToken && !authDisabled) {
       throw new Error("You must be signed in to import a project");
     }
 
@@ -114,7 +119,7 @@ export default function NewProjectPage() {
 
       const project = await projectApi.import(
         importData,
-        session.accessToken,
+        session?.accessToken,
         (progress) => setUploadProgress(progress)
       );
       router.push(`/projects/${project.id}`);
@@ -204,7 +209,7 @@ export default function NewProjectPage() {
 
   // Redirect to sign in if not authenticated. Without an active identity
   // provider sign-in cannot succeed, so explain that instead of linking to it.
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !authDisabled) {
     return (
       <>
         <Header />
@@ -321,6 +326,13 @@ export default function NewProjectPage() {
               />
             )}
 
+            {activeTab === "github" && authDisabled && (
+              <div className="flex items-start gap-3 text-sm text-slate-600 dark:text-slate-400">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" aria-hidden="true" />
+                <p>Cloning from GitHub is unavailable in this configuration.</p>
+              </div>
+            )}
+
             {activeTab === "import" && (
               <div className="space-y-6">
                 {/* File Upload */}
@@ -397,7 +409,7 @@ export default function NewProjectPage() {
               </div>
             )}
 
-            {activeTab === "github" && (
+            {activeTab === "github" && !authDisabled && (
               <div className="space-y-6">
                 {/* Step 1: Select Repository */}
                 <div>

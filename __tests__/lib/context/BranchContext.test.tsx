@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import React from "react";
 import { createQueryWrapper } from "@/__tests__/helpers/renderWithProviders";
@@ -284,6 +284,51 @@ describe("BranchContext", () => {
           await result.current.deleteBranch("feature-1");
         })
       ).rejects.toThrow("Authentication required");
+    });
+  });
+
+  describe("tokenless branch operations by authentication mode", () => {
+    afterEach(() => { vi.unstubAllEnvs(); });
+
+    it("creates, switches and deletes branches without a bearer in disabled mode", async () => {
+      vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+      mockedCreate.mockResolvedValue(makeBranch("new-branch"));
+      mockedDelete.mockResolvedValue(undefined);
+      const wrapper = createWrapper({ projectId: "p1" });
+      const { result } = renderHook(() => useBranch(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await act(async () => {
+        await result.current.createBranch("new-branch", "main");
+      });
+      expect(mockedCreate).toHaveBeenCalledWith("p1", { name: "new-branch", from_branch: "main" }, undefined);
+      expect(result.current.currentBranch).toBe("new-branch");
+
+      await act(async () => {
+        await result.current.switchBranch("feature-1");
+      });
+      expect(result.current.currentBranch).toBe("feature-1");
+      expect(mockedSavePreference).toHaveBeenLastCalledWith("p1", "feature-1", undefined);
+
+      await act(async () => {
+        await result.current.deleteBranch("new-branch");
+      });
+      expect(mockedDelete).toHaveBeenCalledWith("p1", "new-branch", undefined, false);
+    });
+
+    it.each(["required", "optional"])("still refuses tokenless create, switch and delete in %s mode without calling the API", async mode => {
+      vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+      const wrapper = createWrapper({ projectId: "p1" });
+      const { result } = renderHook(() => useBranch(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await expect(act(async () => { await result.current.createBranch("new"); })).rejects.toThrow("Authentication required");
+      await expect(act(async () => { await result.current.switchBranch("feature-1"); })).rejects.toThrow("Authentication required");
+      await expect(act(async () => { await result.current.deleteBranch("feature-1"); })).rejects.toThrow("Authentication required");
+      expect(mockedCreate).not.toHaveBeenCalled();
+      expect(mockedDelete).not.toHaveBeenCalled();
+      expect(mockedSavePreference).not.toHaveBeenCalled();
+      expect(result.current.currentBranch).toBe("main");
     });
   });
 

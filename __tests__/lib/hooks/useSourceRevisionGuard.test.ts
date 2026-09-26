@@ -1,5 +1,5 @@
 import { act, renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, projectOntologyApi } from "@/lib/api/client";
 import { useSourceRevisionGuard } from "@/lib/hooks/useSourceRevisionGuard";
 
@@ -63,6 +63,38 @@ describe("useSourceRevisionGuard", () => {
     );
     expect(setSourceSnapshot).toHaveBeenCalledWith("draft source", "revision-2");
     expect(result.current.conflict).toBeNull();
+  });
+
+  describe("tokenless saves by authentication mode", () => {
+    afterEach(() => { vi.unstubAllEnvs(); });
+    const mountTokenless = () => renderHook(() => useSourceRevisionGuard({
+      projectId: "project-1",
+      accessToken: undefined,
+      activeBranch: "main",
+      sourceRevision: "revision-1",
+      setSourceSnapshot: vi.fn(),
+      reloadSourceContent: vi.fn(),
+    }));
+
+    it("saves without a bearer in disabled mode", async () => {
+      vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+      const { result } = mountTokenless();
+      await act(async () => {
+        await result.current.saveSource("draft source", "Update ontology");
+      });
+      expect(saveSource).toHaveBeenCalledWith(
+        "project-1", "draft source", "Update ontology", undefined, "main", "revision-1",
+      );
+    });
+
+    it.each(["required", "optional"])("still refuses a tokenless save in %s mode without calling the API", async mode => {
+      vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+      const { result } = mountTokenless();
+      await act(async () => {
+        await expect(result.current.saveSource("draft source", "Update ontology")).rejects.toThrow("Not authenticated");
+      });
+      expect(saveSource).not.toHaveBeenCalled();
+    });
   });
 
   it("preserves the draft and exposes reconciliation state without retrying a stale save", async () => {

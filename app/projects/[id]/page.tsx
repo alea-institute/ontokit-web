@@ -20,7 +20,7 @@ import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { useToast } from "@/lib/context/ToastContext";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
-import { shouldShowAuthUI } from "@/lib/auth-mode";
+import { isClientAuthDisabled, shouldShowAuthUI } from "@/lib/auth-mode";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
 export default function ProjectViewerPage() {
@@ -33,6 +33,9 @@ export default function ProjectViewerPage() {
   // Project data from shared React Query cache
   const { project, isRetiredRedirecting, isLoading, error, errorKind } = useProject(projectId, session?.accessToken);
   const { canManage, hasOntology } = derivePermissions(project, session?.accessToken);
+  // Project settings need a token for every read and action, so auth-disabled
+  // mode never links there, even for the workspace owner.
+  const settingsUnavailable = isClientAuthDisabled();
 
   if (isLoading || isRetiredRedirecting || (status === "loading" && authMode === "required")) {
     return (
@@ -115,7 +118,7 @@ export default function ProjectViewerPage() {
                     <LayoutDashboard className="h-4 w-4" />
                   </Button>
                 </Link>
-                {canManage && (
+                {canManage && !settingsUnavailable && (
                   <Link href={`/projects/${projectId}/settings`}>
                     <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                       <Settings className="h-4 w-4" />
@@ -132,13 +135,23 @@ export default function ProjectViewerPage() {
               <p className="mt-2 text-slate-600 dark:text-slate-400">
                 This project doesn&apos;t have an ontology file yet.
               </p>
-              {canManage && (
+              {canManage && !settingsUnavailable && (
                 <>
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
                     Import an ontology file from the project settings.
                   </p>
                   <Link href={`/projects/${projectId}/settings`} className="mt-6 inline-block">
                     <Button variant="outline">Go to Settings</Button>
+                  </Link>
+                </>
+              )}
+              {canManage && settingsUnavailable && (
+                <>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
+                    Project settings are unavailable in this configuration, so an ontology file can&apos;t be added here. Import one as a new project instead.
+                  </p>
+                  <Link href="/projects/new" className="mt-6 inline-block">
+                    <Button variant="outline">Import a new project</Button>
                   </Link>
                 </>
               )}
@@ -327,7 +340,7 @@ function ViewerContent({
                 </Button>
               )}
 
-              {canManage && (
+              {canManage && !isClientAuthDisabled() && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />

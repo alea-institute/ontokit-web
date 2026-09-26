@@ -115,9 +115,10 @@ describe('new project route through the real form and HTTP client', () => {
     expect(form().getByRole('link', { name: 'Sign In' }).getAttribute('href')).toBe('/auth/signin');
   });
 
-  // Disabled mode shows this copy until U4 of the auth-mode matrix plan replaces
-  // it with the Create-Empty form; reverting U4 restores it.
-  it.each([['optional', 'false'], ['disabled', 'false'], ['disabled', 'true']])('explains that project creation is unavailable in %s mode (provider flag %s)', (mode, configured) => {
+  // Disabled mode is a single-user workspace (auth-mode matrix plan U4, provisional):
+  // it gets the Create-Empty form below instead of this copy. Reverting U4
+  // restores the disabled rows here.
+  it.each([['optional', 'false']])('explains that project creation is unavailable in %s mode (provider flag %s)', (mode, configured) => {
     vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', configured);
     const { fetcher } = mount(null);
     expect(screen.getByRole('heading', { name: 'Project creation is unavailable' })).toBeDefined();
@@ -128,6 +129,74 @@ describe('new project route through the real form and HTTP client', () => {
     expect(form().queryByLabelText(/Project Name/)).toBeNull();
     expect(form().getByRole('link', { name: 'Browse public projects' }).getAttribute('href')).toBe('/');
     expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([['disabled', 'false'], ['disabled', 'true']])('creates an empty project without a token in %s mode (provider flag %s)', async (mode, configured) => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', configured);
+    const { fetcher } = mount(null);
+    expect(screen.queryByRole('heading', { name: 'Project creation is unavailable' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Sign in required' })).toBeNull();
+    fireEvent.change(form().getByLabelText(/Project Name/), { target: { value: 'Workspace ontology' } });
+    fireEvent.click(form().getByRole('button', { name: 'Create Project' }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/created-project'));
+    const posts = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');
+    expect(posts).toHaveLength(1);
+    expect(new URL(String(posts[0][0])).pathname).toBe('/api/v1/projects');
+    expect(JSON.parse(String(posts[0][1]?.body))).toEqual({ name: 'Workspace ontology', is_public: false });
+    expect(new Headers(posts[0][1]?.headers).get('Authorization')).toBeNull();
+  });
+
+  it.each([false, true])('imports a Turtle file without a token in disabled mode (provider flag %s)', async configured => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', 'disabled'); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', String(configured));
+    vi.stubGlobal('XMLHttpRequest', Upload);
+    const { fetcher } = mount(null);
+    fireEvent.click(form().getByRole('button', { name: 'Import from File' }));
+    const file = new File(['@prefix ex: <https://example.test/> .\nex:Person a <http://www.w3.org/2002/07/owl#Class> .'], 'workspace.ttl', { type: 'text/turtle' });
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [file] } });
+    fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
+    expect(Upload.requests).toHaveLength(1);
+    const upload = Upload.requests[0];
+    expect(upload.open).toHaveBeenCalledWith('POST', expect.stringContaining('/api/v1/projects/import'));
+    expect(upload.setRequestHeader).not.toHaveBeenCalledWith('Authorization', expect.anything());
+    expect(upload.body?.get('file')).toBe(file);
+    await act(async () => upload.finish(200, { id: 'imported-project' }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/projects/imported-project'));
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([['required', 'true'], ['optional', 'true']])('still refuses a tokenless import in %s mode without uploading', async (mode, configured) => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', configured);
+    vi.stubGlobal('XMLHttpRequest', Upload); mount({ ...session, accessToken: undefined });
+    fireEvent.click(form().getByRole('button', { name: 'Import from File' }));
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(['data'], 'ontology.ttl')] } });
+    fireEvent.click(form().getByRole('button', { name: 'Import Project' }));
+    await screen.findByText('You must be signed in to import a project');
+    expect(Upload.requests).toHaveLength(0); expect(navigation.push).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Clone from GitHub', 'Cloning from GitHub is unavailable in this configuration.', 'Clone & Create Project'],
+  ])('explains that %s is unavailable in disabled mode and offers no submit control', (tab, copy, submit) => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', 'disabled'); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', 'false');
+    const { fetcher } = mount(null);
+    fireEvent.click(form().getByRole('button', { name: tab }));
+    expect(form().getByText(copy)).toBeDefined();
+    expect(form().queryByRole('button', { name: submit })).toBeNull();
+    expect(form().queryByLabelText(/Project Name/)).toBeNull();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+    fireEvent.click(form().getByRole('button', { name: 'Create Empty' }));
+    expect(form().getByRole('button', { name: 'Create Project' })).toBeDefined();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([['required', 'true'], ['optional', 'true']])('still refuses a tokenless create in %s mode without calling the API', async (mode, configured) => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', configured);
+    const { fetcher } = mount({ ...session, accessToken: undefined });
+    fireEvent.change(form().getByLabelText(/Project Name/), { target: { value: 'Project' } });
+    fireEvent.click(form().getByRole('button', { name: 'Create Project' }));
+    expect(await screen.findByText('You must be signed in to create a project')).toBeDefined();
+    expect(fetcher.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false);
+    expect(navigation.push).not.toHaveBeenCalled();
   });
 
   it('rejects a session missing its API token without issuing a create request', async () => {

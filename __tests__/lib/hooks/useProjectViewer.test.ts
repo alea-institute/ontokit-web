@@ -261,6 +261,25 @@ describe("useProjectViewer", () => {
     expect(result.current.hasValidAccess).toBe(false);
   });
 
+  it.each([
+    ["disabled", true, true],
+    ["disabled", false, false],
+    ["optional", true, false],
+    ["required", true, false],
+  ] as const)("in %s mode with derived write access %s reports hasValidAccess %s for a tokenless session", (mode, derived, expected) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+    try {
+      mockUseProject.mockReturnValue({ project: makeProject(), isLoading: false, error: null, errorKind: null });
+      mockDerivePermissions.mockReturnValue(defaultPermissions({ hasValidAccess: derived }));
+      const { result } = renderHook(() =>
+        useProjectViewer({ projectId: "p1", accessToken: undefined, sessionStatus: "unauthenticated", activeBranch: "main" })
+      );
+      expect(result.current.hasValidAccess).toBe(expected);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("returns secondary data (openPRCount, lintSummary) from React Query hooks", () => {
     const project = makeProject();
     mockUseProject.mockReturnValue({

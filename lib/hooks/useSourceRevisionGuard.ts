@@ -6,6 +6,7 @@ import {
   type SourceRevisionConflictDetail,
 } from "@/lib/api/client";
 import type { RevisionFileResponse } from "@/lib/api/revisions";
+import { isClientAuthDisabled } from "@/lib/auth-mode";
 
 export interface SourceRevisionConflictState {
   detail: SourceRevisionConflictDetail;
@@ -75,7 +76,8 @@ export function useSourceRevisionGuard({
     baseRevisionOverride?: string,
   ): Promise<SourceContentSaveResponse> => {
     if (conflict) throw new SourceRevisionConflictError(conflict);
-    if (!accessToken) throw new Error("Not authenticated");
+    // Auth-disabled mode has no token; the API saves as its anonymous identity.
+    if (!accessToken && !isClientAuthDisabled()) throw new Error("Not authenticated");
     if (!activeBranch) throw new Error("No branch selected");
     const baseRevision = baseRevisionOverride ?? sourceRevision;
     if (!baseRevision) {

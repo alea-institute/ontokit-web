@@ -202,9 +202,11 @@ export const projectApi = {
   /**
    * Create a new project
    */
-  create: (data: ProjectCreate, token: string) =>
+  create: (data: ProjectCreate, token?: string) =>
     api.post<Project>("/api/v1/projects", data, {
-      headers: { Authorization: `Bearer ${token}` },
+      // Tokenless only in auth-disabled mode, where the API treats every
+      // caller as its anonymous identity.
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     }),
 
   /**
@@ -215,9 +217,12 @@ export const projectApi = {
    */
   import: (
     data: ProjectImportData,
-    token: string,
+    // Undefined only in auth-disabled mode, where the API imports as its
+    // anonymous identity.
+    token?: string,
     onProgress?: (progress: UploadProgress) => void
   ) => {
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
     const formData = new FormData();
     formData.append("file", data.file);
     formData.append("is_public", String(data.is_public));
@@ -234,14 +239,14 @@ export const projectApi = {
         "/api/v1/projects/import",
         formData,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers,
           onProgress,
         }
       );
     }
 
     return api.upload<ProjectImportResponse>("/api/v1/projects/import", formData, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers,
     });
   },
 

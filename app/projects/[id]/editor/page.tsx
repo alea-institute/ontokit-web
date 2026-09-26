@@ -61,7 +61,7 @@ import { useAnonymousSuggestion } from "@/lib/hooks/useAnonymousSuggestion";
 import { CreditModal } from "@/components/suggestions/CreditModal";
 import { ProposalSubmittedDialog } from "@/components/editor/ProposalSubmittedDialog";
 import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
-import { shouldShowAuthUI } from "@/lib/auth-mode";
+import { isClientAuthDisabled, shouldShowAuthUI } from "@/lib/auth-mode";
 import type { TrustGate } from "@/components/editor/TrustExplainer";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
@@ -121,6 +121,10 @@ export default function EditorPage() {
   // with stale provider flags never offers sign-in.
   const showAuthUI = shouldShowAuthUI();
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+  // Auth-disabled mode never has a token: the API accepts writes as its
+  // anonymous identity and returns that identity's role, which the redirect
+  // and write paths below trust. Required and optional keep every token guard.
+  const writesWithoutToken = isClientAuthDisabled();
 
   // Branch state
   const queryClient = useQueryClient();
@@ -366,7 +370,7 @@ export default function EditorPage() {
   const pendingSaveRejectRef = useRef<((error: Error) => void) | null>(null);
 
   const handleSaveSource = useCallback(async (newContent: string) => {
-    if (!projectId || !session?.accessToken) {
+    if (!projectId || (!session?.accessToken && !writesWithoutToken)) {
       throw new Error("Not authenticated");
     }
     setPendingSaveContent(newContent);
@@ -375,10 +379,10 @@ export default function EditorPage() {
       pendingSaveResolveRef.current = resolve;
       pendingSaveRejectRef.current = reject;
     });
-  }, [projectId, session?.accessToken]);
+  }, [projectId, session?.accessToken, writesWithoutToken]);
 
   const handleCommitConfirm = useCallback(async (commitMessage: string) => {
-    if (!projectId || !session?.accessToken || !pendingSaveContent) {
+    if (!projectId || (!session?.accessToken && !writesWithoutToken) || !pendingSaveContent) {
       throw new Error("Not authenticated or no content to save");
     }
 
@@ -406,7 +410,7 @@ export default function EditorPage() {
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session, pendingSaveContent, loadRootClasses, queryClient, setSourceIriIndex, saveDirectSource]);
+  }, [projectId, session, writesWithoutToken, pendingSaveContent, loadRootClasses, queryClient, setSourceIriIndex, saveDirectSource]);
 
   const handleCommitDialogClose = useCallback((open: boolean) => {
     setCommitDialogOpen(open);
@@ -502,12 +506,12 @@ export default function EditorPage() {
         setSourceContent((prev) => prev + snippet);
       } else {
         // Source not yet loaded — fetch it first to avoid overwriting with just the snippet
-        if (!projectId || !session?.accessToken || !activeBranch) return;
+        if (!projectId || (!session?.accessToken && !writesWithoutToken) || !activeBranch) return;
         try {
           const response = await revisionsApi.getFileAtVersion(
             projectId,
             activeBranch,
-            session.accessToken,
+            session?.accessToken,
             project?.git_ontology_path
           );
           setSourceSnapshot(response.content + snippet, response.revision);
@@ -521,7 +525,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent, setSourceSnapshot],
+    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, writesWithoutToken, activeBranch, project, toast, setSourceContent, setSourceSnapshot],
   );
 
   const generatedEntityAccessToken = session?.accessToken;
@@ -698,7 +702,7 @@ export default function EditorPage() {
   }, []);
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTargetIri || !session?.accessToken) return;
+    if (!deleteTargetIri || (!session?.accessToken && !writesWithoutToken)) return;
 
     // Optimistic removal
     removeOptimisticNode(deleteTargetIri);
@@ -708,7 +712,7 @@ export default function EditorPage() {
         projectId,
         deleteTargetIri,
         `Delete class ${deleteTargetLabel}`,
-        session.accessToken,
+        session?.accessToken,
         activeBranch
       );
       toast.success(`Deleted "${deleteTargetLabel}"`);
@@ -726,12 +730,12 @@ export default function EditorPage() {
       // Reload tree to restore state
       loadRootClasses();
     }
-  }, [deleteTargetIri, deleteTargetLabel, session, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, resetSourceState]);
+  }, [deleteTargetIri, deleteTargetLabel, session, writesWithoutToken, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, resetSourceState]);
 
   // Handle update class (form-based editing)
   // Routes through source save: modifies the Turtle text and commits via PUT /source
   const handleUpdateClass = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
-    if (!session?.accessToken) {
+    if (!session?.accessToken && !writesWithoutToken) {
       throw new Error("Not authenticated");
     }
     if (!activeBranch) {
@@ -753,11 +757,11 @@ export default function EditorPage() {
     // Update the tree node label in-place (preserves expansion state)
     updateNodeLabel(classIri, label);
     refreshAfterDirectEntitySave();
-  }, [session, activeBranch, toast, updateNodeLabel, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
+  }, [session, writesWithoutToken, activeBranch, toast, updateNodeLabel, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle update property (form-based editing)
   const handleUpdateProperty = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
-    if (!session?.accessToken) {
+    if (!session?.accessToken && !writesWithoutToken) {
       throw new Error("Not authenticated");
     }
     if (!activeBranch) {
@@ -773,11 +777,11 @@ export default function EditorPage() {
     await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
     refreshAfterDirectEntitySave();
-  }, [session, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
+  }, [session, writesWithoutToken, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle update individual (form-based editing)
   const handleUpdateIndividual = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
-    if (!session?.accessToken) {
+    if (!session?.accessToken && !writesWithoutToken) {
       throw new Error("Not authenticated");
     }
     if (!activeBranch) {
@@ -793,7 +797,7 @@ export default function EditorPage() {
     await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
     refreshAfterDirectEntitySave();
-  }, [session, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
+  }, [session, writesWithoutToken, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle suggestion-mode class update
   // Instead of directly committing, sends modified source to the suggestion branch
@@ -1202,7 +1206,9 @@ export default function EditorPage() {
   // Auth guard: redirect unauthenticated or unauthorized users to the viewer —
   // UNLESS anonymous proposal mode applies (AUTH_MODE != required + public
   // project): those users are this page's audience in propose mode (PR-7).
-  if ((status === "unauthenticated" || (project && !canSuggest)) && !canPropose) {
+  // In auth-disabled mode there is never a session, so an edit-capable API role
+  // (reported by hasValidAccess) keeps the visitor in the editor.
+  if (((status === "unauthenticated" && !hasValidAccess) || (project && !canSuggest)) && !canPropose) {
     router.replace(`/projects/${projectId}`);
     return (
       <>
@@ -1234,7 +1240,7 @@ export default function EditorPage() {
                 <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
                 <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               </div>
-              {canManage && (
+              {canManage && !writesWithoutToken && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
@@ -1250,12 +1256,27 @@ export default function EditorPage() {
               <p className="mt-2 text-slate-600 dark:text-slate-400">
                 This project doesn&apos;t have an ontology file yet.
               </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
-                Import an ontology file from the project settings.
-              </p>
-              <Link href={`/projects/${projectId}/settings`} className="mt-6 inline-block">
-                <Button variant="outline">Go to Settings</Button>
-              </Link>
+              {writesWithoutToken ? (
+                // Project settings need a token for every read and action, so
+                // auth-disabled mode points at importing a new project instead.
+                <>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
+                    Project settings are unavailable in this configuration, so an ontology file can&apos;t be added here. Import one as a new project instead.
+                  </p>
+                  <Link href="/projects/new" className="mt-6 inline-block">
+                    <Button variant="outline">Import a new project</Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
+                    Import an ontology file from the project settings.
+                  </p>
+                  <Link href={`/projects/${projectId}/settings`} className="mt-6 inline-block">
+                    <Button variant="outline">Go to Settings</Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </main>
@@ -1475,7 +1496,7 @@ export default function EditorPage() {
                 <Keyboard className="h-4 w-4" />
               </Button>
 
-              {canManage && (
+              {canManage && !writesWithoutToken && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />

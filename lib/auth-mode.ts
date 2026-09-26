@@ -49,3 +49,17 @@ export function shouldShowAuthUI(): boolean {
   const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
   return mode !== "disabled" && zitadelConfigured;
 }
+
+/**
+ * Client-safe disabled-mode predicate. Reads the build-time
+ * NEXT_PUBLIC_AUTH_MODE flag and, like {@link getAuthMode}, ignores case.
+ *
+ * In disabled mode the API treats every caller as its anonymous identity and
+ * grants that identity the role it holds on each project (owner of the
+ * projects it created). The web therefore trusts the API-returned `user_role`
+ * and makes write calls without a bearer token in this mode only; required and
+ * optional modes keep every token guard.
+ */
+export function isClientAuthDisabled(): boolean {
+  return (process.env.NEXT_PUBLIC_AUTH_MODE || "required").toLowerCase() === "disabled";
+}

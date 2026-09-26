@@ -162,6 +162,14 @@ export const revisionsApi = {
   },
 };
 
+/**
+ * Bearer header for a token, or none. Branch writes are tokenless only in
+ * auth-disabled mode, where the API treats every caller as its anonymous
+ * identity; every other mode still supplies a token.
+ */
+const bearer = (token?: string): HeadersInit | undefined =>
+  token ? { Authorization: `Bearer ${token}` } : undefined;
+
 export const branchesApi = {
   /**
    * List all branches for a project
@@ -180,44 +188,44 @@ export const branchesApi = {
   /**
    * Create a new branch
    */
-  create: (projectId: string, data: BranchCreate, token: string) =>
+  create: (projectId: string, data: BranchCreate, token?: string) =>
     api.post<BranchInfo>(`/api/v1/projects/${projectId}/branches`, data, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: bearer(token),
     }),
 
   /**
    * Switch to a different branch
    */
-  switch: (projectId: string, branchName: string, token: string) =>
+  switch: (projectId: string, branchName: string, token?: string) =>
     api.post<BranchInfo>(
       `/api/v1/projects/${projectId}/branches/${encodeURIComponent(branchName)}/checkout`,
       undefined,
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: bearer(token),
       }
     ),
 
   /**
    * Delete a branch
    */
-  delete: (projectId: string, branchName: string, token: string, force = false) =>
+  delete: (projectId: string, branchName: string, token?: string, force = false) =>
     api.delete(
       `/api/v1/projects/${projectId}/branches/${encodeURIComponent(branchName)}`,
       {
         params: { force },
-        headers: { Authorization: `Bearer ${token}` },
+        headers: bearer(token),
       }
     ),
 
   /**
    * Save user's branch preference (fire-and-forget)
    */
-  savePreference: (projectId: string, branch: string, token: string) =>
+  savePreference: (projectId: string, branch: string, token?: string) =>
     api.put<void>(
       `/api/v1/projects/${projectId}/branch-preference`,
       undefined,
       {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: bearer(token),
         params: { branch },
       }
     ),

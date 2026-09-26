@@ -5,6 +5,7 @@ import {
   isAuthRequired,
   isAuthActive,
   shouldShowAuthUI,
+  isClientAuthDisabled,
 } from "@/lib/auth-mode";
 
 // These helpers read process.env at call time (no module-level side effects),
@@ -112,6 +113,22 @@ describe("shouldShowAuthUI mode matrix (gates every sign-in affordance)", () => 
   ] as const)("mode %s with provider flag %s -> %s", (mode, configured, expected) => {
     setEnv({ NEXT_PUBLIC_AUTH_MODE: mode, NEXT_PUBLIC_ZITADEL_CONFIGURED: configured });
     expect(shouldShowAuthUI()).toBe(expected);
+  });
+});
+
+describe("isClientAuthDisabled (client-safe disabled-mode predicate)", () => {
+  it.each([
+    ["disabled", "false", true],
+    ["disabled", "true", true],
+    // Matches the server's case-insensitive getAuthMode().
+    ["DISABLED", undefined, true],
+    ["optional", "false", false],
+    ["optional", "true", false],
+    ["required", "true", false],
+    [undefined, "true", false],
+  ] as const)("mode %s with provider flag %s -> %s", (mode, configured, expected) => {
+    setEnv({ NEXT_PUBLIC_AUTH_MODE: mode, NEXT_PUBLIC_ZITADEL_CONFIGURED: configured });
+    expect(isClientAuthDisabled()).toBe(expected);
   });
 });
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import React from "react";
@@ -162,6 +162,43 @@ describe("derivePermissions", () => {
   it("reports no ontology when source_file_path is absent", () => {
     const perms = derivePermissions(makeProject({ source_file_path: undefined }));
     expect(perms.hasOntology).toBe(false);
+  });
+});
+
+describe("derivePermissions by authentication mode", () => {
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it.each(["owner", "admin", "editor"] as const)("in disabled mode trusts the API role %s without an access token", role => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+    const perms = derivePermissions(makeProject({ user_role: role }));
+    expect(perms.canEdit).toBe(true);
+    expect(perms.canSuggest).toBe(true);
+    expect(perms.isSuggestionMode).toBe(false);
+    expect(perms.hasValidAccess).toBe(true);
+  });
+
+  it.each([["viewer"], [undefined]] as const)("in disabled mode grants no write access for role %s", role => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+    const perms = derivePermissions(makeProject({ user_role: role }));
+    expect(perms.canEdit).toBe(false);
+    expect(perms.canSuggest).toBe(false);
+    expect(perms.hasValidAccess).toBe(false);
+  });
+
+  it("in disabled mode grants no edit permission for an unexpected role string", () => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+    const perms = derivePermissions(makeProject({ user_role: "superuser" as unknown as Project["user_role"] }));
+    expect(perms.canEdit).toBe(false);
+    expect(perms.canManage).toBe(false);
+    expect(perms.hasValidAccess).toBe(false);
+  });
+
+  it.each([["required", "true"], ["optional", "true"], ["optional", "false"]])("in %s mode (provider flag %s) grants no write access without a token even when a role is present", (mode, configured) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", configured);
+    const perms = derivePermissions(makeProject({ user_role: "owner" }));
+    expect(perms.hasValidAccess).toBe(false);
+    expect(derivePermissions(makeProject({ user_role: "owner" }), "token").hasValidAccess).toBe(true);
   });
 });
 
