@@ -45,9 +45,10 @@ export function isAuthActive(): boolean {
  * (Sign in button, UserMenu, NotificationBell) are shown.
  */
 export function shouldShowAuthUI(): boolean {
-  const mode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
   const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
-  return mode !== "disabled" && zitadelConfigured;
+  // Same case-insensitive disabled check as isClientAuthDisabled(), so a
+  // mixed-case mode can never both write tokenless and offer sign-in.
+  return !isClientAuthDisabled() && zitadelConfigured;
 }
 
 /**

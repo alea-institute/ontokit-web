@@ -51,7 +51,7 @@ function mount(options: { role?: string; public?: boolean; anonymous?: boolean; 
       client.setQueryData(key, { ...current, user_role: role });
     }, fail: (value: boolean) => { failMutation = value; } };
 }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 const main = () => within(screen.getByRole('main'));
 
 describe('dashboard through project queries, permissions and join-request HTTP client', () => {
@@ -207,6 +207,33 @@ describe('dashboard through project queries, permissions and join-request HTTP c
     expect(main().queryByRole('link', { name: /Translation Coverage/ })).toBeNull();
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('Authorization')).toBe(false);
+  });
+
+  // Auth-mode matrix U4 review: Settings needs a token for every read and
+  // action, so a tokenless disabled-mode owner must not be sent there.
+  it.each([
+    { mode: 'required', anonymous: false, settings: true },
+    { mode: 'disabled', anonymous: true, settings: false },
+  ])('offers owner Settings navigation only when Settings is usable ($mode mode)', async ({ mode, anonymous, settings }) => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode);
+    mount({ role: 'owner', anonymous, memberCount: 3 });
+    expect(await screen.findByRole('heading', { name: 'Connected ontology' })).toBeDefined();
+    expect(main().getByRole('link', { name: 'Open Editor' }).getAttribute('href')).toBe('/projects/dashboard-project/editor');
+    const links = [
+      main().queryByRole('link', { name: 'Settings' }),
+      main().queryByRole('link', { name: /Project Settings/ }),
+      main().queryByRole('link', { name: /Team Members/ }),
+    ];
+    if (settings) {
+      expect(links.map(link => link?.getAttribute('href'))).toEqual([
+        '/projects/dashboard-project/settings',
+        '/projects/dashboard-project/settings',
+        '/projects/dashboard-project/settings#members',
+      ]);
+    } else {
+      expect(links).toEqual([null, null, null]);
+      expect(screen.queryAllByRole('link').some(link => link.getAttribute('href')?.includes('/settings'))).toBe(false);
+    }
   });
 
   it.each([

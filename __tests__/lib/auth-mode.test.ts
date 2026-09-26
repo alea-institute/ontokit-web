@@ -110,9 +110,17 @@ describe("shouldShowAuthUI mode matrix (gates every sign-in affordance)", () => 
     ["disabled", "false", false],
     // Disabled mode with stale provider flags must never offer sign-in.
     ["disabled", "true", false],
+    // Case-insensitive, like getAuthMode() and isClientAuthDisabled(): a
+    // mixed-case disabled mode writes tokenless, so it must not offer sign-in.
+    ["Disabled", "true", false],
+    ["DISABLED", "true", false],
+    ["Optional", "true", true],
+    ["REQUIRED", "true", true],
   ] as const)("mode %s with provider flag %s -> %s", (mode, configured, expected) => {
     setEnv({ NEXT_PUBLIC_AUTH_MODE: mode, NEXT_PUBLIC_ZITADEL_CONFIGURED: configured });
     expect(shouldShowAuthUI()).toBe(expected);
+    // The two client predicates must never both claim the same mode.
+    if (isClientAuthDisabled()) expect(shouldShowAuthUI()).toBe(false);
   });
 });
 
@@ -122,6 +130,7 @@ describe("isClientAuthDisabled (client-safe disabled-mode predicate)", () => {
     ["disabled", "true", true],
     // Matches the server's case-insensitive getAuthMode().
     ["DISABLED", undefined, true],
+    ["Disabled", "true", true],
     ["optional", "false", false],
     ["optional", "true", false],
     ["required", "true", false],

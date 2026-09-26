@@ -39,6 +39,17 @@ describe('Next configuration through the real internationalization wrapper', () 
   });
 
   it.each([
+    ['Disabled', 'disabled'],
+    ['OPTIONAL', 'optional'],
+    ['Required', 'required'],
+  ])('publishes a mixed-case %s mode in the server\'s normalized form', async (mode, expected) => {
+    vi.stubEnv('AUTH_MODE', mode);
+    const value = await config();
+    expect(value.env?.NEXT_PUBLIC_AUTH_MODE).toBe(expected);
+    expect(value.env?.NEXT_PUBLIC_AUTH_MODE).toBe(getAuthMode());
+  });
+
+  it.each([
     { api: undefined, ws: undefined, allowed: ['http://localhost:8000'] },
     { api: 'https://api.example.invalid/v1?query=ignored', ws: 'wss://socket.example.invalid:8443/ws', allowed: ['https://api.example.invalid', 'wss://socket.example.invalid:8443'] },
     { api: 'invalid-api', ws: 'invalid-socket', allowed: [] },

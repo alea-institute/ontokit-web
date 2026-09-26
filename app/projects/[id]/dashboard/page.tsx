@@ -23,6 +23,7 @@ import {
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
+import { isClientAuthDisabled } from "@/lib/auth-mode";
 import {
   joinRequestApi,
   type MyJoinRequestResponse,
@@ -38,6 +39,9 @@ export default function ProjectDashboardPage() {
   // Project data from shared React Query cache
   const { project, isRetiredRedirecting, isLoading, error } = useProject(projectId, session?.accessToken);
   const { canEdit, canSuggest, canManage } = derivePermissions(project, session?.accessToken);
+  // Project settings need a token for every read and action, so auth-disabled
+  // mode (never a token) offers no link there. Matches the project page.
+  const settingsAvailable = !isClientAuthDisabled();
 
   // Join request state
   const [joinRequestStatus, setJoinRequestStatus] =
@@ -267,7 +271,7 @@ export default function ProjectDashboardPage() {
               </div>
 
               <div className="flex shrink-0 gap-2">
-                {canManage && (
+                {canManage && settingsAvailable && (
                   <Link href={`/projects/${project.id}/settings`}>
                     <Button variant="outline" size="sm">
                       <Settings className="mr-2 h-4 w-4" />
@@ -478,7 +482,7 @@ export default function ProjectDashboardPage() {
               </Link>
             )}
 
-            {canManage && (
+            {canManage && settingsAvailable && (
               <Link
                 href={`/projects/${project.id}/settings`}
                 className="rounded-lg border border-slate-200 bg-white p-5 transition-all hover:border-primary-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-primary-600"
@@ -495,7 +499,7 @@ export default function ProjectDashboardPage() {
               </Link>
             )}
 
-            {(canManage || project.member_count > 1) && (
+            {settingsAvailable && (canManage || project.member_count > 1) && (
               <Link
                 href={`/projects/${project.id}/settings#members`}
                 className="rounded-lg border border-slate-200 bg-white p-5 transition-all hover:border-primary-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-800 dark:hover:border-primary-600"

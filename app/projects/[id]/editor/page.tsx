@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn, Pencil } from "lucide-react";
+import { ArrowLeft, Settings, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn, Pencil } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
+import { NoOntologyFileEmptyState } from "@/components/projects/NoOntologyFileEmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { SourceRevisionConflictBanner } from "@/components/editor/SourceRevisionConflictBanner";
@@ -125,6 +126,9 @@ export default function EditorPage() {
   // anonymous identity and returns that identity's role, which the redirect
   // and write paths below trust. Required and optional keep every token guard.
   const writesWithoutToken = isClientAuthDisabled();
+  // Single write guard for this page, mirroring canWrite in BranchContext: a
+  // token authorizes writes, and so does auth-disabled mode, which never has one.
+  const canWrite = !!session?.accessToken || writesWithoutToken;
 
   // Branch state
   const queryClient = useQueryClient();
@@ -370,7 +374,7 @@ export default function EditorPage() {
   const pendingSaveRejectRef = useRef<((error: Error) => void) | null>(null);
 
   const handleSaveSource = useCallback(async (newContent: string) => {
-    if (!projectId || (!session?.accessToken && !writesWithoutToken)) {
+    if (!projectId || !canWrite) {
       throw new Error("Not authenticated");
     }
     setPendingSaveContent(newContent);
@@ -379,10 +383,10 @@ export default function EditorPage() {
       pendingSaveResolveRef.current = resolve;
       pendingSaveRejectRef.current = reject;
     });
-  }, [projectId, session?.accessToken, writesWithoutToken]);
+  }, [projectId, canWrite]);
 
   const handleCommitConfirm = useCallback(async (commitMessage: string) => {
-    if (!projectId || (!session?.accessToken && !writesWithoutToken) || !pendingSaveContent) {
+    if (!projectId || !canWrite || !pendingSaveContent) {
       throw new Error("Not authenticated or no content to save");
     }
 
@@ -410,7 +414,7 @@ export default function EditorPage() {
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session, writesWithoutToken, pendingSaveContent, loadRootClasses, queryClient, setSourceIriIndex, saveDirectSource]);
+  }, [projectId, session, canWrite, pendingSaveContent, loadRootClasses, queryClient, setSourceIriIndex, saveDirectSource]);
 
   const handleCommitDialogClose = useCallback((open: boolean) => {
     setCommitDialogOpen(open);
@@ -506,7 +510,7 @@ export default function EditorPage() {
         setSourceContent((prev) => prev + snippet);
       } else {
         // Source not yet loaded — fetch it first to avoid overwriting with just the snippet
-        if (!projectId || (!session?.accessToken && !writesWithoutToken) || !activeBranch) return;
+        if (!projectId || !canWrite || !activeBranch) return;
         try {
           const response = await revisionsApi.getFileAtVersion(
             projectId,
@@ -525,7 +529,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, writesWithoutToken, activeBranch, project, toast, setSourceContent, setSourceSnapshot],
+    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, canWrite, activeBranch, project, toast, setSourceContent, setSourceSnapshot],
   );
 
   const generatedEntityAccessToken = session?.accessToken;
@@ -702,7 +706,7 @@ export default function EditorPage() {
   }, []);
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTargetIri || (!session?.accessToken && !writesWithoutToken)) return;
+    if (!deleteTargetIri || !canWrite) return;
 
     // Optimistic removal
     removeOptimisticNode(deleteTargetIri);
@@ -730,12 +734,12 @@ export default function EditorPage() {
       // Reload tree to restore state
       loadRootClasses();
     }
-  }, [deleteTargetIri, deleteTargetLabel, session, writesWithoutToken, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, resetSourceState]);
+  }, [deleteTargetIri, deleteTargetLabel, session, canWrite, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, resetSourceState]);
 
   // Handle update class (form-based editing)
   // Routes through source save: modifies the Turtle text and commits via PUT /source
   const handleUpdateClass = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
-    if (!session?.accessToken && !writesWithoutToken) {
+    if (!canWrite) {
       throw new Error("Not authenticated");
     }
     if (!activeBranch) {
@@ -757,11 +761,11 @@ export default function EditorPage() {
     // Update the tree node label in-place (preserves expansion state)
     updateNodeLabel(classIri, label);
     refreshAfterDirectEntitySave();
-  }, [session, writesWithoutToken, activeBranch, toast, updateNodeLabel, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
+  }, [session, canWrite, activeBranch, toast, updateNodeLabel, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle update property (form-based editing)
   const handleUpdateProperty = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
-    if (!session?.accessToken && !writesWithoutToken) {
+    if (!canWrite) {
       throw new Error("Not authenticated");
     }
     if (!activeBranch) {
@@ -777,11 +781,11 @@ export default function EditorPage() {
     await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
     refreshAfterDirectEntitySave();
-  }, [session, writesWithoutToken, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
+  }, [session, canWrite, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle update individual (form-based editing)
   const handleUpdateIndividual = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
-    if (!session?.accessToken && !writesWithoutToken) {
+    if (!canWrite) {
       throw new Error("Not authenticated");
     }
     if (!activeBranch) {
@@ -797,7 +801,7 @@ export default function EditorPage() {
     await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
     refreshAfterDirectEntitySave();
-  }, [session, writesWithoutToken, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
+  }, [session, canWrite, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle suggestion-mode class update
   // Instead of directly committing, sends modified source to the suggestion branch
@@ -1249,36 +1253,7 @@ export default function EditorPage() {
               )}
             </div>
           </div>
-          <div className="flex h-[calc(100vh-4rem-3.5rem)] items-center justify-center">
-            <div className="text-center">
-              <FileCode className="mx-auto h-16 w-16 text-slate-400" />
-              <h2 className="mt-4 text-xl font-semibold text-slate-900 dark:text-white">No Ontology File</h2>
-              <p className="mt-2 text-slate-600 dark:text-slate-400">
-                This project doesn&apos;t have an ontology file yet.
-              </p>
-              {writesWithoutToken ? (
-                // Project settings need a token for every read and action, so
-                // auth-disabled mode points at importing a new project instead.
-                <>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
-                    Project settings are unavailable in this configuration, so an ontology file can&apos;t be added here. Import one as a new project instead.
-                  </p>
-                  <Link href="/projects/new" className="mt-6 inline-block">
-                    <Button variant="outline">Import a new project</Button>
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
-                    Import an ontology file from the project settings.
-                  </p>
-                  <Link href={`/projects/${projectId}/settings`} className="mt-6 inline-block">
-                    <Button variant="outline">Go to Settings</Button>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
+          <NoOntologyFileEmptyState projectId={projectId} settingsAvailable={!writesWithoutToken} canManage={canManage} />
         </main>
       </>
     );

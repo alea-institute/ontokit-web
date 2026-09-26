@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, LogIn, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Settings, LogIn, LayoutDashboard } from "lucide-react";
 import { ShareButton } from "@/components/editor/ShareButton";
 import { DemoProjectLink } from "@/components/projects/demo-project-entry";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
+import { NoOntologyFileEmptyState } from "@/components/projects/NoOntologyFileEmptyState";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
 import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
 import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
@@ -128,35 +129,7 @@ export default function ProjectViewerPage() {
               </div>
             </div>
           </div>
-          <div className="flex h-[calc(100vh-4rem-3.5rem)] items-center justify-center">
-            <div className="text-center">
-              <FileCode className="mx-auto h-16 w-16 text-slate-400" />
-              <h2 className="mt-4 text-xl font-semibold text-slate-900 dark:text-white">No Ontology File</h2>
-              <p className="mt-2 text-slate-600 dark:text-slate-400">
-                This project doesn&apos;t have an ontology file yet.
-              </p>
-              {canManage && !settingsUnavailable && (
-                <>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
-                    Import an ontology file from the project settings.
-                  </p>
-                  <Link href={`/projects/${projectId}/settings`} className="mt-6 inline-block">
-                    <Button variant="outline">Go to Settings</Button>
-                  </Link>
-                </>
-              )}
-              {canManage && settingsUnavailable && (
-                <>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
-                    Project settings are unavailable in this configuration, so an ontology file can&apos;t be added here. Import one as a new project instead.
-                  </p>
-                  <Link href="/projects/new" className="mt-6 inline-block">
-                    <Button variant="outline">Import a new project</Button>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
+          <NoOntologyFileEmptyState projectId={projectId} settingsAvailable={!settingsUnavailable} canManage={canManage} />
         </main>
       </>
     );
