@@ -1,0 +1,13 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-26T03:21:40Z",
+  "trigger": "precompact-auto",
+  "phase": "16-reviewer-enhancements",
+  "phase_dir": ".planning/phases/16-reviewer-enhancements",
+  "git": {
+    "branch": "test/d09-auth-mode-matrix-20260925",
+    "head": "b6b5f8e2",
+    "modified_files": 1
+  },
+  "note": "Auto-saved by PreCompact hook. Run /gsd-resume-work in a fresh session."
+}
