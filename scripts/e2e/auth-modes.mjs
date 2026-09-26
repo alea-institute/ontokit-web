@@ -52,14 +52,28 @@ export function playwrightProjects(profile) {
 }
 
 // ---- Launcher failure injection (probes only) ----
+// The complete allowlist of --fail-at points. Each predicate says where the point can
+// actually fire; a name outside this list, or a point that cannot fire for the launch,
+// is rejected before any allocation so a typo never degrades into an ordinary green run.
+const always = () => true;
+const identityProfile = ({profile, lifecycleProbe}) => !lifecycleProbe && profileSpec(profile).identity;
 export const FAIL_POINTS = Object.freeze({
-  // Stops after mode agreement and fixture seeding, immediately before Playwright.
-  'before-browser': () => true,
+  // Legacy D06/D08 points.
+  'after-dependencies': always,
+  'after-workflow': always,
+  'identity-pat': identityProfile,
+  'identity-issuer': identityProfile,
+  'identity-callback': identityProfile,
+  'lifecycle-readback': ({profile, lifecycleProbe}) => !lifecycleProbe && profile === 'lifecycle',
+  'clock-preflight': ({profile, lifecycleProbe}) => !lifecycleProbe && profile === 'lifecycle',
+  // Stops after mode agreement and fixture seeding, immediately before Playwright. Only
+  // the seeded D09 profiles reach that stop; baseline and lifecycle would run green.
+  'before-browser': ({profile, lifecycleProbe}) => !lifecycleProbe && MODE_PROFILES.includes(profile),
   // Build the web copy with a neighbouring profile's auth env; the gate must reject it.
-  'web-mode-mismatch': profile => MODE_PROFILES.includes(profile),
+  'web-mode-mismatch': ({profile, lifecycleProbe}) => !lifecycleProbe && MODE_PROFILES.includes(profile),
   // Start the API with a neighbouring mode; provider-less profiles only, because
   // identity bootstrap independently asserts optional-configured's API mode.
-  'api-mode-mismatch': profile => ['optional-anonymous', 'disabled'].includes(profile),
+  'api-mode-mismatch': ({profile, lifecycleProbe}) => !lifecycleProbe && ['optional-anonymous', 'disabled'].includes(profile),
 });
 const WEB_MISMATCH = Object.freeze({'optional-configured': {webMode: 'optional', identity: false}, 'optional-anonymous': {webMode: 'disabled', identity: false}, disabled: {webMode: 'optional', identity: false}});
 const API_MISMATCH = Object.freeze({'optional-anonymous': 'disabled', disabled: 'optional'});
@@ -67,8 +81,9 @@ const API_MISMATCH = Object.freeze({'optional-anonymous': 'disabled', disabled: 
 export function assertLaunch({profile, failAt, lifecycleProbe = false}) {
   profileSpec(profile);
   if (lifecycleProbe && profile !== 'baseline') throw new Error('Unknown E2E profile combination');
-  if (failAt !== undefined && Object.hasOwn(FAIL_POINTS, failAt) && !FAIL_POINTS[failAt](profile)) throw new Error('Unknown E2E profile combination');
-  if (lifecycleProbe && failAt !== undefined && Object.hasOwn(FAIL_POINTS, failAt)) throw new Error('Unknown E2E profile combination');
+  if (failAt === undefined) return profile;
+  if (typeof failAt !== 'string' || !Object.hasOwn(FAIL_POINTS, failAt)) throw new Error('Unknown E2E failure point');
+  if (!FAIL_POINTS[failAt]({profile, lifecycleProbe})) throw new Error('Unknown E2E profile combination');
   return profile;
 }
 /** The API AUTH_MODE Compose receives for this launch. */

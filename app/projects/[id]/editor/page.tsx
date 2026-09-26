@@ -126,9 +126,6 @@ export default function EditorPage() {
   // anonymous identity and returns that identity's role, which the redirect
   // and write paths below trust. Required and optional keep every token guard.
   const writesWithoutToken = isClientAuthDisabled();
-  // Single write guard for this page, mirroring canWrite in BranchContext: a
-  // token authorizes writes, and so does auth-disabled mode, which never has one.
-  const canWrite = !!session?.accessToken || writesWithoutToken;
 
   // Branch state
   const queryClient = useQueryClient();
@@ -162,6 +159,12 @@ export default function EditorPage() {
     connectionStatus, wsEndpoint, wsPurpose,
     resetSourceState,
   } = viewer;
+
+  // Single write guard for this page, mirroring canWrite in BranchContext: a
+  // token authorizes writes. Auth-disabled mode never has one, so there the
+  // anonymous identity's edit-capable role is the credential — a visitor on a
+  // public project it cannot edit may only propose, never commit.
+  const canWrite = !!session?.accessToken || (writesWithoutToken && !!canEdit);
 
   // LLM access gate — shared (React Query dedupes) with the layouts. Used here
   // to scope the suggestion keyboard shortcuts so they only register when the
@@ -547,6 +550,7 @@ export default function EditorPage() {
       : isSuggestionMode
         ? "authenticated-suggestion"
         : "direct";
+    if (mode === "direct" && !canWrite) throw new Error("Not authenticated");
     if (mode === "direct" && sourceRevisionConflictRef.current) {
       throw new SourceRevisionConflictError(sourceRevisionConflictRef.current);
     }
@@ -600,7 +604,7 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     setDetailRefreshKey((key) => key + 1);
-    if (mode === "direct" && generatedEntityAccessToken) {
+    if (mode === "direct") {
       queryClient.invalidateQueries({
         queryKey: branchQueryKeys.list(projectId, generatedEntityAccessToken),
       });
@@ -608,6 +612,7 @@ export default function EditorPage() {
   }, [
     isAnonymousProposalMode,
     isSuggestionMode,
+    canWrite,
     projectId,
     activeBranch,
     generatedEntityAccessToken,
@@ -904,9 +909,15 @@ export default function EditorPage() {
     });
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
-  // Handle anonymous proposal mode class update
-  // Routes through anonymousSuggestion.saveToSession() instead of the normal commit path
-  const handleAnonymousClassUpdate = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
+  // Anonymous proposal saves route through anonymousSuggestion.saveToSession()
+  // instead of any commit path. Every entity kind shares this helper so no
+  // form edit made while proposing can reach a direct base-branch write.
+  const saveAnonymousProposal = useCallback(async (
+    entityIri: string,
+    label: string,
+    modify: (source: string) => string,
+    options: { updateTreeLabel?: boolean } = {},
+  ) => {
     if (!activeBranch && !anonymousSuggestion.branch) {
       throw new Error("No branch selected");
     }
@@ -929,10 +940,9 @@ export default function EditorPage() {
       source = response.content;
     }
 
-    const modifiedSource = updateClassInTurtle(source, classIri, data);
-    const label = data.labels[0]?.value || getLocalName(classIri);
+    const modifiedSource = modify(source);
 
-    const saved = await anonymousSuggestion.saveToSession(modifiedSource, classIri, label);
+    const saved = await anonymousSuggestion.saveToSession(modifiedSource, entityIri, label);
     if (!saved) {
       // A concurrent save was in flight (or the save failed — errors already
       // toast via onError). Do NOT report success or update local state for a
@@ -943,11 +953,42 @@ export default function EditorPage() {
 
     setSourceContent(modifiedSource);
     toast.success(`Proposed update to "${label}"`);
-    updateNodeLabel(classIri, label);
+    if (options.updateTreeLabel) updateNodeLabel(entityIri, label);
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
   }, [activeBranch, anonymousSuggestion, projectId, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, setSourceContent, setSourceIriIndex]);
+
+  const handleAnonymousClassUpdate = useCallback(
+    (classIri: string, data: ClassUpdatePayload) =>
+      saveAnonymousProposal(
+        classIri,
+        data.labels[0]?.value || getLocalName(classIri),
+        (source) => updateClassInTurtle(source, classIri, data),
+        { updateTreeLabel: true },
+      ),
+    [saveAnonymousProposal],
+  );
+
+  const handleAnonymousPropertyUpdate = useCallback(
+    (propertyIri: string, data: TurtlePropertyUpdateData) =>
+      saveAnonymousProposal(
+        propertyIri,
+        data.labels[0]?.value || getLocalName(propertyIri),
+        (source) => updatePropertyInTurtle(source, propertyIri, data),
+      ),
+    [saveAnonymousProposal],
+  );
+
+  const handleAnonymousIndividualUpdate = useCallback(
+    (individualIri: string, data: TurtleIndividualUpdateData) =>
+      saveAnonymousProposal(
+        individualIri,
+        data.labels[0]?.value || getLocalName(individualIri),
+        (source) => updateIndividualInTurtle(source, individualIri, data),
+      ),
+    [saveAnonymousProposal],
+  );
 
   // Handle anonymous proposal "Propose Edit" button click
   const handleProposeEdit = useCallback(async () => {
@@ -979,7 +1020,8 @@ export default function EditorPage() {
     newParentIris: string[],
     mode: "move" | "add",
   ) => {
-    if (!session?.accessToken && !isAnonymousProposalMode) throw new Error("Not authenticated");
+    if (!isAnonymousProposalMode && !isSuggestionMode && !canWrite) throw new Error("Not authenticated");
+    if (isSuggestionMode && !session?.accessToken) throw new Error("Not authenticated");
 
     // Fetch the full class detail to get authoritative parent_iris
     const detail = await projectOntologyApi.getClassDetail(projectId, classIri, session?.accessToken, activeBranch);
@@ -1030,7 +1072,7 @@ export default function EditorPage() {
       ? handleSuggestClassUpdate
       : handleUpdateClass;
     await saveHandler(classIri, payload);
-  }, [session, projectId, activeBranch, isAnonymousProposalMode, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate, handleAnonymousClassUpdate]);
+  }, [session, canWrite, projectId, activeBranch, isAnonymousProposalMode, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate, handleAnonymousClassUpdate]);
 
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
@@ -1260,7 +1302,7 @@ export default function EditorPage() {
   }
 
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch} canEdit={!!canEdit}>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {sourceRevisionConflict && (
@@ -1535,8 +1577,20 @@ export default function EditorPage() {
                       : handleUpdateClass
                   }
                   detailRefreshKey={detailRefreshKey}
-                  onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
-                  onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
+                  onUpdateProperty={
+                    isAnonymousProposalMode
+                      ? handleAnonymousPropertyUpdate
+                      : isSuggestionMode
+                      ? handleSuggestPropertyUpdate
+                      : handleUpdateProperty
+                  }
+                  onUpdateIndividual={
+                    isAnonymousProposalMode
+                      ? handleAnonymousIndividualUpdate
+                      : isSuggestionMode
+                      ? handleSuggestIndividualUpdate
+                      : handleUpdateIndividual
+                  }
                   onReparentClass={handleReparentClass}
                   reparentOptimistic={reparentOptimistic}
                   rollbackReparent={rollbackReparent}
@@ -1590,8 +1644,20 @@ export default function EditorPage() {
                 }
                 detailRefreshKey={detailRefreshKey}
                 sourceContent={sourceContent}
-                onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
-                onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
+                onUpdateProperty={
+                    isAnonymousProposalMode
+                      ? handleAnonymousPropertyUpdate
+                      : isSuggestionMode
+                      ? handleSuggestPropertyUpdate
+                      : handleUpdateProperty
+                  }
+                onUpdateIndividual={
+                    isAnonymousProposalMode
+                      ? handleAnonymousIndividualUpdate
+                      : isSuggestionMode
+                      ? handleSuggestIndividualUpdate
+                      : handleUpdateIndividual
+                  }
                 onReparentClass={handleReparentClass}
                 reparentOptimistic={reparentOptimistic}
                 rollbackReparent={rollbackReparent}

@@ -347,6 +347,64 @@ describe("disabled-mode editor writes without a bearer", () => {
     await screen.findByText('Deleted "Person"');
     expect(requests.find(r => r.method === "DELETE")).toMatchObject({ authorization: null });
   });
+
+  it("reparents a class through PUT /source without an Authorization header", async () => {
+    workspaceOwner();
+    const destination = "https://example.test/Destination";
+    extraTreeNodes = [{ iri: destination, label: "Destination", child_count: 0 }];
+    installTreeGeometry({ [iri]: 100, [destination]: 125 });
+    mount();
+    const row = await screen.findByRole("treeitem", { name: /Person/ });
+    row.focus();
+    fireEvent.keyDown(row, { key: " ", code: "Space" });
+    await screen.findByText("Drop here to make root class");
+    await act(async () => { fireEvent.keyDown(document, { key: "ArrowDown", code: "ArrowDown" }); });
+    fireEvent.keyDown(document, { key: " ", code: "Space" });
+    await waitFor(() => expect(savedBodies).toHaveLength(1));
+    expect(parseBlockTriples((savedBodies[0] as { content: string }).content, iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: destination } });
+    await screen.findByText('Moved "Person"');
+    expect(requests.every(r => r.authorization === null)).toBe(true);
+  });
+
+  // The LLM gate needs a signed-in user, so the generated-entity controls stay
+  // hidden in disabled mode rather than offering an action without a path.
+  it("hides generated-entity suggestion controls in disabled mode", async () => {
+    workspaceOwner(); llmConfigured = true;
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    await screen.findByPlaceholderText("Label text");
+    expect(screen.queryByTitle("Suggest child classes")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Get LLM suggestions for this section" })).toBeNull();
+  });
+
+  // A visitor proposing on a public project it cannot edit must never reach a
+  // direct commit: the API refuses a base-branch PUT for that identity.
+  it.each([
+    ["disabled", "property"], ["disabled", "individual"],
+    ["optional", "property"], ["optional", "individual"],
+  ] as const)("routes a %s-mode anonymous %s proposal to the proposal session, never PUT /source", async (mode, entityType) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+    boundary.session = { data: null, status: "unauthenticated" };
+    projectResponse = { ...projectResponse, user_role: null, is_public: true };
+    sourceContent = originalSource + '\nex:Editable a owl:' + (entityType === "property" ? "ObjectProperty" : "NamedIndividual") + ' ;\n  rdfs:label "Original entity"@en .';
+    entityResults = [{ iri: editableIri, label: "Original entity", entity_type: entityType, property_kind: "object" }];
+    // The proposal starts from the class panel; once active, every entity
+    // form becomes editable, so property and individual saves must follow it.
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    fireEvent.click(await screen.findByRole("button", { name: "Propose Edit" }));
+    await screen.findByText("Proposing");
+    // Hovering the Source tab preloads the source the entity forms parse.
+    await act(async () => { for (const tab of screen.getAllByRole("button", { name: "Source" })) fireEvent.mouseEnter(tab); });
+    fireEvent.click(screen.getByRole("button", { name: entityType === "property" ? "Properties" : "Individuals" }));
+    fireEvent.click(await screen.findByText("Original entity"));
+    const inputs = await screen.findAllByPlaceholderText("Label text");
+    const editable = inputs.find(input => (input as HTMLInputElement).value === "Original entity") as HTMLInputElement;
+    await editAndSave(editable, "Proposed entity");
+    await screen.findByText('Proposed update to "Proposed entity"');
+    expect(savedBodies).toEqual([]);
+    expect(requests.some(r => r.path.endsWith("/source"))).toBe(false);
+    expect(suggestionBodies).toHaveLength(1);
+    expect(suggestionBodies[0]).toMatchObject({ entity_iri: editableIri, entity_label: "Proposed entity" });
+  });
 });
 
 describe('editor route real tree actions and keyboard orchestration', () => {

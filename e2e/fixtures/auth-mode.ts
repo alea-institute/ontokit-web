@@ -13,8 +13,9 @@ import { waitForIndex } from "./polling";
 
 export const SESSION_PATH = "/api/auth/session";
 // Any control that offers to sign in, whatever its exact copy ("Sign in", "Sign In",
-// "Sign in to edit", "Sign in with Zitadel"). Explanatory text is not a control.
-const SIGN_IN_NAME = /\bsign[\s-]?in\b/i;
+// "Sign-in", "Sign in to edit", "Sign in with Zitadel", "Try signing in again").
+// Explanatory text is not a control.
+const SIGN_IN_NAME = /\bsign(?:ing)?[\s-]?in\b/i;
 
 interface ModeFixtures<P extends ModeProfile> {
   run: ModeRunFor<P>;

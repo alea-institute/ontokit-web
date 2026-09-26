@@ -127,8 +127,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   const value = flag => args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined;
   const workflow = args.includes('--lifecycle-probe') ? undefined : (await import('./full-stack.mjs')).fullStack;
-  run({workflow, profile: args.includes('--profile') ? value('--profile') : 'baseline', apiSource: value('--api-source'), lifecycleProbe: args.includes('--lifecycle-probe'), failAt: value('--fail-at'), hold: args.includes('--hold'), retainDiagnostics: args.includes('--retain-diagnostics')}).catch(error => {
-    const known = /^(An explicit|Required source file missing:|Local Docker|Only a local|At least 8|Full-stack workflow|Owned command|Injected |Cleanup failed|Interrupted|Unknown E2E profile|Lifecycle |Clock override|Auth clock control rejected|Authentication mode disagreement|Seed fixture|Provider-less)/.test(error.message);
+  run({workflow, profile: args.includes('--profile') ? value('--profile') : 'baseline', apiSource: value('--api-source'), lifecycleProbe: args.includes('--lifecycle-probe'), failAt: args.includes('--fail-at') ? value('--fail-at') ?? '' : undefined, hold: args.includes('--hold'), retainDiagnostics: args.includes('--retain-diagnostics')}).catch(error => {
+    const known = /^(An explicit|Required source file missing:|Local Docker|Only a local|At least 8|Full-stack workflow|Owned command|Injected |Cleanup failed|Interrupted|Unknown E2E profile|Unknown E2E failure point|Lifecycle |Clock override|Auth clock control rejected|Authentication mode disagreement|Seed fixture|Provider-less)/.test(error.message);
     console.error(known ? error.message : 'Isolated lifecycle failed; inspect the sanitized phase above.');
     console.error('No full-stack acceptance claimed.'); process.exitCode ||= 1;});
 }

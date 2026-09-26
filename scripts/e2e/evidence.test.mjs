@@ -291,7 +291,13 @@ for (const profile of MODE_PROFILES) {
 test('provider-less receipts are accepted without Zitadel and Login; provider receipts are not', () => {
   for (const profile of ['optional-anonymous', 'disabled']) {
     assert.equal(sanitizedEvidence(modeManifest(profile), ok).acceptedRun, true);
-    assert.equal(sanitizedEvidence({...modeManifest(profile), evidenceImages: images()}, ok).acceptedRun, true, 'extra images do not block');
+    // KTD3 exact membership: an identity service in a provider-less receipt means the
+    // run did not exercise the provider-less stack, so the receipt is refused.
+    assert.equal(sanitizedEvidence({...modeManifest(profile), evidenceImages: images()}, ok).acceptedRun, false, 'identity images refuse a provider-less receipt');
+    for (const service of ['zitadel', 'login']) {
+      const withOne = [...modeImages(profile), ...images().filter(i => i.service === service)];
+      assert.equal(sanitizedEvidence({...modeManifest(profile), evidenceImages: withOne}, ok).acceptedRun, false, `${profile} with ${service}`);
+    }
   }
   const missingIdp = m => ({...m, evidenceImages: m.evidenceImages.filter(i => !['zitadel', 'login'].includes(i.service))});
   assert.equal(sanitizedEvidence(missingIdp(modeManifest('optional-configured')), ok).acceptedRun, false);
@@ -358,5 +364,14 @@ test('every mode inventory title is exactly one test title in its registry spec'
     const source = readFileSync(file, 'utf8');
     const titles = [...source.matchAll(/\btest\(\s*"([^"]+)"/g)].map(m => m[1]);
     assert.deepEqual(titles.sort(), MODE_CASES[profile].map(c => c.title).sort(), profile);
+  }
+});
+test('the one-shot migrate job is allowed but not required; unknown services are refused', () => {
+  const migrate = {service: 'migrate', id: `sha256:${'c'.repeat(64)}`, reference: `example/image@sha256:${'d'.repeat(64)}`};
+  for (const manifest of [baselineManifest(), lifecycleManifest(), ...['optional-configured', 'optional-anonymous', 'disabled'].map(modeManifest)]) {
+    assert.equal(sanitizedEvidence(manifest, ok).acceptedRun, true, `${manifest.profile} without migrate`);
+    assert.equal(sanitizedEvidence({...manifest, evidenceImages: [...manifest.evidenceImages, migrate]}, ok).acceptedRun, true, `${manifest.profile} with migrate`);
+    const unknown = {...migrate, service: 'sidecar'};
+    assert.equal(sanitizedEvidence({...manifest, evidenceImages: [...manifest.evidenceImages, unknown]}, ok).acceptedRun, false, `${manifest.profile} with an unknown service`);
   }
 });

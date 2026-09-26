@@ -106,6 +106,20 @@ describe('authentication error route with real retry countdown and session stora
     expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/auth/signin');
   });
 
+  it.each([
+    ['optional', 'false', 'Configuration'], ['optional', 'false', 'AccessDenied'],
+    ['disabled', 'false', 'Configuration'], ['disabled', 'true', 'OAuthSignin'],
+  ])('offers no sign-in retry when no identity provider is active (%s mode, provider flag %s, error %s)', async (mode, configured, error) => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', configured);
+    vi.useFakeTimers(); navigation.params.set('error', error); render(<AuthErrorPage />);
+    expect(screen.getByRole('heading', { name: 'Sign-in is unavailable' })).toBeDefined();
+    expect(screen.getByText("This OntoKit instance isn't configured for sign-in, so there is nothing to retry. You can still browse public projects.")).toBeDefined();
+    expect(screen.queryByRole('button', { name: /sign(ing)?[\s-]?in|retry/i })).toBeNull();
+    expect(screen.queryByText(/Retrying in/)).toBeNull();
+    await tick(30); expect(navigation.push).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: 'Go to homepage' }).getAttribute('href')).toBe('/');
+  });
+
   it('cancels the countdown when the error page unmounts', async () => {
     vi.useFakeTimers(); navigation.params.set('error', 'OAuthSignin'); const view = render(<AuthErrorPage />);
     await tick(3); view.unmount(); await tick(20); expect(navigation.push).not.toHaveBeenCalled();

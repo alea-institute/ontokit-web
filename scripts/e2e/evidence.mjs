@@ -369,6 +369,12 @@ export function sanitizedEvidence(manifest, {cleanup, workflowPassed, startedAt,
     const source = manifest.sources?.[name];
     if (source && /^[a-f0-9]{40}$/.test(source.revision) && hash(source.sha256)) sources[name] = {revision: source.revision, sha256: source.sha256};
   }
+  // KTD3 exact membership: every recorded container belongs to the profile's own service
+  // set, or is the one-shot migrate job (allowed, never required; migrationHeads prove the
+  // migration). A provider-less receipt with a Zitadel or Login container is refused.
+  const allowedServices = profile ? new Set([...serviceSet(profile), 'migrate']) : new Set();
+  const servicesExact = Array.isArray(manifest.evidenceImages) &&
+    manifest.evidenceImages.every(i => typeof i?.service === 'string' && allowedServices.has(i.service));
   const images = (manifest.evidenceImages || []).filter(i =>
     /^(postgres|redis|minio|zitadel|login|api|worker|migrate)$/.test(i.service) &&
     /^sha256:[a-f0-9]{64}$/.test(i.id) &&
@@ -389,5 +395,5 @@ export function sanitizedEvidence(manifest, {cleanup, workflowPassed, startedAt,
     workflowPassed: workflowPassed === true, cleanup: cleanup === 'complete' ? 'complete' : 'failed',
     acceptedRun: workflowPassed === true && cleanup === 'complete' && !!profile && !!tests && (profile !== 'lifecycle' || !!lifecycle) && modesOk &&
       // KTD3: each profile's own service set; provider-less profiles run no Zitadel or Login.
-      Object.keys(sources).length === 2 && serviceSet(profile).every(service => images.some(image => image.service === service)) && migrationHeads.length > 0};
+      Object.keys(sources).length === 2 && servicesExact && serviceSet(profile).every(service => images.some(image => image.service === service)) && migrationHeads.length > 0};
 }

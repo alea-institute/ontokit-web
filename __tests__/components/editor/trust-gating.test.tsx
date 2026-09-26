@@ -253,10 +253,16 @@ describe("mintingLockReason", () => {
     expect(mintingLockReason(gate())).toContain("3 more accepted suggestions");
   });
 
-  it("points an anonymous visitor at signing in", () => {
+  it("points an anonymous visitor at signing in when sign-in is offered", () => {
     expect(
-      mintingLockReason(gate({ tier: "anonymous", progress: null })),
+      mintingLockReason(gate({ tier: "anonymous", progress: null, onSignIn: () => {} })),
     ).toContain("Sign in");
+  });
+
+  it("does not mention signing in when no identity provider can complete it", () => {
+    const reason = mintingLockReason(gate({ tier: "anonymous", progress: null, onSignIn: undefined }));
+    expect(reason).toContain("trusted contributors");
+    expect(reason).not.toMatch(/sign(ing)?[\s-]?in/i);
   });
 
   it("explains the unknown states rather than going quiet", () => {

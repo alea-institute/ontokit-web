@@ -20,7 +20,13 @@ type Kind =
   /** A string literal starting with `/auth/signin` (links and navigations). */
   | "signin-route"
   /** A provider button label such as "Sign in with Zitadel". */
-  | "provider-button";
+  | "provider-button"
+  /**
+   * Visible sign-in wording outside comments: "Sign in", "Sign In", "sign-in",
+   * "Try signing in again". Catches a control whose action is a plain router
+   * push rather than a signIn( call or an /auth/signin literal.
+   */
+  | "sign-in-copy";
 
 type Gate =
   /** Rendered or invoked only when `shouldShowAuthUI()` is true. */
@@ -29,6 +35,10 @@ type Gate =
   | "provider-session-only"
   /** Navigates to `/auth/signin`, which itself explains unavailability when no provider is active. */
   | "lands-on-gated-page"
+  /** A presentational component that renders its sign-in control only when the parent supplies a callback or flag the parent derives from `shouldShowAuthUI()`. */
+  | "parent-gated"
+  /** Explanatory wording only; the file renders no sign-in control. */
+  | "copy-only"
   /** Known ungated site; none may exist (R6). Kept so a regression must be declared, and fails the test. */
   | "ungated-known-gap";
 
@@ -41,24 +51,49 @@ interface Entry {
 }
 
 const SIGN_IN_INVENTORY: Entry[] = [
-  { file: "app/page.tsx", route: "/", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1 } },
-  { file: "app/auth/signin/page.tsx", route: "/auth/signin", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1, "provider-button": 1 } },
-  { file: "app/projects/new/page.tsx", route: "/projects/new", gate: "shouldShowAuthUI", counts: { "signin-route": 1 } },
-  { file: "app/projects/[id]/page.tsx", route: "/projects/[id]", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 2 } },
-  { file: "app/projects/[id]/editor/page.tsx", route: "/projects/[id]/editor", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 6 } },
-  { file: "components/auth/user-menu.tsx", route: "(header, every page)", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1 } },
+  { file: "app/page.tsx", route: "/", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1, "sign-in-copy": 4 } },
+  { file: "app/auth/signin/page.tsx", route: "/auth/signin", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1, "provider-button": 1, "sign-in-copy": 8 } },
+  { file: "app/projects/new/page.tsx", route: "/projects/new", gate: "shouldShowAuthUI", counts: { "signin-route": 1, "sign-in-copy": 3 } },
+  { file: "app/projects/[id]/page.tsx", route: "/projects/[id]", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 2, "sign-in-copy": 6 } },
+  { file: "app/projects/[id]/editor/page.tsx", route: "/projects/[id]/editor", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 6, "sign-in-copy": 3 } },
+  { file: "components/auth/user-menu.tsx", route: "(header, every page)", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1, "sign-in-copy": 1 } },
   {
     file: "components/auth/SessionGuard.tsx", route: "(providers, every page)", gate: "provider-session-only",
     counts: { "signIn-import": 1, "signIn-call": 1 },
     note: "Triggers only on session.error === RefreshAccessTokenError, which requires a provider-issued session.",
   },
   {
-    file: "app/auth/error/page.tsx", route: "/auth/error", gate: "lands-on-gated-page",
-    counts: { "signin-route": 2 },
-    note: "Retry navigates to /auth/signin, which shows the unavailability copy when no provider is active.",
+    file: "app/auth/error/page.tsx", route: "/auth/error", gate: "shouldShowAuthUI",
+    counts: { "signin-route": 2, "sign-in-copy": 4 },
+    note: "Retry and the transient auto-retry run only with an active provider; otherwise the page says sign-in is unavailable.",
   },
-  { file: "app/pr-party/settings/page.tsx", route: "/pr-party/settings", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1 } },
-  { file: "components/pr-party/PRPartyQueueView.tsx", route: "/pr-party", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1 } },
+  { file: "app/pr-party/settings/page.tsx", route: "/pr-party/settings", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1, "sign-in-copy": 3 } },
+  { file: "components/pr-party/PRPartyQueueView.tsx", route: "/pr-party", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1, "sign-in-copy": 3 } },
+  {
+    file: "components/editor/ClassDetailPanel.tsx", route: "/projects/[id]/editor", gate: "parent-gated",
+    counts: { "sign-in-copy": 4 },
+    note: "Both sign-in buttons require showSignInToEdit, which the editor page derives from shouldShowAuthUI().",
+  },
+  {
+    file: "components/editor/ProposalSubmittedDialog.tsx", route: "/projects/[id]/editor", gate: "parent-gated",
+    counts: { "sign-in-copy": 1 },
+    note: "The account button renders only when onSignIn is passed; the editor page passes it only when shouldShowAuthUI() is true.",
+  },
+  {
+    file: "components/editor/TrustExplainer.tsx", route: "/projects/[id]/editor", gate: "parent-gated",
+    counts: { "sign-in-copy": 3 },
+    note: "Sign-in copy and button render only when gate.onSignIn is set, which the editor page sets only when shouldShowAuthUI() is true.",
+  },
+  {
+    file: "app/docs/page.tsx", route: "/docs", gate: "copy-only",
+    counts: { "sign-in-copy": 2 },
+    note: "Documentation prose describing browsing without signing in; no control.",
+  },
+  {
+    file: "app/settings/page.tsx", route: "/settings", gate: "copy-only",
+    counts: { "sign-in-copy": 1 },
+    note: "A 'Sign in required' heading with no control; the page is linked only from the provider-gated user menu.",
+  },
 ];
 
 const PATTERNS: Record<Kind, RegExp> = {
@@ -66,7 +101,13 @@ const PATTERNS: Record<Kind, RegExp> = {
   "signIn-call": /\bsignIn\s*\(/g,
   "signin-route": /["'`]\/auth\/signin\b/g,
   "provider-button": /Sign in with\s+[A-Z]\w*/g,
+  "sign-in-copy": /\b[Ss]ign(?:ing)?[\s-][Ii]n\b/g,
 };
+
+/** Comments are not rendered, so wording in them is not an affordance. */
+function stripComments(content: string): string {
+  return content.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\w])\/\/.*$/gm, "$1");
+}
 
 const KINDS = Object.keys(PATTERNS) as Kind[];
 const ROOT = path.resolve(__dirname, "../..");
@@ -97,7 +138,8 @@ function scanSignInCallSites(files: SourceFile[]): Map<string, Partial<Record<Ki
   for (const file of files) {
     const counts: Partial<Record<Kind, number>> = {};
     for (const kind of KINDS) {
-      const n = file.content.match(PATTERNS[kind])?.length ?? 0;
+      const text = kind === "sign-in-copy" ? stripComments(file.content) : file.content;
+      const n = text.match(PATTERNS[kind])?.length ?? 0;
       if (n > 0) counts[kind] = n;
     }
     if (Object.keys(counts).length > 0) found.set(file.path, counts);
@@ -157,21 +199,40 @@ describe("sign-in call-site inventory", () => {
   it("fails when a new file adds an uninventoried signIn( call", () => {
     const fixture = { path: "components/fixture/NewPrompt.tsx", content: 'import { signIn } from "next-auth/react";\nexport const Prompt = () => <button onClick={() => signIn("zitadel")}>Sign In</button>;\n' };
     expect(diffAgainstInventory(scanSignInCallSites([...tree, fixture]))).toEqual([
-      'components/fixture/NewPrompt.tsx: uninventoried sign-in call site(s) {"signIn-import":1,"signIn-call":1}',
+      'components/fixture/NewPrompt.tsx: uninventoried sign-in call site(s) {"signIn-import":1,"signIn-call":1,"sign-in-copy":1}',
     ]);
   });
 
   it("fails when a new file links to /auth/signin", () => {
     const fixture = { path: "app/fixture/page.tsx", content: 'export default () => <Link href="/auth/signin?callbackUrl=%2F">Sign In</Link>;\n' };
     expect(diffAgainstInventory(scanSignInCallSites([...tree, fixture]))).toEqual([
-      'app/fixture/page.tsx: uninventoried sign-in call site(s) {"signin-route":1}',
+      'app/fixture/page.tsx: uninventoried sign-in call site(s) {"signin-route":1,"sign-in-copy":1}',
     ]);
   });
 
   it("fails when a new file passes signIn by reference or renders a provider button", () => {
     const fixture = { path: "components/fixture/Ref.tsx", content: 'import { useSession, signIn as login } from "next-auth/react";\nexport const Ref = () => <button onClick={login}>Sign in with GitHub</button>;\n' };
     expect(diffAgainstInventory(scanSignInCallSites([...tree, fixture]))).toEqual([
-      'components/fixture/Ref.tsx: uninventoried sign-in call site(s) {"signIn-import":1,"provider-button":1}',
+      'components/fixture/Ref.tsx: uninventoried sign-in call site(s) {"signIn-import":1,"provider-button":1,"sign-in-copy":1}',
+    ]);
+  });
+
+  it("fails when a new file renders sign-in wording on a control without a signIn( call", () => {
+    const fixture = { path: "app/fixture/retry.tsx", content: 'export const Retry = () => <button onClick={() => router.push("/elsewhere")}>Try signing in again</button>;\n' };
+    expect(diffAgainstInventory(scanSignInCallSites([...tree, fixture]))).toEqual([
+      'app/fixture/retry.tsx: uninventoried sign-in call site(s) {"sign-in-copy":1}',
+    ]);
+  });
+
+  it("counts Sign In, sign-in and signing in wording but ignores identifiers and comments", () => {
+    const fixture = { path: "components/fixture/Copy.tsx", content: '// Sign in comment\n/* sign-in block */\nconst onSignIn = signInHandler;\nexport const A = () => <p>Sign In, sign-in, signing in</p>;\n' };
+    expect(scanSignInCallSites([fixture]).get("components/fixture/Copy.tsx")).toEqual({ "sign-in-copy": 3 });
+  });
+
+  it("fails when an inventoried file gains extra sign-in wording", () => {
+    const withExtra = tree.map(f => f.path === "app/auth/error/page.tsx" ? { ...f, content: f.content + '\nconst Extra = () => <a>Sign in again</a>;\n' } : f);
+    expect(diffAgainstInventory(scanSignInCallSites(withExtra))).toEqual([
+      "app/auth/error/page.tsx: sign-in-copy count 5, inventory says 4",
     ]);
   });
 

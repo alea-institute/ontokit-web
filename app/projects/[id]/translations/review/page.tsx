@@ -183,7 +183,11 @@ export default function TranslationReviewPage() {
   const { data: session } = useSession();
   const params = useParams();
   const projectId = params.id as string;
-  return <BranchProvider projectId={projectId} accessToken={session?.accessToken}>
+  // Shares the content's project query (React Query dedupes it). In auth-disabled
+  // mode the edit role, not a token, decides whether branch writes are offered.
+  const { project } = useProject(projectId, session?.accessToken);
+  const { canEdit } = derivePermissions(project, session?.accessToken);
+  return <BranchProvider projectId={projectId} accessToken={session?.accessToken} canEdit={canEdit}>
     <TranslationReviewContent projectId={projectId} token={session?.accessToken} />
   </BranchProvider>;
 }

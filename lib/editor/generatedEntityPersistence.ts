@@ -1,5 +1,6 @@
 import { projectOntologyApi } from "@/lib/api/client";
 import { revisionsApi } from "@/lib/api/revisions";
+import { isClientAuthDisabled } from "@/lib/auth-mode";
 import type { EntityType } from "@/lib/ontology/iriGeneration";
 import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
 import { generateTurtleSnippet, isProvPrefixBoundToProvO } from "@/lib/ontology/turtleSnippetGenerator";
@@ -119,7 +120,11 @@ export async function persistGeneratedEntity(
 
   if (mode === "direct") {
     targetBranch = requireBranch(options.branch, "save the generated entity");
-    if (!accessToken) throw new Error("Could not save the generated entity: sign in and retry.");
+    // Auth-disabled mode has no token: the API saves as its anonymous
+    // identity, and the caller has already checked that identity may edit.
+    if (!accessToken && !isClientAuthDisabled()) {
+      throw new Error("Could not save the generated entity: sign in and retry.");
+    }
     targetToken = accessToken;
   } else {
     session = requireSession(
@@ -175,7 +180,7 @@ export async function persistGeneratedEntity(
         projectId,
         content,
         `Add generated ${kind} "${entity.label}"`,
-        targetToken!,
+        targetToken,
         targetBranch,
         response.revision,
       );

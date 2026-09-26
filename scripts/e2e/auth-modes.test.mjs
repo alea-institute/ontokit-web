@@ -55,6 +55,37 @@ test('unknown profiles and unsupported combinations are rejected', () => {
     assert.equal(assertLaunch({profile, failAt: 'web-mode-mismatch'}), profile);
   }
 });
+test('a misspelled or inapplicable --fail-at is rejected before any allocation', () => {
+  // A typo must never degrade into an ordinary green run.
+  for (const failAt of ['', 'before-browsr', 'after_workflow', 'BEFORE-BROWSER', 'toString', '__proto__', 'constructor', 'hasOwnProperty']) {
+    for (const profile of ['baseline', 'lifecycle', ...MODE_PROFILES]) {
+      assert.throws(() => assertLaunch({profile, failAt}), /Unknown E2E failure point/, `${profile} ${JSON.stringify(failAt)}`);
+    }
+  }
+  // Legacy points stay available where they can fire.
+  for (const profile of ['baseline', 'lifecycle', ...MODE_PROFILES]) {
+    for (const failAt of ['after-dependencies', 'after-workflow']) assert.equal(assertLaunch({profile, failAt}), profile);
+  }
+  for (const profile of MODE_PROFILES) assert.equal(assertLaunch({profile, failAt: 'before-browser'}), profile);
+  // before-browser fires only after D09 fixture seeding, which baseline and lifecycle never do.
+  for (const profile of ['baseline', 'lifecycle']) assert.throws(() => assertLaunch({profile, failAt: 'before-browser'}), /combination/, profile);
+  for (const profile of ['baseline', 'lifecycle', 'optional-configured']) {
+    for (const failAt of ['identity-pat', 'identity-issuer', 'identity-callback']) assert.equal(assertLaunch({profile, failAt}), profile);
+  }
+  for (const failAt of ['lifecycle-readback', 'clock-preflight']) assert.equal(assertLaunch({profile: 'lifecycle', failAt}), 'lifecycle');
+  // Points that cannot fire in a profile would otherwise pass silently.
+  for (const profile of ['optional-anonymous', 'disabled']) {
+    for (const failAt of ['identity-pat', 'identity-issuer', 'identity-callback']) assert.throws(() => assertLaunch({profile, failAt}), /combination/, `${profile} ${failAt}`);
+  }
+  for (const profile of ['baseline', ...MODE_PROFILES]) {
+    for (const failAt of ['lifecycle-readback', 'clock-preflight']) assert.throws(() => assertLaunch({profile, failAt}), /combination/, `${profile} ${failAt}`);
+  }
+  for (const failAt of ['identity-pat', 'lifecycle-readback', 'clock-preflight']) {
+    assert.throws(() => assertLaunch({profile: 'baseline', lifecycleProbe: true, failAt}), /combination/);
+  }
+  assert.equal(assertLaunch({profile: 'baseline', lifecycleProbe: true, failAt: 'after-workflow'}), 'baseline');
+  assert.equal(assertLaunch({profile: 'baseline'}), 'baseline');
+});
 test('API mode follows the profile; the injected API mismatch picks a neighbouring mode', () => {
   assert.equal(apiModeFor('baseline'), 'required');
   assert.equal(apiModeFor('lifecycle'), 'required');
@@ -248,4 +279,30 @@ test('provider run configs require identity URLs, the persona and its fixture', 
   await withRunConfig({...good, fixtures}, load => assert.throws(load, /fixtures/));
   await withRunConfig({...good, authModes: modes('optional', false)}, load => assert.throws(load, /mode agreement/));
   await withRunConfig({...good, profile: 'optional'}, load => assert.throws(load, /Unknown E2E profile/));
+});
+
+// ---- Browser sign-in matcher and provider-less route coverage (D09 review) ----
+const e2eRoot = new URL('../../e2e/', import.meta.url);
+async function signInMatcher() {
+  const {readFile} = await import('node:fs/promises');
+  const source = await readFile(new URL('fixtures/auth-mode.ts', e2eRoot), 'utf8');
+  const literal = source.match(/const SIGN_IN_NAME = \/(.+)\/([a-z]*);/);
+  assert.ok(literal, 'SIGN_IN_NAME regex literal is declared');
+  return new RegExp(literal[1], literal[2]);
+}
+test('the browser sign-in matcher catches every sign-in control variant', async () => {
+  const matcher = await signInMatcher();
+  for (const name of ['Sign in', 'Sign In', 'Sign in to edit', 'Sign in with Zitadel', 'Sign-in', 'signin', 'Try signing in again', 'Sign in for full editing']) {
+    assert.ok(matcher.test(name), `matches ${JSON.stringify(name)}`);
+  }
+  for (const name of ['Sign out', 'Designing insights', 'Propose Edit', 'Go to homepage']) {
+    assert.ok(!matcher.test(name), `ignores ${JSON.stringify(name)}`);
+  }
+});
+test('provider-less browser specs visit the auth-error route inside their existing route case', async () => {
+  const {readFile} = await import('node:fs/promises');
+  for (const spec of ['auth-mode-optional-anonymous.spec.ts', 'auth-mode-disabled.spec.ts']) {
+    const source = await readFile(new URL(`browser/${spec}`, e2eRoot), 'utf8');
+    assert.match(source, /\["\/auth\/error\?error=Configuration", "Sign-in is unavailable"\]/, `${spec} visits /auth/error`);
+  }
 });

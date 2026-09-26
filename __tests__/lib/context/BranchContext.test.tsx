@@ -51,7 +51,7 @@ function makeListResponse(branches: BranchInfo[], overrides?: Partial<BranchList
   };
 }
 
-function createWrapper(props: { projectId: string; accessToken?: string; initialBranch?: string }) {
+function createWrapper(props: { projectId: string; accessToken?: string; initialBranch?: string; canEdit?: boolean }) {
   const QueryWrapper = createQueryWrapper();
   function Wrapper({ children }: { children: React.ReactNode }) {
     return React.createElement(
@@ -59,7 +59,7 @@ function createWrapper(props: { projectId: string; accessToken?: string; initial
       null,
       React.createElement(
         BranchProvider,
-        { projectId: props.projectId, accessToken: props.accessToken, initialBranch: props.initialBranch } as React.ComponentProps<typeof BranchProvider>,
+        { projectId: props.projectId, accessToken: props.accessToken, initialBranch: props.initialBranch, canEdit: props.canEdit } as React.ComponentProps<typeof BranchProvider>,
         children,
       ),
     );
@@ -294,7 +294,7 @@ describe("BranchContext", () => {
       vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
       mockedCreate.mockResolvedValue(makeBranch("new-branch"));
       mockedDelete.mockResolvedValue(undefined);
-      const wrapper = createWrapper({ projectId: "p1" });
+      const wrapper = createWrapper({ projectId: "p1", canEdit: true });
       const { result } = renderHook(() => useBranch(), { wrapper });
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
@@ -314,6 +314,20 @@ describe("BranchContext", () => {
         await result.current.deleteBranch("new-branch");
       });
       expect(mockedDelete).toHaveBeenCalledWith("p1", "new-branch", undefined, false);
+    });
+
+    it.each([false, undefined])("refuses tokenless branch writes in disabled mode when the identity cannot edit (canEdit=%s)", async canEdit => {
+      vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+      const wrapper = createWrapper({ projectId: "p1", canEdit });
+      const { result } = renderHook(() => useBranch(), { wrapper });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+      await expect(act(async () => { await result.current.createBranch("new"); })).rejects.toThrow("Authentication required");
+      await expect(act(async () => { await result.current.switchBranch("feature-1"); })).rejects.toThrow("Authentication required");
+      await expect(act(async () => { await result.current.deleteBranch("feature-1"); })).rejects.toThrow("Authentication required");
+      expect(mockedCreate).not.toHaveBeenCalled();
+      expect(mockedDelete).not.toHaveBeenCalled();
+      expect(mockedSavePreference).not.toHaveBeenCalled();
     });
 
     it.each(["required", "optional"])("still refuses tokenless create, switch and delete in %s mode without calling the API", async mode => {

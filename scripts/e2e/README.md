@@ -226,6 +226,13 @@ both run labels. Removing the run's labelled volumes remains the authoritative d
   neighbouring mode. The gate must reject it. For optional-configured, identity bootstrap
   independently asserts the API mode first.
 
+`FAIL_POINTS` in `auth-modes.mjs` is the complete `--fail-at` allowlist. A name outside it, or a
+point that cannot fire for the launch (for example `before-browser` on baseline, or an
+`identity-*` point on a provider-less profile), is refused before any allocation so a typo can
+never run as an ordinary green run. A receipt's containers must be exactly the profile's service
+set plus, optionally, the one-shot `migrate` job; a provider-less receipt with Zitadel or Login
+is not accepted.
+
 **Evidence.** Each new profile has a fixed exact-count inventory in `evidence.mjs`
 (`MODE_REQUIRED_TESTS`). Any spec that `specOwner()` assigns to another profile, or a test
 in a project outside the profile's, fails the gate. `acceptedRun` requires `serviceSet(profile)`:

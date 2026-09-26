@@ -45,6 +45,8 @@ test("providers are empty and no sign-in control appears on any reachable invent
   for (const [route, landmark] of [
     ["/projects/new", "Project creation is unavailable"],
     ["/auth/signin", "Sign-in is unavailable"],
+    // A stale provider error link must not offer a retry that cannot succeed.
+    ["/auth/error?error=Configuration", "Sign-in is unavailable"],
     ["/pr-party", "PR Party is unavailable here"],
     ["/pr-party/settings", "Review settings are unavailable here"],
   ] as const) {
