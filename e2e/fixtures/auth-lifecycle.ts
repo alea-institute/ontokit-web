@@ -254,6 +254,8 @@ export function recordEvidence(evidence: Record<string, number | boolean | strin
     if (typeof value === "string" && !/^[a-z0-9-]{1,40}$/.test(value)) throw new Error("Lifecycle evidence values must be fixed labels");
   }
   test.info().annotations.push({type: "lifecycle-evidence", description: JSON.stringify(evidence)});
+  // Numbers, booleans and fixed labels only, so the private runner log can carry it.
+  console.log(`lifecycle-evidence ${JSON.stringify(evidence)}`);
 }
 
 /**

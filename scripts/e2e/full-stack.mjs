@@ -60,6 +60,17 @@ export async function fullStack(ctx) {
     if (!Array.isArray(report?.errors) || report.errors.length || stats.unexpected !== 0 || stats.skipped !== 0 || stats.flaky !== 0 || !(stats.expected > 0)) {
       throw new Error('Lifecycle browser cases did not all pass');
     }
+    // Per-case evidence annotations: re-validated here so only numbers, booleans and
+    // fixed labels ever reach the terminal (never credentials or raw report text).
+    const evidence = [];
+    const visit = suites => { for (const suite of suites ?? []) { for (const spec of suite.specs ?? []) for (const t of spec.tests ?? []) for (const a of t.annotations ?? []) if (a?.type === 'lifecycle-evidence') evidence.push(a.description); visit(suite.suites); } };
+    visit(report.suites);
+    for (const description of evidence) {
+      let entry;
+      try { entry = JSON.parse(description); } catch { entry = null; }
+      const safe = entry && typeof entry === 'object' && Object.entries(entry).every(([key, value]) => /^[A-Za-z]{1,40}$/.test(key) && (typeof value === 'boolean' || Number.isFinite(value) || (typeof value === 'string' && /^[a-z0-9-]{1,40}$/.test(value))));
+      console.log(safe ? `Lifecycle evidence: ${JSON.stringify(entry)}` : 'Lifecycle evidence withheld: unexpected shape');
+    }
     // The mandatory lifecycle inventory and its sanitized receipt belong to U4; until
     // then no lifecycle acceptance is claimed even when every case passes.
     console.log(`Lifecycle browser cases: ${stats.expected} passed, ${stats.skipped} skipped, ${stats.unexpected} failed; mandatory lifecycle inventory not yet enforced, no acceptance claimed`);

@@ -10,12 +10,11 @@ import { randomUUID } from "node:crypto";
 import {
   test, expect, accountControl, applyClockOffset, browserSession, clearsAll, END_SESSION_PATH, expectActiveSession,
   followProviderFlow, installSpecimen, jarSessionCookies, protectedOperation, recordEvidence,
-  responseSkewMs, SESSION_PATH, signInControl, signInFromApp, waitUntil, workerSkewMs, type CookieSpecimen,
+  responseSkewMs, SESSION_PATH, signInControl, signInFromApp, waitUntil, workerSkewMs, type BrowserSession, type CookieSpecimen,
 } from "../fixtures/auth-lifecycle";
 
-// Real waits make these cases order-independent but long; never run them in parallel
-// against the shared instance-wide provider policy.
-test.describe.configure({mode: "serial"});
+// The lifecycle project runs one worker, so cases execute one at a time against the
+// shared instance-wide provider policy; each remains independent of the others.
 
 test("R1 UI sign-out ends the application and provider sessions and the next sign-in requires provider interaction", async ({run, fresh}) => {
   test.setTimeout(180_000);
@@ -37,6 +36,15 @@ test("R1 UI sign-out ends the application and provider sessions and the next sig
     const url = new URL(response.url());
     return url.origin === run.web && url.pathname === "/api/auth/signout" && response.request().method() === "POST";
   }, {timeout: 30_000});
+  // The sign-out click leaves the page committed at the application until the
+  // federated logout navigation lands, so wait for a NEW main-frame commit.
+  const landed = page.waitForEvent("framenavigated", {
+    predicate: frame => frame === page.mainFrame() && (() => {
+      const url = new URL(frame.url());
+      return (url.origin === loginOrigin && url.pathname.endsWith("/logout")) || url.origin === run.web;
+    })(),
+    timeout: 30_000,
+  });
   await accountControl(page, first.session).click();
   await page.getByRole("button", {name: "Sign out", exact: true}).click();
 
@@ -51,11 +59,11 @@ test("R1 UI sign-out ends the application and provider sessions and the next sig
 
   // The pinned Login UI completes end-session without an id_token_hint by listing
   // this browser's provider sessions; choosing the persona's session clears it.
-  await expect(page).toHaveURL(url => url.origin === run.web || (url.origin === loginOrigin && url.pathname.endsWith("/logout")), {timeout: 30_000});
-  let providerSessionChooser = false;
-  let postLogoutRedirected = new URL(page.url()).origin === run.web;
-  if (!postLogoutRedirected) {
-    providerSessionChooser = true;
+  await landed;
+  await page.waitForLoadState("load");
+  const providerSessionChooser = new URL(page.url()).origin === loginOrigin;
+  let postLogoutRedirected = !providerSessionChooser;
+  if (providerSessionChooser) {
     const entry = page.getByRole("button").filter({hasText: persona.email});
     await expect(entry).toHaveCount(1);
     await entry.click();
@@ -66,6 +74,8 @@ test("R1 UI sign-out ends the application and provider sessions and the next sig
     await page.waitForLoadState("load");
     postLogoutRedirected = new URL(page.url()).origin === run.web;
   }
+  // Recorded before the next sign-in so a later failure still shows the observed logout path.
+  recordEvidence({case: "r1-logout-observed", providerSessionChooser, postLogoutRedirected, endSessionClientId: clientIdPresent, appCookiesCleared});
 
   // Application session: gone for the browser.
   const signedOut = browserSession(page, run);
@@ -212,13 +222,18 @@ test("R4 controlled Next clock expires the genuine application cookie and explic
   const beforeOffset = boundaryMs - marginMs - Date.now();
   await applyClockOffset(run, beforeOffset);
   await installSpecimen(context, run, specimen!);
-  const beforeWaiter = browserSession(page, run);
-  await page.reload();
-  const before = await beforeWaiter;
+  // Observed by the browser as a top-level document request carrying the specimen from
+  // its own cookie jar. Under the shifted clock the Next worker also sees the provider
+  // access credential as expired and may record a refresh error; a SessionProvider page
+  // would then let SessionGuard start an OIDC exchange at controlled time, which KTD3
+  // forbids. A plain document load exercises the same Auth.js cookie verifier without it.
+  const beforeDocument = await page.goto(`${run.web}${SESSION_PATH}`);
+  expect(beforeDocument?.status(), "pre-boundary session document status").toBe(200);
+  const before = {response: beforeDocument!, body: await beforeDocument!.json() as BrowserSession | null};
   expect(before.body?.user?.id, "specimen accepted just before the boundary").toBe(persona.id);
+  const refreshErrorBeforeBoundary = before.body?.error === "RefreshAccessTokenError";
   const workerShiftErrorMs = Math.round(Math.abs((await responseSkewMs(before.response, before.body, run)) - normalSkewMs - beforeOffset));
   expect(workerShiftErrorMs <= skewToleranceMs, "Next worker observed the controlled clock").toBe(true);
-  await expect(accountControl(page, before.body)).toBeVisible();
   const toleranceWindowExercised = boundaryMs - marginMs > specimen!.expiresMs;
   // Positive control: the cookie Auth.js renewed at controlled time. It is used only to
   // observe the instrument, never substituted for the specimen.
@@ -244,7 +259,7 @@ test("R4 controlled Next clock expires the genuine application cookie and explic
   expect(Math.abs((await observeWorker()) - afterOffset) <= skewToleranceMs, "Next worker at the post-boundary clock").toBe(true);
   await installSpecimen(context, run, specimen!);
   const afterWaiter = browserSession(page, run);
-  await page.reload();
+  await page.goto(`${run.web}/`);
   const after = await afterWaiter;
   expect(after.body, "specimen rejected after the boundary").toBeNull();
   const cookiesCleared = clearsAll(await after.response.headersArray(), names, Date.now());
@@ -271,6 +286,6 @@ test("R4 controlled Next clock expires the genuine application cookie and explic
   recordEvidence({
     case: "r4-cookie-expiry", clock: "controlled-next-process", specimenSource: "oidc-callback", verifierToleranceSeconds: run.lifecycle.verifierToleranceSeconds,
     marginSeconds: marginMs / 1000, workerShiftErrorMs, toleranceWindowExercised, beforeAccepted: true, afterRejected: true, cookiesCleared,
-    signedOutUi: true, restoredBeforeSignIn: true, providerSsoReused: !flow.interactive,
+    signedOutUi: true, restoredBeforeSignIn: true, refreshErrorBeforeBoundary, providerSsoReused: !flow.interactive,
   });
 });
