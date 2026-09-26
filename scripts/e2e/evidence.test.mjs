@@ -112,6 +112,10 @@ for (const [name, mutate] of Object.entries({
   'controlled clock claimed on R2': r => { specOf(r, 'R2').tests[0].annotations = annotate([{...EVIDENCE.R2[0], clock: 'controlled-next-process'}]); },
   'false proof field': r => { specOf(r, 'R4').tests[0].annotations = annotate([{...EVIDENCE.R4[0], afterRejected: false}]); },
   'interactive renewal': r => { specOf(r, 'R2').tests[0].annotations = annotate([{...EVIDENCE.R2[0], interactiveLogin: true}]); },
+  'R1 logout without id_token_hint': r => { specOf(r, 'R1').tests[0].annotations = annotate([{...EVIDENCE.R1[0], endSessionIdTokenHint: false}, EVIDENCE.R1[1]]); },
+  'R1 provider session chooser tolerated': r => { specOf(r, 'R1').tests[0].annotations = annotate([EVIDENCE.R1[0], {...EVIDENCE.R1[1], providerSessionChooser: true}]); },
+  'R1 no post-logout redirect': r => { specOf(r, 'R1').tests[0].annotations = annotate([{...EVIDENCE.R1[0], postLogoutRedirected: false}, EVIDENCE.R1[1]]); },
+  'R1 id_token_hint omitted from evidence': r => { const {endSessionIdTokenHint: _omitted, ...rest} = EVIDENCE.R1[1]; specOf(r, 'R1').tests[0].annotations = annotate([EVIDENCE.R1[0], rest]); },
   'malformed evidence JSON': r => { specOf(r, 'R1').tests[0].annotations[1].description = '{not json'; },
 })) test(`lifecycle ${name} prevents acceptance`, () => {
   const r = lifecycle(); mutate(r); rejects(r, 'lifecycle');

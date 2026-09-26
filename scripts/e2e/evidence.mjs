@@ -129,10 +129,11 @@ const B = 'boolean', N = 'number';
 const CASES = [
   {test: 0, case: 'r1-logout-observed', clock: null,
     fields: {providerSessionChooser: B, postLogoutRedirected: B, endSessionClientId: B, endSessionIdTokenHint: B, appCookiesCleared: B},
-    proof: {endSessionClientId: true, appCookiesCleared: true}},
+    // RP-initiated logout with id_token_hint ends the provider session without a chooser.
+    proof: {endSessionClientId: true, endSessionIdTokenHint: true, providerSessionChooser: false, postLogoutRedirected: true, appCookiesCleared: true}},
   {test: 0, case: 'r1-logout', clock: CLOCK_LABELS.real,
     fields: {firstLoginInteractive: B, appCookiesCleared: B, endSessionClientId: B, endSessionIdTokenHint: B, providerSessionChooser: B, postLogoutRedirected: B, nextLoginInteractive: B},
-    proof: {firstLoginInteractive: true, appCookiesCleared: true, endSessionClientId: true, nextLoginInteractive: true}},
+    proof: {firstLoginInteractive: true, appCookiesCleared: true, endSessionClientId: true, endSessionIdTokenHint: true, providerSessionChooser: false, postLogoutRedirected: true, nextLoginInteractive: true}},
   {test: 1, case: 'r2-renewal', clock: CLOCK_LABELS.realElapsed,
     fields: {observedAccessLifetimeSeconds: N, graceSeconds: N, renewedAfterExpirySeconds: N, credentialChanged: B, sameSubject: B, interactiveLogin: B},
     proof: {credentialChanged: true, sameSubject: true, interactiveLogin: false}},
