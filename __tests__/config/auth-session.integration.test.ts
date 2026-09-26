@@ -170,6 +170,158 @@ describe('authenticated sessions through encrypted cookies and real callbacks', 
     for (const credential of ['old-access-value', 'refresh-credential-value', 'synthetic-client-secret', secret]) expect(output).not.toContain(credential);
   });
 
+  it('bounds a hanging issuer refresh and reports RefreshAccessTokenError without leaking credentials', async () => {
+    let signal: AbortSignal | undefined;
+    let markCalled!: () => void;
+    const called = new Promise<void>(resolve => { markCalled = resolve; });
+    // Never settles and ignores abort: the callback must not depend on it.
+    fetcher.mockImplementation((_url: string, init?: RequestInit) => { signal = init?.signal ?? undefined; markCalled(); return new Promise<Response>(() => {}); });
+    const logged: unknown[][] = [];
+    for (const method of ['error', 'warn', 'log', 'info', 'debug'] as const) vi.spyOn(console, method).mockImplementation((...args: unknown[]) => { logged.push(args); });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let settled = false;
+      const pending = session({ user, accessToken: 'hanging-access-value', refreshToken: 'hanging-refresh-value', expiresAt: 1 }).finally(() => { settled = true; });
+      await called;
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      const response = await pending;
+      expect(signal?.aborted).toBe(true);
+      const body = await response.json();
+      expect(body).toMatchObject({ user, accessToken: 'hanging-access-value', error: 'RefreshAccessTokenError' });
+      expect(body.refreshToken).toBeUndefined();
+      expect(await cookieToken(response)).toMatchObject({ error: 'RefreshAccessTokenError', refreshToken: 'hanging-refresh-value' });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(logged.length).toBeGreaterThan(0);
+    const output = logged.map(args => args.map(arg => arg instanceof Error ? `${arg.name}: ${arg.message} ${arg.stack}` : typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ')).join('\n');
+    expect(output).toContain('TimeoutError');
+    for (const credential of ['hanging-access-value', 'hanging-refresh-value', 'synthetic-client-secret', secret]) expect(output).not.toContain(credential);
+  });
+
+  it('emits redacted Auth.js debug messages in development and never their metadata', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    const logged: unknown[][] = [];
+    for (const method of ['error', 'warn', 'log', 'info', 'debug'] as const) vi.spyOn(console, method).mockImplementation((...args: unknown[]) => { logged.push(args); });
+    const { createAuthConfig } = await import('@/auth');
+    const authConfig = createAuthConfig();
+    expect(authConfig.debug).toBe(true);
+    const jwtShaped = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJkZWJ1Zy1zdWJqZWN0In0.ZGVidWctc2lnbmF0dXJl';
+    authConfig.logger!.debug!(`callback tokens id_token=${jwtShaped}`, { tokens: { access_token: 'debug-metadata-access-value' } });
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toHaveLength(1);
+    const [line] = logged[0] as [string];
+    expect(line).toMatch(/^\[auth\]\[debug\] callback tokens id_token=\[redacted\]$/);
+    for (const credential of ['debug-metadata-access-value', jwtShaped, 'eyJhbGciOiJSUzI1NiJ9', 'ZGVidWctc2lnbmF0dXJl']) expect(line).not.toContain(credential);
+  });
+
+  it('keeps decrypted session credentials out of server output when an expired session cookie is presented', async () => {
+    const logged: unknown[][] = [];
+    for (const method of ['error', 'warn', 'log', 'info', 'debug'] as const) vi.spyOn(console, method).mockImplementation((...args: unknown[]) => { logged.push(args); });
+    const { createAuthConfig } = await import('@/auth');
+    const authConfig = createAuthConfig();
+    // A genuinely expired Auth.js cookie: the JWE decrypts, then its exp claim fails.
+    const cookie = await encode({ token: { user, accessToken: 'expired-cookie-access-value', refreshToken: 'expired-cookie-refresh-value', idToken: 'expired-cookie-id-token-value' }, secret, salt: 'authjs.session-token', maxAge: -3600 });
+    const response = await Auth(new Request('http://localhost/api/auth/session', { headers: { cookie: `authjs.session-token=${cookie}` } }), { ...authConfig, secret, trustHost: true, basePath: '/api/auth' });
+    expect(await response.json()).toBeNull();
+    const output = logged.map(args => args.map(arg => arg instanceof Error ? `${arg.name}: ${arg.message} ${arg.stack}` : typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ')).join('\n');
+    // Operational signal survives: the failure type is still reported.
+    expect(output).toContain('JWTSessionError');
+    for (const credential of ['expired-cookie-access-value', 'expired-cookie-refresh-value', 'expired-cookie-id-token-value', 'reviewer@example.invalid', secret]) expect(output).not.toContain(credential);
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('logs only allowlisted error fields when an OIDC callback failure carries ID-token claims', async () => {
+    // Auth.js constructs callback errors from the underlying Error at runtime.
+    const CallbackRouteError = (await import('@auth/core/errors')).CallbackRouteError as unknown as new (err: Error, data: object) => Error;
+    const logged: unknown[][] = [];
+    for (const method of ['error', 'warn', 'log', 'info', 'debug'] as const) vi.spyOn(console, method).mockImplementation((...args: unknown[]) => { logged.push(args); });
+    const { createAuthConfig } = await import('@/auth');
+    const authConfig = createAuthConfig();
+    expect(authConfig.logger?.error).toBeTypeOf('function');
+    const cause = Object.assign(new Error('unexpected ID Token "nonce" claim value'), { name: 'OperationProcessingError', code: 'OAUTH_JWT_CLAIM_COMPARISON_FAILED', cause: { claims: { sub: 'reviewer', email: 'claims-email@example.invalid', nonce: 'claims-nonce-value' }, id_token: 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJyZXZpZXdlciJ9.c2lnbmF0dXJlLXZhbHVl' } });
+    authConfig.logger!.error!(new CallbackRouteError(cause, { provider: 'zitadel', tokens: { access_token: 'callback-access-value', id_token: 'callback-id-token-value' } }));
+    authConfig.logger!.warn!('debug-enabled');
+    authConfig.logger!.debug!('callback route', { tokens: { access_token: 'debug-access-value' } });
+    const output = logged.map(args => args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ')).join('\n');
+    expect(output).toContain('CallbackRouteError');
+    expect(output).toContain('OperationProcessingError');
+    expect(output).toContain('debug-enabled');
+    for (const credential of ['callback-access-value', 'callback-id-token-value', 'claims-email@example.invalid', 'claims-nonce-value', 'eyJhbGciOiJSUzI1NiJ9', 'debug-access-value']) expect(output).not.toContain(credential);
+  });
+
+  it('retains the provider ID token server-side at sign-in and across refresh without exposing it to the browser session', async () => {
+    const { createAuthConfig } = await import('@/auth');
+    const authConfig = createAuthConfig();
+    const initial = await authConfig.callbacks!.jwt!({ token: { sub: 'authjs-generated-user-id' }, user: { ...user, id: 'authjs-generated-user-id' }, account: { provider: 'zitadel', type: 'oidc', providerAccountId: 'reviewer', access_token: 'initial-access', refresh_token: 'initial-refresh', id_token: 'initial-id-token', expires_at: Math.floor(Date.now() / 1000) + 600 } });
+    expect(initial).toMatchObject({ idToken: 'initial-id-token' });
+    const unexpired = await session(initial!);
+    const unexpiredBody = await unexpired.text();
+    expect(unexpiredBody).not.toContain('initial-id-token');
+    expect(await cookieToken(unexpired)).toMatchObject({ idToken: 'initial-id-token' });
+
+    // An issuer that does not return a new ID token on refresh keeps the original.
+    fetcher.mockResolvedValueOnce(Response.json({ access_token: 'renewed-access', expires_in: 3600 }));
+    const kept = await session({ ...initial!, expiresAt: 1 });
+    expect(await kept.text()).not.toContain('initial-id-token');
+    expect(await cookieToken(kept)).toMatchObject({ accessToken: 'renewed-access', idToken: 'initial-id-token' });
+
+    // A rotated ID token replaces the retained one.
+    fetcher.mockResolvedValueOnce(Response.json({ access_token: 'renewed-again', expires_in: 3600, id_token: 'rotated-id-token' }));
+    const rotated = await session({ ...initial!, expiresAt: 1 });
+    expect(await rotated.text()).not.toContain('rotated-id-token');
+    expect(await cookieToken(rotated)).toMatchObject({ idToken: 'rotated-id-token' });
+  });
+
+  describe('federated logout end-session URL', () => {
+    const origin = 'http://localhost:3000';
+    async function logoutUrl(token: JWT | undefined, init: { origin?: string | null; cookieName?: string } = {}) {
+      const { federatedLogoutUrl } = await import('@/auth');
+      const headers = new Headers();
+      if (init.origin !== null) headers.set('origin', init.origin ?? origin);
+      if (token) {
+        const cookieName = init.cookieName ?? 'authjs.session-token';
+        headers.set('cookie', `${cookieName}=${await encode({ token, secret, salt: cookieName })}`);
+      }
+      return federatedLogoutUrl(new Request('http://localhost/api/auth/federated-logout', { method: 'POST', headers }));
+    }
+
+    it.each(['authjs.session-token', '__Secure-authjs.session-token'])('adds id_token_hint from the server-side session token (%s)', async cookieName => {
+      const url = new URL((await logoutUrl({ user, idToken: 'retained-id-token' }, { cookieName }))!);
+      expect(`${url.origin}${url.pathname}`).toBe('https://issuer.example.invalid/oidc/v1/end_session');
+      expect(Object.fromEntries(url.searchParams)).toEqual({ id_token_hint: 'retained-id-token', client_id: 'synthetic-client', post_logout_redirect_uri: origin });
+    });
+
+    it('falls back to the client-only URL when the session carries no ID token', async () => {
+      for (const token of [{ user }, undefined]) {
+        const url = new URL((await logoutUrl(token))!);
+        expect(url.searchParams.has('id_token_hint')).toBe(false);
+        expect(Object.fromEntries(url.searchParams)).toEqual({ client_id: 'synthetic-client', post_logout_redirect_uri: origin });
+      }
+    });
+
+    it('ignores a session cookie that does not decrypt with the application secret', async () => {
+      const { federatedLogoutUrl } = await import('@/auth');
+      const forged = await encode({ token: { idToken: 'forged-id-token' }, secret: 'another-secret-another-secret-xx', salt: 'authjs.session-token' });
+      const url = new URL((await federatedLogoutUrl(new Request('http://localhost/api/auth/federated-logout', { method: 'POST', headers: { origin, cookie: `authjs.session-token=${forged}` } })))!);
+      expect(url.searchParams.has('id_token_hint')).toBe(false);
+    });
+
+    it('returns nothing without a browser origin to return to', async () => {
+      expect(await logoutUrl({ user, idToken: 'retained-id-token' }, { origin: null })).toBeNull();
+      expect(await logoutUrl({ user, idToken: 'retained-id-token' }, { origin: 'javascript:alert(1)' })).toBeNull();
+    });
+
+    it.each(['disabled', 'optional'])('makes no provider logout URL when the provider is inactive (%s)', async mode => {
+      vi.stubEnv('AUTH_MODE', mode);
+      if (mode === 'optional') { vi.stubEnv('ZITADEL_ISSUER', undefined); vi.stubEnv('ZITADEL_CLIENT_ID', undefined); vi.stubEnv('ZITADEL_CLIENT_SECRET', undefined); }
+      expect(await logoutUrl({ user, idToken: 'retained-id-token' })).toBeNull();
+    });
+  });
+
   it('returns no session for a request without a session cookie', async () => {
     const { createAuthConfig } = await import('@/auth');
     const authConfig = createAuthConfig();

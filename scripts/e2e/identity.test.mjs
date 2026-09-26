@@ -58,3 +58,16 @@ test('read-only identity readiness retries network startup failures', async () =
   });
   assert.equal(attempts, 2);
 });
+
+test('default baseline profile provisions exactly the D06 owner and unrelated personas', async () => {
+  const { provisionPersonas } = await import('./bootstrap-identity.mjs');
+  const calls = [];
+  let next = 0;
+  const call = async (endpoint, _body, _readOnly = false, method = 'POST') => { calls.push(`${method} ${endpoint}`); return {id: `id-${++next}`}; };
+  const {users, lifetimes} = await provisionPersonas(call, {organizationId: 'org', runId: 'a'.repeat(32)});
+  assert.deepEqual(Object.keys(users), ['owner', 'unrelated']);
+  assert.equal(lifetimes, null, 'baseline never changes instance-wide provider lifetimes');
+  assert.deepEqual(calls, ['POST /v2/users/new', 'POST /v2/users/new']);
+  const duplicate = async () => ({id: 'same'});
+  await assert.rejects(provisionPersonas(duplicate, {organizationId: 'org', runId: 'a'.repeat(32)}), /distinct/);
+});

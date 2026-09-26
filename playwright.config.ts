@@ -1,8 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 import path from "node:path";
-import { loadRun } from "./e2e/fixtures/run";
+import { loadRunConfig } from "./e2e/fixtures/run";
 
-const run = loadRun();
+// Profiles run on separate fresh stacks (KTD1). The lifecycle profile shortens
+// instance-wide provider lifetimes, so its spec never joins the baseline run and
+// baseline specs never run against lifecycle lifetimes.
+const run = loadRunConfig();
+const LIFECYCLE_SPEC = /auth-lifecycle\.spec\.ts$/;
 export default defineConfig({
   testDir: "./e2e",
   outputDir: path.join(run.dir, "test-results"),
@@ -22,9 +26,11 @@ export default defineConfig({
     screenshot: "off",
     video: "off",
   },
-  projects: [
-    { name: "stack setup", testMatch: /stack\.setup\.ts/, teardown: "stack teardown" },
-    { name: "stack teardown", testMatch: /stack\.teardown\.ts/ },
-    { name: "chromium", testMatch: /.*\.spec\.ts/, dependencies: ["stack setup"] },
-  ],
+  projects: run.profile === "lifecycle"
+    ? [{ name: "lifecycle", testMatch: LIFECYCLE_SPEC }]
+    : [
+      { name: "stack setup", testMatch: /stack\.setup\.ts/, teardown: "stack teardown" },
+      { name: "stack teardown", testMatch: /stack\.teardown\.ts/ },
+      { name: "chromium", testMatch: /.*\.spec\.ts/, testIgnore: LIFECYCLE_SPEC, dependencies: ["stack setup"] },
+    ],
 });

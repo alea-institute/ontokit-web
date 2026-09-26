@@ -2,25 +2,42 @@ import { test as base, expect, type APIRequestContext, type Browser, type Page }
 import fs from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
-import { loadRun, authPath, sessionPath, type Persona, type RunConfig } from "./run";
+import { loadRun, authPath, sessionPath, type Persona, type RunConfig, type RunUser } from "./run";
 
 export interface Session { accessToken: string; user: { id: string; email: string }; error?: string }
-async function completeSignIn(page: Page, run: RunConfig, persona: Persona): Promise<Session> {
-  await page.goto(`${run.web}/auth/signin?callbackUrl=${encodeURIComponent(`${run.web}/`)}`);
-  await page.getByRole("button", { name: "Sign in with Zitadel" }).click();
-  await expect(page).toHaveURL(url => url.origin === new URL(run.login).origin);
-  await page.getByTestId("username-text-input").fill(run.users[persona].email);
+/**
+ * Completes the provider's credential screens once the browser is already at the
+ * Login UI. Initiating OIDC (app button, SessionGuard, user menu) stays with the
+ * caller so lifecycle cases can prove who started the flow. Accepts the password
+ * screen first when the provider already knows the login name. Returns when the
+ * browser is back on the application origin (any path).
+ */
+export async function enterProviderCredentials(page: Page, {login, web, user}: {login: string; web: string; user: RunUser}) {
+  const loginOrigin = new URL(login).origin;
+  const username = page.getByTestId("username-text-input");
+  const password = page.getByTestId("password-text-input");
+  await expect(username.or(password).first()).toBeVisible({timeout: 30_000});
+  if (await username.isVisible()) {
+    await username.fill(user.email);
+    await page.getByTestId("submit-button").click();
+    await expect(password).toBeVisible({timeout: 30_000});
+  }
+  await password.fill(user.password);
   await page.getByTestId("submit-button").click();
-  await expect(page.getByTestId("password-text-input")).toBeVisible({timeout: 30_000});
-  await page.getByTestId("password-text-input").fill(run.users[persona].password);
-  await page.getByTestId("submit-button").click();
-  await expect(page).toHaveURL(url => (url.origin === run.web && url.pathname === "/") || (url.origin === new URL(run.login).origin && url.pathname.endsWith("/mfa/set")), {timeout: 45_000});
+  await expect(page).toHaveURL(url => url.origin === web || (url.origin === loginOrigin && url.pathname.endsWith("/mfa/set")), {timeout: 45_000});
   if (new URL(page.url()).pathname.endsWith("/mfa/set")) {
     // Optional enrollment is not authentication bypass. Never click password-reset.
     const skip = page.getByTestId("reset-button");
     await expect(skip).toHaveText(/skip/i);
     await skip.click();
   }
+  await expect(page).toHaveURL(url => url.origin === web, {timeout: 45_000});
+}
+async function completeSignIn(page: Page, run: RunConfig, persona: Persona): Promise<Session> {
+  await page.goto(`${run.web}/auth/signin?callbackUrl=${encodeURIComponent(`${run.web}/`)}`);
+  await page.getByRole("button", { name: "Sign in with Zitadel" }).click();
+  await expect(page).toHaveURL(url => url.origin === new URL(run.login).origin);
+  await enterProviderCredentials(page, {login: run.login, web: run.web, user: run.users[persona]});
   await expect(page).toHaveURL(url => url.origin === run.web && url.pathname === "/", {timeout: 45_000});
   const response = await page.request.get(`${run.web}/api/auth/session`);
   expect(response.status()).toBe(200);

@@ -130,3 +130,32 @@ bootstrap credential, `--fail-at identity-issuer` rejects discovery, and
 browser authentication fails. All must return nonzero and complete owned cleanup.
 The normal command has no injected failure. U2 establishes authentication only; later
 units add B10 domain and editor workflows, so this alone does not complete B10.
+
+## Profile inventories and receipts (D08 U4)
+
+`validateReport(report, {profile})` in `evidence.mjs` requires an explicit profile, either
+`baseline` or `lifecycle`. There is no default. It checks the Playwright JSON report against
+that profile's fixed inventory in `PROFILE_INVENTORIES`. `baseline` is the unchanged 21-test D06
+inventory. `lifecycle` is exactly the four `browser/auth-lifecycle.spec.ts` tests in the
+`lifecycle` project. A test from the other profile's file or project fails either gate.
+So do a duplicate, an unlisted lifecycle test, a skip, a retry (`retry > 0` or more than one
+result), a `skip`/`fixme`/`fail` annotation, a flaky or unexpected outcome, and a runner error.
+
+Lifecycle `lifecycle-evidence` annotations are parsed per test and rebuilt against
+per-case schemas (the `CASES` table). Unknown keys and wrongly typed values are dropped.
+The `case` and `clock` labels must match the case's position, and proof fields must hold
+the values the spec asserted. A missing, duplicated, misplaced or malformed entry fails
+the gate. The validated summary records `realElapsedCases` (R2, R3) and
+`clockControlledCases` (R4) separately (R8).
+
+`sanitizedEvidence` writes receipt `version: 2`. It keeps `profile` only when it is a known
+profile and matches `manifest.tests.profile`. It rebuilds test names from the inventory
+rather than copying them, and re-sanitizes lifecycle case evidence. From
+`manifest.lifecycle` it keeps only the four integer OIDC lifetimes, `graceSeconds`,
+`observedAccessTokenLifetimeSeconds` and the preflight numbers and booleans. The clock
+control path and any other field are dropped. For a lifecycle receipt, `acceptedRun`
+also requires that block, with `beforeAccepted`, `afterRejected`, `cookiesCleared`,
+`toleranceWindowExercised` and `restored` all true. Every receipt states
+`acceptance: {scope: "local-verification", hostedAcceptance: false}`.
+`npm run test:e2e:evidence` covers each negative case with synthetic reports only.
+Synthetic reports are never live acceptance.
