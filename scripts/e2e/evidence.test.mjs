@@ -204,3 +204,105 @@ for (const [name, mutate] of Object.entries({
   if (mutate) mutate(m);
   assert.equal(sanitizedEvidence(m, mutate ? ok : {cleanup: 'failed', workflowPassed: true}).acceptedRun, false);
 });
+
+// ---- D09 auth-mode profiles (U6: KTD3, KTD7) ----
+const MODE_PROFILES = ['optional-configured', 'optional-anonymous', 'disabled'];
+const modeReport = profile => {
+  const inventory = PROFILE_INVENTORIES[profile];
+  return {stats: {expected: inventory.length, skipped: 0, unexpected: 0, flaky: 0}, errors: [], suites: [{specs: inventory.map(t => ({file: t.file, title: t.title, ok: true, tests: [passing(t.project)]}))}]};
+};
+const MODE_SHAPE = {'optional-configured': ['optional', true], 'optional-anonymous': ['optional', false], disabled: ['disabled', false]};
+const authModes = (profile, web = MODE_SHAPE[profile], api = web) => ({profile, web: {mode: web[0], providerConfigured: web[1]}, api: {mode: api[0], providerConfigured: api[1]}});
+const providerless = profile => !MODE_SHAPE[profile][1];
+const modeImages = profile => images().filter(i => !providerless(profile) || !['zitadel', 'login'].includes(i.service));
+const modeManifest = profile => ({...baselineManifest(), profile, tests: validateReport(modeReport(profile), {profile}), evidenceImages: modeImages(profile), authModes: authModes(profile)});
+
+test('baseline and lifecycle inventories are unchanged by the new profiles', () => {
+  assert.equal(PROFILE_INVENTORIES.baseline, REQUIRED_TESTS);
+  assert.equal(REQUIRED_TESTS.length, 21);
+  assert.equal(PROFILE_INVENTORIES.lifecycle, LIFECYCLE_REQUIRED_TESTS);
+  assert.equal(LIFECYCLE_REQUIRED_TESTS.length, 4);
+});
+for (const profile of MODE_PROFILES) {
+  test(`${profile} has a fixed inventory from its own registry spec and project`, () => {
+    const inventory = PROFILE_INVENTORIES[profile];
+    assert.ok(inventory.length > 0);
+    assert.ok(inventory.every(t => t.file === `browser/auth-mode-${profile}.spec.ts` && t.project === profile));
+    assert.equal(new Set(inventory.map(t => t.title)).size, inventory.length);
+    const result = validateReport(modeReport(profile), {profile});
+    assert.equal(result.profile, profile);
+    assert.equal(result.passed, inventory.length);
+  });
+  test(`${profile}: removing any mandatory case fails even with an inflated count`, () => {
+    for (let i = 0; i < PROFILE_INVENTORIES[profile].length; i++) {
+      const r = modeReport(profile); const keep = r.suites[0].specs.filter((_, j) => j !== i);
+      r.suites[0].specs = [...keep, {...structuredClone(keep[0] ?? modeReport(profile).suites[0].specs[0]), title: 'an unrelated green test'}];
+      rejects(r, profile);
+    }
+  });
+  test(`${profile}: foreign spec, duplicate, extra, skip, retry or runner error prevents acceptance`, () => {
+    for (const mutate of [
+      r => { r.suites[0].specs.push({file: 'api/projects.spec.ts', title: REQUIRED_TESTS[12].title, ok: true, tests: [passing(profile)]}); r.stats.expected++; },
+      r => { r.suites[0].specs.push({file: 'browser/auth-lifecycle.spec.ts', title: 'x', ok: true, tests: [passing(profile)]}); r.stats.expected++; },
+      r => { const other = MODE_PROFILES.find(p => p !== profile); r.suites[0].specs.push({file: `browser/auth-mode-${other}.spec.ts`, title: 'x', ok: true, tests: [passing(profile)]}); r.stats.expected++; },
+      r => { r.suites[0].specs[0].tests[0].projectName = 'chromium'; },
+      r => { r.suites[0].specs.push(structuredClone(r.suites[0].specs[0])); r.stats.expected++; },
+      r => { r.suites[0].specs.push({...structuredClone(r.suites[0].specs[0]), title: 'unlisted'}); r.stats.expected++; },
+      r => { r.stats.skipped = 1; },
+      r => { r.suites[0].specs[0].tests[0].results[0].retry = 1; },
+      r => { r.errors.push({message: SENTINEL}); },
+      r => { r.suites[0].specs[0].tests[0].annotations.push({type: 'fixme'}); },
+    ]) { const r = modeReport(profile); mutate(r); rejects(r, profile); }
+  });
+  test(`${profile} report cannot stand in for baseline or lifecycle, nor they for it`, () => {
+    rejects(modeReport(profile), 'baseline');
+    rejects(modeReport(profile), 'lifecycle');
+    rejects(baseline(), profile);
+    rejects(lifecycle(), profile);
+  });
+  test(`${profile} receipt records agreeing modes and its own service set`, () => {
+    const result = sanitizedEvidence(modeManifest(profile), ok);
+    assert.equal(result.acceptedRun, true, profile);
+    assert.equal(result.profile, profile);
+    assert.deepEqual(result.authModes, {web: authModes(profile).web, api: authModes(profile).api});
+    assert.equal(JSON.stringify(result).includes(SENTINEL), false);
+  });
+  test(`${profile} receipt with disagreeing or missing modes is rejected`, () => {
+    const [mode, provider] = MODE_SHAPE[profile];
+    const other = mode === 'disabled' ? 'optional' : 'disabled';
+    for (const modes of [
+      undefined,
+      authModes(profile, [other, provider], [mode, provider]),
+      authModes(profile, [mode, provider], [other, provider]),
+      authModes(profile, [other, provider]),
+      authModes(profile, [mode, !provider], [mode, provider]),
+      authModes(profile, [mode, provider], [mode, !provider]),
+      {...authModes(profile), profile: 'baseline'},
+      {...authModes(profile), web: {mode, providerConfigured: String(provider)}},
+    ]) {
+      const result = sanitizedEvidence({...modeManifest(profile), authModes: modes}, ok);
+      assert.equal(result.acceptedRun, false, JSON.stringify(modes));
+      assert.equal(result.authModes, null);
+    }
+  });
+}
+test('provider-less receipts are accepted without Zitadel and Login; provider receipts are not', () => {
+  for (const profile of ['optional-anonymous', 'disabled']) {
+    assert.equal(sanitizedEvidence(modeManifest(profile), ok).acceptedRun, true);
+    assert.equal(sanitizedEvidence({...modeManifest(profile), evidenceImages: images()}, ok).acceptedRun, true, 'extra images do not block');
+  }
+  const missingIdp = m => ({...m, evidenceImages: m.evidenceImages.filter(i => !['zitadel', 'login'].includes(i.service))});
+  assert.equal(sanitizedEvidence(missingIdp(modeManifest('optional-configured')), ok).acceptedRun, false);
+  assert.equal(sanitizedEvidence(missingIdp(baselineManifest()), ok).acceptedRun, false);
+  assert.equal(sanitizedEvidence(missingIdp(lifecycleManifest()), ok).acceptedRun, false);
+  const noWorker = {...modeManifest('disabled'), evidenceImages: modeImages('disabled').filter(i => i.service !== 'worker')};
+  assert.equal(sanitizedEvidence(noWorker, ok).acceptedRun, false);
+});
+test('baseline receipts still accept without recorded modes but reject recorded disagreement', () => {
+  assert.equal(sanitizedEvidence(baselineManifest(), ok).acceptedRun, true);
+  const agreeing = {...baselineManifest(), authModes: {profile: 'baseline', web: {mode: 'required', providerConfigured: true}, api: {mode: 'required', providerConfigured: true}}};
+  assert.equal(sanitizedEvidence(agreeing, ok).acceptedRun, true);
+  assert.deepEqual(sanitizedEvidence(agreeing, ok).authModes, {web: agreeing.authModes.web, api: agreeing.authModes.api});
+  const disagreeing = {...agreeing, authModes: {...agreeing.authModes, api: {mode: 'optional', providerConfigured: true}}};
+  assert.equal(sanitizedEvidence(disagreeing, ok).acceptedRun, false);
+});

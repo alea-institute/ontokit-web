@@ -104,6 +104,7 @@ export async function fullStack(ctx, overrides = {}) {
       ...(identity ? {issuer: identity.issuer, login: identity.login, users: identity.users, ordinaryUserPolicyVerified: true} : {}),
     };
     await deps.writePrivate(runFile, runConfig);
+    await phase('browser-ready');
     if (ctx.failAt === 'before-browser') throw new Error('Injected before-browser stop after mode agreement and fixture seeding');
     await phase(`testing-${profile}`);
     await Promise.race([server, deps.runPlaywright(ctx, env, webSource, runFile, 1_800_000)]);
