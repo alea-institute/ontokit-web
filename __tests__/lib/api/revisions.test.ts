@@ -255,4 +255,36 @@ describe("branchesApi", () => {
       expect(options.headers.get("Authorization")).toBe("Bearer tok");
     });
   });
+
+  // --- tokenless calls (auth-disabled mode) ---
+
+  describe("without a token", () => {
+    it("create, switch, delete and savePreference send no Authorization header", async () => {
+      mockOk({ name: "feature" });
+      mockOk({ name: "feature" });
+      mockEmpty();
+      mockEmpty();
+
+      await branchesApi.create("p1", { name: "feature", from_branch: "main" });
+      await branchesApi.switch("p1", "feature");
+      await branchesApi.delete("p1", "feature");
+      await branchesApi.savePreference("p1", "feature");
+
+      expect(mockFetch).toHaveBeenCalledTimes(4);
+      for (const [, options] of mockFetch.mock.calls) {
+        expect(options.headers.get("Authorization")).toBeNull();
+      }
+    });
+
+    it("switch and delete still send the bearer when given one", async () => {
+      mockOk({ name: "feature" });
+      mockEmpty();
+
+      await branchesApi.switch("p1", "feature", "tok");
+      await branchesApi.delete("p1", "feature", "tok");
+
+      expect(mockFetch.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer tok");
+      expect(mockFetch.mock.calls[1][1].headers.get("Authorization")).toBe("Bearer tok");
+    });
+  });
 });

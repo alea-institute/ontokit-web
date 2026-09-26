@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
 import { DemoProjectEntry } from "@/components/projects/demo-project-entry";
 import { projectApi } from "@/lib/api/projects";
+import { isClientAuthDisabled, shouldShowAuthUI } from "@/lib/auth-mode";
 import { cn } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
@@ -24,6 +25,13 @@ export default function HomePage() {
 
   const isAuthenticated = status === "authenticated";
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+  // Sign-in is offered only when a provider can actually complete it; otherwise
+  // the private tabs explain why they are empty instead of showing a dead end.
+  const showAuthUI = shouldShowAuthUI();
+  // Auth-disabled mode is a single-user workspace: the API lists and creates
+  // the anonymous identity's own projects without a token, so "My Projects",
+  // "Private" and project creation are available while signed out.
+  const hasWorkspace = isAuthenticated || isClientAuthDisabled();
 
   // Default authenticated users to "mine" tab
   const authDefaultApplied = useRef(false);
@@ -65,7 +73,7 @@ export default function HomePage() {
     },
     enabled:
       (status !== "loading" || (filter === "public" && authMode !== "required")) &&
-      !((filter === "mine" || filter === "private") && !isAuthenticated),
+      !((filter === "mine" || filter === "private") && !hasWorkspace),
   });
 
   const projects = data?.pages.flatMap((page) => page.items) ?? [];
@@ -102,12 +110,12 @@ export default function HomePage() {
                 Projects
               </h1>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                {isAuthenticated
+                {hasWorkspace
                   ? "Browse public projects or manage your own"
                   : "Browse public ontology projects"}
               </p>
             </div>
-            {isAuthenticated && (
+            {hasWorkspace && (
               <Link href="/projects/new">
                 <Button>
                   <Plus className="mr-2 h-4 w-4" />
@@ -166,27 +174,46 @@ export default function HomePage() {
           {/* Content */}
           <div className="mt-8">
             {/* Private tab login prompt for unauthenticated users */}
-            {(filter === "mine" || filter === "private") && !isAuthenticated ? (
+            {(filter === "mine" || filter === "private") && !hasWorkspace ? (
               <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
                 {filter === "private" ? (
                   <Lock className="mx-auto h-12 w-12 text-slate-400" />
                 ) : (
                   <User className="mx-auto h-12 w-12 text-slate-400" />
                 )}
-                <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
-                  {filter === "private"
-                    ? "Sign in to see private projects"
-                    : "Sign in to see your projects"}
-                </h3>
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  {filter === "private"
-                    ? "View all private projects you own or are a member of"
-                    : "View all projects you own or are a member of"}
-                </p>
-                <Button className="mt-6" onClick={() => signIn()}>
-                  <LogIn className="mr-2 h-4 w-4" />
-                  Sign In
-                </Button>
+                {showAuthUI ? (
+                  <>
+                    <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
+                      {filter === "private"
+                        ? "Sign in to see private projects"
+                        : "Sign in to see your projects"}
+                    </h3>
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                      {filter === "private"
+                        ? "View all private projects you own or are a member of"
+                        : "View all projects you own or are a member of"}
+                    </p>
+                    <Button className="mt-6" onClick={() => signIn()}>
+                      <LogIn className="mr-2 h-4 w-4" />
+                      Sign In
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
+                      {filter === "private"
+                        ? "Private projects aren't available here"
+                        : "Your projects aren't available here"}
+                    </h3>
+                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                      Sign-in is unavailable in this configuration, so only public projects can be browsed.
+                    </p>
+                    <Button variant="outline" className="mt-6" onClick={() => setFilter("public")}>
+                      <Globe className="mr-2 h-4 w-4" />
+                      Browse public projects
+                    </Button>
+                  </>
+                )}
               </div>
             ) : isLoading ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -224,13 +251,13 @@ export default function HomePage() {
                 <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
                   {debouncedSearch
                     ? "Try a different search term"
-                    : filter === "private" && isAuthenticated
+                    : filter === "private" && hasWorkspace
                     ? "You are not a member of any private projects, and do not own any private projects. Create your first private project to get started."
-                    : filter === "mine" && isAuthenticated
+                    : filter === "mine" && hasWorkspace
                     ? "Create your first project to get started"
                     : "Check back later for public projects"}
                 </p>
-                {(filter === "mine" || filter === "private") && isAuthenticated && !debouncedSearch && (
+                {(filter === "mine" || filter === "private") && hasWorkspace && !debouncedSearch && (
                   <Link href="/projects/new" className="mt-4 inline-block">
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />

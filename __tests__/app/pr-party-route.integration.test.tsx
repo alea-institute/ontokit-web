@@ -57,7 +57,7 @@ beforeEach(() => {
     unexpected.push(path); return json({ detail: "Unexpected fixture request" }, 404);
   }));
 });
-afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); localStorage.removeItem(qaDraftKey("route-card", "route-reviewer")); expect(unexpected).toEqual([]); });
+afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); localStorage.removeItem(qaDraftKey("route-card", "route-reviewer")); expect(unexpected).toEqual([]); });
 
 describe("review route through real queue, detail, question form and API hooks", () => {
   it("opens a deep-linked card and posts a question through its real detail panel", async () => {
@@ -98,6 +98,8 @@ describe("review route through real queue, detail, question form and API hooks",
   });
 
   it("keeps an anonymous deep link gated without authenticated HTTP requests", async () => {
+    // Required mode always runs with a provider (lib/env.ts enforces it).
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "required"); vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
     boundary.session = null; boundary.params = new URLSearchParams({ card: "route-card" }); mount();
     await waitFor(() => expect(within(screen.getByRole("main")).getByRole("button", { name: /Sign in/i })).toBeDefined());
     expect(requests).toEqual([]);

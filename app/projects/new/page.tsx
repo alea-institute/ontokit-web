@@ -22,6 +22,7 @@ import {
 import type { GitHubRepoInfo } from "@/lib/api/userSettings";
 import type { UploadProgress } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import { isClientAuthDisabled, shouldShowAuthUI } from "@/lib/auth-mode";
 
 type TabType = "create" | "import" | "github";
 
@@ -67,19 +68,24 @@ export default function NewProjectPage() {
 
   const isAuthenticated = status === "authenticated";
   const isLoading = status === "loading";
+  // Auth-disabled mode is a single-user workspace: the API creates and imports
+  // projects as its anonymous identity without a token, so Create Empty and
+  // Import from File work signed out. GitHub clone stays unavailable there
+  // because it needs the user's stored GitHub credential.
+  const authDisabled = isClientAuthDisabled();
 
   const handleCreateSubmit = async (data: {
     name: string;
     description?: string;
     is_public: boolean;
   }) => {
-    if (!session?.accessToken) {
+    if (!session?.accessToken && !authDisabled) {
       throw new Error("You must be signed in to create a project");
     }
 
     setIsSubmitting(true);
     try {
-      const project = await projectApi.create(data as ProjectCreate, session.accessToken);
+      const project = await projectApi.create(data as ProjectCreate, session?.accessToken);
       router.push(`/projects/${project.id}`);
     } finally {
       setIsSubmitting(false);
@@ -91,7 +97,7 @@ export default function NewProjectPage() {
     description?: string;
     is_public: boolean;
   }) => {
-    if (!session?.accessToken) {
+    if (!session?.accessToken && !authDisabled) {
       throw new Error("You must be signed in to import a project");
     }
 
@@ -113,7 +119,7 @@ export default function NewProjectPage() {
 
       const project = await projectApi.import(
         importData,
-        session.accessToken,
+        session?.accessToken,
         (progress) => setUploadProgress(progress)
       );
       router.push(`/projects/${project.id}`);
@@ -201,23 +207,40 @@ export default function NewProjectPage() {
     );
   }
 
-  // Redirect to sign in if not authenticated
-  if (!isAuthenticated) {
+  // Redirect to sign in if not authenticated. Without an active identity
+  // provider sign-in cannot succeed, so explain that instead of linking to it.
+  if (!isAuthenticated && !authDisabled) {
     return (
       <>
         <Header />
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
             <div className="rounded-lg border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-                Sign in required
-              </h2>
-              <p className="mt-2 text-slate-600 dark:text-slate-400">
-                You need to be signed in to create a project.
-              </p>
-              <Link href="/auth/signin" className="mt-4 inline-block">
-                <Button>Sign In</Button>
-              </Link>
+              {shouldShowAuthUI() ? (
+                <>
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                    Sign in required
+                  </h2>
+                  <p className="mt-2 text-slate-600 dark:text-slate-400">
+                    You need to be signed in to create a project.
+                  </p>
+                  <Link href="/auth/signin" className="mt-4 inline-block">
+                    <Button>Sign In</Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                    Project creation is unavailable
+                  </h2>
+                  <p className="mt-2 text-slate-600 dark:text-slate-400">
+                    Sign-in is unavailable in this configuration, so new projects can&apos;t be created here. You can still browse public projects.
+                  </p>
+                  <Link href="/" className="mt-4 inline-block">
+                    <Button variant="outline">Browse public projects</Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </main>
@@ -303,6 +326,13 @@ export default function NewProjectPage() {
               />
             )}
 
+            {activeTab === "github" && authDisabled && (
+              <div className="flex items-start gap-3 text-sm text-slate-600 dark:text-slate-400">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" aria-hidden="true" />
+                <p>Cloning from GitHub is unavailable in this configuration.</p>
+              </div>
+            )}
+
             {activeTab === "import" && (
               <div className="space-y-6">
                 {/* File Upload */}
@@ -379,7 +409,7 @@ export default function NewProjectPage() {
               </div>
             )}
 
-            {activeTab === "github" && (
+            {activeTab === "github" && !authDisabled && (
               <div className="space-y-6">
                 {/* Step 1: Select Repository */}
                 <div>

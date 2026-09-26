@@ -176,6 +176,17 @@ describe("projectApi", () => {
       expect(JSON.parse(options.body)).toEqual({ name: "New" });
       expect(options.headers.get("Authorization")).toBe("Bearer tok");
     });
+
+    it("omits the Authorization header when called without a token (auth-disabled create)", async () => {
+      mockOk({ id: "p1", name: "New" });
+
+      await projectApi.create({ name: "New" });
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects");
+      expect(options.method).toBe("POST");
+      expect(options.headers.get("Authorization")).toBeNull();
+    });
   });
 
   // --- update ---
@@ -239,6 +250,19 @@ describe("projectApi", () => {
       expect(fileEntry.type).toBe("text/turtle");
       expect(formData.get("is_public")).toBe("true");
       expect(formData.get("name")).toBe("My Ont");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+    });
+
+    it("omits the Authorization header when called without a token (auth-disabled import)", async () => {
+      mockOk({ id: "p1", name: "Imported", file_path: "/tmp/ont.ttl" });
+
+      const file = new File(["content"], "ontology.ttl", { type: "text/turtle" });
+      await projectApi.import({ file, is_public: false });
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/import");
+      expect(options.method).toBe("POST");
+      expect(options.headers.get("Authorization")).toBeNull();
     });
   });
 

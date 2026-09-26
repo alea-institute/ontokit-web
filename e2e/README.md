@@ -35,7 +35,7 @@ database heads, fixed mandatory test names/counts, timestamps, workflow outcome 
 cleanup outcome, plus `acceptance: {scope: "local-verification", hostedAcceptance: false}`.
 `acceptedRun` requires an explicit known profile whose inventory matches the tests,
 both workflow and cleanup success, and complete metadata. Receipt `version` 2 adds the
-profile fields; the committed D06 receipts are version 1 and predate them. It
+profile fields and version 3 adds `authModes`; the committed D06 receipts are version 1 and predate them. It
 proves that single run only; neighbor integrity and repeatability require separate
 observations. Copy reviewed receipts into release evidence when closing D06. Never
 copy raw Playwright JSON, sessions, logs, credentials or private source contents there.
@@ -78,6 +78,42 @@ the clock preflight's numbers and booleans. A missing or unproven preflight (for
 `restored` is not true) prevents `acceptedRun`. Both profiles record local verification
 only. Hosted acceptance is a separate gate.
 
+## Authentication-mode profiles (D09)
+
+```sh
+npm run test:e2e:profiles
+npm run test:e2e:optional-configured -- --api-source /absolute/path/to/ontokit-api
+npm run test:e2e:optional-anonymous -- --api-source /absolute/path/to/ontokit-api
+npm run test:e2e:disabled -- --api-source /absolute/path/to/ontokit-api
+```
+
+Each profile runs on its own fresh stack with its own production web build, and runs only
+its own spec.
+
+- `optional-configured` uses optional mode with real Zitadel/Login and one ordinary persona.
+- `optional-anonymous` uses optional mode with no provider, and starts no identity services.
+- `disabled` uses disabled mode with no provider.
+
+The specs are `e2e/browser/auth-mode-<profile>.spec.ts`. The baseline project ignores all of
+them, and the lifecycle profile never sees them. Before any browser case, the launcher fails
+unless the compiled web build and the running API agree on the mode and on provider
+configuration. It then seeds run-tagged public and foreign-private projects, plus a
+persona-owned private project for `optional-configured`, inside the API container. Specs
+read the IDs with `seededProject(loadModeRun(profile), key)` and must not delete them.
+
+Each profile has a fixed exact-count inventory in `scripts/e2e/evidence.mjs`, and its own
+required service set. Provider-less receipts are accepted without Zitadel or Login images.
+Receipts (`version: 3`) record the agreed web and API modes. A receipt from one profile
+never substitutes for another, and baseline and lifecycle remain separately required.
+Probes: `--fail-at before-browser` (stop just before Playwright), `--fail-at
+web-mode-mismatch` and, for the provider-less profiles, `--fail-at api-mode-mismatch`. The
+gate must reject both mismatch probes. Details are in
+[the maintainer guide](../scripts/e2e/README.md#authentication-mode-profiles-d09).
+
+**Disabled-mode trust boundary:** disabled mode gives every caller who can reach the API
+create and edit rights as the shared anonymous owner. It is supported only for a
+single-user deployment that is not network-exposed.
+
 ## Lifecycle and recovery
 
 For full ownership, confinement and opt-in private diagnostic details see
@@ -115,8 +151,9 @@ Missing prerequisites must fail, not skip. Parent-owned live evidence is recorde
 ## Scope
 
 D08 adds R1–R4 required-mode lifecycle proof (sign-out, real access-token renewal,
-real refresh-idle recovery, controlled-clock application-cookie expiry). B11's
-optional/unconfigured/disabled auth-mode matrix and suggestion review remain open.
+real refresh-idle recovery, controlled-clock application-cookie expiry). D09 adds the
+optional/configured, optional/unconfigured and disabled auth-mode profiles above;
+suggestion review remains open.
 
 B10 maps to project CRUD, import/entity reads/source persistence, branches/PR diff and
 merge, lexical search, real worker lint, rejected writes without mutation and the real

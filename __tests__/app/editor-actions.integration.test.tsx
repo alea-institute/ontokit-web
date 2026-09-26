@@ -276,6 +276,137 @@ afterEach(() => {
   expect(unexpected, JSON.stringify(unexpected)).toEqual([]);
 });
 
+// Auth-mode matrix plan U4 (provisional): disabled mode is a single-user
+// workspace. The API returns the anonymous identity's role and accepts writes
+// without a bearer, so the editor's write paths proceed tokenless there.
+describe("disabled-mode editor writes without a bearer", () => {
+  function workspaceOwner() {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+    boundary.session = { data: null, status: "unauthenticated" };
+    projectResponse = { ...projectResponse, user_role: "owner", is_public: false };
+  }
+
+  it("persists a class form edit through PUT /source without an Authorization header", async () => {
+    workspaceOwner();
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await waitFor(() => expect(label.value).toBe("Person"));
+    await editAndSave(label, "Human");
+    await screen.findByText('Updated "Human"');
+    // URL selection sync may replace the query string; the viewer redirect must not fire.
+    expect(boundary.replace).not.toHaveBeenCalledWith("/projects/route-project");
+    expect(savedBodies).toHaveLength(1);
+    expect(savedBodies[0]).toMatchObject({ base_revision: "base-commit", commit_message: "Update class Human" });
+    expect(requests.find(r => r.path.endsWith("/source"))).toMatchObject({ method: "PUT", search: "?branch=main", authorization: null });
+    expect(requests.every(r => r.authorization === null)).toBe(true);
+
+    // Reload: a fresh editor reads the committed source back without a bearer.
+    cleanup(); client.clear(); requests.length = 0;
+    mount(); await screen.findByText("Person");
+    fireEvent.click(await screen.findByRole("button", { name: "Source" }));
+    const source = await screen.findByRole("textbox", { name: "Turtle source boundary" });
+    await waitFor(() => expect((source as HTMLTextAreaElement).value).toContain('"Human"'));
+    expect(requests.find(r => r.path.endsWith("/revisions/file"))).toMatchObject({ authorization: null });
+  });
+
+  it.each(["property", "individual"] as const)("persists a %s form edit without an Authorization header", async entityType => {
+    workspaceOwner();
+    const label = await openEntityForm(entityType);
+    await editAndSave(label, "Workspace change");
+    await screen.findByText('Updated "Workspace change"');
+    expect(savedBodies).toHaveLength(1);
+    expect(requests.find(r => r.path.endsWith("/source"))).toMatchObject({ method: "PUT", authorization: null });
+  });
+
+  it("fetches the source without a bearer before adding the first entity", async () => {
+    workspaceOwner();
+    mount(); await screen.findByText("Person");
+    fireEvent.keyDown(document, { key: "n", ctrlKey: true });
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("Label"), { target: { value: "New entity" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Advanced" }));
+    fireEvent.change(within(dialog).getByLabelText("IRI"), { target: { value: "https://example.test/NewEntity" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create" }));
+    await screen.findByText("New entity");
+    expect(requests.filter(r => r.path.endsWith("/revisions/file"))).not.toHaveLength(0);
+    expect(requests.every(r => r.authorization === null)).toBe(true);
+    fireEvent.click(await screen.findByRole("button", { name: "Source" }));
+    const source = await screen.findByRole("textbox", { name: "Turtle source boundary" });
+    await waitFor(() => expect((source as HTMLTextAreaElement).value).toContain('"New entity"'));
+    expect((source as HTMLTextAreaElement).value).toContain(originalSource);
+  });
+
+  it("sends a class delete without an Authorization header", async () => {
+    workspaceOwner(); referenceTotal = 0;
+    mount(); fireEvent.contextMenu(await screen.findByText("Person"));
+    fireEvent.click(await screen.findByRole("menuitem", { name: "Delete" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete Class" });
+    const button = within(dialog).getByRole("button", { name: "Delete" });
+    await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
+    fireEvent.click(button);
+    await screen.findByText('Deleted "Person"');
+    expect(requests.find(r => r.method === "DELETE")).toMatchObject({ authorization: null });
+  });
+
+  it("reparents a class through PUT /source without an Authorization header", async () => {
+    workspaceOwner();
+    const destination = "https://example.test/Destination";
+    extraTreeNodes = [{ iri: destination, label: "Destination", child_count: 0 }];
+    installTreeGeometry({ [iri]: 100, [destination]: 125 });
+    mount();
+    const row = await screen.findByRole("treeitem", { name: /Person/ });
+    row.focus();
+    fireEvent.keyDown(row, { key: " ", code: "Space" });
+    await screen.findByText("Drop here to make root class");
+    await act(async () => { fireEvent.keyDown(document, { key: "ArrowDown", code: "ArrowDown" }); });
+    fireEvent.keyDown(document, { key: " ", code: "Space" });
+    await waitFor(() => expect(savedBodies).toHaveLength(1));
+    expect(parseBlockTriples((savedBodies[0] as { content: string }).content, iri)).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: destination } });
+    await screen.findByText('Moved "Person"');
+    expect(requests.every(r => r.authorization === null)).toBe(true);
+  });
+
+  // The LLM gate needs a signed-in user, so the generated-entity controls stay
+  // hidden in disabled mode rather than offering an action without a path.
+  it("hides generated-entity suggestion controls in disabled mode", async () => {
+    workspaceOwner(); llmConfigured = true;
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    await screen.findByPlaceholderText("Label text");
+    expect(screen.queryByTitle("Suggest child classes")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Get LLM suggestions for this section" })).toBeNull();
+  });
+
+  // A visitor proposing on a public project it cannot edit must never reach a
+  // direct commit: the API refuses a base-branch PUT for that identity.
+  it.each([
+    ["disabled", "property"], ["disabled", "individual"],
+    ["optional", "property"], ["optional", "individual"],
+  ] as const)("routes a %s-mode anonymous %s proposal to the proposal session, never PUT /source", async (mode, entityType) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+    boundary.session = { data: null, status: "unauthenticated" };
+    projectResponse = { ...projectResponse, user_role: null, is_public: true };
+    sourceContent = originalSource + '\nex:Editable a owl:' + (entityType === "property" ? "ObjectProperty" : "NamedIndividual") + ' ;\n  rdfs:label "Original entity"@en .';
+    entityResults = [{ iri: editableIri, label: "Original entity", entity_type: entityType, property_kind: "object" }];
+    // The proposal starts from the class panel; once active, every entity
+    // form becomes editable, so property and individual saves must follow it.
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    fireEvent.click(await screen.findByRole("button", { name: "Propose Edit" }));
+    await screen.findByText("Proposing");
+    // Hovering the Source tab preloads the source the entity forms parse.
+    await act(async () => { for (const tab of screen.getAllByRole("button", { name: "Source" })) fireEvent.mouseEnter(tab); });
+    fireEvent.click(screen.getByRole("button", { name: entityType === "property" ? "Properties" : "Individuals" }));
+    fireEvent.click(await screen.findByText("Original entity"));
+    const inputs = await screen.findAllByPlaceholderText("Label text");
+    const editable = inputs.find(input => (input as HTMLInputElement).value === "Original entity") as HTMLInputElement;
+    await editAndSave(editable, "Proposed entity");
+    await screen.findByText('Proposed update to "Proposed entity"');
+    expect(savedBodies).toEqual([]);
+    expect(requests.some(r => r.path.endsWith("/source"))).toBe(false);
+    expect(suggestionBodies).toHaveLength(1);
+    expect(suggestionBodies[0]).toMatchObject({ entity_iri: editableIri, entity_label: "Proposed entity" });
+  });
+});
+
 describe('editor route real tree actions and keyboard orchestration', () => {
   it('opens keyboard help and closes the topmost overlay with Escape', async () => {
     mount(); await screen.findByText('Person');

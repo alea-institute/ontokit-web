@@ -4,11 +4,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, LogIn, LayoutDashboard } from "lucide-react";
+import { ArrowLeft, Settings, LogIn, LayoutDashboard } from "lucide-react";
 import { ShareButton } from "@/components/editor/ShareButton";
 import { DemoProjectLink } from "@/components/projects/demo-project-entry";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
+import { NoOntologyFileEmptyState } from "@/components/projects/NoOntologyFileEmptyState";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
 import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
 import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
@@ -20,6 +21,7 @@ import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { useToast } from "@/lib/context/ToastContext";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
+import { isClientAuthDisabled, shouldShowAuthUI } from "@/lib/auth-mode";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
 export default function ProjectViewerPage() {
@@ -27,10 +29,14 @@ export default function ProjectViewerPage() {
   const params = useParams();
   const projectId = params.id as string;
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+  const showAuthUI = shouldShowAuthUI();
 
   // Project data from shared React Query cache
   const { project, isRetiredRedirecting, isLoading, error, errorKind } = useProject(projectId, session?.accessToken);
-  const { canManage, hasOntology } = derivePermissions(project, session?.accessToken);
+  const { canManage, canEdit, hasOntology } = derivePermissions(project, session?.accessToken);
+  // Project settings need a token for every read and action, so auth-disabled
+  // mode never links there, even for the workspace owner.
+  const settingsUnavailable = isClientAuthDisabled();
 
   if (isLoading || isRetiredRedirecting || (status === "loading" && authMode === "required")) {
     return (
@@ -60,10 +66,17 @@ export default function ProjectViewerPage() {
             </Link>
             <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-900/50 dark:bg-red-900/20">
               <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">
-                {error || "Project not found"}
+                {errorKind === "private-403" && !showAuthUI
+                  ? "This is a private project"
+                  : error || "Project not found"}
               </h2>
+              {errorKind === "private-403" && !showAuthUI && (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Sign-in is unavailable in this configuration, so private projects can&apos;t be opened here.
+                </p>
+              )}
               <div className="mt-4 flex items-center justify-center gap-3">
-                {errorKind === "private-403" && (
+                {errorKind === "private-403" && showAuthUI && (
                   <Button onClick={() => signIn("zitadel")} className="gap-2">
                     <LogIn className="h-4 w-4" />
                     Sign In
@@ -106,7 +119,7 @@ export default function ProjectViewerPage() {
                     <LayoutDashboard className="h-4 w-4" />
                   </Button>
                 </Link>
-                {canManage && (
+                {canManage && !settingsUnavailable && (
                   <Link href={`/projects/${projectId}/settings`}>
                     <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                       <Settings className="h-4 w-4" />
@@ -116,32 +129,14 @@ export default function ProjectViewerPage() {
               </div>
             </div>
           </div>
-          <div className="flex h-[calc(100vh-4rem-3.5rem)] items-center justify-center">
-            <div className="text-center">
-              <FileCode className="mx-auto h-16 w-16 text-slate-400" />
-              <h2 className="mt-4 text-xl font-semibold text-slate-900 dark:text-white">No Ontology File</h2>
-              <p className="mt-2 text-slate-600 dark:text-slate-400">
-                This project doesn&apos;t have an ontology file yet.
-              </p>
-              {canManage && (
-                <>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
-                    Import an ontology file from the project settings.
-                  </p>
-                  <Link href={`/projects/${projectId}/settings`} className="mt-6 inline-block">
-                    <Button variant="outline">Go to Settings</Button>
-                  </Link>
-                </>
-              )}
-            </div>
-          </div>
+          <NoOntologyFileEmptyState projectId={projectId} settingsAvailable={!settingsUnavailable} canManage={canManage} />
         </main>
       </>
     );
   }
 
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken} canEdit={canEdit}>
       <ViewerContent
         projectId={projectId}
         accessToken={session?.accessToken}
@@ -203,6 +198,7 @@ function ViewerContent({
     sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
     loadSourceContent, sourceIriIndex,
   } = viewer;
+  const showAuthUI = shouldShowAuthUI();
 
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
@@ -293,8 +289,19 @@ function ViewerContent({
               </Link>
 
               {/* Sign In affordance for unauthenticated users — the Viewer/Editor switcher above
-                  carries authenticated users into the editor. */}
-              {!canSuggest && !hasValidAccess && (
+                  carries authenticated users into the editor. Without an active identity
+                  provider sign-in cannot succeed, so a read-only note replaces it. */}
+              {!canSuggest && !hasValidAccess && !showAuthUI && (
+                <span
+                  data-testid="viewer-sign-in-unavailable"
+                  title="Sign-in is unavailable in this configuration."
+                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                >
+                  Read-only
+                  <span className="sr-only"> — sign-in is unavailable in this configuration</span>
+                </span>
+              )}
+              {!canSuggest && !hasValidAccess && showAuthUI && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -306,7 +313,7 @@ function ViewerContent({
                 </Button>
               )}
 
-              {canManage && (
+              {canManage && !isClientAuthDisabled() && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />

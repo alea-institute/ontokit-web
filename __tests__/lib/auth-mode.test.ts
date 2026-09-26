@@ -5,6 +5,7 @@ import {
   isAuthRequired,
   isAuthActive,
   shouldShowAuthUI,
+  isClientAuthDisabled,
 } from "@/lib/auth-mode";
 
 // These helpers read process.env at call time (no module-level side effects),
@@ -96,6 +97,47 @@ describe("shouldShowAuthUI (client mirror of isAuthActive via NEXT_PUBLIC_* flag
   it("defaults to required-mode behavior (shows UI) when flag present", () => {
     setEnv({ NEXT_PUBLIC_AUTH_MODE: undefined, NEXT_PUBLIC_ZITADEL_CONFIGURED: "true" });
     expect(shouldShowAuthUI()).toBe(true);
+  });
+});
+
+describe("shouldShowAuthUI mode matrix (gates every sign-in affordance)", () => {
+  it.each([
+    ["required", "true", true],
+    ["optional", "true", true],
+    ["required", "false", false],
+    ["optional", "false", false],
+    ["optional", undefined, false],
+    ["disabled", "false", false],
+    // Disabled mode with stale provider flags must never offer sign-in.
+    ["disabled", "true", false],
+    // Case-insensitive, like getAuthMode() and isClientAuthDisabled(): a
+    // mixed-case disabled mode writes tokenless, so it must not offer sign-in.
+    ["Disabled", "true", false],
+    ["DISABLED", "true", false],
+    ["Optional", "true", true],
+    ["REQUIRED", "true", true],
+  ] as const)("mode %s with provider flag %s -> %s", (mode, configured, expected) => {
+    setEnv({ NEXT_PUBLIC_AUTH_MODE: mode, NEXT_PUBLIC_ZITADEL_CONFIGURED: configured });
+    expect(shouldShowAuthUI()).toBe(expected);
+    // The two client predicates must never both claim the same mode.
+    if (isClientAuthDisabled()) expect(shouldShowAuthUI()).toBe(false);
+  });
+});
+
+describe("isClientAuthDisabled (client-safe disabled-mode predicate)", () => {
+  it.each([
+    ["disabled", "false", true],
+    ["disabled", "true", true],
+    // Matches the server's case-insensitive getAuthMode().
+    ["DISABLED", undefined, true],
+    ["Disabled", "true", true],
+    ["optional", "false", false],
+    ["optional", "true", false],
+    ["required", "true", false],
+    [undefined, "true", false],
+  ] as const)("mode %s with provider flag %s -> %s", (mode, configured, expected) => {
+    setEnv({ NEXT_PUBLIC_AUTH_MODE: mode, NEXT_PUBLIC_ZITADEL_CONFIGURED: configured });
+    expect(isClientAuthDisabled()).toBe(expected);
   });
 });
 

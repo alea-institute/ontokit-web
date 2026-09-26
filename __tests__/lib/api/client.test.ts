@@ -875,6 +875,22 @@ describe("projectOntologyApi", () => {
     expect(headers.get("Authorization")).toBe("Bearer tok");
   });
 
+  it("saveSource omits the Authorization header when called without a token (auth-disabled save)", async () => {
+    await projectOntologyApi.saveSource("p1", "content", "save source", undefined, "main", "0123456789abcdef");
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toContain("/api/v1/projects/p1/source");
+    expect(options.method).toBe("PUT");
+    expect(JSON.parse(options.body as string).base_revision).toBe("0123456789abcdef");
+    expect((options.headers as Headers).get("Authorization")).toBeNull();
+  });
+
+  it("deleteClass sends a bearer when given one and omits it without a token", async () => {
+    await projectOntologyApi.deleteClass("p1", "http://ex.org/A", "Delete class A", "tok", "main");
+    await projectOntologyApi.deleteClass("p1", "http://ex.org/A", "Delete class A", undefined, "main");
+    expect((mockFetch.mock.calls[0][1].headers as Headers).get("Authorization")).toBe("Bearer tok");
+    expect((mockFetch.mock.calls[1][1].headers as Headers).get("Authorization")).toBeNull();
+  });
+
   it("parses a structured source revision conflict without accepting lookalikes", async () => {
     const { ApiError, getSourceRevisionConflict } = await import("@/lib/api/client");
     const conflict = new ApiError(

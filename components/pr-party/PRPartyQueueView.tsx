@@ -8,6 +8,7 @@ import { AlertCircle, LogIn, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { usePRPartyCapabilities } from "@/lib/hooks/usePRPartyCapabilities";
 import { usePRPartyQueue, usePRPartySettings } from "@/lib/hooks/usePRPartyQueue";
+import { shouldShowAuthUI } from "@/lib/auth-mode";
 import type { PRPartyQueueCard } from "@/lib/api/prParty";
 import { PRPartyCard } from "./PRPartyCard";
 import { QueueTabs, type PRPartyTab } from "./QueueTabs";
@@ -139,6 +140,22 @@ export function PRPartyQueueView({ renderCardDetail }: PRPartyQueueViewProps = {
           aria-label="Loading the review queue"
           className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600"
         />
+      </div>
+    );
+  }
+
+  if (status !== "authenticated" && !shouldShowAuthUI()) {
+    // No identity provider can complete sign-in here, so explain rather than
+    // offer a Sign In that leads nowhere.
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
+        <h2 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+          PR Party is unavailable here
+        </h2>
+        <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+          Sign-in is unavailable in this configuration, and reviewing pull requests needs a
+          signed-in reviewer. Nothing else on OntoKit is affected.
+        </p>
       </div>
     );
   }

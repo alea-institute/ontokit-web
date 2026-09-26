@@ -9,7 +9,7 @@
  */
 
 import React from "react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { nextLinkMock } from "@/__tests__/helpers/mockNextNavigation";
@@ -187,7 +187,12 @@ beforeEach(() => {
 // --- Access gates ---
 
 describe("PR Party access gates", () => {
+  afterEach(() => { vi.unstubAllEnvs(); });
+
   it("offers an unauthenticated visitor a sign-in CTA that carries a callback URL", async () => {
+    // Required mode always runs with a provider (lib/env.ts enforces it).
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "required");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
     mockStatus = "unauthenticated";
     render(<PRPartyQueueView />);
 
@@ -196,6 +201,23 @@ describe("PR Party access gates", () => {
     expect(signInSpy).toHaveBeenCalledWith("zitadel", {
       callbackUrl: window.location.href,
     });
+  });
+
+  it.each([
+    ["optional", "false"],
+    ["disabled", "false"],
+    ["disabled", "true"],
+  ])("explains that review is unavailable without sign-in in %s mode (provider flag %s)", (mode, configured) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", configured);
+    mockStatus = "unauthenticated";
+    render(<PRPartyQueueView />);
+
+    expect(screen.getByRole("heading", { name: "PR Party is unavailable here" })).toBeDefined();
+    expect(screen.getByText("Sign-in is unavailable in this configuration, and reviewing pull requests needs a signed-in reviewer. Nothing else on OntoKit is affected.")).toBeDefined();
+    expect(screen.queryByText("Sign in to review pull requests")).toBeNull();
+    expect(screen.queryByRole("button", { name: /sign in/i })).toBeNull();
+    expect(signInSpy).not.toHaveBeenCalled();
   });
 
   it("tells a signed-in non-reviewer the queue is reviewer-only, naming no reviewers", () => {

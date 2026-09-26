@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Settings, FileCode, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn, Pencil } from "lucide-react";
+import { ArrowLeft, Settings, GitPullRequest, Activity, RefreshCw, Lightbulb, Eye, Keyboard, LogIn, Pencil } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
+import { NoOntologyFileEmptyState } from "@/components/projects/NoOntologyFileEmptyState";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CommitMessageDialog } from "@/components/editor/CommitMessageDialog";
 import { SourceRevisionConflictBanner } from "@/components/editor/SourceRevisionConflictBanner";
@@ -61,6 +62,7 @@ import { useAnonymousSuggestion } from "@/lib/hooks/useAnonymousSuggestion";
 import { CreditModal } from "@/components/suggestions/CreditModal";
 import { ProposalSubmittedDialog } from "@/components/editor/ProposalSubmittedDialog";
 import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
+import { isClientAuthDisabled, shouldShowAuthUI } from "@/lib/auth-mode";
 import type { TrustGate } from "@/components/editor/TrustExplainer";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
@@ -115,8 +117,15 @@ export default function EditorPage() {
   }, [setProjectViewMode]);
 
   // Auth mode — set at build time by next.config.ts
-  const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
+  // Sign-in affordances need an identity provider that can actually complete
+  // sign-in. This is the same client predicate the header uses, so disabled mode
+  // with stale provider flags never offers sign-in.
+  const showAuthUI = shouldShowAuthUI();
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+  // Auth-disabled mode never has a token: the API accepts writes as its
+  // anonymous identity and returns that identity's role, which the redirect
+  // and write paths below trust. Required and optional keep every token guard.
+  const writesWithoutToken = isClientAuthDisabled();
 
   // Branch state
   const queryClient = useQueryClient();
@@ -151,6 +160,12 @@ export default function EditorPage() {
     resetSourceState,
   } = viewer;
 
+  // Single write guard for this page, mirroring canWrite in BranchContext: a
+  // token authorizes writes. Auth-disabled mode never has one, so there the
+  // anonymous identity's edit-capable role is the credential — a visitor on a
+  // public project it cannot edit may only propose, never commit.
+  const canWrite = !!session?.accessToken || (writesWithoutToken && !!canEdit);
+
   // LLM access gate — shared (React Query dedupes) with the layouts. Used here
   // to scope the suggestion keyboard shortcuts so they only register when the
   // project actually has LLM access (H-1).
@@ -179,7 +194,7 @@ export default function EditorPage() {
       onRetry: () => { void refetchTrust(); },
       progress: promotionProgress,
       onSignIn:
-        trustTier === "anonymous" && zitadelConfigured
+        trustTier === "anonymous" && showAuthUI
           ? () => signIn("zitadel", { callbackUrl: window.location.href })
           : undefined,
     }),
@@ -190,7 +205,7 @@ export default function EditorPage() {
       isTrustError,
       promotionProgress,
       refetchTrust,
-      zitadelConfigured,
+      showAuthUI,
     ],
   );
 
@@ -362,7 +377,7 @@ export default function EditorPage() {
   const pendingSaveRejectRef = useRef<((error: Error) => void) | null>(null);
 
   const handleSaveSource = useCallback(async (newContent: string) => {
-    if (!projectId || !session?.accessToken) {
+    if (!projectId || !canWrite) {
       throw new Error("Not authenticated");
     }
     setPendingSaveContent(newContent);
@@ -371,10 +386,10 @@ export default function EditorPage() {
       pendingSaveResolveRef.current = resolve;
       pendingSaveRejectRef.current = reject;
     });
-  }, [projectId, session?.accessToken]);
+  }, [projectId, canWrite]);
 
   const handleCommitConfirm = useCallback(async (commitMessage: string) => {
-    if (!projectId || !session?.accessToken || !pendingSaveContent) {
+    if (!projectId || !canWrite || !pendingSaveContent) {
       throw new Error("Not authenticated or no content to save");
     }
 
@@ -402,7 +417,7 @@ export default function EditorPage() {
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
     setPendingSaveContent(null);
-  }, [projectId, session, pendingSaveContent, loadRootClasses, queryClient, setSourceIriIndex, saveDirectSource]);
+  }, [projectId, session, canWrite, pendingSaveContent, loadRootClasses, queryClient, setSourceIriIndex, saveDirectSource]);
 
   const handleCommitDialogClose = useCallback((open: boolean) => {
     setCommitDialogOpen(open);
@@ -498,12 +513,12 @@ export default function EditorPage() {
         setSourceContent((prev) => prev + snippet);
       } else {
         // Source not yet loaded — fetch it first to avoid overwriting with just the snippet
-        if (!projectId || !session?.accessToken || !activeBranch) return;
+        if (!projectId || !canWrite || !activeBranch) return;
         try {
           const response = await revisionsApi.getFileAtVersion(
             projectId,
             activeBranch,
-            session.accessToken,
+            session?.accessToken,
             project?.git_ontology_path
           );
           setSourceSnapshot(response.content + snippet, response.revision);
@@ -517,7 +532,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, activeBranch, project, toast, setSourceContent, setSourceSnapshot],
+    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, canWrite, activeBranch, project, toast, setSourceContent, setSourceSnapshot],
   );
 
   const generatedEntityAccessToken = session?.accessToken;
@@ -535,6 +550,7 @@ export default function EditorPage() {
       : isSuggestionMode
         ? "authenticated-suggestion"
         : "direct";
+    if (mode === "direct" && !canWrite) throw new Error("Not authenticated");
     if (mode === "direct" && sourceRevisionConflictRef.current) {
       throw new SourceRevisionConflictError(sourceRevisionConflictRef.current);
     }
@@ -588,7 +604,7 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     setDetailRefreshKey((key) => key + 1);
-    if (mode === "direct" && generatedEntityAccessToken) {
+    if (mode === "direct") {
       queryClient.invalidateQueries({
         queryKey: branchQueryKeys.list(projectId, generatedEntityAccessToken),
       });
@@ -596,6 +612,7 @@ export default function EditorPage() {
   }, [
     isAnonymousProposalMode,
     isSuggestionMode,
+    canWrite,
     projectId,
     activeBranch,
     generatedEntityAccessToken,
@@ -694,7 +711,7 @@ export default function EditorPage() {
   }, []);
 
   const handleDeleteConfirm = useCallback(async () => {
-    if (!deleteTargetIri || !session?.accessToken) return;
+    if (!deleteTargetIri || !canWrite) return;
 
     // Optimistic removal
     removeOptimisticNode(deleteTargetIri);
@@ -704,7 +721,7 @@ export default function EditorPage() {
         projectId,
         deleteTargetIri,
         `Delete class ${deleteTargetLabel}`,
-        session.accessToken,
+        session?.accessToken,
         activeBranch
       );
       toast.success(`Deleted "${deleteTargetLabel}"`);
@@ -722,12 +739,12 @@ export default function EditorPage() {
       // Reload tree to restore state
       loadRootClasses();
     }
-  }, [deleteTargetIri, deleteTargetLabel, session, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, resetSourceState]);
+  }, [deleteTargetIri, deleteTargetLabel, session, canWrite, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, resetSourceState]);
 
   // Handle update class (form-based editing)
   // Routes through source save: modifies the Turtle text and commits via PUT /source
   const handleUpdateClass = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
-    if (!session?.accessToken) {
+    if (!canWrite) {
       throw new Error("Not authenticated");
     }
     if (!activeBranch) {
@@ -749,11 +766,11 @@ export default function EditorPage() {
     // Update the tree node label in-place (preserves expansion state)
     updateNodeLabel(classIri, label);
     refreshAfterDirectEntitySave();
-  }, [session, activeBranch, toast, updateNodeLabel, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
+  }, [session, canWrite, activeBranch, toast, updateNodeLabel, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle update property (form-based editing)
   const handleUpdateProperty = useCallback(async (propertyIri: string, data: TurtlePropertyUpdateData) => {
-    if (!session?.accessToken) {
+    if (!canWrite) {
       throw new Error("Not authenticated");
     }
     if (!activeBranch) {
@@ -769,11 +786,11 @@ export default function EditorPage() {
     await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
     refreshAfterDirectEntitySave();
-  }, [session, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
+  }, [session, canWrite, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle update individual (form-based editing)
   const handleUpdateIndividual = useCallback(async (individualIri: string, data: TurtleIndividualUpdateData) => {
-    if (!session?.accessToken) {
+    if (!canWrite) {
       throw new Error("Not authenticated");
     }
     if (!activeBranch) {
@@ -789,7 +806,7 @@ export default function EditorPage() {
     await saveDirectSource(modifiedSource, commitMessage, snapshot.revision);
     toast.success(`Updated "${label}"`);
     refreshAfterDirectEntitySave();
-  }, [session, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
+  }, [session, canWrite, activeBranch, toast, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle suggestion-mode class update
   // Instead of directly committing, sends modified source to the suggestion branch
@@ -892,9 +909,15 @@ export default function EditorPage() {
     });
   }, [session, projectId, activeBranch, project, sourceContent, toast, suggestionSession, setSourceContent, setSourceIriIndex]);
 
-  // Handle anonymous proposal mode class update
-  // Routes through anonymousSuggestion.saveToSession() instead of the normal commit path
-  const handleAnonymousClassUpdate = useCallback(async (classIri: string, data: ClassUpdatePayload) => {
+  // Anonymous proposal saves route through anonymousSuggestion.saveToSession()
+  // instead of any commit path. Every entity kind shares this helper so no
+  // form edit made while proposing can reach a direct base-branch write.
+  const saveAnonymousProposal = useCallback(async (
+    entityIri: string,
+    label: string,
+    modify: (source: string) => string,
+    options: { updateTreeLabel?: boolean } = {},
+  ) => {
     if (!activeBranch && !anonymousSuggestion.branch) {
       throw new Error("No branch selected");
     }
@@ -917,10 +940,9 @@ export default function EditorPage() {
       source = response.content;
     }
 
-    const modifiedSource = updateClassInTurtle(source, classIri, data);
-    const label = data.labels[0]?.value || getLocalName(classIri);
+    const modifiedSource = modify(source);
 
-    const saved = await anonymousSuggestion.saveToSession(modifiedSource, classIri, label);
+    const saved = await anonymousSuggestion.saveToSession(modifiedSource, entityIri, label);
     if (!saved) {
       // A concurrent save was in flight (or the save failed — errors already
       // toast via onError). Do NOT report success or update local state for a
@@ -931,11 +953,42 @@ export default function EditorPage() {
 
     setSourceContent(modifiedSource);
     toast.success(`Proposed update to "${label}"`);
-    updateNodeLabel(classIri, label);
+    if (options.updateTreeLabel) updateNodeLabel(entityIri, label);
     setDetailRefreshKey((k) => k + 1);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
   }, [activeBranch, anonymousSuggestion, projectId, project?.git_ontology_path, sourceContent, toast, updateNodeLabel, setSourceContent, setSourceIriIndex]);
+
+  const handleAnonymousClassUpdate = useCallback(
+    (classIri: string, data: ClassUpdatePayload) =>
+      saveAnonymousProposal(
+        classIri,
+        data.labels[0]?.value || getLocalName(classIri),
+        (source) => updateClassInTurtle(source, classIri, data),
+        { updateTreeLabel: true },
+      ),
+    [saveAnonymousProposal],
+  );
+
+  const handleAnonymousPropertyUpdate = useCallback(
+    (propertyIri: string, data: TurtlePropertyUpdateData) =>
+      saveAnonymousProposal(
+        propertyIri,
+        data.labels[0]?.value || getLocalName(propertyIri),
+        (source) => updatePropertyInTurtle(source, propertyIri, data),
+      ),
+    [saveAnonymousProposal],
+  );
+
+  const handleAnonymousIndividualUpdate = useCallback(
+    (individualIri: string, data: TurtleIndividualUpdateData) =>
+      saveAnonymousProposal(
+        individualIri,
+        data.labels[0]?.value || getLocalName(individualIri),
+        (source) => updateIndividualInTurtle(source, individualIri, data),
+      ),
+    [saveAnonymousProposal],
+  );
 
   // Handle anonymous proposal "Propose Edit" button click
   const handleProposeEdit = useCallback(async () => {
@@ -967,7 +1020,8 @@ export default function EditorPage() {
     newParentIris: string[],
     mode: "move" | "add",
   ) => {
-    if (!session?.accessToken && !isAnonymousProposalMode) throw new Error("Not authenticated");
+    if (!isAnonymousProposalMode && !isSuggestionMode && !canWrite) throw new Error("Not authenticated");
+    if (isSuggestionMode && !session?.accessToken) throw new Error("Not authenticated");
 
     // Fetch the full class detail to get authoritative parent_iris
     const detail = await projectOntologyApi.getClassDetail(projectId, classIri, session?.accessToken, activeBranch);
@@ -1018,7 +1072,7 @@ export default function EditorPage() {
       ? handleSuggestClassUpdate
       : handleUpdateClass;
     await saveHandler(classIri, payload);
-  }, [session, projectId, activeBranch, isAnonymousProposalMode, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate, handleAnonymousClassUpdate]);
+  }, [session, canWrite, projectId, activeBranch, isAnonymousProposalMode, isSuggestionMode, handleUpdateClass, handleSuggestClassUpdate, handleAnonymousClassUpdate]);
 
   // Handle branch change
   const handleBranchChange = useCallback((branchName: string) => {
@@ -1168,10 +1222,17 @@ export default function EditorPage() {
             </Link>
             <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-900/50 dark:bg-red-900/20">
               <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">
-                {error || "Project not found"}
+                {errorKind === "private-403" && !showAuthUI
+                  ? "This is a private project"
+                  : error || "Project not found"}
               </h2>
+              {errorKind === "private-403" && !showAuthUI && (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Sign-in is unavailable in this configuration, so private projects can&apos;t be opened here.
+                </p>
+              )}
               <div className="mt-4 flex items-center justify-center gap-3">
-                {errorKind === "private-403" && zitadelConfigured && (
+                {errorKind === "private-403" && showAuthUI && (
                   <Button onClick={() => signIn("zitadel", { callbackUrl: window.location.href })} className="gap-2">
                     <LogIn className="h-4 w-4" />
                     Sign In
@@ -1191,7 +1252,9 @@ export default function EditorPage() {
   // Auth guard: redirect unauthenticated or unauthorized users to the viewer —
   // UNLESS anonymous proposal mode applies (AUTH_MODE != required + public
   // project): those users are this page's audience in propose mode (PR-7).
-  if ((status === "unauthenticated" || (project && !canSuggest)) && !canPropose) {
+  // In auth-disabled mode there is never a session, so an edit-capable API role
+  // (reported by hasValidAccess) keeps the visitor in the editor.
+  if (((status === "unauthenticated" && !hasValidAccess) || (project && !canSuggest)) && !canPropose) {
     router.replace(`/projects/${projectId}`);
     return (
       <>
@@ -1223,7 +1286,7 @@ export default function EditorPage() {
                 <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
                 <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               </div>
-              {canManage && (
+              {canManage && !writesWithoutToken && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
@@ -1232,28 +1295,14 @@ export default function EditorPage() {
               )}
             </div>
           </div>
-          <div className="flex h-[calc(100vh-4rem-3.5rem)] items-center justify-center">
-            <div className="text-center">
-              <FileCode className="mx-auto h-16 w-16 text-slate-400" />
-              <h2 className="mt-4 text-xl font-semibold text-slate-900 dark:text-white">No Ontology File</h2>
-              <p className="mt-2 text-slate-600 dark:text-slate-400">
-                This project doesn&apos;t have an ontology file yet.
-              </p>
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-500">
-                Import an ontology file from the project settings.
-              </p>
-              <Link href={`/projects/${projectId}/settings`} className="mt-6 inline-block">
-                <Button variant="outline">Go to Settings</Button>
-              </Link>
-            </div>
-          </div>
+          <NoOntologyFileEmptyState projectId={projectId} settingsAvailable={!writesWithoutToken} canManage={canManage} />
         </main>
       </>
     );
   }
 
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch} canEdit={!!canEdit}>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {sourceRevisionConflict && (
@@ -1289,8 +1338,8 @@ export default function EditorPage() {
                 </span>
               )}
 
-              {/* Sign-in CTA for unauthenticated users (only when Zitadel is configured) */}
-              {!hasValidAccess && zitadelConfigured && (
+              {/* Sign-in CTA for unauthenticated users (only when an identity provider is active) */}
+              {!hasValidAccess && showAuthUI && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1464,7 +1513,7 @@ export default function EditorPage() {
                 <Keyboard className="h-4 w-4" />
               </Button>
 
-              {canManage && (
+              {canManage && !writesWithoutToken && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
@@ -1528,12 +1577,24 @@ export default function EditorPage() {
                       : handleUpdateClass
                   }
                   detailRefreshKey={detailRefreshKey}
-                  onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
-                  onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
+                  onUpdateProperty={
+                    isAnonymousProposalMode
+                      ? handleAnonymousPropertyUpdate
+                      : isSuggestionMode
+                      ? handleSuggestPropertyUpdate
+                      : handleUpdateProperty
+                  }
+                  onUpdateIndividual={
+                    isAnonymousProposalMode
+                      ? handleAnonymousIndividualUpdate
+                      : isSuggestionMode
+                      ? handleSuggestIndividualUpdate
+                      : handleUpdateIndividual
+                  }
                   onReparentClass={handleReparentClass}
                   reparentOptimistic={reparentOptimistic}
                   rollbackReparent={rollbackReparent}
-                  showSignInToEdit={!hasValidAccess && zitadelConfigured && !canPropose}
+                  showSignInToEdit={!hasValidAccess && showAuthUI && !canPropose}
                   onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
                   canPropose={canPropose && !isAnonymousProposalMode}
                   onProposeEdit={handleProposeEdit}
@@ -1583,12 +1644,24 @@ export default function EditorPage() {
                 }
                 detailRefreshKey={detailRefreshKey}
                 sourceContent={sourceContent}
-                onUpdateProperty={isSuggestionMode ? handleSuggestPropertyUpdate : handleUpdateProperty}
-                onUpdateIndividual={isSuggestionMode ? handleSuggestIndividualUpdate : handleUpdateIndividual}
+                onUpdateProperty={
+                    isAnonymousProposalMode
+                      ? handleAnonymousPropertyUpdate
+                      : isSuggestionMode
+                      ? handleSuggestPropertyUpdate
+                      : handleUpdateProperty
+                  }
+                onUpdateIndividual={
+                    isAnonymousProposalMode
+                      ? handleAnonymousIndividualUpdate
+                      : isSuggestionMode
+                      ? handleSuggestIndividualUpdate
+                      : handleUpdateIndividual
+                  }
                 onReparentClass={handleReparentClass}
                 reparentOptimistic={reparentOptimistic}
                 rollbackReparent={rollbackReparent}
-                showSignInToEdit={!hasValidAccess && zitadelConfigured && !canPropose}
+                showSignInToEdit={!hasValidAccess && showAuthUI && !canPropose}
                 onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
                 canPropose={canPropose && !isAnonymousProposalMode}
                 onProposeEdit={handleProposeEdit}
@@ -1722,7 +1795,7 @@ export default function EditorPage() {
         prUrl={submittedProposal?.prUrl ?? null}
         isSignedIn={!!session?.accessToken}
         onSignIn={
-          zitadelConfigured
+          showAuthUI
             ? () => signIn("zitadel", { callbackUrl: window.location.href })
             : undefined
         }

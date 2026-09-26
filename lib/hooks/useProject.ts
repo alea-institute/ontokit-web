@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { projectApi, type Project } from "@/lib/api/projects";
 import { useSearchParams } from "next/navigation";
 import { ApiError, getDemoGenerationRetired, isProjectUuid } from "@/lib/api/client";
+import { isClientAuthDisabled } from "@/lib/auth-mode";
 
 export type ProjectErrorKind = "private-403" | "no-access" | "not-found" | "generic";
 
@@ -82,7 +83,11 @@ export function derivePermissions(
   const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || !!project?.is_superadmin;
   const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!accessToken);
   const canSuggest = canEdit || isSuggester;
-  const hasValidAccess = !!accessToken;
+  // In auth-disabled mode there is never a token: the API treats every caller
+  // as its anonymous identity and returns that identity's role, so an
+  // edit-capable role is itself the write credential. Every other mode still
+  // requires a token.
+  const hasValidAccess = !!accessToken || (isClientAuthDisabled() && canEdit);
   const hasOntology = !!project?.source_file_path;
   const isSuggestionMode = isSuggester && !canEdit;
   return { canManage, canEdit, canSuggest, isSuggester, isSuggestionMode, hasValidAccess, hasOntology, hasExplicitRole };

@@ -1,3 +1,5 @@
+import { PROFILE_REGISTRY, profileSpec, specOwner, serviceSet } from './auth-modes.mjs';
+
 // Explicit acceptance inventory: deleting a spec cannot silently lower the gate.
 export const REQUIRED_TESTS = [
   {
@@ -116,8 +118,82 @@ export const LIFECYCLE_REQUIRED_TESTS = [
   'R3 real elapsed refresh-token idle expiry reauthenticates through SessionGuard back to the original URL',
   'R4 controlled Next clock expires the genuine application cookie and explicit sign-in recovers at normal time',
 ].map(title => ({file: LIFECYCLE_SPEC, title, project: 'lifecycle'}));
-export const PROFILE_INVENTORIES = Object.freeze({baseline: REQUIRED_TESTS, lifecycle: LIFECYCLE_REQUIRED_TESTS});
-const PROFILE_PROJECTS = {baseline: ['chromium', 'stack setup', 'stack teardown'], lifecycle: ['lifecycle']};
+// D09 auth-mode profiles (KTD7): one spec and one project each, from the registry.
+// KTD9: every refusal (and each accepted anonymous or tokenless write) is recorded by the
+// spec as a `mode-evidence` annotation naming its tier, method, fixed path template,
+// observed status and whether the request carried an Authorization header. Receipts keep
+// only these allowlisted labels, numbers and booleans, and each value must equal the table.
+export const MODE_PATHS = Object.freeze({
+  project: '/api/v1/projects/{id}',
+  projects: '/api/v1/projects',
+  import: '/api/v1/projects/import',
+  source: '/api/v1/projects/{id}/source',
+  proposal: '/api/v1/projects/{id}/suggestions/anonymous/sessions',
+  pullRequests: '/api/v1/projects/{id}/pull-requests',
+  duplicateCheck: '/api/v1/projects/{id}/duplicate-check',
+  prPartyQueue: '/api/v1/pr-party/queue',
+  providers: '/api/auth/providers',
+});
+const probe = (name, tier, method, path, status, authorization) => Object.freeze({probe: name, tier, method, path: MODE_PATHS[path], status, authorization});
+const PROPOSAL = probe('anonymous-proposal-session', 'api', 'POST', 'proposal', 201, false);
+const FOREIGN_ANON = probe('foreign-private-anonymous', 'api', 'GET', 'project', 403, false);
+const PROVIDERS = probe('providers-empty', 'web', 'GET', 'providers', 200, false);
+export const MODE_CASES = Object.freeze({
+  'optional-configured': [
+    {title: 'anonymous visitor sees header sign-in and the public project but neither private fixture', probes: []},
+    {title: 'foreign private denial Sign In completes real OIDC, returns to the original URL and stays denied', probes: [
+      FOREIGN_ANON, probe('foreign-private-signed-in', 'api', 'GET', 'project', 403, true)]},
+    {title: 'anonymous visitor starts a proposal session on a public project that the API accepts', probes: [PROPOSAL]},
+    {title: 'after real sign-in the persona-owned private project is visible and a project create succeeds', probes: [
+      probe('persona-private-anonymous', 'api', 'GET', 'project', 403, false),
+      probe('persona-private-signed-in', 'api', 'GET', 'project', 200, true),
+      probe('project-create-signed-in', 'api', 'POST', 'projects', 201, true)]},
+    {title: 'sign-out returns the application to the anonymous state', probes: []},
+  ],
+  'optional-anonymous': [
+    {title: 'providers are empty and no sign-in control appears on any reachable inventoried route', probes: [PROVIDERS, FOREIGN_ANON]},
+    {title: 'public browsing and an anonymous proposal work while private access and API create are refused', probes: [
+      PROPOSAL, FOREIGN_ANON, probe('project-create-anonymous', 'api', 'POST', 'projects', 401, false)]},
+  ],
+  disabled: [
+    {title: 'providers are empty and no authentication UI appears on any reachable inventoried route', probes: [PROVIDERS, FOREIGN_ANON]},
+    {title: 'public browsing and proposal work while PR create and duplicate check are refused and PR Party is absent', probes: [
+      PROPOSAL,
+      probe('pull-request-create', 'api', 'POST', 'pullRequests', 403, false),
+      probe('duplicate-check', 'api', 'POST', 'duplicateCheck', 403, false),
+      probe('pr-party-queue', 'api', 'GET', 'prPartyQueue', 404, false)]},
+    // Provisional (U4): remove this case with U4 if the disabled-mode decision changes.
+    {title: 'a project imported in the browser opens in the editor and an edit saves without a bearer token', probes: [
+      probe('project-import-tokenless', 'api', 'POST', 'import', 201, false),
+      probe('source-save-tokenless', 'api', 'PUT', 'source', 200, false)]},
+  ],
+});
+const MODE_FIELDS = ['probe', 'tier', 'method', 'path', 'status', 'authorization'];
+/** Rebuilds each mode case's probes from untrusted input; null unless exactly the table. */
+function modeCases(profile, evidenceByTest) {
+  const table = MODE_CASES[profile];
+  if (!table || evidenceByTest.length !== table.length) return null;
+  const cases = [];
+  for (const [i, entries] of evidenceByTest.entries()) {
+    if (!Array.isArray(entries) || entries.length !== table[i].probes.length) return null;
+    const seen = new Set();
+    for (const entry of entries) {
+      const expected = table[i].probes.find(p => p.probe === entry?.probe);
+      if (!expected || seen.has(entry.probe) || MODE_FIELDS.some(field => entry[field] !== expected[field])) return null;
+      seen.add(entry.probe);
+    }
+    cases.push({title: table[i].title, evidence: table[i].probes.map(p => ({...p}))});
+  }
+  return cases;
+}
+export const MODE_REQUIRED_TESTS = Object.freeze(Object.fromEntries(Object.entries(MODE_CASES).map(([profile, titles]) => {
+  const {specs: [file], projects: [project]} = profileSpec(profile);
+  return [profile, Object.freeze(titles.map(({title}) => Object.freeze({file, title, project})))];
+})));
+export const PROFILE_INVENTORIES = Object.freeze({baseline: REQUIRED_TESTS, lifecycle: LIFECYCLE_REQUIRED_TESTS, ...MODE_REQUIRED_TESTS});
+const PROFILE_PROJECTS = Object.fromEntries(Object.keys(PROFILE_INVENTORIES).map(profile => [profile, PROFILE_REGISTRY[profile].projects]));
+// Only baseline tolerates additional dynamic tests; every other profile is exact-count.
+const exactCount = profile => profile !== 'baseline';
 
 // R8: which proof each lifecycle case supplies. Real elapsed provider expiry and the
 // controlled Next-process clock are separate kinds of evidence and never interchange.
@@ -196,14 +272,16 @@ export function validateReport(report, {profile} = {}) {
               result.status !== 'passed' || (result.errors?.length || 0) || (result.retry ?? 0) !== 0) fail();
           const annotations = [...(t.annotations || []), ...(result.annotations || [])];
           if (annotations.some(a => EXPECTED_FAILURE.has(a?.type))) fail();
-          // A mixed run (either profile's cases in the other's report) never counts.
-          if (!PROFILE_PROJECTS[profile].includes(t.projectName) || (profile === 'baseline') === (spec.file === LIFECYCLE_SPEC)) fail();
+          // A mixed run (any other profile's spec or project in this report) never counts (KTD7).
+          if (!PROFILE_PROJECTS[profile].includes(t.projectName) || specOwner(spec.file) !== profile) fail();
           // Playwright copies runtime annotations onto the test; read one source only.
-          const own = (t.annotations?.some(a => a?.type === 'lifecycle-evidence') ? t.annotations : result.annotations) || [];
-          const evidence = own.filter(a => a?.type === 'lifecycle-evidence').map(a => {
-            try { return JSON.parse(a.description); } catch { return fail(); }
-          });
-          found.push({file: spec.file, title: spec.title, project: t.projectName, evidence});
+          const read = type => {
+            const own = (t.annotations?.some(a => a?.type === type) ? t.annotations : result.annotations) || [];
+            return own.filter(a => a?.type === type).map(a => {
+              try { return JSON.parse(a.description); } catch { return fail(); }
+            });
+          };
+          found.push({file: spec.file, title: spec.title, project: t.projectName, evidence: read('lifecycle-evidence'), modeEvidence: read('mode-evidence')});
         }
       }
       visit(suite.suites || []);
@@ -211,13 +289,20 @@ export function validateReport(report, {profile} = {}) {
   }
   visit(report.suites);
   if (found.length !== stats.expected) fail();
-  if (profile === 'lifecycle' && found.length !== inventory.length) fail();
+  if (exactCount(profile) && found.length !== inventory.length) fail();
   const matches = inventory.map(required => found.filter(t => t.file === required.file && t.title === required.title && t.project === required.project));
   if (matches.some(m => m.length !== 1)) fail();
-  if (profile === 'baseline' && found.some(t => t.evidence.length)) fail();
+  if (profile !== 'lifecycle' && found.some(t => t.evidence.length)) fail();
+  const modeProfile = Object.hasOwn(MODE_CASES, profile);
+  if (!modeProfile && found.some(t => t.modeEvidence.length)) fail();
   // Only checked, fixed inventory names are durable; additional dynamic titles stay private.
   const summary = {profile, passed: stats.expected, skipped: 0, failed: 0, flaky: 0, mandatory: inventory.map(t => ({...t}))};
-  if (profile === 'baseline') return summary;
+  if (modeProfile) {
+    const cases = modeCases(profile, matches.map(m => m[0].modeEvidence));
+    if (!cases) fail();
+    return {...summary, cases};
+  }
+  if (profile !== 'lifecycle') return summary;
   const cases = lifecycleCases(matches.map(m => m[0].evidence));
   if (!cases) fail();
   return {...summary, ...lifecycleSummary(cases)};
@@ -252,13 +337,30 @@ function sanitizedLifecycle(value) {
 function sanitizedTests(profile, tests) {
   if (!profile || tests?.profile !== profile) return null;
   const inventory = PROFILE_INVENTORIES[profile];
-  if (!Number.isSafeInteger(tests.passed) || tests.passed < inventory.length || (profile === 'lifecycle' && tests.passed !== inventory.length)) return null;
+  if (!Number.isSafeInteger(tests.passed) || tests.passed < inventory.length || (exactCount(profile) && tests.passed !== inventory.length)) return null;
   const summary = {passed: tests.passed, skipped: 0, failed: 0, flaky: 0, mandatory: inventory.map(t => ({...t}))};
-  if (profile === 'baseline') return summary;
+  if (Object.hasOwn(MODE_CASES, profile)) {
+    const modeInput = Array.isArray(tests.cases) && tests.cases.length === inventory.length ? tests.cases : null;
+    if (!modeInput || modeInput.some((c, i) => c?.title !== inventory[i].title)) return null;
+    const cases = modeCases(profile, modeInput.map(c => c.evidence));
+    return cases && {...summary, cases};
+  }
+  if (profile !== 'lifecycle') return summary;
   const input = Array.isArray(tests.cases) && tests.cases.length === inventory.length ? tests.cases : null;
   if (!input || input.some((c, i) => c?.title !== inventory[i].title || c?.clock !== TEST_CLOCKS[i])) return null;
   const cases = lifecycleCases(input.map(c => c.evidence));
   return cases && {...summary, ...lifecycleSummary(cases)};
+}
+/**
+ * KTD2 mode evidence: the compiled web and running API modes the launcher observed.
+ * Null unless both are well formed and both match the profile's registry entry.
+ */
+function sanitizedAuthModes(profile, value) {
+  if (!profile || !value || value.profile !== profile) return null;
+  const {apiMode, identity} = profileSpec(profile);
+  const side = observed => observed && observed.mode === apiMode && observed.providerConfigured === identity ? {mode: apiMode, providerConfigured: identity} : null;
+  const web = side(value.web), api = side(value.api);
+  return web && api ? {web, api} : null;
 }
 export function sanitizedEvidence(manifest, {cleanup, workflowPassed, startedAt, finishedAt}) {
   const profile = Object.hasOwn(PROFILE_INVENTORIES, manifest.profile) ? manifest.profile : null;
@@ -267,6 +369,12 @@ export function sanitizedEvidence(manifest, {cleanup, workflowPassed, startedAt,
     const source = manifest.sources?.[name];
     if (source && /^[a-f0-9]{40}$/.test(source.revision) && hash(source.sha256)) sources[name] = {revision: source.revision, sha256: source.sha256};
   }
+  // KTD3 exact membership: every recorded container belongs to the profile's own service
+  // set, or is the one-shot migrate job (allowed, never required; migrationHeads prove the
+  // migration). A provider-less receipt with a Zitadel or Login container is refused.
+  const allowedServices = profile ? new Set([...serviceSet(profile), 'migrate']) : new Set();
+  const servicesExact = Array.isArray(manifest.evidenceImages) &&
+    manifest.evidenceImages.every(i => typeof i?.service === 'string' && allowedServices.has(i.service));
   const images = (manifest.evidenceImages || []).filter(i =>
     /^(postgres|redis|minio|zitadel|login|api|worker|migrate)$/.test(i.service) &&
     /^sha256:[a-f0-9]{64}$/.test(i.id) &&
@@ -275,12 +383,17 @@ export function sanitizedEvidence(manifest, {cleanup, workflowPassed, startedAt,
   const migrationHeads = (manifest.migrationHeads || []).filter(h => /^[a-zA-Z0-9_]{1,100}$/.test(h));
   const tests = sanitizedTests(profile, manifest.tests);
   const lifecycle = profile === 'lifecycle' ? sanitizedLifecycle(manifest.lifecycle) : null;
+  const authModes = sanitizedAuthModes(profile, manifest.authModes);
+  // New profiles must record agreement; baseline/lifecycle keep their D06/D08 rules but a
+  // recorded disagreement (or malformed record) still refuses acceptance.
+  const modesOk = profile && !Object.hasOwn(MODE_REQUIRED_TESTS, profile) ? (manifest.authModes === undefined || !!authModes) : !!authModes;
   const time = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
-  return {version: 2, profile, run: /^[a-f0-9]{32}$/.test(manifest.id) ? manifest.id : null,
-    startedAt: time(startedAt), finishedAt: time(finishedAt), sources, images, migrationHeads, tests, lifecycle,
+  return {version: 3, profile, run: /^[a-f0-9]{32}$/.test(manifest.id) ? manifest.id : null,
+    startedAt: time(startedAt), finishedAt: time(finishedAt), sources, images, migrationHeads, tests, lifecycle, authModes,
     // R8: this harness only ever proves local verification; hosted acceptance is separate.
     acceptance: {scope: 'local-verification', hostedAcceptance: false},
     workflowPassed: workflowPassed === true, cleanup: cleanup === 'complete' ? 'complete' : 'failed',
-    acceptedRun: workflowPassed === true && cleanup === 'complete' && !!profile && !!tests && (profile !== 'lifecycle' || !!lifecycle) &&
-      Object.keys(sources).length === 2 && ['postgres', 'redis', 'minio', 'zitadel', 'login', 'api', 'worker'].every(service => images.some(image => image.service === service)) && migrationHeads.length > 0};
+    acceptedRun: workflowPassed === true && cleanup === 'complete' && !!profile && !!tests && (profile !== 'lifecycle' || !!lifecycle) && modesOk &&
+      // KTD3: each profile's own service set; provider-less profiles run no Zitadel or Login.
+      Object.keys(sources).length === 2 && servicesExact && serviceSet(profile).every(service => images.some(image => image.service === service)) && migrationHeads.length > 0};
 }

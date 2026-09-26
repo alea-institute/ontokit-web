@@ -40,7 +40,11 @@ export function mintingLockReason(gate: TrustGate | undefined | null): string {
   if (gate.isLoading) return "Checking what you can do here…";
   if (gate.isError) return "We couldn't check your contributor status, so creating new entries stays unavailable.";
   if (gate.tier === "anonymous") {
-    return "Creating new entries is for trusted contributors. Sign in to start earning that trust — suggesting edits still works without an account.";
+    // Only point at sign-in when the page can actually offer it (onSignIn is
+    // set only while an identity provider is active).
+    return gate.onSignIn
+      ? "Creating new entries is for trusted contributors. Sign in to start earning that trust — suggesting edits still works without an account."
+      : "Creating new entries is for trusted contributors — suggesting edits still works without an account.";
   }
   if (gate.progress) {
     const { remaining, threshold } = gate.progress;
@@ -127,15 +131,17 @@ export function TrustExplainerPanel({ gate, className }: TrustExplainerPanelProp
             Creating brand-new entries is reserved for trusted contributors, so that new
             concepts always get a second pair of eyes.
           </p>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Sign in and your accepted suggestions start counting toward trusted status on
-            this project.
-          </p>
           {gate.onSignIn && (
-            <Button type="button" size="sm" className="mt-3 gap-1.5" onClick={gate.onSignIn}>
-              <LogIn className="h-3.5 w-3.5" />
-              Sign in
-            </Button>
+            <>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                Sign in and your accepted suggestions start counting toward trusted status on
+                this project.
+              </p>
+              <Button type="button" size="sm" className="mt-3 gap-1.5" onClick={gate.onSignIn}>
+                <LogIn className="h-3.5 w-3.5" />
+                Sign in
+              </Button>
+            </>
           )}
         </>
       ) : (

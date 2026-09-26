@@ -148,7 +148,7 @@ the values the spec asserted. A missing, duplicated, misplaced or malformed entr
 the gate. The validated summary records `realElapsedCases` (R2, R3) and
 `clockControlledCases` (R4) separately (R8).
 
-`sanitizedEvidence` writes receipt `version: 2`. It keeps `profile` only when it is a known
+`sanitizedEvidence` writes receipt `version: 3` (D09 added `authModes`; version 2 had the profile fields). It keeps `profile` only when it is a known
 profile and matches `manifest.tests.profile`. It rebuilds test names from the inventory
 rather than copying them, and re-sanitizes lifecycle case evidence. From
 `manifest.lifecycle` it keeps only the four integer OIDC lifetimes, `graceSeconds`,
@@ -159,3 +159,89 @@ also requires that block, with `beforeAccepted`, `afterRejected`, `cookiesCleare
 `acceptance: {scope: "local-verification", hostedAcceptance: false}`.
 `npm run test:e2e:evidence` covers each negative case with synthetic reports only.
 Synthetic reports are never live acceptance.
+
+## Authentication-mode profiles (D09)
+
+Three more fresh-stack profiles live beside `baseline` and `lifecycle`. One registry,
+`PROFILE_REGISTRY` in `auth-modes.mjs`, holds each profile's API `AUTH_MODE`, compiled web
+mode, whether Zitadel/Login start, personas, seeded fixtures, spec file and Playwright project.
+`playwright.config.ts`, the launcher and `evidence.mjs` all read it.
+
+| Profile | API and web mode | Identity services and bootstrap | Seeded fixtures | Spec |
+|---|---|---|---|---|
+| `baseline` | required | yes | none (D06 fixtures) | every spec not owned by another profile |
+| `lifecycle` | required | yes | none | `browser/auth-lifecycle.spec.ts` |
+| `optional-configured` | optional, provider active | yes, one `owner` persona | public, foreign private, persona-owned private | `browser/auth-mode-optional-configured.spec.ts` |
+| `optional-anonymous` | optional, no provider | none | public, foreign private | `browser/auth-mode-optional-anonymous.spec.ts` |
+| `disabled` | disabled | none | public, foreign private | `browser/auth-mode-disabled.spec.ts` |
+
+```
+npm run test:e2e:profiles
+npm run test:e2e:optional-configured -- --api-source /absolute/path/to/ontokit-api
+npm run test:e2e:optional-anonymous -- --api-source /absolute/path/to/ontokit-api
+npm run test:e2e:disabled -- --api-source /absolute/path/to/ontokit-api
+```
+
+Compose receives the API mode as `API_AUTH_MODE` in the private `runtime.env`. Each profile
+builds its own production web copy. Provider-less profiles pass no issuer, client ID or
+client secret to that build. They start neither Zitadel nor Login, so the API keeps the
+harness placeholder client ID `unconfigured`.
+
+**Mode-agreement gate (KTD2).** After the build and before the web server starts or any
+fixture exists, the launcher reads two things:
+
+- `NEXT_PUBLIC_AUTH_MODE` and `NEXT_PUBLIC_ZITADEL_CONFIGURED` from the compiled
+  `.next/required-server-files.json`;
+- inside the running `api` container, `settings.auth_mode`, the serving process's (PID 1)
+  `AUTH_MODE`, whether a real client ID is configured, and the superadmin count.
+
+The run fails with `Authentication mode disagreement: …` unless web and API report the
+profile's mode and provider state, both API sources agree, and no superadmin exists. The
+result is saved as `manifest.authModes`. The gate runs for every profile, baseline and
+lifecycle included. `/auth/signin` readiness is liveness only and never mode evidence.
+
+**Seeded fixtures (KTD4).** `seed-fixtures.mjs` runs a fixed Python entry in the run's own
+`api` container through `ProjectService.create_from_import`, using the tiny ontology from
+the copied snapshot and a synthetic current user, then queues the ontology index build.
+Each project's description is tagged `ontokit-e2e-run:<run>:<key>`.
+
+- `publicProject` and `foreignPrivateProject` are owned by `e2e-foreign-<run>`.
+- `personaPrivateProject` (optional-configured only) is owned by the bootstrapped persona's
+  subject.
+
+The container must report exactly the planned rows. The launcher then checks each fixture as
+an anonymous API caller: public returns 200, private returns 403. Only the IDs reach the
+private Playwright config (`fixtures`, read with `seededProject()` in
+`e2e/fixtures/projects.ts`). IDs, owners and tags are recorded in the recovery manifest.
+After the tests, the fixtures are deleted by exact ID, only while the tag and owner still
+match. `cleanup.mjs` repeats that purge through a still-running API container that carries
+both run labels. Removing the run's labelled volumes remains the authoritative data cleanup.
+
+**Failure probes** (each must exit nonzero and clean up completely):
+
+- `--fail-at before-browser` stops after the gate, seeding and web liveness, just before Playwright.
+- `--fail-at web-mode-mismatch` (all three new profiles) builds the web copy with a neighbouring
+  profile's auth env. The gate must reject it.
+- `--fail-at api-mode-mismatch` (optional-anonymous and disabled only) starts the API in a
+  neighbouring mode. The gate must reject it. For optional-configured, identity bootstrap
+  independently asserts the API mode first.
+
+`FAIL_POINTS` in `auth-modes.mjs` is the complete `--fail-at` allowlist. A name outside it, or a
+point that cannot fire for the launch (for example `before-browser` on baseline, or an
+`identity-*` point on a provider-less profile), is refused before any allocation so a typo can
+never run as an ordinary green run. A receipt's containers must be exactly the profile's service
+set plus, optionally, the one-shot `migrate` job; a provider-less receipt with Zitadel or Login
+is not accepted.
+
+**Evidence.** Each new profile has a fixed exact-count inventory in `evidence.mjs`
+(`MODE_REQUIRED_TESTS`). Any spec that `specOwner()` assigns to another profile, or a test
+in a project outside the profile's, fails the gate. `acceptedRun` requires `serviceSet(profile)`:
+Zitadel and Login for baseline, lifecycle and optional-configured; neither for the
+provider-less profiles. The receipt carries `authModes: {web, api}` only when both match the
+profile. A new-profile receipt without agreeing modes is never accepted. A baseline or
+lifecycle receipt with a recorded disagreement is not accepted either.
+
+**Disabled-mode trust boundary.** Disabled mode gives every caller who can reach the API
+create and edit rights as the shared anonymous owner. It is supported only for a single-user
+deployment that is not network-exposed. The disabled profile proves that behavior on a
+loopback-only disposable stack. It does not make disabled mode safe to expose.

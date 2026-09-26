@@ -205,8 +205,12 @@ export default function TranslationCoveragePage() {
   const { data: session } = useSession();
   const params = useParams();
   const projectId = params.id as string;
+  // Shares the content's project query (React Query dedupes it). In auth-disabled
+  // mode the edit role, not a token, decides whether branch writes are offered.
+  const { project } = useProject(projectId, session?.accessToken);
+  const { canEdit } = derivePermissions(project, session?.accessToken);
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken} canEdit={canEdit}>
       <TranslationCoverageContent projectId={projectId} token={session?.accessToken} />
     </BranchProvider>
   );

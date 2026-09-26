@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useOntologyTree } from "@/lib/hooks/useOntologyTree";
 import { useCollaborationStatus } from "@/lib/hooks/useCollaborationStatus";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
+import { isClientAuthDisabled } from "@/lib/auth-mode";
 import { useOpenPRCount } from "@/lib/hooks/useOpenPRCount";
 import { useLintSummary } from "@/lib/hooks/useLintSummary";
 import { useNormalizationStatus } from "@/lib/hooks/useNormalizationStatus";
@@ -35,8 +36,12 @@ export function useProjectViewer({
     canManage, canEdit, canSuggest, isSuggester, isSuggestionMode,
     hasValidAccess: _hasValidAccess, hasOntology, hasExplicitRole,
   } = permissions;
-  // Override hasValidAccess to check session status (not just token presence)
-  const hasValidAccess = sessionStatus === "authenticated" && !!accessToken;
+  // Override hasValidAccess to check session status (not just token presence).
+  // Auth-disabled mode has no session at all, so there the role-derived value
+  // from derivePermissions stands.
+  const hasValidAccess = isClientAuthDisabled()
+    ? _hasValidAccess
+    : sessionStatus === "authenticated" && !!accessToken;
 
   // Secondary data via React Query hooks
   const { data: openPRCount = 0 } = useOpenPRCount(projectId, accessToken);

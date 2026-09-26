@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState, useCallback } from "react";
+import { shouldShowAuthUI } from "@/lib/auth-mode";
 
 function ErrorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const error = searchParams.get("error");
+  // Retrying only makes sense when an identity provider can complete sign-in.
+  // Without one (optional mode unconfigured, or disabled mode) the page must
+  // neither offer nor auto-start a retry that lands on an unavailable sign-in.
+  const canSignIn = shouldShowAuthUI();
 
-  const isTransient = error === "Configuration" || error === "OAuthSignin" || error === "OAuthCallback" || error === "Callback";
+  const isTransient = canSignIn && (error === "Configuration" || error === "OAuthSignin" || error === "OAuthCallback" || error === "Callback");
   const RETRY_SECONDS = 10;
   const MAX_RETRIES = 6;
 
@@ -79,7 +84,12 @@ function ErrorContent() {
     },
   };
 
-  const errorInfo = errorMessages[error || "Default"] || errorMessages.Default;
+  const errorInfo = canSignIn
+    ? errorMessages[error || "Default"] || errorMessages.Default
+    : {
+        title: "Sign-in is unavailable",
+        description: "This OntoKit instance isn't configured for sign-in, so there is nothing to retry. You can still browse public projects.",
+      };
   const exhaustedRetries = retryCount >= MAX_RETRIES;
 
   // Clear stored count once we've given up, so a future visit starts fresh
@@ -124,6 +134,7 @@ function ErrorContent() {
         </div>
 
         <div className="mt-8 space-y-4">
+          {canSignIn && (
           <button
             onClick={() => {
               try { sessionStorage.removeItem(storageKey); } catch {}
@@ -136,6 +147,7 @@ function ErrorContent() {
           >
             {retrying ? "Retrying..." : "Try signing in again"}
           </button>
+          )}
           <Link
             href="/"
             className="w-full flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-xs text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"

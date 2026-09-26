@@ -66,7 +66,7 @@ export default function PullRequestsPage() {
   }
 
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken} canEdit={canCreatePR}>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">

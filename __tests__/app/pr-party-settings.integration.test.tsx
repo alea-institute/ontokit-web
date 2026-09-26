@@ -6,7 +6,7 @@ import Page from '@/app/pr-party/settings/page';
 import type { PRPartyMe, PRPartySettings } from '@/lib/api/prParty';
 import { jsonResponse, llmHookHarness } from '../fixtures/llm-hook-harness';
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/pr-party/settings' }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/pr-party/settings', useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
 const session: Session = { user: { email: 'reviewer@example.invalid', name: 'Fixture reviewer' }, accessToken: 'synthetic-session', expires: '2099-01-01T00:00:00Z' };
 const healthy = { expires_at: null, last_validated_at: null, last_error: null, expired: false, expires_soon: false };
 function mount(options: { auth?: Session | null; me?: Partial<PRPartyMe>; capabilitiesStatus?: number; holdCapabilities?: boolean; failSettings?: boolean } = {}) {
@@ -43,13 +43,26 @@ function mount(options: { auth?: Session | null; me?: Partial<PRPartyMe>; capabi
 }
 const requests = (fetcher: ReturnType<typeof mount>['fetcher'], method: string) => fetcher.mock.calls.filter(([, init]) => init?.method === method);
 const ready = () => screen.findByRole('heading', { name: 'Review settings' });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('review settings route with real capability, settings and credential chains', () => {
   it('gates anonymous visitors without making authenticated requests', () => {
+    // Required mode always runs with a provider (lib/env.ts enforces it).
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', 'required'); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', 'true');
     const { fetcher } = mount({ auth: null });
+    expect(within(screen.getByRole('main')).getByRole('button', { name: 'Sign In' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Sign in to manage your review settings' })).toBeDefined();
     expect(screen.queryByLabelText('GitHub personal access token')).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([['optional', 'false'], ['disabled', 'false'], ['disabled', 'true']])('explains that review settings are unavailable without sign-in in %s mode (provider flag %s)', (mode, configured) => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', configured);
+    const { fetcher } = mount({ auth: null });
+    expect(screen.getByRole('heading', { name: 'Review settings are unavailable here' })).toBeDefined();
+    expect(screen.getByText('Sign-in is unavailable in this configuration, and review settings belong to a signed-in reviewer. Nothing else on OntoKit is affected.')).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'Sign in to manage your review settings' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull();
     expect(fetcher).not.toHaveBeenCalled();
   });
 

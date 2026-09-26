@@ -11,7 +11,7 @@
  */
 
 import React from "react";
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -140,6 +140,8 @@ function renderPage() {
   );
 }
 
+afterEach(() => { vi.unstubAllEnvs(); });
+
 describe("PR Party settings page", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -173,6 +175,9 @@ describe("PR Party settings page", () => {
   });
 
   it("asks an unauthenticated visitor to sign in, and comes back here", async () => {
+    // Required mode always runs with a provider (lib/env.ts enforces it).
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "required");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
     mockStatus = "unauthenticated";
     renderPage();
     await userEvent.click(screen.getByRole("button", { name: /sign in/i }));

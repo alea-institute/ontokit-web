@@ -35,6 +35,7 @@ import { parsePRPartyError, prPartyApi, type PRPartyMergePlacement } from "@/lib
 import { trustedGitHubUrl } from "@/lib/prPartyLinks";
 import { hasLapsed, NTFY_TOPIC_PATTERN } from "@/lib/prPartyCredentials";
 import { cn } from "@/lib/utils";
+import { shouldShowAuthUI } from "@/lib/auth-mode";
 
 const MERGE_OPTIONS: { value: PRPartyMergePlacement; label: string; hint: string }[] = [
   {
@@ -139,6 +140,24 @@ export default function PRPartySettingsPage() {
             aria-label="Loading your review settings"
             className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600"
           />
+        </div>
+      </Shell>
+    );
+  }
+
+  if (status !== "authenticated" && !shouldShowAuthUI()) {
+    // No identity provider can complete sign-in here, so explain rather than
+    // offer a Sign In that leads nowhere.
+    return (
+      <Shell>
+        <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
+          <h1 className="text-lg font-medium text-slate-900 dark:text-slate-100">
+            Review settings are unavailable here
+          </h1>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            Sign-in is unavailable in this configuration, and review settings belong to a
+            signed-in reviewer. Nothing else on OntoKit is affected.
+          </p>
         </div>
       </Shell>
     );
