@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const mockSignIn = vi.fn();
@@ -197,6 +197,43 @@ describe("UserMenu", () => {
     await configuredMenu();
     expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
     expect(window.location.href).toBe(clientOnlyUrl);
+  });
+
+  it("bounds a stalled server call, then falls back and still ends the local session", async () => {
+    let signal: AbortSignal | undefined;
+    let markCalled!: () => void;
+    const called = new Promise<void>((resolve) => { markCalled = resolve; });
+    // Never settles, and ignores abort: the component must not depend on it.
+    const fetchMock = vi.fn((_path: string, init?: RequestInit) => {
+      signal = init?.signal ?? undefined;
+      markCalled();
+      return new Promise<Response>(() => {});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_ISSUER", "https://auth.example.test");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CLIENT_ID", "client-123");
+    vi.resetModules();
+    const { UserMenu: ConfiguredUserMenu } = await import("@/components/auth/user-menu");
+    mockUseSession.mockReturnValue({
+      data: { user: { name: "Alice", email: "alice@test.com", image: null } },
+      status: "authenticated",
+    });
+    render(<ConfiguredUserMenu />);
+    await userEvent.click(screen.getByText("A"));
+
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      fireEvent.click(screen.getByText("Sign out"));
+      await called;
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(mockSignOut).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(signal?.aborted).toBe(true);
+      expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
+      expect(window.location.href).toBe(clientOnlyUrl);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("fails loudly without an issuer and never redirects to localhost", async () => {

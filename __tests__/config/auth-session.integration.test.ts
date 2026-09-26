@@ -170,6 +170,54 @@ describe('authenticated sessions through encrypted cookies and real callbacks', 
     for (const credential of ['old-access-value', 'refresh-credential-value', 'synthetic-client-secret', secret]) expect(output).not.toContain(credential);
   });
 
+  it('bounds a hanging issuer refresh and reports RefreshAccessTokenError without leaking credentials', async () => {
+    let signal: AbortSignal | undefined;
+    let markCalled!: () => void;
+    const called = new Promise<void>(resolve => { markCalled = resolve; });
+    // Never settles and ignores abort: the callback must not depend on it.
+    fetcher.mockImplementation((_url: string, init?: RequestInit) => { signal = init?.signal ?? undefined; markCalled(); return new Promise<Response>(() => {}); });
+    const logged: unknown[][] = [];
+    for (const method of ['error', 'warn', 'log', 'info', 'debug'] as const) vi.spyOn(console, method).mockImplementation((...args: unknown[]) => { logged.push(args); });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      let settled = false;
+      const pending = session({ user, accessToken: 'hanging-access-value', refreshToken: 'hanging-refresh-value', expiresAt: 1 }).finally(() => { settled = true; });
+      await called;
+      await vi.advanceTimersByTimeAsync(9_999);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      const response = await pending;
+      expect(signal?.aborted).toBe(true);
+      const body = await response.json();
+      expect(body).toMatchObject({ user, accessToken: 'hanging-access-value', error: 'RefreshAccessTokenError' });
+      expect(body.refreshToken).toBeUndefined();
+      expect(await cookieToken(response)).toMatchObject({ error: 'RefreshAccessTokenError', refreshToken: 'hanging-refresh-value' });
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(logged.length).toBeGreaterThan(0);
+    const output = logged.map(args => args.map(arg => arg instanceof Error ? `${arg.name}: ${arg.message} ${arg.stack}` : typeof arg === 'string' ? arg : JSON.stringify(arg)).join(' ')).join('\n');
+    expect(output).toContain('TimeoutError');
+    for (const credential of ['hanging-access-value', 'hanging-refresh-value', 'synthetic-client-secret', secret]) expect(output).not.toContain(credential);
+  });
+
+  it('emits redacted Auth.js debug messages in development and never their metadata', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    const logged: unknown[][] = [];
+    for (const method of ['error', 'warn', 'log', 'info', 'debug'] as const) vi.spyOn(console, method).mockImplementation((...args: unknown[]) => { logged.push(args); });
+    const { createAuthConfig } = await import('@/auth');
+    const authConfig = createAuthConfig();
+    expect(authConfig.debug).toBe(true);
+    const jwtShaped = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJkZWJ1Zy1zdWJqZWN0In0.ZGVidWctc2lnbmF0dXJl';
+    authConfig.logger!.debug!(`callback tokens id_token=${jwtShaped}`, { tokens: { access_token: 'debug-metadata-access-value' } });
+    expect(logged).toHaveLength(1);
+    expect(logged[0]).toHaveLength(1);
+    const [line] = logged[0] as [string];
+    expect(line).toMatch(/^\[auth\]\[debug\] callback tokens id_token=\[redacted\]$/);
+    for (const credential of ['debug-metadata-access-value', jwtShaped, 'eyJhbGciOiJSUzI1NiJ9', 'ZGVidWctc2lnbmF0dXJl']) expect(line).not.toContain(credential);
+  });
+
   it('keeps decrypted session credentials out of server output when an expired session cookie is presented', async () => {
     const logged: unknown[][] = [];
     for (const method of ['error', 'warn', 'log', 'info', 'debug'] as const) vi.spyOn(console, method).mockImplementation((...args: unknown[]) => { logged.push(args); });

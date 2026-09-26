@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { provisionPersonas, assertProfile, identityRequest } from './bootstrap-identity.mjs';
 import {
   LIFECYCLE_LIFETIMES, AUTHJS_SESSION_MAX_AGE_SECONDS, configureLifecycleLifetimes, durationSeconds, jwtLifetimeSeconds,
+  decodeJwtClaims, parseSetCookie, cookieCleared, cookieExpiresMs,
   nextServerEnv, assertNoClockOverride, validateSpecimen, clockPreflight, verifyOrdinaryPersona,
 } from './auth-lifecycle.mjs';
 import { run } from './run.mjs';
@@ -116,6 +117,34 @@ test('durations and issued access-token lifetimes parse strictly', () => {
   const jwt = claims => `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`;
   assert.equal(jwtLifetimeSeconds(jwt({iat: 100, exp: 160})), 60);
   for (const bad of ['opaque', jwt({iat: 100}), jwt({iat: 100, exp: 90}), 'a.!!!.c']) assert.throws(() => jwtLifetimeSeconds(bad));
+});
+
+test('shared JWT decoding reports shape and payload failures without the token', () => {
+  const jwt = claims => `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`;
+  assert.deepEqual(decodeJwtClaims(jwt({sub: 'x', iat: 1, exp: 2})), {ok: true, claims: {sub: 'x', iat: 1, exp: 2}});
+  assert.deepEqual(decodeJwtClaims(`h.${Buffer.from('null').toString('base64url')}.s`), {ok: true, claims: null});
+  for (const bad of ['opaque', 'a.b', 'a.b.c.d', undefined, 42]) assert.deepEqual(decodeJwtClaims(bad), {ok: false, reason: 'shape'});
+  assert.deepEqual(decodeJwtClaims('a.!!!.c'), {ok: false, reason: 'payload'});
+  assert.throws(() => jwtLifetimeSeconds('opaque'), /not a JWT/);
+  assert.throws(() => jwtLifetimeSeconds('a.!!!.c'), /claims malformed/);
+});
+
+test('shared Set-Cookie parsing detects clearing and expiry exactly as both callers did', () => {
+  const now = Date.parse('2030-01-01T00:00:00Z');
+  const cookie = parseSetCookie('authjs.session-token=a=b; Path=/; MAX-AGE = 60 ; Expires=Tue, 01 Jan 2030 00:10:00 GMT; HttpOnly');
+  assert.equal(cookie.name, 'authjs.session-token');
+  assert.equal(cookie.value, 'a=b');
+  assert.equal(cookie.separator, 20);
+  assert.deepEqual(cookie.attributes.map(a => a.key), ['path', 'max-age', 'expires', 'httponly']);
+  assert.equal(parseSetCookie('nameless').separator, -1);
+  // Last Max-Age wins over any Expires; Expires applies only without Max-Age.
+  assert.equal(cookieExpiresMs(cookie.attributes, now), now + 60_000);
+  assert.equal(cookieExpiresMs(parseSetCookie('n=v; Max-Age=60; Max-Age=5').attributes, now), now + 5_000);
+  assert.equal(cookieExpiresMs(parseSetCookie('n=v; Expires=Tue, 01 Jan 2030 00:10:00 GMT; Expires=bad').attributes, now), now + 600_000);
+  assert.ok(Number.isNaN(cookieExpiresMs(parseSetCookie('n=v; Path=/').attributes, now)));
+  // Any clearing attribute clears the cookie.
+  for (const cleared of ['n=; Max-Age=0', 'n=; max-age=-1', 'n=; Expires=Thu, 01 Jan 1970 00:00:00 GMT', 'n=; Max-Age=60; Expires=Thu, 01 Jan 1970 00:00:00 GMT']) assert.equal(cookieCleared(parseSetCookie(cleared).attributes, now), true, cleared);
+  for (const kept of ['n=v; Max-Age=60', 'n=v; Path=/', 'n=v; Expires=Tue, 01 Jan 2030 00:10:00 GMT']) assert.equal(cookieCleared(parseSetCookie(kept).attributes, now), false, kept);
 });
 
 test('clock preload reaches only the owned Next process environment', () => {

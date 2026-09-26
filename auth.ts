@@ -43,6 +43,28 @@ export function describeAuthError(error: Error): string {
   return line;
 }
 
+// A stalled issuer must not hold the session request open indefinitely.
+const REFRESH_TIMEOUT_MS = 10_000;
+
+// Runs `operation` with an abort signal and rejects with a TimeoutError after
+// `ms`, even if the aborted operation never settles.
+async function withTimeout<T>(ms: number, operation: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      const reason = Object.assign(new Error(`Timed out after ${ms}ms`), { name: "TimeoutError" });
+      controller.abort(reason);
+      reject(reason);
+    }, ms);
+  });
+  try {
+    return await Promise.race([operation(controller.signal), timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function createAuthLogger(debugEnabled: boolean): NonNullable<NextAuthConfig["logger"]> {
   return {
     error(error) {
@@ -136,21 +158,24 @@ export function createAuthConfig(): NextAuthConfig {
         // Access token has expired, try to refresh it
         if (token.refreshToken) {
           try {
-            const response = await fetch(
-              `${process.env.ZITADEL_ISSUER}/oauth/v2/token`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: new URLSearchParams({
-                  client_id: process.env.ZITADEL_CLIENT_ID || "",
-                  client_secret: process.env.ZITADEL_CLIENT_SECRET || "",
-                  grant_type: "refresh_token",
-                  refresh_token: token.refreshToken as string,
-                }),
-              }
-            );
-
-            const tokens = await response.json();
+            // The timeout bounds both the request and the body read.
+            const { response, tokens } = await withTimeout(REFRESH_TIMEOUT_MS, async signal => {
+              const response = await fetch(
+                `${process.env.ZITADEL_ISSUER}/oauth/v2/token`,
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                  body: new URLSearchParams({
+                    client_id: process.env.ZITADEL_CLIENT_ID || "",
+                    client_secret: process.env.ZITADEL_CLIENT_SECRET || "",
+                    grant_type: "refresh_token",
+                    refresh_token: token.refreshToken as string,
+                  }),
+                  signal,
+                }
+              );
+              return { response, tokens: await response.json() };
+            });
 
             if (!response.ok) throw tokens;
 

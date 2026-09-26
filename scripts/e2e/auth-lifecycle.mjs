@@ -77,12 +77,24 @@ export async function verifyOrdinaryPersona(call, personaId) {
   return true;
 }
 
+/**
+ * Decodes a compact JWT's payload in memory without verifying it. Shared with the
+ * browser lifecycle fixture. Callers validate claims and choose their own error
+ * messages, so the token never appears in a thrown message.
+ * @param {unknown} token
+ * @returns {{ok: false, reason: 'shape' | 'payload'} | {ok: true, claims: unknown}}
+ */
+export function decodeJwtClaims(token) {
+  const parts = typeof token === 'string' ? token.split('.') : [];
+  if (parts.length !== 3) return {ok: false, reason: 'shape'};
+  try { return {ok: true, claims: JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))}; } catch { return {ok: false, reason: 'payload'}; }
+}
+
 /** exp - iat of a JWT access token, computed in memory; the token itself is never returned. */
 export function jwtLifetimeSeconds(token) {
-  const parts = typeof token === 'string' ? token.split('.') : [];
-  if (parts.length !== 3) throw new Error('Lifecycle access token is not a JWT');
-  let claims;
-  try { claims = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8')); } catch { throw new Error('Lifecycle access token claims malformed'); }
+  const decoded = decodeJwtClaims(token);
+  if (!decoded.ok && decoded.reason === 'shape') throw new Error('Lifecycle access token is not a JWT');
+  const claims = decoded.ok ? decoded.claims : undefined;
   if (!Number.isSafeInteger(claims?.exp) || !Number.isSafeInteger(claims?.iat) || claims.exp <= claims.iat) throw new Error('Lifecycle access token claims malformed');
   return claims.exp - claims.iat;
 }
@@ -118,16 +130,54 @@ export function validateSpecimen(specimen, {now = Date.now()} = {}) {
   return {cookieHeader: cookies.map(cookie => `${cookie.name}=${cookie.value}`).join('; '), names: [...names], expiresMs, subject: specimen.subject};
 }
 
-function clearsCookie(header, name, now) {
+/**
+ * Splits one Set-Cookie header value into its name/value pair and attributes
+ * (keys lower-cased, values trimmed). `separator` is the index of the pair's '='
+ * (-1 when absent). Shared with the browser lifecycle fixture.
+ * @param {string} header
+ * @returns {{name: string, value: string, separator: number, attributes: {key: string, value: string}[]}}
+ */
+export function parseSetCookie(header) {
   const [pair, ...attributes] = header.split(';');
-  if (pair.slice(0, pair.indexOf('=')).trim() !== name) return false;
-  return attributes.some(attribute => {
-    const [key, ...rest] = attribute.split('=');
-    const value = rest.join('=').trim();
-    if (key.trim().toLowerCase() === 'max-age') return Number(value) <= 0;
-    if (key.trim().toLowerCase() === 'expires') return Date.parse(value) <= now;
+  const separator = pair.indexOf('=');
+  return {
+    name: pair.slice(0, separator).trim(),
+    value: pair.slice(separator + 1).trim(),
+    separator,
+    attributes: attributes.map(attribute => {
+      const [key, ...rest] = attribute.split('=');
+      return {key: key.trim().toLowerCase(), value: rest.join('=').trim()};
+    }),
+  };
+}
+/**
+ * True when any Max-Age<=0 or past Expires attribute clears the cookie.
+ * @param {{key: string, value: string}[]} attributes
+ * @param {number} now
+ */
+export function cookieCleared(attributes, now) {
+  return attributes.some(({key, value}) => {
+    if (key === 'max-age') return Number(value) <= 0;
+    if (key === 'expires') return Date.parse(value) <= now;
     return false;
   });
+}
+/**
+ * Absolute expiry in ms: the last Max-Age wins, else the first Expires; NaN when neither parses.
+ * @param {{key: string, value: string}[]} attributes
+ * @param {number} now
+ */
+export function cookieExpiresMs(attributes, now) {
+  let expiresMs = NaN;
+  for (const {key, value} of attributes) {
+    if (key === 'max-age') expiresMs = now + Number(value) * 1000;
+    else if (key === 'expires' && !Number.isFinite(expiresMs)) expiresMs = Date.parse(value);
+  }
+  return expiresMs;
+}
+function clearsCookie(header, name, now) {
+  const cookie = parseSetCookie(header);
+  return cookie.name === name && cookieCleared(cookie.attributes, now);
 }
 
 /**

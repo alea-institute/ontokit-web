@@ -12,18 +12,16 @@ const ZITADEL_ISSUER = process.env.NEXT_PUBLIC_ZITADEL_ISSUER;
 const ZITADEL_CLIENT_ID = process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID || "";
 
 const FEDERATED_LOGOUT_PATH = "/api/auth/federated-logout";
+// A stalled server call must not leave the user signed in without feedback.
+const FEDERATED_LOGOUT_TIMEOUT_MS = 5_000;
 
-// Prefer the server-built URL carrying id_token_hint; fall back to the
-// client_id-only URL (the provider then asks which session to end).
-async function resolveEndSessionUrl(issuer: string): Promise<string> {
-  const endSession = `${issuer}/oidc/v1/end_session`;
-  const postLogoutRedirectUri = encodeURIComponent(window.location.origin);
-  const fallback = `${endSession}?client_id=${ZITADEL_CLIENT_ID}&post_logout_redirect_uri=${postLogoutRedirectUri}`;
+async function requestHintedUrl(endSession: string, fallback: string, signal: AbortSignal): Promise<string> {
   try {
     const response = await fetch(FEDERATED_LOGOUT_PATH, {
       method: "POST",
       credentials: "same-origin",
       cache: "no-store",
+      signal,
     });
     if (!response.ok) return fallback;
     const body = (await response.json()) as { url?: unknown } | null;
@@ -31,9 +29,32 @@ async function resolveEndSessionUrl(issuer: string): Promise<string> {
     // Only ever navigate to the configured issuer's end-session endpoint.
     if (typeof url === "string" && url.startsWith(`${endSession}?`)) return url;
   } catch {
-    // Network or parse failure: the client-only URL still ends the provider session.
+    // Network, abort or parse failure: the client-only URL still ends the provider session.
   }
   return fallback;
+}
+
+// Prefer the server-built URL carrying id_token_hint; fall back to the
+// client_id-only URL (the provider then asks which session to end). The
+// request and body read are bounded; on timeout the fallback wins the race even
+// if the aborted request never settles.
+async function resolveEndSessionUrl(issuer: string): Promise<string> {
+  const endSession = `${issuer}/oidc/v1/end_session`;
+  const postLogoutRedirectUri = encodeURIComponent(window.location.origin);
+  const fallback = `${endSession}?client_id=${ZITADEL_CLIENT_ID}&post_logout_redirect_uri=${postLogoutRedirectUri}`;
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timedOut = new Promise<string>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      resolve(fallback);
+    }, FEDERATED_LOGOUT_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([requestHintedUrl(endSession, fallback, controller.signal), timedOut]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function UserMenu() {

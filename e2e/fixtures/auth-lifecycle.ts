@@ -7,6 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { test as base, expect, type BrowserContext, type Page, type Request, type Response } from "@playwright/test";
 import { enterProviderCredentials } from "./auth";
 import { loadLifecycleRun, resetAuthClock, setAuthClockOffset, type LifecycleRunConfig } from "./run";
+import { cookieCleared, cookieExpiresMs, decodeJwtClaims, parseSetCookie } from "../../scripts/e2e/auth-lifecycle.mjs";
 
 export const SESSION_PATH = "/api/auth/session";
 export const CALLBACK_PATH = "/api/auth/callback/zitadel";
@@ -23,10 +24,9 @@ export interface CookieSpecimen { cookies: { name: string; value: string; expire
 
 /** Decodes JWT claims in memory; the token never appears in a thrown message. */
 export function jwtClaims(token: string | undefined): Claims {
-  const parts = typeof token === "string" ? token.split(".") : [];
-  let claims: Partial<Claims> | undefined;
-  try { claims = JSON.parse(Buffer.from(parts[1] ?? "", "base64url").toString("utf8")) as Partial<Claims>; } catch { claims = undefined; }
-  if (parts.length !== 3 || !claims || typeof claims.sub !== "string" || !Number.isSafeInteger(claims.iat) || !Number.isSafeInteger(claims.exp)) {
+  const decoded = decodeJwtClaims(token);
+  const claims = decoded.ok ? decoded.claims as Partial<Claims> | null : undefined;
+  if (!claims || typeof claims.sub !== "string" || !Number.isSafeInteger(claims.iat) || !Number.isSafeInteger(claims.exp)) {
     throw new Error("Lifecycle bearer is not a JWT with sub/iat/exp claims");
   }
   return claims as Claims;
@@ -189,18 +189,9 @@ export function parseIssuedCookies(headers: { name: string; value: string }[], n
   const cookies: CookieSpecimen["cookies"] = [];
   for (const header of headers) {
     if (header.name.toLowerCase() !== "set-cookie") continue;
-    const [pair, ...attributes] = header.value.split(";");
-    const index = pair.indexOf("=");
-    const name = pair.slice(0, index).trim();
-    const value = pair.slice(index + 1).trim();
-    if (index < 1 || !SESSION_COOKIE.test(name) || !value) continue;
-    let expiresMs = NaN;
-    for (const attribute of attributes) {
-      const [key, ...rest] = attribute.split("=");
-      const raw = rest.join("=").trim();
-      if (key.trim().toLowerCase() === "max-age") expiresMs = now + Number(raw) * 1000;
-      else if (key.trim().toLowerCase() === "expires" && !Number.isFinite(expiresMs)) expiresMs = Date.parse(raw);
-    }
+    const {name, value, separator, attributes} = parseSetCookie(header.value);
+    if (separator < 1 || !SESSION_COOKIE.test(name) || !value) continue;
+    const expiresMs = cookieExpiresMs(attributes, now);
     if (!Number.isFinite(expiresMs) || expiresMs <= now) continue;
     cookies.push({name, value, expires: Math.floor(expiresMs / 1000)});
   }
@@ -212,15 +203,8 @@ export function clearsAll(headers: { name: string; value: string }[], names: str
   const cleared = new Set<string>();
   for (const header of headers) {
     if (header.name.toLowerCase() !== "set-cookie") continue;
-    const [pair, ...attributes] = header.value.split(";");
-    const name = pair.slice(0, pair.indexOf("=")).trim();
-    if (attributes.some(attribute => {
-      const [key, ...rest] = attribute.split("=");
-      const raw = rest.join("=").trim();
-      if (key.trim().toLowerCase() === "max-age") return Number(raw) <= 0;
-      if (key.trim().toLowerCase() === "expires") return Date.parse(raw) <= now;
-      return false;
-    })) cleared.add(name);
+    const {name, attributes} = parseSetCookie(header.value);
+    if (cookieCleared(attributes, now)) cleared.add(name);
   }
   return names.every(name => cleared.has(name));
 }
