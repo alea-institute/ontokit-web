@@ -162,7 +162,7 @@ test('baseline discovery ignores every spec owned by another profile', () => {
   const [setup, teardown, chromium] = playwrightProjects('baseline');
   assert.deepEqual([setup.name, teardown.name, chromium.name], ['stack setup', 'stack teardown', 'chromium']);
   assert.deepEqual(chromium.dependencies, ['stack setup']);
-  const ignored = file => chromium.testIgnore.some(pattern => pattern.test(`/tmp/run/web/e2e/${file}`));
+  const ignored = file => chromium.testIgnore.some(pattern => path.matchesGlob(`/tmp/run/web/e2e/${file}`, pattern));
   for (const file of foreignSpecs('baseline')) assert.equal(ignored(file), true, file);
   for (const file of ['api/projects.spec.ts', 'browser/ontology-workflow.spec.ts', 'auth-foundation.spec.ts', 'browser/x-auth-mode-disabled.spec.ts.bak']) assert.equal(ignored(file), false, file);
   assert.equal(foreignSpecs('baseline').length, 4);
@@ -174,7 +174,7 @@ test('each non-baseline profile discovers exactly its own spec', () => {
     assert.equal(projects[0].name, PROFILE_REGISTRY[profile].projects[0]);
     for (const [other, p] of Object.entries(PROFILE_REGISTRY)) {
       for (const file of p.specs ?? ['api/projects.spec.ts', 'stack.setup.ts']) {
-        assert.equal(projects[0].testMatch.test(`/tmp/run/web/e2e/${file}`), other === profile, `${profile} vs ${file}`);
+        assert.equal(path.matchesGlob(`/tmp/run/web/e2e/${file}`, projects[0].testMatch), other === profile, `${profile} vs ${file}`);
       }
     }
     assert.equal(specOwner(PROFILE_REGISTRY[profile].specs[0]), profile);

@@ -35,8 +35,8 @@ export const foreignSpecs = profile => Object.entries(PROFILE_REGISTRY).filter((
 /** Which profile owns a spec file (relative to e2e/); unowned specs belong to baseline. */
 export const specOwner = file => Object.entries(PROFILE_REGISTRY).find(([, p]) => p.specs?.includes(file))?.[0] ?? 'baseline';
 
-const escape = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const specPattern = file => new RegExp(`(?:^|[\\\\/])${escape(file).replace(/\//g, '[\\\\/]')}$`);
+// Playwright glob (not a constructed RegExp): matches the spec path literally.
+const specPattern = file => `**/${file}`;
 /** Playwright projects for one profile, built from the registry (KTD7). */
 export function playwrightProjects(profile) {
   const p = profileSpec(profile);
