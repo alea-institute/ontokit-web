@@ -29,7 +29,7 @@ type Gate =
   | "provider-session-only"
   /** Navigates to `/auth/signin`, which itself explains unavailability when no provider is active. */
   | "lands-on-gated-page"
-  /** Known ungated site outside the U3 file list; tracked so it cannot grow unnoticed. */
+  /** Known ungated site; none may exist (R6). Kept so a regression must be declared, and fails the test. */
   | "ungated-known-gap";
 
 interface Entry {
@@ -57,16 +57,8 @@ const SIGN_IN_INVENTORY: Entry[] = [
     counts: { "signin-route": 2 },
     note: "Retry navigates to /auth/signin, which shows the unavailability copy when no provider is active.",
   },
-  {
-    file: "app/pr-party/settings/page.tsx", route: "/pr-party/settings", gate: "ungated-known-gap",
-    counts: { "signIn-import": 1, "signIn-call": 1 },
-    note: "Outside the U3 file list. Reachable only by direct URL: the Review nav link is reviewer-only.",
-  },
-  {
-    file: "components/pr-party/PRPartyQueueView.tsx", route: "/pr-party", gate: "ungated-known-gap",
-    counts: { "signIn-import": 1, "signIn-call": 1 },
-    note: "Outside the U3 file list. Reachable only by direct URL: the Review nav link is reviewer-only.",
-  },
+  { file: "app/pr-party/settings/page.tsx", route: "/pr-party/settings", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1 } },
+  { file: "components/pr-party/PRPartyQueueView.tsx", route: "/pr-party", gate: "shouldShowAuthUI", counts: { "signIn-import": 1, "signIn-call": 1 } },
 ];
 
 const PATTERNS: Record<Kind, RegExp> = {
@@ -158,11 +150,8 @@ describe("sign-in call-site inventory", () => {
     for (const entry of SIGN_IN_INVENTORY.filter(e => e.gate !== "shouldShowAuthUI")) {
       expect(entry.note, entry.file).toBeTruthy();
     }
-    // Growing the list of known-ungated sites must be a deliberate edit here.
-    expect(SIGN_IN_INVENTORY.filter(e => e.gate === "ungated-known-gap").map(e => e.file)).toEqual([
-      "app/pr-party/settings/page.tsx",
-      "components/pr-party/PRPartyQueueView.tsx",
-    ]);
+    // R6: no sign-in control may be ungated in a provider-less mode.
+    expect(SIGN_IN_INVENTORY.filter(e => e.gate === "ungated-known-gap").map(e => e.file)).toEqual([]);
   });
 
   it("fails when a new file adds an uninventoried signIn( call", () => {
