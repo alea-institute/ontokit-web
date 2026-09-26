@@ -11,6 +11,31 @@ import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
 const ZITADEL_ISSUER = process.env.NEXT_PUBLIC_ZITADEL_ISSUER;
 const ZITADEL_CLIENT_ID = process.env.NEXT_PUBLIC_ZITADEL_CLIENT_ID || "";
 
+const FEDERATED_LOGOUT_PATH = "/api/auth/federated-logout";
+
+// Prefer the server-built URL carrying id_token_hint; fall back to the
+// client_id-only URL (the provider then asks which session to end).
+async function resolveEndSessionUrl(issuer: string): Promise<string> {
+  const endSession = `${issuer}/oidc/v1/end_session`;
+  const postLogoutRedirectUri = encodeURIComponent(window.location.origin);
+  const fallback = `${endSession}?client_id=${ZITADEL_CLIENT_ID}&post_logout_redirect_uri=${postLogoutRedirectUri}`;
+  try {
+    const response = await fetch(FEDERATED_LOGOUT_PATH, {
+      method: "POST",
+      credentials: "same-origin",
+      cache: "no-store",
+    });
+    if (!response.ok) return fallback;
+    const body = (await response.json()) as { url?: unknown } | null;
+    const url = body?.url;
+    // Only ever navigate to the configured issuer's end-session endpoint.
+    if (typeof url === "string" && url.startsWith(`${endSession}?`)) return url;
+  } catch {
+    // Network or parse failure: the client-only URL still ends the provider session.
+  }
+  return fallback;
+}
+
 export function UserMenu() {
   const { data: session, status } = useSession();
   // Whether sign-in affordances are shown — shared predicate with header.tsx.
@@ -24,17 +49,19 @@ export function UserMenu() {
     // a same-tab sign-out/sign-in cannot expose them to the next account, even
     // if the federated logout request fails after NextAuth is cleared.
     useByoKeyStore.getState().clearAll();
-    // First clear the NextAuth session
-    await signOut({ redirect: false });
     if (!ZITADEL_ISSUER) {
+      await signOut({ redirect: false });
       console.error(
         "Cannot complete federated logout: NEXT_PUBLIC_ZITADEL_ISSUER is not configured",
       );
       return;
     }
-    // Then redirect to Zitadel's end_session endpoint with client_id for proper redirect
-    const postLogoutRedirectUri = encodeURIComponent(window.location.origin);
-    window.location.href = `${ZITADEL_ISSUER}/oidc/v1/end_session?client_id=${ZITADEL_CLIENT_ID}&post_logout_redirect_uri=${postLogoutRedirectUri}`;
+    // The server builds the end-session URL with id_token_hint while the session
+    // cookie still exists, so the provider ends its session without a chooser.
+    const endSessionUrl = await resolveEndSessionUrl(ZITADEL_ISSUER);
+    // Then clear the NextAuth session and leave through the provider.
+    await signOut({ redirect: false });
+    window.location.href = endSessionUrl;
   };
 
   // Close menu when clicking outside

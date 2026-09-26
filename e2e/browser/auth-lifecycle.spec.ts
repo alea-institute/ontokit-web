@@ -54,28 +54,28 @@ test("R1 UI sign-out ends the application and provider sessions and the next sig
   expect(appCookiesCleared, "application sign-out clears every session cookie").toBe(true);
   const endSessionUrl = new URL((await endSession).url());
   const clientIdPresent = (endSessionUrl.searchParams.get("client_id") ?? "").length > 0;
+  // RP-initiated logout names the session to end; only presence is observed, never the value.
+  const idTokenHintPresent = (endSessionUrl.searchParams.get("id_token_hint") ?? "").length > 0;
   expect(clientIdPresent, "end_session names the OIDC client").toBe(true);
+  expect(idTokenHintPresent, "end_session carries id_token_hint").toBe(true);
   expect(endSessionUrl.searchParams.get("post_logout_redirect_uri"), "post-logout redirect").toBe(run.web);
 
-  // The pinned Login UI completes end-session without an id_token_hint by listing
-  // this browser's provider sessions; choosing the persona's session clears it.
+  // With id_token_hint the provider ends the hinted session and redirects straight
+  // back. A Login UI session chooser means the hint was missing or ignored: that is
+  // a detected failure, never clicked through.
   await landed;
   await page.waitForLoadState("load");
-  const providerSessionChooser = new URL(page.url()).origin === loginOrigin;
-  let postLogoutRedirected = !providerSessionChooser;
-  if (providerSessionChooser) {
-    const entry = page.getByRole("button").filter({hasText: persona.email});
-    await expect(entry).toHaveCount(1);
-    await entry.click();
-    await Promise.race([
-      page.waitForURL(url => url.origin === run.web, {timeout: 30_000}),
-      expect(entry).toHaveCount(0, {timeout: 30_000}),
-    ]);
+  if (new URL(page.url()).origin !== run.web) {
+    await page.waitForURL(url => url.origin === run.web || (url.origin === loginOrigin && !url.pathname.endsWith("/logout")), {timeout: 30_000}).catch(() => undefined);
     await page.waitForLoadState("load");
-    postLogoutRedirected = new URL(page.url()).origin === run.web;
   }
-  // Recorded before the next sign-in so a later failure still shows the observed logout path.
-  recordEvidence({case: "r1-logout-observed", providerSessionChooser, postLogoutRedirected, endSessionClientId: clientIdPresent, appCookiesCleared});
+  const landedAt = new URL(page.url());
+  const providerSessionChooser = landedAt.origin === loginOrigin && await page.getByRole("button").filter({hasText: persona.email}).count() > 0;
+  const postLogoutRedirected = landedAt.origin === run.web;
+  // Recorded before asserting so a failure still shows the observed logout path.
+  recordEvidence({case: "r1-logout-observed", providerSessionChooser, postLogoutRedirected, endSessionClientId: clientIdPresent, endSessionIdTokenHint: idTokenHintPresent, appCookiesCleared});
+  expect(providerSessionChooser, "provider asked the user to choose a session to end").toBe(false);
+  expect(postLogoutRedirected, "provider redirected back to the application without interaction").toBe(true);
 
   // Application session: gone for the browser.
   const signedOut = browserSession(page, run);
@@ -93,7 +93,7 @@ test("R1 UI sign-out ends the application and provider sessions and the next sig
   expectActiveSession((await landing).body, run);
   recordEvidence({
     case: "r1-logout", clock: "real", firstLoginInteractive: first.interactive, appCookiesCleared, endSessionClientId: clientIdPresent,
-    providerSessionChooser, postLogoutRedirected, nextLoginInteractive: second.interactive,
+    endSessionIdTokenHint: idTokenHintPresent, providerSessionChooser, postLogoutRedirected, nextLoginInteractive: second.interactive,
   });
 });
 

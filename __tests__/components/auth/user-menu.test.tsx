@@ -51,6 +51,7 @@ describe("UserMenu", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it("shows loading skeleton when status is loading", () => {
@@ -147,7 +148,7 @@ describe("UserMenu", () => {
     );
   });
 
-  it("navigates to the configured federated logout endpoint with an encoded redirect", async () => {
+  async function configuredMenu() {
     vi.stubEnv("NEXT_PUBLIC_ZITADEL_ISSUER", "https://auth.example.test");
     vi.stubEnv("NEXT_PUBLIC_ZITADEL_CLIENT_ID", "client-123");
     vi.resetModules();
@@ -158,14 +159,44 @@ describe("UserMenu", () => {
       data: { user: { name: "Alice", email: "alice@test.com", image: null } },
       status: "authenticated",
     });
-
     render(<ConfiguredUserMenu />);
     await userEvent.click(screen.getByText("A"));
     await userEvent.click(screen.getByText("Sign out"));
+  }
 
-    expect(window.location.href).toBe(
-      "https://auth.example.test/oidc/v1/end_session?client_id=client-123&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000",
+  const clientOnlyUrl =
+    "https://auth.example.test/oidc/v1/end_session?client_id=client-123&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000";
+
+  it("obtains the hinted end-session URL from the server before clearing the local session, then navigates to it", async () => {
+    const hinted =
+      "https://auth.example.test/oidc/v1/end_session?id_token_hint=server-held&client_id=client-123&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000";
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ url: hinted }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await configuredMenu();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [path, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/auth/federated-logout");
+    expect(init.method).toBe("POST");
+    // The session cookie is still present when the server reads the ID token.
+    expect(fetchMock.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSignOut.mock.invocationCallOrder[0],
     );
+    expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
+    expect(window.location.href).toBe(hinted);
+  });
+
+  it.each([
+    ["the server call fails", () => vi.fn().mockRejectedValue(new TypeError("offline"))],
+    ["the server returns an error", () => vi.fn().mockResolvedValue(new Response(null, { status: 500 }))],
+    ["the server has no URL", () => vi.fn().mockResolvedValue(Response.json({ url: null }))],
+    ["the server URL is not the configured issuer", () => vi.fn().mockResolvedValue(Response.json({ url: "https://evil.example.test/oidc/v1/end_session?x=1" }))],
+  ])("falls back to the client-only end-session URL when %s", async (_case, makeFetch) => {
+    vi.stubGlobal("fetch", makeFetch());
+    await configuredMenu();
+    expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
+    expect(window.location.href).toBe(clientOnlyUrl);
   });
 
   it("fails loudly without an issuer and never redirects to localhost", async () => {
@@ -175,6 +206,8 @@ describe("UserMenu", () => {
       "@/components/auth/user-menu"
     );
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
     mockUseSession.mockReturnValue({
       data: { user: { name: "Alice", email: "alice@test.com", image: null } },
       status: "authenticated",
@@ -187,6 +220,7 @@ describe("UserMenu", () => {
     expect(mockSignOut).toHaveBeenCalledWith({ redirect: false });
     expect(window.location.href).toBe("");
     expect(window.location.href).not.toContain("localhost:8080");
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalledWith(
       "Cannot complete federated logout: NEXT_PUBLIC_ZITADEL_ISSUER is not configured",
     );
