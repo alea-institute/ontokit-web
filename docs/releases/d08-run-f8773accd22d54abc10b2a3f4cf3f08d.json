@@ -1,0 +1,188 @@
+{
+  "version": 2,
+  "profile": "baseline",
+  "run": "f8773accd22d54abc10b2a3f4cf3f08d",
+  "startedAt": "2026-09-26T01:11:49.362Z",
+  "finishedAt": "2026-09-26T01:13:50.631Z",
+  "sources": {
+    "api": {
+      "revision": "a2d483624e472883151c01ea2d4862a5860ed31b",
+      "sha256": "1078ada9dc380989741f8c928dc1e42dad7ba754cac40f05ddead873ee10651f"
+    },
+    "web": {
+      "revision": "93ea222d31324ac47bc1d7e96fb5a20e4b0aadec",
+      "sha256": "325f3b7abab34938993fb349f3e5458e7ff388a41881369165e1121394b63153"
+    }
+  },
+  "images": [
+    {
+      "service": "api",
+      "id": "sha256:0de6ad2cfdd723636a20a5ddcd94d1b14eb568dadd32e6b25e79c5ff868ebebb",
+      "reference": "ontokit-e2e-f8773accd22d54abc10b2a3f4cf3f08d/api:run"
+    },
+    {
+      "service": "worker",
+      "id": "sha256:0de6ad2cfdd723636a20a5ddcd94d1b14eb568dadd32e6b25e79c5ff868ebebb",
+      "reference": "ontokit-e2e-f8773accd22d54abc10b2a3f4cf3f08d/api:run"
+    },
+    {
+      "service": "login",
+      "id": "sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648",
+      "reference": "ghcr.io/zitadel/zitadel-login@sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648"
+    },
+    {
+      "service": "zitadel",
+      "id": "sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64",
+      "reference": "ghcr.io/zitadel/zitadel@sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:0de6ad2cfdd723636a20a5ddcd94d1b14eb568dadd32e6b25e79c5ff868ebebb",
+      "reference": "ontokit-e2e-f8773accd22d54abc10b2a3f4cf3f08d/api:run"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:0de6ad2cfdd723636a20a5ddcd94d1b14eb568dadd32e6b25e79c5ff868ebebb",
+      "reference": "ontokit-e2e-f8773accd22d54abc10b2a3f4cf3f08d/api:run"
+    },
+    {
+      "service": "redis",
+      "id": "sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2",
+      "reference": "redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2"
+    },
+    {
+      "service": "postgres",
+      "id": "sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38",
+      "reference": "pgvector/pgvector@sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38"
+    },
+    {
+      "service": "minio",
+      "id": "sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+      "reference": "minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
+    }
+  ],
+  "migrationHeads": [
+    "i7j8k9l0m1n2"
+  ],
+  "tests": {
+    "passed": 21,
+    "skipped": 0,
+    "failed": 0,
+    "flaky": 0,
+    "mandatory": [
+      {
+        "file": "api/branches.spec.ts",
+        "title": "branch edits persist independently of the target branch",
+        "project": "chromium"
+      },
+      {
+        "file": "api/branches.spec.ts",
+        "title": "stale branch revision is rejected without changing source or target",
+        "project": "chromium"
+      },
+      {
+        "file": "api/errors.spec.ts",
+        "title": "absent project write returns stable 404 and creates nothing",
+        "project": "chromium"
+      },
+      {
+        "file": "api/errors.spec.ts",
+        "title": "schema-invalid project create returns validation locations and creates nothing",
+        "project": "chromium"
+      },
+      {
+        "file": "api/errors.spec.ts",
+        "title": "anonymous source write is rejected without changing owner state",
+        "project": "chromium"
+      },
+      {
+        "file": "api/errors.spec.ts",
+        "title": "unrelated source write is rejected without changing owner state",
+        "project": "chromium"
+      },
+      {
+        "file": "api/errors.spec.ts",
+        "title": "invalid Turtle source write is rejected without changing owner state",
+        "project": "chromium"
+      },
+      {
+        "file": "api/errors.spec.ts",
+        "title": "invalid schema source write is rejected without changing owner state",
+        "project": "chromium"
+      },
+      {
+        "file": "api/errors.spec.ts",
+        "title": "malformed Turtle import leaves no partial project",
+        "project": "chromium"
+      },
+      {
+        "file": "api/errors.spec.ts",
+        "title": "malformed multipart import leaves no partial project",
+        "project": "chromium"
+      },
+      {
+        "file": "api/ontology.spec.ts",
+        "title": "import initializes persisted source, branch, class and property labels",
+        "project": "chromium"
+      },
+      {
+        "file": "api/ontology.spec.ts",
+        "title": "source save persists a new immutable revision",
+        "project": "chromium"
+      },
+      {
+        "file": "api/projects.spec.ts",
+        "title": "project create, list, read, update and delete persist through HTTP",
+        "project": "chromium"
+      },
+      {
+        "file": "api/pull-requests.spec.ts",
+        "title": "ordinary owner reviews a diff and merges persisted branch content into the target",
+        "project": "chromium"
+      },
+      {
+        "file": "api/search-lint.spec.ts",
+        "title": "lexical search reflects the saved target revision and excludes nonmatching entities",
+        "project": "chromium"
+      },
+      {
+        "file": "api/search-lint.spec.ts",
+        "title": "each lint enqueue produces a fresh completed persisted worker run with deterministic issues",
+        "project": "chromium"
+      },
+      {
+        "file": "auth-foundation.spec.ts",
+        "title": "real owner and unrelated sessions authenticate protected API reads",
+        "project": "chromium"
+      },
+      {
+        "file": "auth-foundation.spec.ts",
+        "title": "anonymous context has no identity and cannot access a protected API read",
+        "project": "chromium"
+      },
+      {
+        "file": "browser/ontology-workflow.spec.ts",
+        "title": "fresh UI sign-in imports, edits, reviews and merges a label that survives target reload",
+        "project": "chromium"
+      },
+      {
+        "file": "stack.setup.ts",
+        "title": "genuine OIDC sessions for two fresh ordinary users",
+        "project": "stack setup"
+      },
+      {
+        "file": "stack.teardown.ts",
+        "title": "remove private browser credentials",
+        "project": "stack teardown"
+      }
+    ]
+  },
+  "lifecycle": null,
+  "acceptance": {
+    "scope": "local-verification",
+    "hostedAcceptance": false
+  },
+  "workflowPassed": true,
+  "cleanup": "complete",
+  "acceptedRun": true
+}

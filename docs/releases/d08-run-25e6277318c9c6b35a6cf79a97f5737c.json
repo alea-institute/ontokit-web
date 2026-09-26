@@ -1,0 +1,52 @@
+{
+  "version": 2,
+  "profile": "lifecycle",
+  "run": "25e6277318c9c6b35a6cf79a97f5737c",
+  "startedAt": "2026-09-26T01:58:39.724Z",
+  "finishedAt": "2026-09-26T02:05:07.232Z",
+  "sources": {
+    "api": {
+      "revision": "a2d483624e472883151c01ea2d4862a5860ed31b",
+      "sha256": "1078ada9dc380989741f8c928dc1e42dad7ba754cac40f05ddead873ee10651f"
+    },
+    "web": {
+      "revision": "93ea222d31324ac47bc1d7e96fb5a20e4b0aadec",
+      "sha256": "325f3b7abab34938993fb349f3e5458e7ff388a41881369165e1121394b63153"
+    }
+  },
+  "images": [],
+  "migrationHeads": [
+    "i7j8k9l0m1n2"
+  ],
+  "tests": null,
+  "lifecycle": {
+    "lifetimes": {
+      "accessTokenLifetime": 60,
+      "idTokenLifetime": 60,
+      "refreshTokenIdleExpiration": 180,
+      "refreshTokenExpiration": 360
+    },
+    "graceSeconds": 20,
+    "observedAccessTokenLifetimeSeconds": 60,
+    "preflight": {
+      "verifierToleranceSeconds": 15,
+      "sessionMaxAgeSeconds": 2592000,
+      "marginMs": 5000,
+      "workerShiftErrorMs": 10,
+      "serviceClockSkewMs": 0,
+      "toleranceWindowExercised": true,
+      "refreshErrorBeforeBoundary": false,
+      "beforeAccepted": true,
+      "afterRejected": true,
+      "cookiesCleared": true,
+      "restored": true
+    }
+  },
+  "acceptance": {
+    "scope": "local-verification",
+    "hostedAcceptance": false
+  },
+  "workflowPassed": false,
+  "cleanup": "complete",
+  "acceptedRun": false
+}

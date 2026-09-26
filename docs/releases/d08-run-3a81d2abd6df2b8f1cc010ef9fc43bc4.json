@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "profile": "lifecycle",
+  "run": "3a81d2abd6df2b8f1cc010ef9fc43bc4",
+  "startedAt": "2026-09-26T01:26:36.685Z",
+  "finishedAt": "2026-09-26T01:28:26.426Z",
+  "sources": {
+    "api": {
+      "revision": "a2d483624e472883151c01ea2d4862a5860ed31b",
+      "sha256": "1078ada9dc380989741f8c928dc1e42dad7ba754cac40f05ddead873ee10651f"
+    },
+    "web": {
+      "revision": "93ea222d31324ac47bc1d7e96fb5a20e4b0aadec",
+      "sha256": "325f3b7abab34938993fb349f3e5458e7ff388a41881369165e1121394b63153"
+    }
+  },
+  "images": [],
+  "migrationHeads": [
+    "i7j8k9l0m1n2"
+  ],
+  "tests": null,
+  "lifecycle": null,
+  "acceptance": {
+    "scope": "local-verification",
+    "hostedAcceptance": false
+  },
+  "workflowPassed": false,
+  "cleanup": "complete",
+  "acceptedRun": false
+}
