@@ -1,0 +1,169 @@
+{
+  "version": 2,
+  "profile": "lifecycle",
+  "run": "0241353789a6a1c7b5bfcd7696aa6978",
+  "startedAt": "2026-09-26T01:31:19.941Z",
+  "finishedAt": "2026-09-26T01:37:52.565Z",
+  "sources": {
+    "api": {
+      "revision": "a2d483624e472883151c01ea2d4862a5860ed31b",
+      "sha256": "1078ada9dc380989741f8c928dc1e42dad7ba754cac40f05ddead873ee10651f"
+    },
+    "web": {
+      "revision": "93ea222d31324ac47bc1d7e96fb5a20e4b0aadec",
+      "sha256": "325f3b7abab34938993fb349f3e5458e7ff388a41881369165e1121394b63153"
+    }
+  },
+  "images": [],
+  "migrationHeads": [
+    "i7j8k9l0m1n2"
+  ],
+  "tests": {
+    "passed": 4,
+    "skipped": 0,
+    "failed": 0,
+    "flaky": 0,
+    "mandatory": [
+      {
+        "file": "browser/auth-lifecycle.spec.ts",
+        "title": "R1 UI sign-out ends the application and provider sessions and the next sign-in requires provider interaction",
+        "project": "lifecycle"
+      },
+      {
+        "file": "browser/auth-lifecycle.spec.ts",
+        "title": "R2 real elapsed access-token expiry renews through the provider on reload without interactive login",
+        "project": "lifecycle"
+      },
+      {
+        "file": "browser/auth-lifecycle.spec.ts",
+        "title": "R3 real elapsed refresh-token idle expiry reauthenticates through SessionGuard back to the original URL",
+        "project": "lifecycle"
+      },
+      {
+        "file": "browser/auth-lifecycle.spec.ts",
+        "title": "R4 controlled Next clock expires the genuine application cookie and explicit sign-in recovers at normal time",
+        "project": "lifecycle"
+      }
+    ],
+    "cases": [
+      {
+        "title": "R1 UI sign-out ends the application and provider sessions and the next sign-in requires provider interaction",
+        "clock": "real",
+        "evidence": [
+          {
+            "case": "r1-logout-observed",
+            "providerSessionChooser": false,
+            "postLogoutRedirected": true,
+            "endSessionClientId": true,
+            "endSessionIdTokenHint": true,
+            "appCookiesCleared": true
+          },
+          {
+            "case": "r1-logout",
+            "clock": "real",
+            "firstLoginInteractive": true,
+            "appCookiesCleared": true,
+            "endSessionClientId": true,
+            "endSessionIdTokenHint": true,
+            "providerSessionChooser": false,
+            "postLogoutRedirected": true,
+            "nextLoginInteractive": true
+          }
+        ]
+      },
+      {
+        "title": "R2 real elapsed access-token expiry renews through the provider on reload without interactive login",
+        "clock": "real-elapsed",
+        "evidence": [
+          {
+            "case": "r2-renewal",
+            "clock": "real-elapsed",
+            "observedAccessLifetimeSeconds": 60,
+            "graceSeconds": 20,
+            "renewedAfterExpirySeconds": 5,
+            "credentialChanged": true,
+            "sameSubject": true,
+            "interactiveLogin": false
+          }
+        ]
+      },
+      {
+        "title": "R3 real elapsed refresh-token idle expiry reauthenticates through SessionGuard back to the original URL",
+        "clock": "real-elapsed",
+        "evidence": [
+          {
+            "case": "r3-refresh-recovery",
+            "clock": "real-elapsed",
+            "refreshIdleSeconds": 180,
+            "graceSeconds": 20,
+            "waitedAfterIssueSeconds": 201,
+            "refreshErrorObserved": true,
+            "sessionGuardInitiated": true,
+            "providerSsoReused": true,
+            "originalUrlRestored": true,
+            "credentialChanged": true
+          }
+        ]
+      },
+      {
+        "title": "R4 controlled Next clock expires the genuine application cookie and explicit sign-in recovers at normal time",
+        "clock": "controlled-next-process",
+        "evidence": [
+          {
+            "case": "r4-cookie-expiry",
+            "clock": "controlled-next-process",
+            "specimenSource": "oidc-callback",
+            "verifierToleranceSeconds": 15,
+            "marginSeconds": 5,
+            "workerShiftErrorMs": 27,
+            "toleranceWindowExercised": true,
+            "beforeAccepted": true,
+            "afterRejected": true,
+            "cookiesCleared": true,
+            "signedOutUi": true,
+            "restoredBeforeSignIn": true,
+            "refreshErrorBeforeBoundary": false,
+            "providerSsoReused": true
+          }
+        ]
+      }
+    ],
+    "realElapsedCases": [
+      "R2 real elapsed access-token expiry renews through the provider on reload without interactive login",
+      "R3 real elapsed refresh-token idle expiry reauthenticates through SessionGuard back to the original URL"
+    ],
+    "clockControlledCases": [
+      "R4 controlled Next clock expires the genuine application cookie and explicit sign-in recovers at normal time"
+    ]
+  },
+  "lifecycle": {
+    "lifetimes": {
+      "accessTokenLifetime": 60,
+      "idTokenLifetime": 60,
+      "refreshTokenIdleExpiration": 180,
+      "refreshTokenExpiration": 360
+    },
+    "graceSeconds": 20,
+    "observedAccessTokenLifetimeSeconds": 60,
+    "preflight": {
+      "verifierToleranceSeconds": 15,
+      "sessionMaxAgeSeconds": 2592000,
+      "marginMs": 5000,
+      "workerShiftErrorMs": 11,
+      "serviceClockSkewMs": 59,
+      "toleranceWindowExercised": true,
+      "refreshErrorBeforeBoundary": false,
+      "beforeAccepted": true,
+      "afterRejected": true,
+      "cookiesCleared": true,
+      "restored": true
+    }
+  },
+  "acceptance": {
+    "scope": "local-verification",
+    "hostedAcceptance": false
+  },
+  "workflowPassed": false,
+  "cleanup": "complete",
+  "acceptedRun": false
+}
