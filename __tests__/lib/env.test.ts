@@ -208,6 +208,7 @@ describe("compiled authentication contract", () => {
     vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
     vi.stubEnv("NEXT_PUBLIC_ZITADEL_ISSUER", "https://identity.example.invalid");
     vi.stubEnv("ZITADEL_ISSUER", "https://identity.example.invalid");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CLIENT_ID", "public-client");
     vi.stubEnv("ZITADEL_CLIENT_ID", "public-client");
     vi.stubEnv("ZITADEL_CLIENT_SECRET", "synthetic-provider-secret");
     vi.stubEnv("NEXTAUTH_SECRET", "synthetic-session-secret");
@@ -218,6 +219,7 @@ describe("compiled authentication contract", () => {
     ["ZITADEL_ISSUER", undefined],
     ["ZITADEL_CLIENT_ID", undefined],
     ["ZITADEL_ISSUER", "https://other.example.invalid"],
+    ["ZITADEL_CLIENT_ID", "other-client"],
     ["AUTH_MODE", "disabled"],
     ["AUTH_MODE", "required"],
     ["NEXT_PUBLIC_ZITADEL_CONFIGURED", "false"],
@@ -235,6 +237,18 @@ describe("compiled authentication contract", () => {
     expect(() => validateServerEnv()).toThrow("compiled authentication configuration");
   });
 
+  it("accepts a stale client ID left in an anonymous build's runtime settings", async () => {
+    // Without an issuer the provider is inactive and the client ID is never used
+    // for sign-in or logout, so it cannot cause client drift.
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "false");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_ISSUER", "");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CLIENT_ID", "");
+    vi.stubEnv("ZITADEL_ISSUER", undefined);
+    vi.stubEnv("ZITADEL_CLIENT_ID", "stale-client");
+    const { validateServerEnv } = await import("@/lib/env");
+    expect(() => validateServerEnv()).not.toThrow();
+  });
+
   it.each([
     ["required", true], ["optional", true], ["optional", false],
     ["disabled", false], ["disabled", true],
@@ -243,7 +257,7 @@ describe("compiled authentication contract", () => {
     vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
     vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", String(configured));
     if (!configured) {
-      for (const key of ["ZITADEL_ISSUER", "ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "NEXTAUTH_SECRET", "NEXT_PUBLIC_ZITADEL_ISSUER"]) vi.stubEnv(key, undefined);
+      for (const key of ["ZITADEL_ISSUER", "ZITADEL_CLIENT_ID", "ZITADEL_CLIENT_SECRET", "NEXTAUTH_SECRET", "NEXT_PUBLIC_ZITADEL_ISSUER", "NEXT_PUBLIC_ZITADEL_CLIENT_ID"]) vi.stubEnv(key, undefined);
     }
     const { validateServerEnv } = await import("@/lib/env");
     expect(() => validateServerEnv()).not.toThrow();

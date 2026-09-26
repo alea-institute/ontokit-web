@@ -53,6 +53,7 @@ if [[ "$profile" == configured ]]; then
   expect_rejection ZITADEL_CLIENT_SECRET -e "NEXTAUTH_SECRET=$session_canary"
   expect_rejection NEXTAUTH_SECRET -e "ZITADEL_CLIENT_SECRET=$provider_canary"
   expect_rejection changed-issuer -e ZITADEL_ISSUER=https://other.example.invalid -e NEXT_PUBLIC_ZITADEL_ISSUER=https://other.example.invalid -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
+  expect_rejection changed-client-id -e ZITADEL_CLIENT_ID=d03-other-client -e NEXT_PUBLIC_ZITADEL_CLIENT_ID=d03-other-client -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
   expect_rejection changed-mode -e AUTH_MODE=disabled -e "NEXTAUTH_SECRET=$session_canary" -e "ZITADEL_CLIENT_SECRET=$provider_canary"
   configured_runtime=("${runtime[@]}")
   runtime=("${anonymous_runtime[@]}")
@@ -99,17 +100,18 @@ const noSecrets = text => { for (const secret of canaries) assert(!text.includes
   assert.equal(env.NEXT_PUBLIC_AUTH_MODE, mode);
   assert.equal(env.NEXT_PUBLIC_ZITADEL_CONFIGURED, String(configured));
   assert.equal(env.NEXT_PUBLIC_ZITADEL_ISSUER || '', configured ? 'https://identity.example.invalid' : '');
+  assert.equal(env.NEXT_PUBLIC_ZITADEL_CLIENT_ID || '', configured ? 'd03-public-client' : '');
   if (configured) {
     assert.equal(env.NEXT_PUBLIC_API_URL, 'https://api.example.invalid');
     assert.equal(env.NEXT_PUBLIC_WS_URL, 'wss://api.example.invalid');
     assert.equal(process.env.ZITADEL_ISSUER, env.NEXT_PUBLIC_ZITADEL_ISSUER);
-    assert.equal(process.env.ZITADEL_CLIENT_ID, 'd03-public-client');
+    assert.equal(process.env.ZITADEL_CLIENT_ID, env.NEXT_PUBLIC_ZITADEL_CLIENT_ID);
   }
   // Inspect every shipped browser asset and fetch representative assets containing
   // each public URL. Minification can fold boolean/mode branches, so those values
   // are checked against the compiled Next configuration above.
   const files = fs.readdirSync('.next/static', {recursive: true}).filter(file => file.endsWith('.js'));
-  const needed = new Set(configured ? [env.NEXT_PUBLIC_ZITADEL_ISSUER, env.NEXT_PUBLIC_API_URL, env.NEXT_PUBLIC_WS_URL] : []);
+  const needed = new Set(configured ? [env.NEXT_PUBLIC_ZITADEL_ISSUER, env.NEXT_PUBLIC_ZITADEL_CLIENT_ID, env.NEXT_PUBLIC_API_URL, env.NEXT_PUBLIC_WS_URL] : []);
   for (const file of files) {
     const content = fs.readFileSync(path.join('.next/static', file), 'utf8');
     noSecrets(content);
