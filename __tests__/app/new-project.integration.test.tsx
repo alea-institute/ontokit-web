@@ -37,7 +37,7 @@ function mount(auth: Session | null = session, sessionGate?: Promise<Session | n
   const { wrapper: QueryWrapper } = llmHookHarness();
   return { fetcher, setCloneError: (body: unknown) => { cloneError = body; }, delayClone: (gate: Promise<void>) => { cloneGate = gate; }, reject: (next: boolean) => { fail = next; }, ...render(<SessionProvider session={sessionGate ? undefined : auth} refetchOnWindowFocus={false}><QueryWrapper><NewProjectPage /></QueryWrapper></SessionProvider>) };
 }
-afterEach(() => { cleanup(); Upload.requests.length = 0; vi.useRealTimers(); vi.unstubAllGlobals(); navigation.push.mockClear(); });
+afterEach(() => { cleanup(); Upload.requests.length = 0; vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); navigation.push.mockClear(); });
 const form = () => within(screen.getByRole('main'));
 
 describe('new project route through the real form and HTTP client', () => {
@@ -99,10 +99,34 @@ describe('new project route through the real form and HTTP client', () => {
   });
 
   it('requires sign-in before exposing a project form', () => {
+    // Required mode always runs with a provider (lib/env.ts enforces it).
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', 'required'); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', 'true');
     const { fetcher } = mount(null);
     expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeDefined();
     expect(form().queryByLabelText(/Project Name/)).toBeNull();
     expect(form().getByRole('link', { name: 'Sign In' }).getAttribute('href')).toBe('/auth/signin');
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('keeps the sign-in path for an anonymous visitor in optional mode with a provider', () => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', 'optional'); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', 'true');
+    mount(null);
+    expect(screen.getByRole('heading', { name: 'Sign in required' })).toBeDefined();
+    expect(form().getByRole('link', { name: 'Sign In' }).getAttribute('href')).toBe('/auth/signin');
+  });
+
+  // Disabled mode shows this copy until U4 of the auth-mode matrix plan replaces
+  // it with the Create-Empty form; reverting U4 restores it.
+  it.each([['optional', 'false'], ['disabled', 'false'], ['disabled', 'true']])('explains that project creation is unavailable in %s mode (provider flag %s)', (mode, configured) => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', configured);
+    const { fetcher } = mount(null);
+    expect(screen.getByRole('heading', { name: 'Project creation is unavailable' })).toBeDefined();
+    expect(screen.getByText("Sign-in is unavailable in this configuration, so new projects can't be created here. You can still browse public projects.")).toBeDefined();
+    expect(screen.queryByRole('heading', { name: 'Sign in required' })).toBeNull();
+    expect(screen.queryByRole('link', { name: /sign in/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull();
+    expect(form().queryByLabelText(/Project Name/)).toBeNull();
+    expect(form().getByRole('link', { name: 'Browse public projects' }).getAttribute('href')).toBe('/');
     expect(fetcher).not.toHaveBeenCalled();
   });
 

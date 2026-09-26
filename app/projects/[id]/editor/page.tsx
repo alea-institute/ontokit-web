@@ -61,6 +61,7 @@ import { useAnonymousSuggestion } from "@/lib/hooks/useAnonymousSuggestion";
 import { CreditModal } from "@/components/suggestions/CreditModal";
 import { ProposalSubmittedDialog } from "@/components/editor/ProposalSubmittedDialog";
 import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
+import { shouldShowAuthUI } from "@/lib/auth-mode";
 import type { TrustGate } from "@/components/editor/TrustExplainer";
 
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
@@ -115,7 +116,10 @@ export default function EditorPage() {
   }, [setProjectViewMode]);
 
   // Auth mode — set at build time by next.config.ts
-  const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
+  // Sign-in affordances need an identity provider that can actually complete
+  // sign-in. This is the same client predicate the header uses, so disabled mode
+  // with stale provider flags never offers sign-in.
+  const showAuthUI = shouldShowAuthUI();
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
 
   // Branch state
@@ -179,7 +183,7 @@ export default function EditorPage() {
       onRetry: () => { void refetchTrust(); },
       progress: promotionProgress,
       onSignIn:
-        trustTier === "anonymous" && zitadelConfigured
+        trustTier === "anonymous" && showAuthUI
           ? () => signIn("zitadel", { callbackUrl: window.location.href })
           : undefined,
     }),
@@ -190,7 +194,7 @@ export default function EditorPage() {
       isTrustError,
       promotionProgress,
       refetchTrust,
-      zitadelConfigured,
+      showAuthUI,
     ],
   );
 
@@ -1168,10 +1172,17 @@ export default function EditorPage() {
             </Link>
             <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-900/50 dark:bg-red-900/20">
               <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">
-                {error || "Project not found"}
+                {errorKind === "private-403" && !showAuthUI
+                  ? "This is a private project"
+                  : error || "Project not found"}
               </h2>
+              {errorKind === "private-403" && !showAuthUI && (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Sign-in is unavailable in this configuration, so private projects can&apos;t be opened here.
+                </p>
+              )}
               <div className="mt-4 flex items-center justify-center gap-3">
-                {errorKind === "private-403" && zitadelConfigured && (
+                {errorKind === "private-403" && showAuthUI && (
                   <Button onClick={() => signIn("zitadel", { callbackUrl: window.location.href })} className="gap-2">
                     <LogIn className="h-4 w-4" />
                     Sign In
@@ -1289,8 +1300,8 @@ export default function EditorPage() {
                 </span>
               )}
 
-              {/* Sign-in CTA for unauthenticated users (only when Zitadel is configured) */}
-              {!hasValidAccess && zitadelConfigured && (
+              {/* Sign-in CTA for unauthenticated users (only when an identity provider is active) */}
+              {!hasValidAccess && showAuthUI && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1533,7 +1544,7 @@ export default function EditorPage() {
                   onReparentClass={handleReparentClass}
                   reparentOptimistic={reparentOptimistic}
                   rollbackReparent={rollbackReparent}
-                  showSignInToEdit={!hasValidAccess && zitadelConfigured && !canPropose}
+                  showSignInToEdit={!hasValidAccess && showAuthUI && !canPropose}
                   onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
                   canPropose={canPropose && !isAnonymousProposalMode}
                   onProposeEdit={handleProposeEdit}
@@ -1588,7 +1599,7 @@ export default function EditorPage() {
                 onReparentClass={handleReparentClass}
                 reparentOptimistic={reparentOptimistic}
                 rollbackReparent={rollbackReparent}
-                showSignInToEdit={!hasValidAccess && zitadelConfigured && !canPropose}
+                showSignInToEdit={!hasValidAccess && showAuthUI && !canPropose}
                 onSignInToEdit={() => signIn("zitadel", { callbackUrl: window.location.href })}
                 canPropose={canPropose && !isAnonymousProposalMode}
                 onProposeEdit={handleProposeEdit}
@@ -1722,7 +1733,7 @@ export default function EditorPage() {
         prUrl={submittedProposal?.prUrl ?? null}
         isSignedIn={!!session?.accessToken}
         onSignIn={
-          zitadelConfigured
+          showAuthUI
             ? () => signIn("zitadel", { callbackUrl: window.location.href })
             : undefined
         }

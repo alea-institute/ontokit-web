@@ -128,6 +128,43 @@ describe("Editor page real access and empty-state chains", () => {
     await screen.findByRole("heading", { name: /private project/ });
     expect(screen.queryByRole("button", { name: /sign in/i })).toBeNull();
   });
+  it.each([
+    ["optional", "false"],
+    ["disabled", "false"],
+    ["disabled", "true"],
+  ])("explains unavailable sign-in on a private-project denial in %s mode (provider flag %s)", async (mode, configured) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", configured);
+    projectStatus = 403;
+    projectResponse = { detail: "private" };
+    mount();
+    expect(await screen.findByRole("heading", { name: "This is a private project" })).toBeTruthy();
+    expect(screen.queryByText(/Sign in to request access/)).toBeNull();
+    expect(screen.getByText("Sign-in is unavailable in this configuration, so private projects can't be opened here.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /sign in/i })).toBeNull();
+    expect(boundary.signIn).not.toHaveBeenCalled();
+  });
+  it("keeps the editor's Sign in to edit action for an anonymous public project in optional mode with a provider", async () => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Sign in to edit" }));
+    expect(boundary.signIn).toHaveBeenCalledWith("zitadel", { callbackUrl: window.location.href });
+  });
+  it.each([
+    ["optional", "false"],
+    ["disabled", "true"],
+  ])("offers no editor sign-in action for an anonymous public project in %s mode (provider flag %s)", async (mode, configured) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", configured);
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    mount();
+    expect(await screen.findByRole("heading", { name: "Route ontology" })).toBeTruthy();
+    await waitFor(() => expect(requests.some((request) => request.path.endsWith("/ontology/tree"))).toBe(true));
+    expect(screen.queryByRole("button", { name: /sign in/i })).toBeNull();
+    expect(boundary.signIn).not.toHaveBeenCalled();
+  });
   it("distinguishes a signed-in access denial and sends the real bearer header", async () => {
     authenticate();
     projectStatus = 403;

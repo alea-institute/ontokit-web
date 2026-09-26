@@ -20,6 +20,7 @@ import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { useToast } from "@/lib/context/ToastContext";
 import { useProject, derivePermissions } from "@/lib/hooks/useProject";
+import { shouldShowAuthUI } from "@/lib/auth-mode";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 
 export default function ProjectViewerPage() {
@@ -27,6 +28,7 @@ export default function ProjectViewerPage() {
   const params = useParams();
   const projectId = params.id as string;
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+  const showAuthUI = shouldShowAuthUI();
 
   // Project data from shared React Query cache
   const { project, isRetiredRedirecting, isLoading, error, errorKind } = useProject(projectId, session?.accessToken);
@@ -60,10 +62,17 @@ export default function ProjectViewerPage() {
             </Link>
             <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-900/50 dark:bg-red-900/20">
               <h2 className="text-xl font-semibold text-red-700 dark:text-red-400">
-                {error || "Project not found"}
+                {errorKind === "private-403" && !showAuthUI
+                  ? "This is a private project"
+                  : error || "Project not found"}
               </h2>
+              {errorKind === "private-403" && !showAuthUI && (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Sign-in is unavailable in this configuration, so private projects can&apos;t be opened here.
+                </p>
+              )}
               <div className="mt-4 flex items-center justify-center gap-3">
-                {errorKind === "private-403" && (
+                {errorKind === "private-403" && showAuthUI && (
                   <Button onClick={() => signIn("zitadel")} className="gap-2">
                     <LogIn className="h-4 w-4" />
                     Sign In
@@ -203,6 +212,7 @@ function ViewerContent({
     sourceContent, setSourceContent, isLoadingSource, sourceError, isPreloading,
     loadSourceContent, sourceIriIndex,
   } = viewer;
+  const showAuthUI = shouldShowAuthUI();
 
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
@@ -293,8 +303,19 @@ function ViewerContent({
               </Link>
 
               {/* Sign In affordance for unauthenticated users — the Viewer/Editor switcher above
-                  carries authenticated users into the editor. */}
-              {!canSuggest && !hasValidAccess && (
+                  carries authenticated users into the editor. Without an active identity
+                  provider sign-in cannot succeed, so a read-only note replaces it. */}
+              {!canSuggest && !hasValidAccess && !showAuthUI && (
+                <span
+                  data-testid="viewer-sign-in-unavailable"
+                  title="Sign-in is unavailable in this configuration."
+                  className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+                >
+                  Read-only
+                  <span className="sr-only"> — sign-in is unavailable in this configuration</span>
+                </span>
+              )}
+              {!canSuggest && !hasValidAccess && showAuthUI && (
                 <Button
                   variant="ghost"
                   size="sm"

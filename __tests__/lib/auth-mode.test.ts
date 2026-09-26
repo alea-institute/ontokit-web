@@ -99,6 +99,22 @@ describe("shouldShowAuthUI (client mirror of isAuthActive via NEXT_PUBLIC_* flag
   });
 });
 
+describe("shouldShowAuthUI mode matrix (gates every sign-in affordance)", () => {
+  it.each([
+    ["required", "true", true],
+    ["optional", "true", true],
+    ["required", "false", false],
+    ["optional", "false", false],
+    ["optional", undefined, false],
+    ["disabled", "false", false],
+    // Disabled mode with stale provider flags must never offer sign-in.
+    ["disabled", "true", false],
+  ] as const)("mode %s with provider flag %s -> %s", (mode, configured, expected) => {
+    setEnv({ NEXT_PUBLIC_AUTH_MODE: mode, NEXT_PUBLIC_ZITADEL_CONFIGURED: configured });
+    expect(shouldShowAuthUI()).toBe(expected);
+  });
+});
+
 describe("isAuthRequired", () => {
   it("true only in required mode", () => {
     setEnv({ AUTH_MODE: "required" });

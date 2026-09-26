@@ -120,6 +120,8 @@ afterEach(() => {
 
 describe("Project viewer route through real providers and API", () => {
   it("shows a private project sign-in action after an anonymous 403", async () => {
+    // Required mode always runs with a provider (lib/env.ts enforces it).
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
     projectStatus = 403;
     mount();
     await screen.findByRole("heading", { name: "This is a private project. Sign in to request access." });
@@ -274,6 +276,7 @@ describe("Project viewer route through real providers and API", () => {
   });
 
   it("offers authentication from a public ontology without leaving the viewer first", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
     projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
     mount(); await screen.findByText("Person");
     fireEvent.click(await screen.findByRole("button", { name: "Sign in to edit" }));
@@ -300,4 +303,39 @@ describe("Project viewer route through real providers and API", () => {
     expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
   });
 
+  it("keeps the private-project Sign In action in optional mode with a provider", async () => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional"); vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");
+    projectStatus = 403; mount();
+    await screen.findByRole("heading", { name: "This is a private project. Sign in to request access." });
+    fireEvent.click(screen.getByRole("button", { name: "Sign In" }));
+    expect(boundary.signIn).toHaveBeenCalledWith("zitadel");
+  });
+
+  it.each([
+    ["optional", "false"],
+    ["disabled", "false"],
+    ["disabled", "true"],
+  ])("explains unavailable sign-in on a private-project denial in %s mode (provider flag %s)", async (mode, configured) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode); vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", configured);
+    projectStatus = 403; mount();
+    await screen.findByRole("heading", { name: "This is a private project" });
+    expect(screen.queryByText(/Sign in to request access/)).toBeNull();
+    expect(screen.getByText("Sign-in is unavailable in this configuration, so private projects can't be opened here.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /sign in/i })).toBeNull();
+    expect(screen.getByRole("link", { name: "Back to Projects" }).getAttribute("href")).toBe("/");
+    expect(boundary.signIn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["optional", "false"],
+    ["disabled", "true"],
+  ])("replaces the viewer's Sign in to edit action with a read-only note in %s mode (provider flag %s)", async (mode, configured) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode); vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", configured);
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    mount(); await screen.findByText("Person");
+    expect(screen.queryByRole("button", { name: /sign in/i })).toBeNull();
+    expect(screen.getByTestId("viewer-sign-in-unavailable").textContent).toBe("Read-only — sign-in is unavailable in this configuration");
+    expect(screen.getByTestId("viewer-sign-in-unavailable").getAttribute("title")).toBe("Sign-in is unavailable in this configuration.");
+    expect(boundary.signIn).not.toHaveBeenCalled();
+  });
 });

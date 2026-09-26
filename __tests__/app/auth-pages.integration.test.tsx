@@ -5,8 +5,12 @@ import AuthErrorPage from '@/app/auth/error/page';
 
 const navigation = vi.hoisted(() => ({ params: new URLSearchParams(), push: vi.fn() }));
 vi.mock('next/navigation', () => ({ useSearchParams: () => navigation.params, useRouter: () => navigation }));
-beforeEach(() => { navigation.params = new URLSearchParams(); navigation.push.mockReset(); sessionStorage.clear(); });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); sessionStorage.clear(); });
+beforeEach(() => {
+  navigation.params = new URLSearchParams(); navigation.push.mockReset(); sessionStorage.clear();
+  // Required mode always runs with a provider (lib/env.ts enforces it).
+  vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', 'required'); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', 'true');
+});
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); sessionStorage.clear(); });
 
 describe('sign in route through the installed NextAuth client', () => {
   it.each([undefined, '/projects/ontology/editor?classIri=https%3A%2F%2Fexample.org%2FPerson'])('performs provider discovery and CSRF-protected sign in with callback %s', async callbackUrl => {
@@ -38,6 +42,27 @@ describe('sign in route through the installed NextAuth client', () => {
   ])('explains %s while retaining a sign-in action', (error, message) => {
     navigation.params.set('error', error); render(<SignInPage />);
     expect(screen.getByText(message)).toBeDefined(); expect(screen.getByRole('button', { name: 'Sign in with Zitadel' })).toBeDefined();
+  });
+});
+
+describe('sign in route without an active identity provider', () => {
+  it('keeps the provider button in optional mode with a provider', () => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', 'optional');
+    render(<SignInPage />);
+    expect(screen.getByRole('button', { name: 'Sign in with Zitadel' })).toBeDefined();
+  });
+
+  it.each([['optional', 'false', undefined], ['disabled', 'false', undefined], ['disabled', 'true', undefined], ['optional', 'false', 'Configuration']])('explains that sign-in is unavailable in %s mode (provider flag %s, error %s)', (mode, configured, error) => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode); vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', configured);
+    if (error) navigation.params.set('error', error);
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher);
+    render(<SignInPage />);
+    expect(screen.getByRole('heading', { name: 'Sign-in is unavailable' })).toBeDefined();
+    expect(screen.getByText("This OntoKit instance isn't configured for sign-in, so there is no account to sign in to. You can still browse public projects.")).toBeDefined();
+    expect(screen.queryByRole('button', { name: /sign in/i })).toBeNull();
+    expect(screen.queryByText(/By signing in/)).toBeNull();
+    expect(screen.getByRole('link', { name: 'Browse public projects' }).getAttribute('href')).toBe('/');
+    expect(fetcher).not.toHaveBeenCalled();
   });
 });
 

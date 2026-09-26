@@ -22,6 +22,7 @@ import {
 import type { GitHubRepoInfo } from "@/lib/api/userSettings";
 import type { UploadProgress } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import { shouldShowAuthUI } from "@/lib/auth-mode";
 
 type TabType = "create" | "import" | "github";
 
@@ -201,7 +202,8 @@ export default function NewProjectPage() {
     );
   }
 
-  // Redirect to sign in if not authenticated
+  // Redirect to sign in if not authenticated. Without an active identity
+  // provider sign-in cannot succeed, so explain that instead of linking to it.
   if (!isAuthenticated) {
     return (
       <>
@@ -209,15 +211,31 @@ export default function NewProjectPage() {
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
           <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
             <div className="rounded-lg border border-slate-200 bg-white p-8 text-center dark:border-slate-700 dark:bg-slate-800">
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-                Sign in required
-              </h2>
-              <p className="mt-2 text-slate-600 dark:text-slate-400">
-                You need to be signed in to create a project.
-              </p>
-              <Link href="/auth/signin" className="mt-4 inline-block">
-                <Button>Sign In</Button>
-              </Link>
+              {shouldShowAuthUI() ? (
+                <>
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                    Sign in required
+                  </h2>
+                  <p className="mt-2 text-slate-600 dark:text-slate-400">
+                    You need to be signed in to create a project.
+                  </p>
+                  <Link href="/auth/signin" className="mt-4 inline-block">
+                    <Button>Sign In</Button>
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
+                    Project creation is unavailable
+                  </h2>
+                  <p className="mt-2 text-slate-600 dark:text-slate-400">
+                    Sign-in is unavailable in this configuration, so new projects can&apos;t be created here. You can still browse public projects.
+                  </p>
+                  <Link href="/" className="mt-4 inline-block">
+                    <Button variant="outline">Browse public projects</Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </main>

@@ -2,9 +2,45 @@
 
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { Suspense } from "react";
+import { shouldShowAuthUI } from "@/lib/auth-mode";
+
+/**
+ * Shown instead of the provider button when no identity provider is active
+ * (optional mode without Zitadel, or disabled mode). Offering a button that
+ * cannot complete sign-in would be a dead end.
+ */
+function SignInUnavailable() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8 text-center">
+        <div>
+          <p className="text-4xl font-bold text-gray-900 dark:text-white">OntoKit</p>
+          <h1 className="mt-6 text-2xl font-semibold text-gray-900 dark:text-white">
+            Sign-in is unavailable
+          </h1>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            This OntoKit instance isn&apos;t configured for sign-in, so there is no account to sign in to. You can still browse public projects.
+          </p>
+        </div>
+        <Link
+          href="/"
+          className="inline-flex justify-center items-center py-3 px-4 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-900 dark:text-white bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+        >
+          Browse public projects
+        </Link>
+      </div>
+    </div>
+  );
+}
 
 function SignInContent() {
+  if (!shouldShowAuthUI()) return <SignInUnavailable />;
+  return <SignInForm />;
+}
+
+function SignInForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/";
   const error = searchParams.get("error");
