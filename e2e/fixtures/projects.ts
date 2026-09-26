@@ -4,7 +4,7 @@ import path from "node:path";
 import type { APIRequestContext } from "@playwright/test";
 import type { Project, ProjectCreate, ProjectImportResponse } from "../../lib/api/projects";
 import { test as authenticatedTest, expect } from "./auth";
-import type { ModeRunConfig, OptionalConfiguredRunConfig } from "./run";
+import type { ModeRunConfig } from "./run";
 
 export const projectsPath = "/api/v1/projects";
 export const ontologyNamespace = "https://example.org/ontokit-e2e#";
@@ -37,9 +37,7 @@ export async function projectIds(api: APIRequestContext): Promise<string[]> {
  * `personaPrivateProject` (optional-configured only) belongs to `run.users.owner`.
  * Outer run cleanup deletes them by exact ID; specs must not delete them.
  */
-export function seededProject(run: ModeRunConfig, key: "publicProject" | "foreignPrivateProject"): string;
-export function seededProject(run: OptionalConfiguredRunConfig, key: "personaPrivateProject"): string;
-export function seededProject(run: ModeRunConfig, key: string): string {
+export function seededProject(run: ModeRunConfig, key: "publicProject" | "foreignPrivateProject" | "personaPrivateProject"): string {
   const id = (run.fixtures as unknown as Record<string, unknown>)[key];
   if (typeof id !== "string" || !/^[0-9a-f-]{36}$/.test(id)) throw new Error(`Seeded project ${key} is not available in the ${run.profile} profile`);
   return id;

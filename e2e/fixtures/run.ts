@@ -138,10 +138,11 @@ export function loadRun(): RunConfig {
   return run;
 }
 /** D09 mode-profile consumers: rejects every other profile, so a spec cannot run on the wrong stack. */
-export function loadModeRun<P extends ModeProfile>(profile: P): Extract<ModeRunConfig, { profile: P }> {
+export type ModeRunFor<P extends ModeProfile> = P extends "optional-configured" ? OptionalConfiguredRunConfig : ProviderlessRunConfig & { profile: P };
+export function loadModeRun<P extends ModeProfile>(profile: P): ModeRunFor<P> {
   const run = loadRunConfig();
   if (run.profile !== profile) throw new Error(`This suite requires the ${profile} E2E profile`);
-  return run as Extract<ModeRunConfig, { profile: P }>;
+  return run as ModeRunFor<P>;
 }
 /** Lifecycle consumers: rejects the baseline profile, whose provider lifetimes are normal. */
 export function loadLifecycleRun(): LifecycleRunConfig {
