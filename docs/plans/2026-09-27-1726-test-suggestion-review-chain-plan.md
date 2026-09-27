@@ -82,14 +82,14 @@ Suggestions are how non-editors contribute. Today no end-to-end run proves them,
 
 ### Key Technical Decisions
 
-- KTD1. **Reopen is an explicit transition.** Add `POST /projects/{id}/suggestions/sessions/{sid}/reopen` (session owner only) moving `changes-requested` → `active` and returning a fresh beacon token. Save keeps its single "active only" rule. `resubmit` accepts an `active` session that already has a pull request, re-binds to that same pull request, bumps the revision and notifies reviewers. Chosen over allowing saves in `changes-requested`, which would split save's invariant. Governs R3.
+- KTD1. **Reopen is an explicit transition.** Add `POST /projects/{id}/suggestions/sessions/{sid}/reopen` (session owner only) moving `changes-requested` → `active`, refreshing `last_activity` and returning a fresh beacon token; it is refused with 409 while the owner has another active session in the project, preserving the single-active-session invariant `create_session` relies on. Save keeps its single "active only" rule. An `active` session that already has a pull request is a reopened revision: `resubmit`, `submit` and the auto-submit sweep all send it through resubmission semantics (same pull request, re-run `_validate_submission_content` under the submit locks, revision+1, reviewer notification with resubmission wording) rather than the create/re-bind path. Discarding a reopened session closes its pull request. Chosen over allowing saves in `changes-requested`, which would split save's invariant. Governs R3.
 - KTD2. **Decision notifications go to the suggester's account.** Approve, reject and request-changes each create one notification (`suggestion_approved`, `suggestion_rejected`, `suggestion_changes_requested`, the types `lib/api/notifications.ts` already declares) for the session's authenticated creator; anonymous sessions notify no one. Governs R5.
-- KTD3. **Reject closes the pull request** through the existing pull-request service close path, after the status change, in the same request. Governs R4.
-- KTD4. **Self-approval is refused in the service**, comparing the reviewer with the session creator before any status change. Governs R6.
+- KTD3. **Reject closes the pull request through a reviewer-authorized close seam.** The interactive `close_pull_request` allows only the author or owner/admin, and suggestion PRs are authored by the suggester, so the suggestion service closes the PR through an internal pull-request-service seam whose authority is `_can_review` (parallel to U2's merge seam); the direct close endpoint keeps its rule. Order: close the PR locally first (a refused close changes nothing), then set `rejected`, record the outcome and commit; a GitHub sync failure after the local close is non-fatal, matching the close service's "local transition is authoritative" rule. Governs R4.
+- KTD4. **Self-approval is refused in `_approve_unchecked`**, the path both `approve` and `bulk_review` use, comparing the acting user with `session.user_id` before any merge; the reserved system auto-accept actor passes. Governs R6.
 - KTD5. **A dedicated `suggestions` profile.** Required mode with identity services and personas `owner`, `suggester`, `editor` and `unrelated`. The owner is a bootstrapped non-superadmin persona, so role refusals are real. Memberships are added over HTTP by the owner (`POST /projects/{id}/members`) in the spec's setup against run-tagged fixtures, exercising the product path rather than seeding roles in the database. Governs R12.
 - KTD6. **Probes record tier and status.** Reuse D09's `directProbe`/`recordProbe` evidence shape with a new `SUGGESTION_CASES` table in `scripts/e2e/evidence.mjs`, exact-count like the mode profiles. Governs R6–R8, R12.
 - KTD7. **Poll, never sleep.** Notification assertions reload or `expect.poll` within a bounded budget because the bell polls every 30 s; merge assertions poll the API for the new label because the index refresh is queued after the commit. Governs R2, R5.
-- KTD8. **Provisional decisions land as separate commits.** R9 (editor approval merges through the suggestion approve path without widening direct PR merge) and R10 (non-member create on public projects) each land alone so either can be reverted with its cases.
+- KTD8. **Provisional decisions land as separate commits with standalone cases.** R9 (editor approval merges through the suggestion approve path without widening direct PR merge) and R10 (non-member create on public projects) each land alone, and each is proven by its own inventory case, so reverting one removes exactly that commit and that case while R1–R8 evidence stays intact.
 
 ### Assumptions
 
@@ -143,21 +143,24 @@ stateDiagram-v2
 **Approach:**
 
 1. Characterize current behaviour first: save on `changes-requested` returns 400; resubmit on `active` returns 400; reject leaves the PR open; approve by the session creator succeeds; no decision notifications exist.
-2. Add the reopen route and service method (KTD1); return a beacon token like create.
-3. Let resubmit accept an `active` session with a pull request, keeping the same PR number, bumping revision, notifying reviewers with resubmission wording.
-4. Emit decision notifications (KTD2) and close the PR on reject (KTD3).
-5. Refuse self-approval before any state change (KTD4).
+2. Add the reopen route and service method (KTD1).
+3. Route every submission of a reopened revision (resubmit, submit, auto-submit sweep) through resubmission semantics (KTD1); close the PR when a reopened session is discarded.
+4. Emit decision notifications (KTD2) and close the PR on reject through the reviewer-authorized seam (KTD3).
+5. Refuse self-approval in `_approve_unchecked` (KTD4).
 
 **Execution note:** Start with failing tests that pin each defect before changing the service.
 
 **Test scenarios:**
 
-- Reopen by the session owner moves `changes-requested` → `active` and returns a beacon token; reopen by anyone else is 403; reopen from any other status is 400.
+- Reopen by the session owner moves `changes-requested` → `active` and returns a beacon token; reopen by anyone else is 403; reopen from any other status is 400; reopen while the owner has another active session is 409, and `create_session` still finds exactly one active session afterwards.
 - Save after reopen succeeds and commits to the same branch.
 - Resubmit after reopen keeps the pull request number, increments revision and creates one reviewer notification; resubmit with no pull request is 400.
+- Content saved after reopen that fails a submission gate (e.g. invalid Turtle) is refused at resubmit.
+- `submit` on a reopened session behaves as resubmit; a stale reopened trusted session swept by `auto_submit_stale_sessions` is resubmitted (revision+1, notification), not silently re-bound.
+- Discarding a reopened session closes its pull request and deletes its branch.
 - Approve, reject and request-changes each create exactly one notification for the authenticated creator; an anonymous session's decision creates none; dismiss creates none.
-- Reject closes the session's pull request; a PR-close failure is surfaced as an error and leaves the session status unchanged.
-- Approve by the session creator is 403 with no merge attempted; approve by another reviewer succeeds.
+- Owner and editor rejections each close the session's pull request and notify the suggester; a refused local close leaves the session `submitted`; a direct PR close by a non-author editor is still refused.
+- Approve by the session creator is 403 with no merge attempted; bulk-accepting one's own suggestion reports that item failed with no merge; approve by another reviewer succeeds.
 - Reviewer actions on `active` or `merged` sessions are 400, not 500.
 
 **Verification:** Targeted and full API unit suites pass; the disabled-mode write inventory covers the reopen route.
@@ -170,13 +173,14 @@ stateDiagram-v2
 
 **Files:** `ontokit-api:ontokit/services/suggestion_service.py`, `ontokit-api:ontokit/services/pull_request_service.py`, `ontokit-api:tests/unit/test_suggestion_service.py`, `ontokit-api:tests/unit/test_pull_request_service*.py`.
 
-**Approach:** The suggestion approve path performs the merge with the suggestion reviewer's authority already verified by `_can_review`; the direct PR merge endpoint keeps its owner/admin rule. Land as one commit.
+**Approach:** The suggestion approve path performs the merge through a reviewer-authorized merge seam that replaces only the owner/admin role check with `_can_review` and keeps enforcing `project.pr_approval_required`; the direct PR merge endpoint keeps its owner/admin rule. Land as one commit.
 
 **Test scenarios:**
 
 - An editor approves a submitted suggestion: merged, branch deleted, suggester notified.
 - An editor calling the direct PR merge endpoint is still refused.
 - An editor cannot approve their own suggestion (U1's guard still applies).
+- With `pr_approval_required` ≥ 1 and no recorded approvals, an editor's suggestion approve is refused and nothing merges.
 
 **Verification:** API unit tests pass; U6's editor case passes.
 
@@ -247,16 +251,18 @@ stateDiagram-v2
 
 **Requirements:** R1–R11; KTD6, KTD7. **Dependencies:** U1–U5.
 
-**Files:** new `e2e/browser/suggestions.spec.ts`, `e2e/browser/auth-mode-optional-configured.spec.ts` (one added case), `scripts/e2e/evidence.mjs` (optional-configured inventory +1), `e2e/fixtures/suggestions.ts`.
+**Files:** new `e2e/browser/suggestions.spec.ts`, `e2e/browser/auth-mode-optional-configured.spec.ts` (one added case), `scripts/e2e/evidence.mjs` (optional-configured inventory +1), `scripts/e2e/seed-fixtures.mjs` and `scripts/e2e/seed-fixtures.test.mjs` (an owner-persona-owned public fixture for optional-configured, the one fixture change R12 permits), `e2e/fixtures/suggestions.ts`.
 
 **Test scenarios (the mandatory inventory):**
 
 1. Suggester edits an existing class label, saves and submits; the owner's triage tab lists it; probes: save on the submitted session 400, suggester approve 403. (R1, R6, R7)
 2. Owner approves from triage; the label reloads on main from the API; the session branch is gone; the suggester's bell shows the approval. Probe: approve again on the merged session 400; creator self-approval 403 using an owner-created suggestion. (R2, R5, R6, R7)
-3. The owner requests changes on a second suggestion; the suggester sees the notification, resumes, edits, saves and resubmits on the same pull request with revision 2; the editor approves it and it merges (provisional R9). (R3, R5, R9)
-4. The owner rejects a third suggestion; its pull request is closed and the suggester sees the rejection. (R4, R5)
-5. Refusals: non-member create on a private fixture 403; untrusted mint 403; capabilities agree with create for a non-member on a public fixture, and that non-member submits successfully (provisional R10). (R8, R10)
-6. Optional-configured (added case): an anonymous visitor submits a proposal on the public fixture and the signed-in owner sees it in triage. (R11)
+3. The owner requests changes on a second suggestion; the suggester sees the notification, resumes, edits, saves and resubmits on the same pull request with revision 2; the owner approves the revision and it merges. (R3, R5)
+4. The editor rejects a third suggestion; its pull request is closed and the suggester sees the rejection. (R4, R5)
+5. Refusals: non-member create on a private fixture 403; untrusted mint 403. (R8)
+6. Provisional R9 (standalone): the editor approves a fourth suggestion and it merges. (R9)
+7. Provisional R10 (standalone): capabilities agree with create for a non-member on a public fixture, and that non-member submits successfully. (R10)
+8. Optional-configured (added case): an anonymous visitor submits a proposal on the owner-persona-owned public fixture and the signed-in owner sees it in triage. (R11)
 
 **Verification:** The `suggestions` profile passes twice on fresh stacks and optional-configured passes twice with its new count; baseline and lifecycle pass once each unchanged; every probe records endpoint, tier and status; cleanup and neighbours as in D09.
 
@@ -271,7 +277,7 @@ stateDiagram-v2
 | `npm run test:e2e:profiles`, `test:e2e:evidence`, `test:e2e:identity`, `test:e2e:ownership` (umask 022) | U5, U6 | Pass |
 | `suggestions` profile, two fresh runs | U6 | Full inventory, identical source fingerprints, complete cleanup |
 | optional-configured, two fresh runs | U6 | 6/6 each |
-| baseline and lifecycle, one fresh run each | R12 | 21/21 and 4/4 unchanged |
+| baseline, lifecycle, optional-anonymous and disabled, one fresh run each | R12 | 21/21, 4/4, 2/2 and 3/3 unchanged |
 | Neighbour Docker resources before/after | R12 | Unchanged |
 
 Use an explicit API checkout at the reviewed API revision. Receipts claim local verification only.
