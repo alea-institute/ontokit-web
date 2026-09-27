@@ -168,13 +168,14 @@ describe("derivePermissions", () => {
 describe("derivePermissions by authentication mode", () => {
   afterEach(() => { vi.unstubAllEnvs(); });
 
-  it.each(["owner", "admin", "editor"] as const)("in disabled mode trusts the API role %s without an access token", role => {
+  it.each(["owner", "admin", "editor"] as const)("in disabled mode refuses write permission for API role %s without an access token", role => {
     vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
     const perms = derivePermissions(makeProject({ user_role: role }));
-    expect(perms.canEdit).toBe(true);
-    expect(perms.canSuggest).toBe(true);
+    expect(perms.canEdit).toBe(false);
+    expect(perms.canManage).toBe(false);
+    expect(perms.canSuggest).toBe(false);
     expect(perms.isSuggestionMode).toBe(false);
-    expect(perms.hasValidAccess).toBe(true);
+    expect(perms.hasValidAccess).toBe(false);
   });
 
   it.each([["viewer"], [undefined]] as const)("in disabled mode grants no write access for role %s", role => {

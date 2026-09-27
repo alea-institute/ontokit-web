@@ -119,7 +119,7 @@ export const LIFECYCLE_REQUIRED_TESTS = [
   'R4 controlled Next clock expires the genuine application cookie and explicit sign-in recovers at normal time',
 ].map(title => ({file: LIFECYCLE_SPEC, title, project: 'lifecycle'}));
 // D09 auth-mode profiles (KTD7): one spec and one project each, from the registry.
-// KTD9: every refusal (and each accepted anonymous or tokenless write) is recorded by the
+// KTD9: every refusal (and each accepted anonymous proposal) is recorded by the
 // spec as a `mode-evidence` annotation naming its tier, method, fixed path template,
 // observed status and whether the request carried an Authorization header. Receipts keep
 // only these allowlisted labels, numbers and booleans, and each value must equal the table.
@@ -162,10 +162,10 @@ export const MODE_CASES = Object.freeze({
       probe('pull-request-create', 'api', 'POST', 'pullRequests', 403, false),
       probe('duplicate-check', 'api', 'POST', 'duplicateCheck', 403, false),
       probe('pr-party-queue', 'api', 'GET', 'prPartyQueue', 404, false)]},
-    // Provisional (U4): remove this case with U4 if the disabled-mode decision changes.
-    {title: 'a project imported in the browser opens in the editor and an edit saves without a bearer token', probes: [
-      probe('project-import-tokenless', 'api', 'POST', 'import', 201, false),
-      probe('source-save-tokenless', 'api', 'PUT', 'source', 200, false)]},
+    {title: 'project create, import and source save are refused by the API and the web explains they are unavailable', probes: [
+      probe('project-create-disabled', 'api', 'POST', 'projects', 403, false),
+      probe('project-import-disabled', 'api', 'POST', 'import', 403, false),
+      probe('source-save-disabled', 'api', 'PUT', 'source', 403, false)]},
   ],
 });
 const MODE_FIELDS = ['probe', 'tier', 'method', 'path', 'status', 'authorization'];

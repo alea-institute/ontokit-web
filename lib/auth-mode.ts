@@ -4,7 +4,7 @@
  * AUTH_MODE controls authentication behavior:
  * - "required" (default): Zitadel OIDC, must sign in to use app
  * - "optional": Browse anonymously, sign in available if Zitadel configured
- * - "disabled": No auth at all, anonymous browsing only
+ * - "disabled": No auth, public browsing and anonymous proposals only
  */
 
 export type AuthMode = "required" | "optional" | "disabled";
@@ -47,7 +47,7 @@ export function isAuthActive(): boolean {
 export function shouldShowAuthUI(): boolean {
   const zitadelConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED === "true";
   // Same case-insensitive disabled check as isClientAuthDisabled(), so a
-  // mixed-case mode can never both write tokenless and offer sign-in.
+  // mixed-case disabled mode can never offer sign-in.
   return !isClientAuthDisabled() && zitadelConfigured;
 }
 
@@ -55,11 +55,9 @@ export function shouldShowAuthUI(): boolean {
  * Client-safe disabled-mode predicate. Reads the build-time
  * NEXT_PUBLIC_AUTH_MODE flag and, like {@link getAuthMode}, ignores case.
  *
- * In disabled mode the API treats every caller as its anonymous identity and
- * grants that identity the role it holds on each project (owner of the
- * projects it created). The web therefore trusts the API-returned `user_role`
- * and makes write calls without a bearer token in this mode only; required and
- * optional modes keep every token guard.
+ * Disabled mode is read-and-suggest only. The API refuses direct writes from
+ * its anonymous identity; public reads and anonymous proposal sessions remain
+ * available. This predicate gates unavailable UI and never authorizes writes.
  */
 export function isClientAuthDisabled(): boolean {
   return (process.env.NEXT_PUBLIC_AUTH_MODE || "required").toLowerCase() === "disabled";

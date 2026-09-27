@@ -339,15 +339,14 @@ describe("Project viewer route through real providers and API", () => {
     expect(boundary.signIn).not.toHaveBeenCalled();
   });
 
-  // Auth-mode matrix plan U4: project settings need a token throughout, so a
-  // tokenless workspace owner is not sent there.
+  // Disabled-mode anonymous roles must not expose settings or import actions.
   it("offers a tokenless owner no settings links in disabled mode", async () => {
     vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
     const view = mount();
     await screen.findByRole("heading", { name: "No Ontology File" });
     expect(screen.queryByTitle("Project settings")).toBeNull();
     expect(screen.queryByRole("link", { name: "Go to Settings" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Import a new project" }).getAttribute("href")).toBe("/projects/new");
+    expect(screen.queryByRole("link", { name: "Import a new project" })).toBeNull();
     view.unmount(); client.clear();
     projectResponse = { ...projectResponse, source_file_path: "ontology.ttl" };
     mount(); await screen.findByText("Person");

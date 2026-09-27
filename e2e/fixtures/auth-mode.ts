@@ -67,8 +67,10 @@ export function apiCall(page: Page, run: ModeRunConfig, method: string, pathname
   }, {timeout: 45_000});
 }
 /** Direct API probe for actions the UI does not offer (no Authorization header at all). */
-export async function directProbe(api: APIRequestContext, method: "GET" | "POST", path: string, data?: unknown): Promise<Observed> {
-  const response = method === "GET" ? await api.get(path) : await api.post(path, {data: data ?? {}});
+export async function directProbe(api: APIRequestContext, method: "GET" | "POST" | "PUT", path: string, data?: unknown): Promise<Observed> {
+  const response = method === "GET" ? await api.get(path)
+    : method === "PUT" ? await api.put(path, {data: data ?? {}})
+    : await api.post(path, {data: data ?? {}});
   return {status: response.status(), authorization: false};
 }
 

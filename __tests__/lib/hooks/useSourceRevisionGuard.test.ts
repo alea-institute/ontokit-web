@@ -76,18 +76,7 @@ describe("useSourceRevisionGuard", () => {
       reloadSourceContent: vi.fn(),
     }));
 
-    it("saves without a bearer in disabled mode", async () => {
-      vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
-      const { result } = mountTokenless();
-      await act(async () => {
-        await result.current.saveSource("draft source", "Update ontology");
-      });
-      expect(saveSource).toHaveBeenCalledWith(
-        "project-1", "draft source", "Update ontology", undefined, "main", "revision-1",
-      );
-    });
-
-    it.each(["required", "optional"])("still refuses a tokenless save in %s mode without calling the API", async mode => {
+    it.each(["disabled", "required", "optional"])("still refuses a tokenless save in %s mode without calling the API", async mode => {
       vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
       const { result } = mountTokenless();
       await act(async () => {

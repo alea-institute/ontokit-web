@@ -111,7 +111,7 @@ describe("shouldShowAuthUI mode matrix (gates every sign-in affordance)", () => 
     // Disabled mode with stale provider flags must never offer sign-in.
     ["disabled", "true", false],
     // Case-insensitive, like getAuthMode() and isClientAuthDisabled(): a
-    // mixed-case disabled mode writes tokenless, so it must not offer sign-in.
+    // mixed-case disabled mode must not offer sign-in.
     ["Disabled", "true", false],
     ["DISABLED", "true", false],
     ["Optional", "true", true],

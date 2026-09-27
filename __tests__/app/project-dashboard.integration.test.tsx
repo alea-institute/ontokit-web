@@ -209,8 +209,7 @@ describe('dashboard through project queries, permissions and join-request HTTP c
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('Authorization')).toBe(false);
   });
 
-  // Auth-mode matrix U4 review: Settings needs a token for every read and
-  // action, so a tokenless disabled-mode owner must not be sent there.
+  // Disabled-mode anonymous owners cannot edit or use project settings.
   it.each([
     { mode: 'required', anonymous: false, settings: true },
     { mode: 'disabled', anonymous: true, settings: false },
@@ -218,7 +217,8 @@ describe('dashboard through project queries, permissions and join-request HTTP c
     vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode);
     mount({ role: 'owner', anonymous, memberCount: 3 });
     expect(await screen.findByRole('heading', { name: 'Connected ontology' })).toBeDefined();
-    expect(main().getByRole('link', { name: 'Open Editor' }).getAttribute('href')).toBe('/projects/dashboard-project/editor');
+    if (anonymous) expect(main().queryByRole('link', { name: 'Open Editor' })).toBeNull();
+    else expect(main().getByRole('link', { name: 'Open Editor' }).getAttribute('href')).toBe('/projects/dashboard-project/editor');
     const links = [
       main().queryByRole('link', { name: 'Settings' }),
       main().queryByRole('link', { name: /Project Settings/ }),

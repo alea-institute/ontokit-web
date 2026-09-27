@@ -15,7 +15,6 @@ import {
   branchesApi,
   type BranchInfo,
 } from "@/lib/api/revisions";
-import { isClientAuthDisabled } from "@/lib/auth-mode";
 
 // --- Query key factory ---
 
@@ -70,13 +69,6 @@ interface BranchProviderProps {
   projectId: string;
   accessToken?: string;
   initialBranch?: string;
-  /**
-   * Whether the current identity holds an edit-capable project role. Only
-   * consulted in auth-disabled mode, where no token exists and the role the
-   * API returns for its anonymous identity is the write credential. Omitted
-   * means no tokenless writes.
-   */
-  canEdit?: boolean;
   children: ReactNode;
 }
 
@@ -84,7 +76,6 @@ export function BranchProvider({
   projectId,
   accessToken,
   initialBranch,
-  canEdit = false,
   children,
 }: BranchProviderProps) {
   const queryClient = useQueryClient();
@@ -115,11 +106,8 @@ export function BranchProvider({
     () => initialBranch || getStoredBranch(projectId) || "main"
   );
   const [pendingChanges, setPendingChanges] = useState(false);
-  // Branch writes need a token, except in auth-disabled mode where the API
-  // treats every caller as its anonymous identity and no token ever exists.
-  // There the identity's edit role is the credential: a public project the
-  // anonymous identity cannot edit stays read-only.
-  const canWrite = !!accessToken || (isClientAuthDisabled() && canEdit);
+  // All branch writes require a bearer token.
+  const canWrite = !!accessToken;
 
   const isFeatureBranch = currentBranch !== defaultBranch;
 

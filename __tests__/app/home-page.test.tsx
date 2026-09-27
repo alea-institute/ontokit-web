@@ -194,10 +194,8 @@ describe("HomePage private-tab sign-in prompt by authentication mode", () => {
   });
 });
 
-// Auth-mode matrix plan U4 (provisional): disabled mode is a single-user
-// workspace, and the API lists the anonymous identity's own projects without a
-// token. Reverting U4 restores the unavailable-copy behavior for these tabs.
-describe("HomePage in auth-disabled single-user workspace mode", () => {
+// Disabled mode keeps public browsing and explains unavailable personal tabs.
+describe("HomePage in auth-disabled read-and-suggest mode", () => {
   const originalAuthMode = process.env.NEXT_PUBLIC_AUTH_MODE;
   const originalConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED;
 
@@ -219,25 +217,24 @@ describe("HomePage in auth-disabled single-user workspace mode", () => {
   it.each([
     ["My Projects", "mine", "false"],
     ["Private", "private", "true"],
-  ] as const)("lists the workspace's own projects on the %s tab (filter %s, provider flag %s) without a token", async (tab, filter, configured) => {
+  ] as const)("explains the unavailable %s tab (filter %s, provider flag %s) without sign-in", async (tab, filter, configured) => {
     process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED = configured;
     renderPage();
     await screen.findByText("FOLIO DEV");
     fireEvent.click(screen.getByRole("button", { name: tab }));
-    await waitFor(() => expect(listProjects).toHaveBeenCalledWith(0, 50, filter, undefined, undefined));
-    expect(await screen.findByText("FOLIO DEV")).toBeDefined();
-    expect(screen.queryByRole("heading", { name: /aren't available here/ })).toBeNull();
+    expect(await screen.findByRole("heading", { name: /aren't available here/ })).toBeDefined();
+    expect(listProjects).not.toHaveBeenCalledWith(0, 50, filter, undefined, undefined);
     expect(screen.queryByRole("button", { name: /sign in/i })).toBeNull();
     expect(signIn).not.toHaveBeenCalled();
   });
 
-  it("offers project creation from the header and the empty workspace", async () => {
+  it("offers no project creation from the header or personal tabs", async () => {
     listProjects.mockResolvedValue({ items: [], total: 0, unfiltered_total: 0, skip: 0, limit: 50 });
     renderPage();
-    expect((await screen.findByRole("link", { name: "New Project" })).getAttribute("href")).toBe("/projects/new");
+    expect(screen.queryByRole("link", { name: "New Project" })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "My Projects" }));
-    expect(await screen.findByRole("heading", { name: "No projects yet" })).toBeDefined();
-    expect(screen.getByRole("link", { name: "Create Project" }).getAttribute("href")).toBe("/projects/new");
+    expect(await screen.findByRole("heading", { name: "Your projects aren't available here" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "Create Project" })).toBeNull();
   });
 
   it("keeps the anonymous prompt and no New Project action in optional mode without a provider", async () => {

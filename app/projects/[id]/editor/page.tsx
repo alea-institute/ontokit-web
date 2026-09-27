@@ -122,10 +122,7 @@ export default function EditorPage() {
   // with stale provider flags never offers sign-in.
   const showAuthUI = shouldShowAuthUI();
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
-  // Auth-disabled mode never has a token: the API accepts writes as its
-  // anonymous identity and returns that identity's role, which the redirect
-  // and write paths below trust. Required and optional keep every token guard.
-  const writesWithoutToken = isClientAuthDisabled();
+  const settingsUnavailable = isClientAuthDisabled();
 
   // Branch state
   const queryClient = useQueryClient();
@@ -160,11 +157,8 @@ export default function EditorPage() {
     resetSourceState,
   } = viewer;
 
-  // Single write guard for this page, mirroring canWrite in BranchContext: a
-  // token authorizes writes. Auth-disabled mode never has one, so there the
-  // anonymous identity's edit-capable role is the credential — a visitor on a
-  // public project it cannot edit may only propose, never commit.
-  const canWrite = !!session?.accessToken || (writesWithoutToken && !!canEdit);
+  // Shared write guard: direct mutations require a bearer token in every mode.
+  const canWrite = !!session?.accessToken;
 
   // LLM access gate — shared (React Query dedupes) with the layouts. Used here
   // to scope the suggestion keyboard shortcuts so they only register when the
@@ -721,7 +715,7 @@ export default function EditorPage() {
         projectId,
         deleteTargetIri,
         `Delete class ${deleteTargetLabel}`,
-        session?.accessToken,
+        session!.accessToken!,
         activeBranch
       );
       toast.success(`Deleted "${deleteTargetLabel}"`);
@@ -1252,8 +1246,7 @@ export default function EditorPage() {
   // Auth guard: redirect unauthenticated or unauthorized users to the viewer —
   // UNLESS anonymous proposal mode applies (AUTH_MODE != required + public
   // project): those users are this page's audience in propose mode (PR-7).
-  // In auth-disabled mode there is never a session, so an edit-capable API role
-  // (reported by hasValidAccess) keeps the visitor in the editor.
+  // Anonymous visitors can propose on public projects in provider-less modes.
   if (((status === "unauthenticated" && !hasValidAccess) || (project && !canSuggest)) && !canPropose) {
     router.replace(`/projects/${projectId}`);
     return (
@@ -1286,7 +1279,7 @@ export default function EditorPage() {
                 <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
                 <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
               </div>
-              {canManage && !writesWithoutToken && (
+              {canManage && !settingsUnavailable && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />
@@ -1295,14 +1288,14 @@ export default function EditorPage() {
               )}
             </div>
           </div>
-          <NoOntologyFileEmptyState projectId={projectId} settingsAvailable={!writesWithoutToken} canManage={canManage} />
+          <NoOntologyFileEmptyState projectId={projectId} settingsAvailable={!settingsUnavailable} canManage={canManage} />
         </main>
       </>
     );
   }
 
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch} canEdit={!!canEdit}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch}>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {sourceRevisionConflict && (
@@ -1513,7 +1506,7 @@ export default function EditorPage() {
                 <Keyboard className="h-4 w-4" />
               </Button>
 
-              {canManage && !writesWithoutToken && (
+              {canManage && !settingsUnavailable && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
                     <Settings className="h-4 w-4" />

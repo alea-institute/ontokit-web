@@ -78,16 +78,14 @@ export function derivePermissions(
   project: Project | null,
   accessToken?: string,
 ) {
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || !!project?.is_superadmin;
+  // An anonymous disabled-mode role is not permission to mutate a project.
+  const roleAccess = !isClientAuthDisabled() || !!accessToken;
+  const canManage = roleAccess && (project?.user_role === "owner" || project?.user_role === "admin" || !!project?.is_superadmin);
   const hasExplicitRole = !!project?.user_role;
-  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || !!project?.is_superadmin;
-  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!accessToken);
+  const canEdit = roleAccess && (project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || !!project?.is_superadmin);
+  const isSuggester = roleAccess && (project?.user_role === "suggester" || (!hasExplicitRole && !!accessToken));
   const canSuggest = canEdit || isSuggester;
-  // In auth-disabled mode there is never a token: the API treats every caller
-  // as its anonymous identity and returns that identity's role, so an
-  // edit-capable role is itself the write credential. Every other mode still
-  // requires a token.
-  const hasValidAccess = !!accessToken || (isClientAuthDisabled() && canEdit);
+  const hasValidAccess = !!accessToken;
   const hasOntology = !!project?.source_file_path;
   const isSuggestionMode = isSuggester && !canEdit;
   return { canManage, canEdit, canSuggest, isSuggester, isSuggestionMode, hasValidAccess, hasOntology, hasExplicitRole };

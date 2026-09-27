@@ -262,7 +262,7 @@ describe("useProjectViewer", () => {
   });
 
   it.each([
-    ["disabled", true, true],
+    ["disabled", true, false],
     ["disabled", false, false],
     ["optional", true, false],
     ["required", true, false],

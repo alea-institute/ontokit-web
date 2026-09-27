@@ -144,14 +144,7 @@ describe("persistGeneratedEntity", () => {
     const entity = { iri: "http://example.org/ont#Child", label: "Child", parentIri: "http://example.org/ont#Parent", entityType: "class" as const };
     afterEach(() => { vi.unstubAllEnvs(); });
 
-    it("saves directly without a bearer in disabled mode", async () => {
-      vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
-      await persistGeneratedEntity({ mode: "direct", projectId: "project-1", branch: "main", entity });
-      expect(mockedLoad).toHaveBeenCalledWith("project-1", "main", undefined, undefined);
-      expect(mockedDirectSave).toHaveBeenCalledWith("project-1", expect.stringContaining("<http://example.org/ont#Child> a owl:Class"), 'Add generated class "Child"', undefined, "main", "abc");
-    });
-
-    it.each(["required", "optional"])("refuses a tokenless direct save in %s mode before any request", async mode => {
+    it.each(["disabled", "required", "optional"])("refuses a tokenless direct save in %s mode before any request", async mode => {
       vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
       await expect(persistGeneratedEntity({ mode: "direct", projectId: "project-1", branch: "main", entity })).rejects.toThrow("sign in and retry");
       expect(mockedLoad).not.toHaveBeenCalled();

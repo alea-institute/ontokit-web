@@ -288,6 +288,29 @@ for (const profile of MODE_PROFILES) {
     }
   });
 }
+test('disabled case 10 requires all three anonymous API write refusals', () => {
+  assert.deepEqual(MODE_CASES.disabled[2], {
+    title: 'project create, import and source save are refused by the API and the web explains they are unavailable',
+    probes: [
+      {probe: 'project-create-disabled', tier: 'api', method: 'POST', path: '/api/v1/projects', status: 403, authorization: false},
+      {probe: 'project-import-disabled', tier: 'api', method: 'POST', path: '/api/v1/projects/import', status: 403, authorization: false},
+      {probe: 'source-save-disabled', tier: 'api', method: 'PUT', path: '/api/v1/projects/{id}/source', status: 403, authorization: false},
+    ],
+  });
+  for (let i = 0; i < 3; i++) {
+    for (const change of [
+      probes => probes.filter((_, j) => j !== i),
+      probes => probes.map((p, j) => j === i ? {...p, status: 200} : p),
+      probes => probes.map((p, j) => j === i ? {...p, authorization: true} : p),
+      probes => probes.map((p, j) => j === i ? {...p, tier: 'web'} : p),
+    ]) {
+      const report = modeReport('disabled');
+      report.suites[0].specs[2].tests[0].annotations = annotateMode(change(MODE_CASES.disabled[2].probes));
+      rejects(report, 'disabled');
+    }
+  }
+});
+
 test('provider-less receipts are accepted without Zitadel and Login; provider receipts are not', () => {
   for (const profile of ['optional-anonymous', 'disabled']) {
     assert.equal(sanitizedEvidence(modeManifest(profile), ok).acceptedRun, true);

@@ -110,9 +110,10 @@ web-mode-mismatch` and, for the provider-less profiles, `--fail-at api-mode-mism
 gate must reject both mismatch probes. Details are in
 [the maintainer guide](../scripts/e2e/README.md#authentication-mode-profiles-d09).
 
-**Disabled-mode trust boundary:** disabled mode gives every caller who can reach the API
-create and edit rights as the shared anonymous owner. It is supported only for a
-single-user deployment that is not network-exposed.
+**Disabled-mode trust boundary:** disabled mode is read-and-suggest only. The API
+refuses direct writes from its anonymous identity with 403. Public browsing and
+anonymous proposals remain available; project creation, import and source save
+are unavailable. The disabled profile verifies these refusals on a disposable stack.
 
 ## Lifecycle and recovery
 

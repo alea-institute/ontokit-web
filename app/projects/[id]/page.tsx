@@ -33,9 +33,9 @@ export default function ProjectViewerPage() {
 
   // Project data from shared React Query cache
   const { project, isRetiredRedirecting, isLoading, error, errorKind } = useProject(projectId, session?.accessToken);
-  const { canManage, canEdit, hasOntology } = derivePermissions(project, session?.accessToken);
+  const { canManage, hasOntology } = derivePermissions(project, session?.accessToken);
   // Project settings need a token for every read and action, so auth-disabled
-  // mode never links there, even for the workspace owner.
+  // mode never links there, even when the API reports an owner role.
   const settingsUnavailable = isClientAuthDisabled();
 
   if (isLoading || isRetiredRedirecting || (status === "loading" && authMode === "required")) {
@@ -136,7 +136,7 @@ export default function ProjectViewerPage() {
   }
 
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken} canEdit={canEdit}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken}>
       <ViewerContent
         projectId={projectId}
         accessToken={session?.accessToken}

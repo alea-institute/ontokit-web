@@ -283,31 +283,22 @@ describe("Editor page real access and empty-state chains", () => {
   });
 
 
-  // Auth-mode matrix plan U4 (provisional): disabled mode trusts the API role.
-  describe("disabled-mode routing and saving follow the API role", () => {
-    it("replaces the token-only settings links with honest copy for a tokenless owner", async () => {
+  describe("disabled-mode routing and saving require a bearer", () => {
+    it("offers no settings or import action for an anonymous owner of a public project", async () => {
       vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+      projectResponse = { ...projectResponse, is_public: true };
       mount();
       expect(await screen.findByRole("heading", { name: "No Ontology File" })).toBeTruthy();
       expect(screen.queryByTitle("Project settings")).toBeNull();
       expect(screen.queryByRole("link", { name: "Go to Settings" })).toBeNull();
-      expect(screen.getByText("Project settings are unavailable in this configuration, so an ontology file can't be added here. Import one as a new project instead.")).toBeTruthy();
-      expect(screen.getByRole("link", { name: "Import a new project" }).getAttribute("href")).toBe("/projects/new");
+      expect(screen.queryByRole("link", { name: "Import a new project" })).toBeNull();
     });
-    it("keeps the header settings link out of the loaded editor for a tokenless owner", async () => {
+    it("keeps the header settings link out of the loaded public editor", async () => {
       vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
-      projectResponse = { ...projectResponse, source_file_path: "ontology.ttl" };
+      projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", is_public: true };
       mount();
       expect(await screen.findByRole("button", { name: "Source" })).toBeTruthy();
       expect(screen.queryByTitle("Project settings")).toBeNull();
-    });
-    it("keeps a tokenless owner in the editor", async () => {
-      vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
-      mount();
-      expect(await screen.findByRole("heading", { name: "No Ontology File" })).toBeTruthy();
-      expect(boundary.replace).not.toHaveBeenCalled();
-      expect(useSelectionStore.getState().mode).toBe("editor");
-      expect(requests.every((request) => request.authorization === null)).toBe(true);
     });
     it("offers propose mode, not a redirect, for a viewer on a public project", async () => {
       vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
@@ -316,7 +307,7 @@ describe("Editor page real access and empty-state chains", () => {
       expect(await screen.findByRole("heading", { name: "No Ontology File" })).toBeTruthy();
       expect(boundary.replace).not.toHaveBeenCalled();
     });
-    it.each([["viewer"], [null], ["superuser"]])("redirects a tokenless %s on a private project to the viewer", async (role) => {
+    it.each([["owner"], ["editor"], ["viewer"], [null], ["superuser"]])("redirects a tokenless %s on a private project to the viewer", async (role) => {
       vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
       projectResponse = { ...projectResponse, user_role: role, is_public: false };
       mount();
@@ -330,21 +321,20 @@ describe("Editor page real access and empty-state chains", () => {
       await waitFor(() => expect(boundary.replace).toHaveBeenCalledWith("/projects/route-project"));
       expect(screen.queryByText("No Ontology File")).toBeNull();
     });
-    it("saves through the source editor and commit dialog without an Authorization header", async () => {
+    it.each(["owner", "editor"])("allows source reading but no save or commit for an anonymous API %s", async role => {
       vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
-      projectResponse = { ...projectResponse, source_file_path: "ontology.ttl" };
+      projectResponse = { ...projectResponse, user_role: role, source_file_path: "ontology.ttl", is_public: true };
       mount();
       fireEvent.click(await screen.findByRole("button", { name: "Source" }));
       const input = await screen.findByRole("textbox", { name: "Turtle source boundary" });
       await waitFor(() => expect((input as HTMLTextAreaElement).value).toBe(originalSource));
-      fireEvent.change(input, { target: { value: originalSource + "\n# workspace" } });
-      fireEvent.click(screen.getByRole("button", { name: "Save" }));
-      const dialog = await screen.findByRole("dialog", { name: "Save Changes" });
-      fireEvent.change(within(dialog).getByPlaceholderText("Describe your changes..."), { target: { value: "Workspace edit" } });
-      fireEvent.click(within(dialog).getByRole("button", { name: "Save & Commit" }));
-      await waitFor(() => expect(savedBodies).toHaveLength(1));
-      expect(requests.find((request) => request.path.endsWith("/source"))).toEqual(expect.objectContaining({ method: "PUT", search: "?branch=main", authorization: null }));
-      expect(savedBodies[0]).toEqual(expect.objectContaining({ content: originalSource + "\n# workspace", commit_message: "Workspace edit", base_revision: "base-commit" }));
+      fireEvent.keyDown(input, { key: "s", ctrlKey: true });
+      expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "Save & Commit" })).toBeNull();
+      expect(screen.queryByRole("dialog", { name: "Save Changes" })).toBeNull();
+      expect(savedBodies).toEqual([]);
+      expect(boundary.replace).not.toHaveBeenCalledWith("/projects/route-project");
+      expect(requests.filter(request => request.method !== "GET")).toEqual([]);
     });
   });
 });

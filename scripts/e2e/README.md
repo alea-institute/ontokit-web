@@ -241,7 +241,7 @@ provider-less profiles. The receipt carries `authModes: {web, api}` only when bo
 profile. A new-profile receipt without agreeing modes is never accepted. A baseline or
 lifecycle receipt with a recorded disagreement is not accepted either.
 
-**Disabled-mode trust boundary.** Disabled mode gives every caller who can reach the API
-create and edit rights as the shared anonymous owner. It is supported only for a single-user
-deployment that is not network-exposed. The disabled profile proves that behavior on a
-loopback-only disposable stack. It does not make disabled mode safe to expose.
+**Disabled-mode trust boundary:** disabled mode is read-and-suggest only. The API
+refuses direct writes from its anonymous identity with 403. Public browsing and
+anonymous proposals remain available; project creation, import and source save
+are unavailable. The disabled profile verifies these refusals on a disposable stack.

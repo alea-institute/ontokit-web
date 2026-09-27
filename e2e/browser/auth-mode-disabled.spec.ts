@@ -1,10 +1,7 @@
-// D09 U5: authentication disabled (R8, R9). No provider, no authentication UI, and every
-// caller is the API's shared anonymous identity. Disabled mode is supported only for a
-// single-user deployment that is not network-exposed; this stack is loopback-only.
-import { randomUUID } from "node:crypto";
-import { readSource, seededProject, tinyOntologyPath } from "../fixtures/projects";
+// D09 U5: authentication disabled (R8, R9) is read-and-suggest only. No provider
+// or authentication UI; the API refuses direct writes from its anonymous identity.
+import { readSource, seededProject } from "../fixtures/projects";
 import { waitForIndex } from "../fixtures/polling";
-import { findSourceText, replaceSourceLabel, showSource } from "../fixtures/editor";
 import {
   modeTest, expect, apiCall, directProbe, expectNoSignInControl, expectProvidersEmpty, fixtureName, gotoResolved,
   observed, projectLink, projectPath, recordProbe, sessionUserId, startProposal,
@@ -32,11 +29,10 @@ test("providers are empty and no authentication UI appears on any reachable inve
 
   await gotoResolved(page, `${run.web}/`, p => projectLink(p, publicId));
   await expectNoAuthUi(page);
-  // A single-user workspace: My Projects and Private list the anonymous owner's projects
-  // (none yet) rather than asking anyone to sign in.
+  // Personal tabs explain their unavailability without offering sign-in.
   for (const tab of ["My Projects", "Private"]) {
     await page.getByRole("button", {name: tab, exact: true}).click();
-    await expect(projectLink(page, publicId).or(page.getByRole("heading", {name: /^No (private )?projects yet$/}))).toBeVisible();
+    await expect(page.getByRole("heading", {name: tab === "My Projects" ? "Your projects aren't available here" : "Private projects aren't available here"})).toBeVisible();
     await expect(projectLink(page, foreignId)).toHaveCount(0);
     await expectNoAuthUi(page);
   }
@@ -53,10 +49,10 @@ test("providers are empty and no authentication UI appears on any reachable inve
   await gotoResolved(page, `${run.web}/projects/${publicId}/editor`, p => p.getByRole("treeitem", {name: /Test Person/}).first());
   await expectNoAuthUi(page);
 
-  await gotoResolved(page, `${run.web}/projects/new`, p => p.getByRole("button", {name: "Create Empty", exact: true}));
+  await gotoResolved(page, `${run.web}/projects/new`, p => p.getByRole("heading", {name: "Project creation is unavailable"}));
   await expectNoAuthUi(page);
-  await page.getByRole("button", {name: "Clone from GitHub", exact: true}).click();
-  await expect(page.getByText("Cloning from GitHub is unavailable in this configuration.")).toBeVisible();
+  await expect(page.locator("main form")).toHaveCount(0);
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
 
   for (const [route, landmark] of [
     ["/auth/signin", "Sign-in is unavailable"],
@@ -91,44 +87,32 @@ test("public browsing and proposal work while PR create and duplicate check are 
   await expect(page.getByRole("banner").getByRole("link", {name: "Review", exact: true})).toHaveCount(0);
 });
 
-// Provisional (U4, disabled mode as a single-user workspace). Remove this describe with
-// U4 if the disabled-mode decision changes.
-test.describe("provisional single-user workspace", () => {
-  test("a project imported in the browser opens in the editor and an edit saves without a bearer token", async ({page, run, anonymousApi}) => {
-    test.setTimeout(240_000);
-    const label = "Disabled Mode Person";
-    await gotoResolved(page, `${run.web}/projects/new`, p => p.getByRole("button", {name: "Import from File", exact: true}));
-    await page.getByRole("button", {name: "Import from File", exact: true}).click();
-    await page.locator('input[type="file"]').setInputFiles(tinyOntologyPath);
-    await page.getByRole("textbox", {name: "Project Name"}).fill(`D09 disabled import ${randomUUID()}`);
-    const imported = apiCall(page, run, "POST", "/api/v1/projects/import");
-    await page.getByRole("button", {name: "Import Project", exact: true}).click();
-    const importResponse = await imported;
-    recordProbe(PROFILE, "project-import-tokenless", await observed(importResponse));
-    const {id} = await importResponse.json() as {id: string};
-    expect(id).toMatch(/^[0-9a-f-]{36}$/);
-    await expect(page).toHaveURL(url => url.pathname === `/projects/${id}`, {timeout: 30_000});
+test("project create, import and source save are refused by the API and the web explains they are unavailable", async ({page, run, anonymousApi}) => {
+  test.setTimeout(150_000);
+  await gotoResolved(page, `${run.web}/projects/new`, p => p.getByRole("heading", {name: "Project creation is unavailable"}));
+  await expectNoAuthUi(page);
+  await expect(page.locator("main form")).toHaveCount(0);
+  await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  await expect(page.getByRole("button", {name: /Create Empty|Import from File|Clone from GitHub/})).toHaveCount(0);
 
-    const original = await readSource(anonymousApi, id);
-    await waitForIndex(anonymousApi, id, "main", original.revision);
-    // The API grants the anonymous owner edit rights; the editor must not redirect away.
-    await gotoResolved(page, `${run.web}/projects/${id}/editor`, p => p.getByRole("group", {name: "Editor mode"}));
-    await expect(page).toHaveURL(url => url.pathname === `/projects/${id}/editor`);
-    await showSource(page);
-    await replaceSourceLabel(page, "Test Person", label);
-    await page.getByRole("button", {name: "Save", exact: true}).click();
-    const dialog = page.getByRole("dialog", {name: "Save Changes"});
-    await dialog.getByPlaceholder("Describe your changes...").fill("Rename Person without a bearer token");
-    const saved = apiCall(page, run, "PUT", `${projectPath(id)}/source`);
-    await dialog.getByRole("button", {name: "Save & Commit", exact: true}).click();
-    recordProbe(PROFILE, "source-save-tokenless", await observed(await saved));
-    await expect(dialog).toBeHidden();
+  const publicId = seededProject(run, "publicProject");
+  const original = await readSource(anonymousApi, publicId);
+  await waitForIndex(anonymousApi, publicId, "main", original.revision);
+  await gotoResolved(page, `${run.web}/projects/${publicId}/editor`, p => p.getByRole("treeitem", {name: /Test Person/}).first());
+  await page.getByRole("treeitem", {name: /Test Person/}).first().click();
+  await expect(page.getByRole("button", {name: "Propose Edit", exact: true})).toBeVisible();
+  await expect(page.getByRole("button", {name: /^(Save|Save & Commit)$/})).toHaveCount(0);
+  await expectNoAuthUi(page);
 
-    const after = await readSource(anonymousApi, id);
-    expect(after.content).toBe(original.content.replace('"Test Person"@en', `"${label}"@en`));
-    expect(after.revision).not.toBe(original.revision);
-    await page.reload();
-    await showSource(page);
-    await findSourceText(page, label);
-  });
+  // The auth dependency refuses even an empty import before body validation.
+  recordProbe(PROFILE, "project-create-disabled", await directProbe(anonymousApi, "POST", "/api/v1/projects", {name: "D09 refused create", is_public: true}));
+  recordProbe(PROFILE, "project-import-disabled", await directProbe(anonymousApi, "POST", "/api/v1/projects/import"));
+  recordProbe(PROFILE, "source-save-disabled", await directProbe(anonymousApi, "PUT", `${projectPath(publicId)}/source?branch=main`, {
+    content: original.content + "\n# refused disabled-mode edit",
+    commit_message: "D09 refused source save",
+    base_revision: original.revision,
+  }));
+  const after = await readSource(anonymousApi, publicId);
+  expect(after.content).toBe(original.content);
+  expect(after.revision).toBe(original.revision);
 });
