@@ -363,3 +363,16 @@ Use an explicit API checkout at `a2d48362` or a reviewed descendant. Record copi
 - Abandoned instrumentation, exploratory specs and unused seed paths are removed from the diff.
 - Independent review covers the web repairs, the sign-in inventory, the disabled create/save/routing change, evidence validity and cleanup.
 - `docs/releases/d09-auth-mode-matrix-readiness.md` records local acceptance, review results, publication state and the disabled-mode trust boundary, and the roadmap carries forward B02/B03, B12, B13 (including recurring CI enforcement), the remaining B14 seams, the deferred non-loopback warning and the open disabled-mode question.
+
+---
+
+## Decision update — 2026-09-27 (supersedes the provisional disabled-mode decision)
+
+Damien answered ask `ontokit-web-2026-09-26-0221-d09-disabled-mode-meaning` (qid `disabled-mode-meaning`): **"Read and suggest only."** Disabled mode is browse-and-propose, not a single-user workspace. This changes R9, U4 and U5 case 10 only; every other requirement, unit and fix stands.
+
+- **R9 (revised).** In disabled mode, project create, import, source save, branch writes and other direct edits are refused by the API (not merely hidden by the web). The web shows the honest "unavailable in this configuration" copy for those actions. Anonymous proposals on public projects keep working.
+- **U4 (replaced).**
+  - **Web:** revert the single-user-workspace behavior, i.e. commit `22088c0d` ("disabled mode is a single-user workspace") and the disabled-mode tokenless-write parts of the later review fixes (`89b602c1`'s dashboard settings gating stays useful; `bec56ef1`'s edit-permission scoping becomes moot). Restore U3's disabled-mode copy on `/projects/new` and the home tabs. Keep all mode-independent improvements: case normalization, the shared canWrite guard, the empty-state component, auth-error and trust-explainer gating, exact service sets, the `--fail-at` allowlist and literal spec globs.
+  - **API (new, ontokit-api):** in `AUTH_MODE=disabled`, refuse the anonymous identity on write routes (project create/import, `PUT /source`, branch create/checkout/delete, other `RequiredUser` mutations) with 403, mirroring `require_authenticated_identity`. Keep reads and anonymous suggestion sessions. Characterize first. This ships as its own API PR, and the web harness pins the new API revision.
+- **U5 case 10 (replaced).** Disabled: `/projects/new` shows the unavailable copy, and direct API probes prove create, import and `PUT /source` return 403 without a token, each recording its tier (KTD9). Update `MODE_CASES` titles and the probe table to match.
+- **Acceptance.** Rerun all profiles twice (baseline and lifecycle once) against the new API revision, then merge the paired API and web PRs, deploy both to DEV, and record the readiness receipt.
