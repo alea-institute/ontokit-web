@@ -1,0 +1,191 @@
+{
+  "version": 3,
+  "profile": "optional-configured",
+  "run": "a893d14b9a0e1af6159c42c110d78a80",
+  "startedAt": "2026-09-27T21:10:52.568Z",
+  "finishedAt": "2026-09-27T21:13:38.298Z",
+  "sources": {
+    "api": {
+      "revision": "be120c405625696207a3dfcacf28416f4182f888",
+      "sha256": "ae5eacf04110404347456b573bd419f94b61e41af066a138d92fb27af6e65ab8"
+    },
+    "web": {
+      "revision": "3746c9680e6209c664aec052d3ed183436bd8997",
+      "sha256": "d50100cce517838bfb1ee5a8659c91ae51944ed8940b24c574e17578f8fe1ccc"
+    }
+  },
+  "images": [
+    {
+      "service": "worker",
+      "id": "sha256:af20a37ac588160d76138dd124a519987bbda8b5c17f7d4deae721c256cd9f43",
+      "reference": "ontokit-e2e-a893d14b9a0e1af6159c42c110d78a80/api:run"
+    },
+    {
+      "service": "api",
+      "id": "sha256:af20a37ac588160d76138dd124a519987bbda8b5c17f7d4deae721c256cd9f43",
+      "reference": "ontokit-e2e-a893d14b9a0e1af6159c42c110d78a80/api:run"
+    },
+    {
+      "service": "login",
+      "id": "sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648",
+      "reference": "ghcr.io/zitadel/zitadel-login@sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648"
+    },
+    {
+      "service": "zitadel",
+      "id": "sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64",
+      "reference": "ghcr.io/zitadel/zitadel@sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:af20a37ac588160d76138dd124a519987bbda8b5c17f7d4deae721c256cd9f43",
+      "reference": "ontokit-e2e-a893d14b9a0e1af6159c42c110d78a80/api:run"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:af20a37ac588160d76138dd124a519987bbda8b5c17f7d4deae721c256cd9f43",
+      "reference": "ontokit-e2e-a893d14b9a0e1af6159c42c110d78a80/api:run"
+    },
+    {
+      "service": "redis",
+      "id": "sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2",
+      "reference": "redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2"
+    },
+    {
+      "service": "postgres",
+      "id": "sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38",
+      "reference": "pgvector/pgvector@sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38"
+    },
+    {
+      "service": "minio",
+      "id": "sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+      "reference": "minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
+    }
+  ],
+  "migrationHeads": [
+    "i7j8k9l0m1n2"
+  ],
+  "tests": {
+    "passed": 5,
+    "skipped": 0,
+    "failed": 0,
+    "flaky": 0,
+    "mandatory": [
+      {
+        "file": "browser/auth-mode-optional-configured.spec.ts",
+        "title": "anonymous visitor sees header sign-in and the public project but neither private fixture",
+        "project": "optional-configured"
+      },
+      {
+        "file": "browser/auth-mode-optional-configured.spec.ts",
+        "title": "foreign private denial Sign In completes real OIDC, returns to the original URL and stays denied",
+        "project": "optional-configured"
+      },
+      {
+        "file": "browser/auth-mode-optional-configured.spec.ts",
+        "title": "anonymous visitor starts a proposal session on a public project that the API accepts",
+        "project": "optional-configured"
+      },
+      {
+        "file": "browser/auth-mode-optional-configured.spec.ts",
+        "title": "after real sign-in the persona-owned private project is visible and a project create succeeds",
+        "project": "optional-configured"
+      },
+      {
+        "file": "browser/auth-mode-optional-configured.spec.ts",
+        "title": "sign-out returns the application to the anonymous state",
+        "project": "optional-configured"
+      }
+    ],
+    "cases": [
+      {
+        "title": "anonymous visitor sees header sign-in and the public project but neither private fixture",
+        "evidence": []
+      },
+      {
+        "title": "foreign private denial Sign In completes real OIDC, returns to the original URL and stays denied",
+        "evidence": [
+          {
+            "probe": "foreign-private-anonymous",
+            "tier": "api",
+            "method": "GET",
+            "path": "/api/v1/projects/{id}",
+            "status": 403,
+            "authorization": false
+          },
+          {
+            "probe": "foreign-private-signed-in",
+            "tier": "api",
+            "method": "GET",
+            "path": "/api/v1/projects/{id}",
+            "status": 403,
+            "authorization": true
+          }
+        ]
+      },
+      {
+        "title": "anonymous visitor starts a proposal session on a public project that the API accepts",
+        "evidence": [
+          {
+            "probe": "anonymous-proposal-session",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects/{id}/suggestions/anonymous/sessions",
+            "status": 201,
+            "authorization": false
+          }
+        ]
+      },
+      {
+        "title": "after real sign-in the persona-owned private project is visible and a project create succeeds",
+        "evidence": [
+          {
+            "probe": "persona-private-anonymous",
+            "tier": "api",
+            "method": "GET",
+            "path": "/api/v1/projects/{id}",
+            "status": 403,
+            "authorization": false
+          },
+          {
+            "probe": "persona-private-signed-in",
+            "tier": "api",
+            "method": "GET",
+            "path": "/api/v1/projects/{id}",
+            "status": 200,
+            "authorization": true
+          },
+          {
+            "probe": "project-create-signed-in",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects",
+            "status": 201,
+            "authorization": true
+          }
+        ]
+      },
+      {
+        "title": "sign-out returns the application to the anonymous state",
+        "evidence": []
+      }
+    ]
+  },
+  "lifecycle": null,
+  "authModes": {
+    "web": {
+      "mode": "optional",
+      "providerConfigured": true
+    },
+    "api": {
+      "mode": "optional",
+      "providerConfigured": true
+    }
+  },
+  "acceptance": {
+    "scope": "local-verification",
+    "hostedAcceptance": false
+  },
+  "workflowPassed": true,
+  "cleanup": "complete",
+  "acceptedRun": true
+}

@@ -1,0 +1,187 @@
+{
+  "version": 3,
+  "profile": "disabled",
+  "run": "2f40e1efb278611bb958890898e28e3b",
+  "startedAt": "2026-09-27T21:18:24.858Z",
+  "finishedAt": "2026-09-27T21:20:29.152Z",
+  "sources": {
+    "api": {
+      "revision": "be120c405625696207a3dfcacf28416f4182f888",
+      "sha256": "ae5eacf04110404347456b573bd419f94b61e41af066a138d92fb27af6e65ab8"
+    },
+    "web": {
+      "revision": "3746c9680e6209c664aec052d3ed183436bd8997",
+      "sha256": "d50100cce517838bfb1ee5a8659c91ae51944ed8940b24c574e17578f8fe1ccc"
+    }
+  },
+  "images": [
+    {
+      "service": "api",
+      "id": "sha256:8947fe3b6eff81f0169b0af77ed62069a98cab18afb0f52563407dba4a7818a1",
+      "reference": "ontokit-e2e-2f40e1efb278611bb958890898e28e3b/api:run"
+    },
+    {
+      "service": "worker",
+      "id": "sha256:8947fe3b6eff81f0169b0af77ed62069a98cab18afb0f52563407dba4a7818a1",
+      "reference": "ontokit-e2e-2f40e1efb278611bb958890898e28e3b/api:run"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:8947fe3b6eff81f0169b0af77ed62069a98cab18afb0f52563407dba4a7818a1",
+      "reference": "ontokit-e2e-2f40e1efb278611bb958890898e28e3b/api:run"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:8947fe3b6eff81f0169b0af77ed62069a98cab18afb0f52563407dba4a7818a1",
+      "reference": "ontokit-e2e-2f40e1efb278611bb958890898e28e3b/api:run"
+    },
+    {
+      "service": "redis",
+      "id": "sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2",
+      "reference": "redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2"
+    },
+    {
+      "service": "postgres",
+      "id": "sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38",
+      "reference": "pgvector/pgvector@sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38"
+    },
+    {
+      "service": "minio",
+      "id": "sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+      "reference": "minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
+    }
+  ],
+  "migrationHeads": [
+    "i7j8k9l0m1n2"
+  ],
+  "tests": {
+    "passed": 3,
+    "skipped": 0,
+    "failed": 0,
+    "flaky": 0,
+    "mandatory": [
+      {
+        "file": "browser/auth-mode-disabled.spec.ts",
+        "title": "providers are empty and no authentication UI appears on any reachable inventoried route",
+        "project": "disabled"
+      },
+      {
+        "file": "browser/auth-mode-disabled.spec.ts",
+        "title": "public browsing and proposal work while PR create and duplicate check are refused and PR Party is absent",
+        "project": "disabled"
+      },
+      {
+        "file": "browser/auth-mode-disabled.spec.ts",
+        "title": "project create, import and source save are refused by the API and the web explains they are unavailable",
+        "project": "disabled"
+      }
+    ],
+    "cases": [
+      {
+        "title": "providers are empty and no authentication UI appears on any reachable inventoried route",
+        "evidence": [
+          {
+            "probe": "providers-empty",
+            "tier": "web",
+            "method": "GET",
+            "path": "/api/auth/providers",
+            "status": 200,
+            "authorization": false
+          },
+          {
+            "probe": "foreign-private-anonymous",
+            "tier": "api",
+            "method": "GET",
+            "path": "/api/v1/projects/{id}",
+            "status": 403,
+            "authorization": false
+          }
+        ]
+      },
+      {
+        "title": "public browsing and proposal work while PR create and duplicate check are refused and PR Party is absent",
+        "evidence": [
+          {
+            "probe": "anonymous-proposal-session",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects/{id}/suggestions/anonymous/sessions",
+            "status": 201,
+            "authorization": false
+          },
+          {
+            "probe": "pull-request-create",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects/{id}/pull-requests",
+            "status": 403,
+            "authorization": false
+          },
+          {
+            "probe": "duplicate-check",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects/{id}/duplicate-check",
+            "status": 403,
+            "authorization": false
+          },
+          {
+            "probe": "pr-party-queue",
+            "tier": "api",
+            "method": "GET",
+            "path": "/api/v1/pr-party/queue",
+            "status": 404,
+            "authorization": false
+          }
+        ]
+      },
+      {
+        "title": "project create, import and source save are refused by the API and the web explains they are unavailable",
+        "evidence": [
+          {
+            "probe": "project-create-disabled",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects",
+            "status": 403,
+            "authorization": false
+          },
+          {
+            "probe": "project-import-disabled",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects/import",
+            "status": 403,
+            "authorization": false
+          },
+          {
+            "probe": "source-save-disabled",
+            "tier": "api",
+            "method": "PUT",
+            "path": "/api/v1/projects/{id}/source",
+            "status": 403,
+            "authorization": false
+          }
+        ]
+      }
+    ]
+  },
+  "lifecycle": null,
+  "authModes": {
+    "web": {
+      "mode": "disabled",
+      "providerConfigured": false
+    },
+    "api": {
+      "mode": "disabled",
+      "providerConfigured": false
+    }
+  },
+  "acceptance": {
+    "scope": "local-verification",
+    "hostedAcceptance": false
+  },
+  "workflowPassed": true,
+  "cleanup": "complete",
+  "acceptedRun": true
+}
