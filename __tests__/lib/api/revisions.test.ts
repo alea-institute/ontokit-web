@@ -255,4 +255,17 @@ describe("branchesApi", () => {
       expect(options.headers.get("Authorization")).toBe("Bearer tok");
     });
   });
+
+  describe("authenticated branch mutations", () => {
+    it("switch and delete still send the bearer when given one", async () => {
+      mockOk({ name: "feature" });
+      mockEmpty();
+
+      await branchesApi.switch("p1", "feature", "tok");
+      await branchesApi.delete("p1", "feature", "tok");
+
+      expect(mockFetch.mock.calls[0][1].headers.get("Authorization")).toBe("Bearer tok");
+      expect(mockFetch.mock.calls[1][1].headers.get("Authorization")).toBe("Bearer tok");
+    });
+  });
 });

@@ -25,7 +25,9 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,
     NEXT_PUBLIC_WS_URL: process.env.NEXT_PUBLIC_WS_URL,
-    NEXT_PUBLIC_AUTH_MODE: process.env.AUTH_MODE || "required",
+    // Lowercased like the server's getAuthMode(), so client comparisons and the
+    // runtime parity guard in lib/env.ts agree for a mixed-case AUTH_MODE.
+    NEXT_PUBLIC_AUTH_MODE: (process.env.AUTH_MODE || "required").toLowerCase(),
     // Must use the SAME predicate as server-side isZitadelConfigured() (issuer AND
     // client id) — otherwise the client shows a "Sign in" button while the server
     // has no provider, and clicking it dead-ends.

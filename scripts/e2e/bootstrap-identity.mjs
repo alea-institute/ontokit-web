@@ -5,10 +5,12 @@ import path from 'node:path';
 import { compose } from './runtime.mjs';
 import { recordFailure } from './diagnostics.mjs';
 import { configureLifecycleLifetimes, verifyOrdinaryPersona, LIFECYCLE_LIFETIMES } from './auth-lifecycle.mjs';
+import { PROFILE_REGISTRY, profileSpec } from './auth-modes.mjs';
 
-export const PROFILES = Object.freeze({baseline: ['owner', 'unrelated'], lifecycle: ['lifecycle']});
+// Personas per profile come from the KTD1 registry; provider-less profiles have none.
+export const PROFILES = Object.freeze(Object.fromEntries(Object.entries(PROFILE_REGISTRY).map(([name, p]) => [name, p.personas])));
 export function assertProfile(profile) {
-  if (!Object.hasOwn(PROFILES, profile)) throw new Error('Unknown E2E profile');
+  profileSpec(profile);
   return profile;
 }
 
@@ -91,6 +93,8 @@ export async function identityRequest({issuer, pat, endpoint, body, method = 'PO
 }
 
 export async function bootstrapIdentity(ctx) {
+  const profile = assertProfile(ctx.profile ?? 'baseline');
+  if (!profileSpec(profile).identity) throw new Error('Provider-less profiles never bootstrap identity');
   const issuer = `http://localhost:${ctx.manifest.ports.identity}`;
   const login = `http://localhost:${ctx.manifest.ports.login}/ui/v2/login`;
   const web = `http://localhost:${ctx.manifest.ports.web}`;
@@ -130,13 +134,18 @@ export async function bootstrapIdentity(ctx) {
   });
   const {clientId, clientSecret} = application.oidcConfiguration ?? {};
   if (!clientId || !clientSecret) throw new Error('Disposable OIDC client credentials missing');
-  const {users, lifetimes} = await provisionPersonas(call, {profile: ctx.profile ?? 'baseline', organizationId, runId: ctx.manifest.id, failAt: ctx.failAt, signal: ctx.signal});
+  const {users, lifetimes} = await provisionPersonas(call, {profile, organizationId, runId: ctx.manifest.id, failAt: ctx.failAt, signal: ctx.signal});
   await compose(ctx, 'up', '-d', '--no-deps', 'login');
   await readyHttp(`${login}/loginname`, {signal: ctx.signal, validate: async response => response.ok && (await response.text()).includes('data-testid="username-text-input"')});
   ctx.values.OIDC_CLIENT_ID = clientId;
   await writeRuntimeEnv(ctx);
   await compose(ctx, 'up', '-d', '--no-deps', '--force-recreate', 'api', 'worker');
-  await compose(ctx, 'exec', '-T', 'api', 'python', '-c', 'from ontokit.core.config import settings; assert settings.auth_mode == "required"; assert not settings.superadmin_ids; print("Required authentication and ordinary-user policy verified")');
+  if (profileSpec(profile).apiMode === 'required') {
+    // D06/D08 unchanged: required authentication and an empty superadmin allowlist.
+    await compose(ctx, 'exec', '-T', 'api', 'python', '-c', 'from ontokit.core.config import settings; assert settings.auth_mode == "required"; assert not settings.superadmin_ids; print("Required authentication and ordinary-user policy verified")');
+  } else {
+    await compose(ctx, 'exec', '-T', 'api', 'python', '-c', 'from ontokit.core.config import settings; assert settings.auth_mode == "optional"; assert not settings.superadmin_ids; print("Optional authentication and ordinary-user policy verified")');
+  }
   return {issuer, login, web, api: `http://localhost:${ctx.manifest.ports.api}`, clientId, clientSecret, users, lifetimes};
 }
 
@@ -147,6 +156,7 @@ export async function bootstrapIdentity(ctx) {
 // browser runs; the outer launcher still owns cleanup.
 export async function provisionPersonas(call, {profile = 'baseline', organizationId, runId, failAt, signal, readbackTimeout} = {}) {
   assertProfile(profile);
+  if (!profileSpec(profile).identity) throw new Error('Provider-less profiles never bootstrap identity');
   let lifetimes = null;
   if (profile === 'lifecycle') {
     const expected = failAt === 'lifecycle-readback' ? {...LIFECYCLE_LIFETIMES, accessTokenLifetime: LIFECYCLE_LIFETIMES.accessTokenLifetime + 1} : LIFECYCLE_LIFETIMES;

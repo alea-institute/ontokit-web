@@ -4,15 +4,19 @@ import { randomBytes } from "node:crypto";
 
 export type Persona = "owner" | "unrelated";
 export type LifecyclePersona = "lifecycle";
-export type Profile = "baseline" | "lifecycle";
+export type ModePersona = "owner";
+export type ModeProfile = "optional-configured" | "optional-anonymous" | "disabled";
+export type Profile = "baseline" | "lifecycle" | ModeProfile;
 export interface RunUser { id: string; email: string; password: string }
-interface RunBase {
+interface RunOrigins {
   id: string;
   dir: string;
-  issuer: string;
-  login: string;
   web: string;
   api: string;
+}
+interface RunBase extends RunOrigins {
+  issuer: string;
+  login: string;
   ordinaryUserPolicyVerified: boolean;
 }
 export interface RunConfig extends RunBase {
@@ -44,13 +48,61 @@ export interface LifecycleRunConfig extends RunBase {
     clockPreflightVerified: boolean;
   };
 }
-export type AnyRunConfig = RunConfig | LifecycleRunConfig;
+/** Mode and provider flags the launcher observed and matched before any browser case (KTD2). */
+export interface ObservedAuthMode { mode: "required" | "optional" | "disabled"; providerConfigured: boolean }
+/** Run-tagged project IDs seeded inside the API container (KTD4). */
+export interface SeededProjects { publicProject: string; foreignPrivateProject: string }
+export interface OptionalConfiguredRunConfig extends RunBase {
+  profile: "optional-configured";
+  users: Record<ModePersona, RunUser>;
+  authModes: { web: ObservedAuthMode; api: ObservedAuthMode };
+  /** personaPrivateProject is owned by users.owner; the other two by a synthetic foreign user. */
+  fixtures: SeededProjects & { personaPrivateProject: string };
+}
+/** Provider-less profiles: no issuer, Login, users or bearer tokens exist. */
+export interface ProviderlessRunConfig extends RunOrigins {
+  profile: "optional-anonymous" | "disabled";
+  authModes: { web: ObservedAuthMode; api: ObservedAuthMode };
+  fixtures: SeededProjects;
+}
+export type ModeRunConfig = OptionalConfiguredRunConfig | ProviderlessRunConfig;
+export type AnyRunConfig = RunConfig | LifecycleRunConfig | ModeRunConfig;
+
+// Mirrors PROFILE_REGISTRY in scripts/e2e/auth-modes.mjs; the loader re-checks agreement.
+const MODE_PROFILES: Record<ModeProfile, { mode: ObservedAuthMode["mode"]; provider: boolean }> = {
+  "optional-configured": { mode: "optional", provider: true },
+  "optional-anonymous": { mode: "optional", provider: false },
+  disabled: { mode: "disabled", provider: false },
+};
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+function loopback(value: unknown) {
+  let url: URL;
+  try { url = new URL(String(value)); } catch { throw new Error("E2E URLs must be explicit loopback origins"); }
+  if (url.protocol !== "http:" || url.hostname !== "localhost" || !url.port || url.username || url.password) throw new Error("E2E URLs must be explicit loopback origins");
+}
+function validateModeRun(run: ModeRunConfig) {
+  const expected = MODE_PROFILES[run.profile];
+  for (const side of [run.authModes?.web, run.authModes?.api]) {
+    if (!side || side.mode !== expected.mode || side.providerConfigured !== expected.provider) throw new Error("E2E config does not record mode agreement for this profile");
+  }
+  const keys = ["publicProject", "foreignPrivateProject", ...(expected.provider ? ["personaPrivateProject"] : [])].sort().join();
+  const fixtures = (run.fixtures ?? {}) as unknown as Record<string, unknown>;
+  const ids = Object.values(fixtures);
+  if (Object.keys(fixtures).sort().join() !== keys || ids.some(id => typeof id !== "string" || !UUID.test(id)) || new Set(ids).size !== ids.length) throw new Error("Seeded E2E fixtures are invalid for this profile");
+  if (run.profile === "optional-configured") {
+    for (const value of [run.issuer, run.login]) loopback(value);
+    if (!run.ordinaryUserPolicyVerified || Object.keys(run.users ?? {}).join() !== "owner" || !validUser(run.users.owner)) throw new Error("Fresh ordinary identities were not verified");
+  } else {
+    const raw = run as unknown as Record<string, unknown>;
+    if (["issuer", "login", "users"].some(key => key in raw)) throw new Error("Provider-less E2E config must not carry identity URLs or users");
+  }
+}
 
 const RUN_ID = /^[a-f0-9]{32}$/;
 function validUser(user: RunUser | undefined): user is RunUser {
   return !!user && typeof user.id === "string" && !!user.id && typeof user.email === "string" && typeof user.password === "string";
 }
-/** Loads and validates the private config for this invocation, for either profile. */
+/** Loads and validates the private config for this invocation, for any profile. */
 export function loadRunConfig(): AnyRunConfig {
   const file = process.env.ONTOKIT_E2E_CONFIG;
   if (!file || !path.isAbsolute(file)) throw new Error("Use npm run test:e2e with an explicit API checkout; a private run config is required");
@@ -59,11 +111,14 @@ export function loadRunConfig(): AnyRunConfig {
   const run = JSON.parse(fs.readFileSync(file, "utf8")) as AnyRunConfig;
   const expected = `/tmp/ontokit-e2e-${process.getuid?.()}/${run.id}`;
   if (!RUN_ID.test(run.id) || run.id !== process.env.ONTOKIT_E2E_RUN || run.dir !== expected || path.dirname(file) !== expected) throw new Error("E2E config does not belong to this invocation");
-  for (const value of [run.web, run.api, run.issuer, run.login]) {
-    const url = new URL(value);
-    if (url.protocol !== "http:" || url.hostname !== "localhost" || !url.port || url.username || url.password) throw new Error("E2E URLs must be explicit loopback origins");
+  for (const value of [run.web, run.api]) loopback(value);
+  if (Object.hasOwn(MODE_PROFILES, run.profile)) {
+    validateModeRun(run as ModeRunConfig);
+    return run;
   }
-  if (!run.ordinaryUserPolicyVerified) throw new Error("Fresh ordinary identities were not verified");
+  const provider = run as RunConfig | LifecycleRunConfig;
+  for (const value of [provider.issuer, provider.login]) loopback(value);
+  if (!provider.ordinaryUserPolicyVerified) throw new Error("Fresh ordinary identities were not verified");
   if (run.profile === "baseline") {
     if (Object.keys(run.users ?? {}).sort().join() !== "owner,unrelated" || !validUser(run.users.owner) || !validUser(run.users.unrelated) || run.users.owner.id === run.users.unrelated.id) throw new Error("Fresh ordinary identities were not verified");
   } else if (run.profile === "lifecycle") {
@@ -81,6 +136,13 @@ export function loadRun(): RunConfig {
   const run = loadRunConfig();
   if (run.profile !== "baseline") throw new Error("This suite requires the baseline E2E profile");
   return run;
+}
+/** D09 mode-profile consumers: rejects every other profile, so a spec cannot run on the wrong stack. */
+export type ModeRunFor<P extends ModeProfile> = P extends "optional-configured" ? OptionalConfiguredRunConfig : ProviderlessRunConfig & { profile: P };
+export function loadModeRun<P extends ModeProfile>(profile: P): ModeRunFor<P> {
+  const run = loadRunConfig();
+  if (run.profile !== profile) throw new Error(`This suite requires the ${profile} E2E profile`);
+  return run as ModeRunFor<P>;
 }
 /** Lifecycle consumers: rejects the baseline profile, whose provider lifetimes are normal. */
 export function loadLifecycleRun(): LifecycleRunConfig {

@@ -276,6 +276,83 @@ afterEach(() => {
   expect(unexpected, JSON.stringify(unexpected)).toEqual([]);
 });
 
+// Disabled mode permits public proposals, never direct edits without a bearer.
+describe("disabled-mode editor refuses direct writes", () => {
+  it.each(["owner", "editor"])("offers proposals and no direct mutation controls for an anonymous API %s", async role => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+    boundary.session = { data: null, status: "unauthenticated" };
+    projectResponse = { ...projectResponse, user_role: role, is_public: true };
+    llmConfigured = true;
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    expect(await screen.findByRole("button", { name: "Propose Edit" })).toBeTruthy();
+    expect(screen.queryByPlaceholderText("Label text")).toBeNull();
+    expect(screen.queryByTitle("Suggest child classes")).toBeNull();
+    fireEvent.keyDown(document, { key: "n", ctrlKey: true });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.contextMenu(screen.getByRole("treeitem", { name: /Person/ }));
+    expect(screen.queryByRole("menuitem", { name: "Delete" })).toBeNull();
+    fireEvent.keyDown(document, { key: "Escape" });
+    fireEvent.click(screen.getAllByRole("button", { name: "Source" })[0]);
+    await screen.findByRole("textbox", { name: "Turtle source boundary" });
+    fireEvent.keyDown(document, { key: "s", ctrlKey: true });
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save & Commit" })).toBeNull();
+    expect(savedBodies).toEqual([]);
+    expect(requests.filter(r => ["POST", "PUT", "PATCH", "DELETE"].includes(r.method))).toEqual([]);
+  });
+
+  it.each(["owner", "editor"])("saves an anonymous API %s's class proposal only to its proposal session", async role => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+    boundary.session = { data: null, status: "unauthenticated" };
+    projectResponse = { ...projectResponse, user_role: role, is_public: true };
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    fireEvent.click(await screen.findByRole("button", { name: "Propose Edit" }));
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await waitFor(() => expect(label.value).toBe("Person"));
+    await editAndSave(label, "Proposed person");
+    await screen.findByText('Proposed update to "Proposed person"');
+    expect(suggestionBodies).toHaveLength(1);
+    expect(suggestionBodies[0]).toMatchObject({ entity_iri: iri, entity_label: "Proposed person" });
+    expect(savedBodies).toEqual([]);
+    const mutations = requests.filter(r => ["POST", "PUT", "PATCH", "DELETE"].includes(r.method));
+    expect(mutations).toHaveLength(2);
+    expect(mutations.every(r => r.path.includes("/suggestions/anonymous") && r.authorization === null)).toBe(true);
+    expect(mutations[1].anonymousToken).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Save & Commit" })).toBeNull();
+    expect(boundary.replace).not.toHaveBeenCalledWith("/projects/route-project");
+  });
+
+  // A visitor proposing on a public project it cannot edit must never reach a
+  // direct commit: the API refuses a base-branch PUT for that identity.
+  it.each([
+    ["disabled", "property"], ["disabled", "individual"],
+    ["optional", "property"], ["optional", "individual"],
+  ] as const)("routes a %s-mode anonymous %s proposal to the proposal session, never PUT /source", async (mode, entityType) => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
+    boundary.session = { data: null, status: "unauthenticated" };
+    projectResponse = { ...projectResponse, user_role: null, is_public: true };
+    sourceContent = originalSource + '\nex:Editable a owl:' + (entityType === "property" ? "ObjectProperty" : "NamedIndividual") + ' ;\n  rdfs:label "Original entity"@en .';
+    entityResults = [{ iri: editableIri, label: "Original entity", entity_type: entityType, property_kind: "object" }];
+    // The proposal starts from the class panel; once active, every entity
+    // form becomes editable, so property and individual saves must follow it.
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    fireEvent.click(await screen.findByRole("button", { name: "Propose Edit" }));
+    await screen.findByText("Proposing");
+    // Hovering the Source tab preloads the source the entity forms parse.
+    await act(async () => { for (const tab of screen.getAllByRole("button", { name: "Source" })) fireEvent.mouseEnter(tab); });
+    fireEvent.click(screen.getByRole("button", { name: entityType === "property" ? "Properties" : "Individuals" }));
+    fireEvent.click(await screen.findByText("Original entity"));
+    const inputs = await screen.findAllByPlaceholderText("Label text");
+    const editable = inputs.find(input => (input as HTMLInputElement).value === "Original entity") as HTMLInputElement;
+    await editAndSave(editable, "Proposed entity");
+    await screen.findByText('Proposed update to "Proposed entity"');
+    expect(savedBodies).toEqual([]);
+    expect(requests.some(r => r.path.endsWith("/source"))).toBe(false);
+    expect(suggestionBodies).toHaveLength(1);
+    expect(suggestionBodies[0]).toMatchObject({ entity_iri: editableIri, entity_label: "Proposed entity" });
+  });
+});
+
 describe('editor route real tree actions and keyboard orchestration', () => {
   it('opens keyboard help and closes the topmost overlay with Escape', async () => {
     mount(); await screen.findByText('Person');

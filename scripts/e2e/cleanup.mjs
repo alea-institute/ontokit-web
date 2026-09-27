@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, RUNTIME_ROOT, privateDirectory, loadManifest, ownsResource, processIdentity, sameProcess } from './ownership.mjs';
 import { docker, setDockerEndpoint } from './runtime.mjs';
+import { purgeSeededForRecovery } from './seed-fixtures.mjs';
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function markedProcesses(id) {
   const found = [];
@@ -55,6 +56,24 @@ export async function cleanupProcesses(manifest) {
   }
   await stopMarkedDescendants(manifest.id);
 }
+/**
+ * D09 seeded fixtures (KTD4): delete this run's recorded project IDs, by exact ID, tag
+ * and owner, through its own still-running API container. Label-verified volume removal
+ * below remains authoritative, so an unavailable container never blocks recovery; an
+ * ownership mismatch still refuses cleanup.
+ */
+export function recoverSeededFixtures(manifest, {docker: run = docker, log = console.log} = {}) {
+  let result;
+  try { result = purgeSeededForRecovery(manifest, {docker: run}); }
+  catch (error) {
+    if (/ownership mismatch|Seed record invalid/.test(error.message)) throw error;
+    log('Seeded fixture purge unavailable; run-labelled volume removal removes them');
+    return 'deferred-to-volume-removal';
+  }
+  if (!result) return manifest.seed?.purged ? 'already-purged' : manifest.seed?.fixtures ? 'deferred-to-volume-removal' : 'none';
+  log(`Seeded fixtures purged by exact ID (${result.deleted})`);
+  return 'purged';
+}
 export async function cleanup(file) {
   // A repeated cleanup succeeds only for a syntactically confined, already absent run.
   if (path.dirname(path.dirname(file)) !== ROOT || path.basename(file) !== 'manifest.json' || !/^[a-f0-9]{32}$/.test(path.basename(path.dirname(file)))) throw new Error('Invalid recovery path');
@@ -62,6 +81,7 @@ export async function cleanup(file) {
   const manifest = await loadManifest(file);
   setDockerEndpoint(manifest.dockerEndpoint);
   await cleanupProcesses(manifest);
+  recoverSeededFixtures(manifest);
   // Enumerate narrowly, inspect immutable IDs, and require two independent labels.
   for (const kind of ['container', 'network', 'volume', 'image']) {
     const args = kind === 'container' ? ['ps', '-aq'] : [kind, 'ls', '-q'];

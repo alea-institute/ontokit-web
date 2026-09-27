@@ -38,6 +38,9 @@ test('profile selector accepts only known profiles and rejects before allocating
   for (const value of [undefined, '', 'Lifecycle', '__proto__', 'toString']) assert.throws(() => assertProfile(value), /Unknown E2E profile/);
   await assert.rejects(run({profile: 'bogus', apiSource: '/nonexistent'}), /Unknown E2E profile/);
   await assert.rejects(run({profile: 'lifecycle', lifecycleProbe: true, apiSource: '/nonexistent'}), /Unknown E2E profile/);
+  // A misspelled failure point is refused before diagnostics expiry, prerequisites or allocation.
+  await assert.rejects(run({profile: 'disabled', failAt: 'befor-browser', apiSource: '/nonexistent'}), /Unknown E2E failure point/);
+  await assert.rejects(run({profile: 'baseline', failAt: '', apiSource: '/nonexistent'}), /Unknown E2E failure point/);
 });
 
 test('default profile keeps the baseline identity sequence and never touches provider lifetimes', async () => {

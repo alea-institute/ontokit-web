@@ -71,3 +71,23 @@ test('default baseline profile provisions exactly the D06 owner and unrelated pe
   const duplicate = async () => ({id: 'same'});
   await assert.rejects(provisionPersonas(duplicate, {organizationId: 'org', runId: 'a'.repeat(32)}), /distinct/);
 });
+
+test('optional-configured provisions exactly one ordinary persona and no lifetime change', async () => {
+  const { provisionPersonas } = await import('./bootstrap-identity.mjs');
+  const calls = [];
+  const call = async (endpoint, _body, _readOnly = false, method = 'POST') => { calls.push(`${method} ${endpoint}`); return {id: '123456789012345678'}; };
+  const {users, lifetimes} = await provisionPersonas(call, {profile: 'optional-configured', organizationId: 'org', runId: 'a'.repeat(32)});
+  assert.deepEqual(Object.keys(users), ['owner']);
+  assert.equal(lifetimes, null);
+  assert.deepEqual(calls, ['POST /v2/users/new']);
+});
+test('provider-less profiles never provision identities or start identity services', async () => {
+  const { provisionPersonas, bootstrapIdentity } = await import('./bootstrap-identity.mjs');
+  for (const profile of ['optional-anonymous', 'disabled']) {
+    let called = false;
+    await assert.rejects(provisionPersonas(async () => { called = true; return {id: '1'}; }, {profile, organizationId: 'org', runId: 'a'.repeat(32)}), /Provider-less/);
+    // Rejected before any Compose call: the context has no ports or runtime directory.
+    await assert.rejects(bootstrapIdentity({profile, manifest: {}}), /Provider-less/);
+    assert.equal(called, false);
+  }
+});

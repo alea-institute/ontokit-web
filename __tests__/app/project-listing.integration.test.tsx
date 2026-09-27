@@ -50,6 +50,8 @@ describe('project listing through query pagination, permissions and actual proje
   });
 
   it.each(['My Projects', 'Private'])('requires sign-in for anonymous %s without sending a privileged list request', async filter => {
+    // Sign-in is offered only with an active provider; provider-less copy is covered in home-page.test.tsx.
+    vi.stubEnv('NEXT_PUBLIC_ZITADEL_CONFIGURED', 'true');
     const { requests } = mount(); await screen.findByText('Ontology first'); const count = requests().length;
     fireEvent.click(content().getByRole('button', { name: filter }));
     expect(content().getByRole('heading', { name: /Sign in to see/ })).toBeDefined();

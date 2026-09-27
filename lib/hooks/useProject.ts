@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { projectApi, type Project } from "@/lib/api/projects";
 import { useSearchParams } from "next/navigation";
 import { ApiError, getDemoGenerationRetired, isProjectUuid } from "@/lib/api/client";
+import { isClientAuthDisabled } from "@/lib/auth-mode";
 
 export type ProjectErrorKind = "private-403" | "no-access" | "not-found" | "generic";
 
@@ -77,10 +78,12 @@ export function derivePermissions(
   project: Project | null,
   accessToken?: string,
 ) {
-  const canManage = project?.user_role === "owner" || project?.user_role === "admin" || !!project?.is_superadmin;
+  // An anonymous disabled-mode role is not permission to mutate a project.
+  const roleAccess = !isClientAuthDisabled() || !!accessToken;
+  const canManage = roleAccess && (project?.user_role === "owner" || project?.user_role === "admin" || !!project?.is_superadmin);
   const hasExplicitRole = !!project?.user_role;
-  const canEdit = project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || !!project?.is_superadmin;
-  const isSuggester = project?.user_role === "suggester" || (!hasExplicitRole && !!accessToken);
+  const canEdit = roleAccess && (project?.user_role === "owner" || project?.user_role === "admin" || project?.user_role === "editor" || !!project?.is_superadmin);
+  const isSuggester = roleAccess && (project?.user_role === "suggester" || (!hasExplicitRole && !!accessToken));
   const canSuggest = canEdit || isSuggester;
   const hasValidAccess = !!accessToken;
   const hasOntology = !!project?.source_file_path;

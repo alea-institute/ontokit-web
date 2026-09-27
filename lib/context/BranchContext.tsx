@@ -106,6 +106,8 @@ export function BranchProvider({
     () => initialBranch || getStoredBranch(projectId) || "main"
   );
   const [pendingChanges, setPendingChanges] = useState(false);
+  // All branch writes require a bearer token.
+  const canWrite = !!accessToken;
 
   const isFeatureBranch = currentBranch !== defaultBranch;
 
@@ -114,7 +116,7 @@ export function BranchProvider({
     if (!response) return;
     setCurrentBranch((prev) => {
       // Unauthenticated users are locked to the default branch
-      if (!accessToken) return response.default_branch ?? response.current_branch;
+      if (!canWrite) return response.default_branch ?? response.current_branch;
 
       const prevExists = response.items.some((b) => b.name === prev);
       if (prevExists) return prev;
@@ -131,13 +133,13 @@ export function BranchProvider({
         ? response.preferred_branch!
         : response.current_branch;
     });
-  }, [response, projectId, accessToken]);
+  }, [response, projectId, canWrite]);
 
   // Set initial branch if specified and different from current (authenticated only)
   const [initialBranchHandled, setInitialBranchHandled] = useState(false);
   useEffect(() => {
     if (
-      accessToken &&
+      canWrite &&
       initialBranch &&
       !initialBranchHandled &&
       !isLoading &&
@@ -149,7 +151,7 @@ export function BranchProvider({
       }
       setInitialBranchHandled(true);
     }
-  }, [accessToken, initialBranch, initialBranchHandled, isLoading, branches, currentBranch]);
+  }, [canWrite, initialBranch, initialBranchHandled, isLoading, branches, currentBranch]);
 
   const refreshBranches = useCallback(async () => {
     await queryClient.invalidateQueries({
@@ -159,7 +161,7 @@ export function BranchProvider({
 
   const createBranch = useCallback(
     async (name: string, fromBranch?: string): Promise<BranchInfo> => {
-      if (!accessToken) {
+      if (!canWrite) {
         throw new Error("Authentication required");
       }
 
@@ -179,12 +181,12 @@ export function BranchProvider({
 
       return newBranch;
     },
-    [projectId, accessToken, refreshBranches]
+    [projectId, accessToken, canWrite, refreshBranches]
   );
 
   const switchBranch = useCallback(
     async (name: string) => {
-      if (!accessToken) {
+      if (!canWrite) {
         throw new Error("Authentication required to switch branches");
       }
 
@@ -206,12 +208,12 @@ export function BranchProvider({
       // Fire-and-forget: persist to DB for cross-session restore
       branchesApi.savePreference(projectId, name, accessToken).catch(() => {});
     },
-    [branches, pendingChanges, projectId, accessToken]
+    [branches, pendingChanges, projectId, accessToken, canWrite]
   );
 
   const deleteBranch = useCallback(
     async (name: string, force = false) => {
-      if (!accessToken) {
+      if (!canWrite) {
         throw new Error("Authentication required");
       }
 
@@ -228,7 +230,7 @@ export function BranchProvider({
       // Refresh branches list
       await refreshBranches();
     },
-    [projectId, accessToken, currentBranch, defaultBranch, refreshBranches]
+    [projectId, accessToken, canWrite, currentBranch, defaultBranch, refreshBranches]
   );
 
   const value: BranchContextValue = {

@@ -119,7 +119,9 @@ export async function persistGeneratedEntity(
 
   if (mode === "direct") {
     targetBranch = requireBranch(options.branch, "save the generated entity");
-    if (!accessToken) throw new Error("Could not save the generated entity: sign in and retry.");
+    if (!accessToken) {
+      throw new Error("Could not save the generated entity: sign in and retry.");
+    }
     targetToken = accessToken;
   } else {
     session = requireSession(
@@ -168,6 +170,10 @@ export async function persistGeneratedEntity(
   });
 
   if (mode === "direct") {
+    const token = targetToken;
+    if (!token) {
+      throw new Error("Could not save the generated entity: sign in and retry.");
+    }
     const kind = entity.entityType === "class" ? "class" : "property";
     let saved;
     try {
@@ -175,7 +181,7 @@ export async function persistGeneratedEntity(
         projectId,
         content,
         `Add generated ${kind} "${entity.label}"`,
-        targetToken!,
+        token,
         targetBranch,
         response.revision,
       );

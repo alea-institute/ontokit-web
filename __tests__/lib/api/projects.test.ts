@@ -176,6 +176,7 @@ describe("projectApi", () => {
       expect(JSON.parse(options.body)).toEqual({ name: "New" });
       expect(options.headers.get("Authorization")).toBe("Bearer tok");
     });
+
   });
 
   // --- update ---
@@ -239,7 +240,9 @@ describe("projectApi", () => {
       expect(fileEntry.type).toBe("text/turtle");
       expect(formData.get("is_public")).toBe("true");
       expect(formData.get("name")).toBe("My Ont");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
     });
+
   });
 
   // --- scanGitHubRepoFiles ---
