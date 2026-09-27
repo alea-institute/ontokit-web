@@ -178,6 +178,16 @@ describe("derivePermissions by authentication mode", () => {
     expect(perms.hasValidAccess).toBe(false);
   });
 
+  it.each([undefined, "token-123"])("in disabled mode gates an explicit suggester role on token %s", token => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
+    const perms = derivePermissions(makeProject({ user_role: "suggester" }), token);
+    expect(perms.isSuggester).toBe(!!token);
+    expect(perms.canSuggest).toBe(!!token);
+    expect(perms.isSuggestionMode).toBe(!!token);
+    expect(perms.canEdit).toBe(false);
+    expect(perms.canManage).toBe(false);
+  });
+
   it.each([["viewer"], [undefined]] as const)("in disabled mode grants no write access for role %s", role => {
     vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "disabled");
     const perms = derivePermissions(makeProject({ user_role: role }));

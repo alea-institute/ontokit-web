@@ -45,10 +45,34 @@ function mount(options: { role?: string; exemplar?: boolean; superadmin?: boolea
   const view = render(<SessionProvider session={options.auth === undefined ? session : options.auth} refetchOnWindowFocus={false}><QueryWrapper><ToastProvider><ProjectSettingsPage /></ToastProvider></QueryWrapper></SessionProvider>);
   return { ...view, fetcher, client, fail: (value: boolean) => { mutationFailure = value; } };
 }
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); navigation.push.mockClear(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); navigation.push.mockClear(); });
 const main = () => within(screen.getByRole('main'));
 
 describe('settings route through real project query, form and HTTP client', () => {
+  it('shows read-only settings in disabled mode for an owner without a token', async () => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', 'disabled');
+    const { fetcher } = mount({ role: 'owner', auth: null });
+    expect(await screen.findByText('View project configuration (read-only)')).toBeDefined();
+    expect(main().queryByLabelText(/Project Name/)).toBeNull();
+    expect(main().queryByRole('button', { name: 'Save Changes' })).toBeNull();
+    expect(main().queryByRole('button', { name: 'Add Member' })).toBeNull();
+    expect(main().queryByRole('button', { name: 'Delete Project' })).toBeNull();
+    expect(main().queryByRole('heading', { name: 'Pull Request Settings' })).toBeNull();
+    expect(fetcher.mock.calls.some(([url]) => String(url).includes('/pr-settings'))).toBe(false);
+    expect(fetcher.mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true);
+  });
+
+  it.each(['required', 'optional'])('preserves the manager surface in %s mode for an owner with a token', async mode => {
+    vi.stubEnv('NEXT_PUBLIC_AUTH_MODE', mode);
+    mount({ role: 'owner', auth: session });
+    expect(await screen.findByLabelText(/Project Name/)).toBeDefined();
+    expect(main().getByRole('button', { name: 'Save Changes' })).toBeDefined();
+    expect(main().getByRole('button', { name: 'Add Member' })).toBeDefined();
+    expect(main().getByRole('button', { name: 'Delete Project' })).toBeDefined();
+    expect(main().getByRole('heading', { name: 'Pull Request Settings' })).toBeDefined();
+    expect(screen.queryByText('View project configuration (read-only)')).toBeNull();
+  });
+
   it('loads an owner form even when independent settings services fail, and saves the returned project into the shared cache', async () => {
     const { fetcher, client } = mount();
     const name = await screen.findByLabelText(/Project Name/);

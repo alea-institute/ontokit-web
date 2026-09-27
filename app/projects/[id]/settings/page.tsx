@@ -59,7 +59,7 @@ import {
   type JoinRequest as JoinRequestType,
 } from "@/lib/api/joinRequests";
 import { useRemoteSync } from "@/lib/hooks/useRemoteSync";
-import { useProject, projectQueryKeys } from "@/lib/hooks/useProject";
+import { useProject, projectQueryKeys, derivePermissions } from "@/lib/hooks/useProject";
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 import { useMemberTrust, memberTrustQueryKeys } from "@/lib/hooks/useMemberTrust";
 import { useMembers, memberQueryKeys } from "@/lib/hooks/useMembers";
@@ -260,9 +260,8 @@ export default function ProjectSettingsPage() {
   const isAuthenticated = status === "authenticated";
   const isLoading = isProjectLoading || status === "loading";
 
-  const canManage =
-    project?.user_role === "owner" || project?.user_role === "admin" || project?.is_superadmin;
-  const isOwner = project?.user_role === "owner";
+  const { canManage } = derivePermissions(project, session?.accessToken);
+  const isOwner = canManage && project?.user_role === "owner";
 
   // Contribution trust ladder (R6): every member's rung and accepted count.
   // Owner/admin only, mirroring the endpoint's own gate.

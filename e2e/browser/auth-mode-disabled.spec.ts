@@ -10,6 +10,7 @@ import type { Page } from "@playwright/test";
 
 const test = modeTest("disabled");
 const PROFILE = "disabled";
+const DISABLED_WRITE_DETAIL = "Authentication is disabled on this deployment, so it is read-only apart from anonymous suggestions";
 
 async function expectNoAuthUi(page: Page) {
   await expectNoSignInControl(page);
@@ -105,13 +106,20 @@ test("project create, import and source save are refused by the API and the web 
   await expectNoAuthUi(page);
 
   // The auth dependency refuses even an empty import before body validation.
-  recordProbe(PROFILE, "project-create-disabled", await directProbe(anonymousApi, "POST", "/api/v1/projects", {name: "D09 refused create", is_public: true}));
-  recordProbe(PROFILE, "project-import-disabled", await directProbe(anonymousApi, "POST", "/api/v1/projects/import"));
-  recordProbe(PROFILE, "source-save-disabled", await directProbe(anonymousApi, "PUT", `${projectPath(publicId)}/source?branch=main`, {
+  // Exact detail distinguishes the disabled-mode gate from an ownership-based 403.
+  const create = await directProbe(anonymousApi, "POST", "/api/v1/projects", {name: "D09 refused create", is_public: true});
+  expect(await create.json()).toHaveProperty("detail", DISABLED_WRITE_DETAIL);
+  recordProbe(PROFILE, "project-create-disabled", create);
+  const imported = await directProbe(anonymousApi, "POST", "/api/v1/projects/import");
+  expect(await imported.json()).toHaveProperty("detail", DISABLED_WRITE_DETAIL);
+  recordProbe(PROFILE, "project-import-disabled", imported);
+  const saved = await directProbe(anonymousApi, "PUT", `${projectPath(publicId)}/source?branch=main`, {
     content: original.content + "\n# refused disabled-mode edit",
     commit_message: "D09 refused source save",
     base_revision: original.revision,
-  }));
+  });
+  expect(await saved.json()).toHaveProperty("detail", DISABLED_WRITE_DETAIL);
+  recordProbe(PROFILE, "source-save-disabled", saved);
   const after = await readSource(anonymousApi, publicId);
   expect(after.content).toBe(original.content);
   expect(after.revision).toBe(original.revision);

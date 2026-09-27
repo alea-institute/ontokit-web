@@ -711,11 +711,13 @@ export default function EditorPage() {
     removeOptimisticNode(deleteTargetIri);
 
     try {
+      const token = session?.accessToken;
+      if (!token) throw new Error("Not authenticated");
       await projectOntologyApi.deleteClass(
         projectId,
         deleteTargetIri,
         `Delete class ${deleteTargetLabel}`,
-        session!.accessToken!,
+        token,
         activeBranch
       );
       toast.success(`Deleted "${deleteTargetLabel}"`);

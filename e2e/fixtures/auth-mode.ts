@@ -67,11 +67,11 @@ export function apiCall(page: Page, run: ModeRunConfig, method: string, pathname
   }, {timeout: 45_000});
 }
 /** Direct API probe for actions the UI does not offer (no Authorization header at all). */
-export async function directProbe(api: APIRequestContext, method: "GET" | "POST" | "PUT", path: string, data?: unknown): Promise<Observed> {
+export async function directProbe(api: APIRequestContext, method: "GET" | "POST" | "PUT", path: string, data?: unknown): Promise<Observed & { json: () => Promise<unknown> }> {
   const response = method === "GET" ? await api.get(path)
     : method === "PUT" ? await api.put(path, {data: data ?? {}})
     : await api.post(path, {data: data ?? {}});
-  return {status: response.status(), authorization: false};
+  return {status: response.status(), authorization: false, json: () => response.json()};
 }
 
 // ---- KTD8 resolved session ----
