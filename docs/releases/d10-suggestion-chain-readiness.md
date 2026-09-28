@@ -1,6 +1,6 @@
 # D10 suggestion review chain readiness
 
-Status: **Locally verified at web `2c120996` / API `19b62d2c`. Publication: [Web PR60](https://github.com/alea-institute/ontokit-web/pull/60) and [API PR60](https://github.com/alea-institute/ontokit-api/pull/60). Merge and DEV deployment are recorded separately after they happen. Hosted persona acceptance (B02/B03) is not claimed.**
+Status: **Locally verified; merged through [Web PR60](https://github.com/alea-institute/ontokit-web/pull/60) as `787eecc4` and [API PR60](https://github.com/alea-institute/ontokit-api/pull/60) as `44b6dfd3`, and deployed together to DEV (EU) on 2026-09-28. Runtime matches checkout for api, worker and web (no revision drift). Hosted persona acceptance (B02/B03) is not claimed.**
 [Plan](../plans/2026-09-27-1726-test-suggestion-review-chain-plan.md)
 
 A non-editor can propose an ontology change. A reviewer can then accept it, reject it
@@ -99,10 +99,24 @@ and it passed.
 
 Unapplied, non-blocking review notes are listed in both PR bodies.
 
-## Deployment note
+## DEV deployment
 
-Deploy the two halves together. Resubmitting a sent-back suggestion now requires a
-prior `reopen`, which only the new web calls.
+The squash merges carry exactly the verified trees: API `44b6dfd3` has the same tree as
+`19b62d2c`, and web `787eecc4` has the same tree as the verified `2c120996` plus this
+receipt and the run receipts. Both deployed together to DEV (EU) on 2026-09-28 through the
+forced-command key. Status reports api, worker and web runtime = checkout with no drift.
+The halves must stay paired: resubmitting a sent-back suggestion now requires a prior
+`reopen`, which only the new web calls.
+
+| Smoke check | Result |
+|---|---|
+| Web `/` | 200 |
+| Providers | 200, contains `zitadel` |
+| Anonymous project create | 401 |
+| Anonymous `POST …/suggestions/sessions/{sid}/reopen` | 401 (route deployed) |
+| OpenAPI lists the reopen route | Yes |
+
+These checks do not establish hosted persona acceptance of the chain (B02/B03).
 
 ## Carried forward (not delivered by D10)
 
