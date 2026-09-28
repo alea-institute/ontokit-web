@@ -22,18 +22,18 @@ browser, plus the API refusals, each recorded with its tier and status.
 | Unit | Commit | Result |
 |---|---|---|
 | U1 API lifecycle | API `7ba90dcb` | Owner-only `reopen` (changes-requested → active, fresh beacon token, 409 while another active session exists). A reopened revision is resubmitted on the **same PR** with revision+1 and a reviewer notification, via submit, resubmit or the stale sweep. Approve, reject and request-changes notify the authenticated suggester; dismiss and anonymous sessions stay silent. Reject and discard of a reopened session close the PR through a reviewer-authorized seam. Self-approval is refused, including in bulk review |
-| U2 editors approve (provisional) | API `bd138727` | Reviewer-authorized merge seam; `pr_approval_required` still enforced; direct PR merge stays owner/admin |
-| U3 public non-member suggestions (provisional) | API `62a6d0ec` | Signed-in non-members suggest on public projects at the untrusted tier; capabilities agree; private projects and minting still refused |
+| U2 editors approve (confirmed 2026-09-28) | API `bd138727` | Reviewer-authorized merge seam; `pr_approval_required` still enforced; direct PR merge stays owner/admin |
+| U3 public non-member suggestions (confirmed 2026-09-28) | API `62a6d0ec` | Signed-in non-members suggest on public projects at the untrusted tier; capabilities agree; private projects and minting still refused |
 | R1 API review fixes | API `19b62d2c` | Approvals from an earlier revision no longer count after resubmission. Reopen refuses a non-open PR. Discard tolerates a PR that is already closed or merged. The stale sweep closes the PR on a lost-access discard and skips unchanged reopened revisions. Guard tests added |
 | U4 web resume flow | Web `86ee808e` | Resume calls `reopen`, adopts the server branch, beacon token and change count; reload adopts the active reopened session; failed or mismatched resume stays read-only |
 | U5 harness profile | Web `e1fef2d2` | Required-auth `suggestions` profile with owner, suggester, editor and unrelated personas (none a superadmin). Memberships are added through the owner's HTTP API. The seven-case inventory is exact |
 | U6 browser proof | Web `ba6c2e36` | `e2e/browser/suggestions.spec.ts` (7 cases) plus one anonymous-proposal case in optional-configured (now 6) |
 | R2 web review fixes | Web `2c120996` | Branch adoption resets branch-scoped source and syncs BranchContext; a resubmit releases the resume guard; `resumeSession` is the single adoption path |
 
-The two provisional policies (U2 and U3) await Cockpit ask
+The two policies (U2 and U3) shipped provisionally. Damien confirmed both on 2026-09-28 in Cockpit ask
 `ontokit-web-2026-09-27-2224-d10-suggestion-permissions` (qids
-`editor-approves-suggestions`, `nonmember-suggestions`). Each ships as one commit with its
-own inventory case (6 and 7), so either can be reverted alone.
+`editor-approves-suggestions`, `nonmember-suggestions`), so no revert is needed. Each still sits in its own commit with its
+own inventory case (6 and 7).
 
 ## Requirements evidence
 
@@ -47,8 +47,8 @@ own inventory case (6 and 7), so either can be reverted alone.
 | R6 role refusals | Probes in cases 1–2; bulk self-approval covered by API unit tests |
 | R7 state refusals are 400 | Probes in cases 1–2; API unit tests for other statuses |
 | R8 private and mint refusals | Case 5: private non-member create 403; untrusted mint 403 |
-| R9 editor approval (provisional) | Case 6 |
-| R10 public non-member (provisional) | Case 7: capabilities agree with create; submission succeeds |
+| R9 editor approval (confirmed) | Case 6 |
+| R10 public non-member (confirmed) | Case 7: capabilities agree with create; submission succeeds |
 | R11 anonymous proposal | Optional-configured case 6: anonymous submission on the owner-persona public fixture reaches the owner's triage |
 | R12 harness integrity | Exact inventories; unchanged baseline, lifecycle, optional-anonymous and disabled counts; sanitized receipts; complete cleanup; neighbors unchanged (below) |
 

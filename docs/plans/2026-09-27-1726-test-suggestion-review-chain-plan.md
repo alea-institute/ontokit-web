@@ -62,8 +62,8 @@ Suggestions are how non-editors contribute. Today no end-to-end run proves them,
 
 ### Key Decisions
 
-- **Editors can approve suggestions (provisional).** Editors can already change the ontology directly, so accepting a suggestion adds no power. Filed as ask `ontokit-web-2026-09-27-2224-d10-suggestion-permissions`, qid `editor-approves-suggestions`; provisional mark recorded. Governs R9.
-- **Signed-in non-members may suggest on public projects (provisional).** Anonymous visitors already can; refusing a signed-in person is backwards. Same ask, qid `nonmember-suggestions`. Governs R10.
+- **Editors can approve suggestions (provisional).** Editors can already change the ontology directly, so accepting a suggestion adds no power. Filed as ask `ontokit-web-2026-09-27-2224-d10-suggestion-permissions`, qid `editor-approves-suggestions`; provisional mark recorded. Governs R9. Confirmed by Damien 2026-09-28.
+- **Signed-in non-members may suggest on public projects (provisional).** Anonymous visitors already can; refusing a signed-in person is backwards. Same ask, qid `nonmember-suggestions`. Governs R10. Confirmed by Damien 2026-09-28.
 
 ### Scope Boundaries
 
