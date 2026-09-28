@@ -381,12 +381,12 @@ test('mode evidence in a baseline or lifecycle report prevents acceptance', () =
   const l = lifecycle(); specOf(l, 'R1').tests[0].annotations.push(...annotateMode([MODE_CASES.disabled[0].probes[0]]));
   rejects(l, 'lifecycle');
 });
-test('every mode inventory title is exactly one test title in its registry spec', () => {
-  for (const profile of MODE_PROFILES) {
+test('every mode and suggestion inventory matches its browser spec titles in order', () => {
+  for (const profile of [...MODE_PROFILES, 'suggestions']) {
     const file = new URL(`../../e2e/${PROFILE_INVENTORIES[profile][0].file}`, import.meta.url);
     const source = readFileSync(file, 'utf8');
     const titles = [...source.matchAll(/\btest\(\s*"([^"]+)"/g)].map(m => m[1]);
-    assert.deepEqual(titles.sort(), MODE_CASES[profile].map(c => c.title).sort(), profile);
+    assert.deepEqual(titles, PROFILE_INVENTORIES[profile].map(c => c.title), profile);
   }
 });
 test('the one-shot migrate job is allowed but not required; unknown services are refused', () => {
@@ -397,4 +397,89 @@ test('the one-shot migrate job is allowed but not required; unknown services are
     const unknown = {...migrate, service: 'sidecar'};
     assert.equal(sanitizedEvidence({...manifest, evidenceImages: [...manifest.evidenceImages, unknown]}, ok).acceptedRun, false, `${manifest.profile} with an unknown service`);
   }
+});
+
+// D10: seven dedicated journeys and one additional optional-configured journey.
+const suggestionTable = async () => (await import('./evidence.mjs')).SUGGESTION_CASES;
+async function suggestionReport() {
+  const table = (await suggestionTable()).filter(c => c.profile === 'suggestions');
+  return {stats: {expected: 7, skipped: 0, unexpected: 0, flaky: 0}, errors: [], suites: [{specs: table.map(c => ({
+    file: 'browser/suggestions.spec.ts', title: c.title, ok: true,
+    tests: [passing('suggestions', annotateMode(c.probes))],
+  }))}]};
+}
+test('suggestions owns seven journeys and extends only optional-configured by one', async () => {
+  const table = await suggestionTable();
+  assert.equal(table.length, 8);
+  assert.deepEqual(table.map(c => c.profile), [...Array(7).fill('suggestions'), 'optional-configured']);
+  assert.equal(PROFILE_INVENTORIES.suggestions.length, 7);
+  assert.equal(PROFILE_INVENTORIES['optional-configured'].length, 6);
+  assert.equal(PROFILE_INVENTORIES['optional-configured'].at(-1).title, table[7].title);
+  assert.equal(validateReport(modeReport('optional-configured'), {profile: 'optional-configured'}).passed, 6);
+  assert.equal(PROFILE_INVENTORIES.baseline.length, 21);
+  assert.equal(PROFILE_INVENTORIES.lifecycle.length, 4);
+  assert.equal(PROFILE_INVENTORIES['optional-anonymous'].length, 2);
+  assert.equal(PROFILE_INVENTORIES.disabled.length, 3);
+  assert.equal(validateReport(await suggestionReport(), {profile: 'suggestions'}).passed, 7);
+});
+test('suggestions rejects every missing, duplicate, extra, skipped, retried or foreign case', async () => {
+  for (let i = 0; i < 7; i++) {
+    for (const mutate of [
+      r => { r.suites[0].specs.splice(i, 1); },
+      r => { r.suites[0].specs[i] = structuredClone(r.suites[0].specs[(i + 1) % 7]); },
+      r => { r.suites[0].specs[i].tests[0].results[0].status = 'skipped'; },
+      r => { r.suites[0].specs[i].tests[0].results[0].retry = 1; },
+      r => { r.suites[0].specs[i].file = 'browser/auth-mode-optional-configured.spec.ts'; },
+      r => { r.suites[0].specs[i].tests[0].projectName = 'chromium'; },
+    ]) { const r = await suggestionReport(); mutate(r); rejects(r, 'suggestions'); }
+  }
+  for (const mutate of [
+    r => { r.errors.push({message: 'runner failed'}); },
+    r => { r.stats.skipped = 1; },
+    r => { r.stats.flaky = 1; },
+    r => { r.suites[0].specs[0].tests[0].annotations.push({type: 'fixme'}); },
+  ]) { const r = await suggestionReport(); mutate(r); rejects(r, 'suggestions'); }
+  const mixed = baseline();
+  mixed.suites[0].specs.push({file: 'browser/suggestions.spec.ts', title: 'foreign case', ok: true, tests: [passing('chromium')]});
+  mixed.stats.expected++;
+  rejects(mixed, 'baseline');
+  const extra = await suggestionReport(); extra.suites[0].specs.push(structuredClone(extra.suites[0].specs[0])); extra.stats.expected++;
+  rejects(extra, 'suggestions');
+  for (const profile of ['baseline', 'lifecycle', ...MODE_PROFILES]) rejects(await suggestionReport(), profile);
+  for (const r of [baseline(), lifecycle(), ...MODE_PROFILES.map(modeReport)]) rejects(r, 'suggestions');
+});
+test('suggestions requires exact API refusal probes and sanitizes receipt evidence', async () => {
+  const table = (await suggestionTable()).filter(c => c.profile === 'suggestions');
+  assert.deepEqual(table.flatMap(c => c.probes).map(p => [p.probe, p.tier, p.status, p.authorization]), [
+    ['submitted-save', 'api', 400, true], ['suggester-approve', 'api', 403, true],
+    ['merged-approve', 'api', 400, true], ['creator-self-approve', 'api', 403, true],
+    ['private-non-member-create', 'api', 403, true], ['untrusted-mint', 'api', 403, true],
+  ]);
+  for (const [i, c] of table.entries()) for (let j = 0; j < c.probes.length; j++) {
+    for (const change of [p => ({...p, tier: 'web'}), p => ({...p, status: 200}), p => ({...p, authorization: false}), p => ({...p, path: '/wrong'}), p => ({...p, method: 'GET'})]) {
+      const r = await suggestionReport();
+      r.suites[0].specs[i].tests[0].annotations[j] = annotateMode([change(c.probes[j])])[0];
+      rejects(r, 'suggestions');
+    }
+    const missing = await suggestionReport(); missing.suites[0].specs[i].tests[0].annotations.splice(j, 1); rejects(missing, 'suggestions');
+    const duplicate = await suggestionReport(); duplicate.suites[0].specs[i].tests[0].annotations.push(duplicate.suites[0].specs[i].tests[0].annotations[j]); rejects(duplicate, 'suggestions');
+  }
+  const report = await suggestionReport();
+  const annotation = report.suites[0].specs[0].tests[0].annotations[0];
+  annotation.description = JSON.stringify({...JSON.parse(annotation.description), token: SENTINEL});
+  const manifest = {...baselineManifest(), profile: 'suggestions', tests: validateReport(report, {profile: 'suggestions'}), authModes: {profile: 'suggestions', web: {mode: 'required', providerConfigured: true}, api: {mode: 'required', providerConfigured: true}}};
+  const receipt = sanitizedEvidence(manifest, ok);
+  assert.equal(receipt.acceptedRun, true);
+  assert.equal(JSON.stringify(receipt).includes(SENTINEL), false);
+  assert.equal(sanitizedEvidence(manifest, {...ok, cleanup: 'failed'}).acceptedRun, false);
+  for (const service of ['postgres', 'redis', 'minio', 'api', 'worker', 'zitadel', 'login']) {
+    assert.equal(sanitizedEvidence({...manifest, evidenceImages: manifest.evidenceImages.filter(i => i.service !== service)}, ok).acceptedRun, false);
+  }
+  const unknownService = {...manifest.evidenceImages[0], service: 'sidecar'};
+  assert.equal(sanitizedEvidence({...manifest, evidenceImages: [...manifest.evidenceImages, unknownService]}, ok).acceptedRun, false);
+  assert.equal(sanitizedEvidence({...manifest, authModes: undefined}, ok).acceptedRun, false);
+  const wrongMode = structuredClone(manifest); wrongMode.authModes.api.mode = 'optional';
+  assert.equal(sanitizedEvidence(wrongMode, ok).acceptedRun, false);
+  const tampered = structuredClone(manifest); tampered.tests.cases[0].evidence[0].status = 200;
+  assert.equal(sanitizedEvidence(tampered, ok).acceptedRun, false);
 });

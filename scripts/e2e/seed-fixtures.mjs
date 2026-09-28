@@ -27,6 +27,8 @@ export function seedPlan(profile, {runId, personaSubject} = {}) {
   const plan = [fixture('publicProject', true, owner), fixture('foreignPrivateProject', false, owner)];
   if (seed.persona) {
     if (typeof personaSubject !== 'string' || !PERSONA_SUBJECT.test(personaSubject)) throw new Error('Seed input invalid: persona subject');
+    // D10's anonymous submission must reach a real owner's review queue.
+    plan[0] = fixture('publicProject', true, personaSubject);
     plan.push(fixture('personaPrivateProject', false, personaSubject));
   } else if (personaSubject !== undefined) throw new Error('Seed input invalid: provider-less profiles have no persona');
   return plan;
@@ -130,7 +132,9 @@ export function purgePayload(manifest) {
   if (seed.runId !== manifest.id || !RUN_ID.test(seed.runId) || !seed.fixtures || typeof seed.fixtures !== 'object') throw new Error('Seed record invalid');
   const fixtures = Object.entries(seed.fixtures).map(([key, f]) => {
     if (!FIXTURE_KEYS.includes(key) || !f || !UUID.test(f.id) || f.tag !== runTag(seed.runId, key)) throw new Error('Seed record invalid');
-    if (key === 'personaPrivateProject' ? !PERSONA_SUBJECT.test(f.owner) : f.owner !== foreignOwner(seed.runId)) throw new Error('Seed record invalid');
+    const personaOwned = key === 'personaPrivateProject' || (key === 'publicProject' && seed.fixtures.personaPrivateProject);
+    if (personaOwned ? !PERSONA_SUBJECT.test(f.owner) : f.owner !== foreignOwner(seed.runId)) throw new Error('Seed record invalid');
+    if (key === 'publicProject' && personaOwned && f.owner !== seed.fixtures.personaPrivateProject.owner) throw new Error('Seed record invalid');
     return {key, id: f.id, owner: f.owner, tag: f.tag};
   });
   if (!fixtures.length) throw new Error('Seed record invalid');

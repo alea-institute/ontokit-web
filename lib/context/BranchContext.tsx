@@ -69,6 +69,8 @@ interface BranchProviderProps {
   projectId: string;
   accessToken?: string;
   initialBranch?: string;
+  /** Authoritative branch returned when a suggestion session is reopened. */
+  adoptedBranch?: string;
   children: ReactNode;
 }
 
@@ -76,6 +78,7 @@ export function BranchProvider({
   projectId,
   accessToken,
   initialBranch,
+  adoptedBranch,
   children,
 }: BranchProviderProps) {
   const queryClient = useQueryClient();
@@ -118,6 +121,8 @@ export function BranchProvider({
       // Unauthenticated users are locked to the default branch
       if (!canWrite) return response.default_branch ?? response.current_branch;
 
+      // A reopened branch may not be in the cached branch list yet.
+      if (prev === adoptedBranch) return prev;
       const prevExists = response.items.some((b) => b.name === prev);
       if (prevExists) return prev;
       // Stored/initial branch was deleted — clear stale sessionStorage
@@ -133,7 +138,7 @@ export function BranchProvider({
         ? response.preferred_branch!
         : response.current_branch;
     });
-  }, [response, projectId, canWrite]);
+  }, [response, projectId, canWrite, adoptedBranch]);
 
   // Set initial branch if specified and different from current (authenticated only)
   const [initialBranchHandled, setInitialBranchHandled] = useState(false);
@@ -152,6 +157,13 @@ export function BranchProvider({
       setInitialBranchHandled(true);
     }
   }, [canWrite, initialBranch, initialBranchHandled, isLoading, branches, currentBranch]);
+
+  useEffect(() => {
+    if (!canWrite || !adoptedBranch) return;
+    setCurrentBranch(adoptedBranch);
+    setStoredBranch(projectId, adoptedBranch);
+    setInitialBranchHandled(true);
+  }, [adoptedBranch, canWrite, projectId]);
 
   const refreshBranches = useCallback(async () => {
     await queryClient.invalidateQueries({

@@ -23,6 +23,7 @@
     "test:e2e:auth-lifecycle": "node scripts/e2e/run.mjs --profile lifecycle",
     "test:e2e:optional-configured": "node scripts/e2e/run.mjs --profile optional-configured",
     "test:e2e:optional-anonymous": "node scripts/e2e/run.mjs --profile optional-anonymous",
+    "test:e2e:suggestions": "node scripts/e2e/run.mjs --profile suggestions",
     "test:e2e:disabled": "node scripts/e2e/run.mjs --profile disabled"
   },
   "dependencies": {

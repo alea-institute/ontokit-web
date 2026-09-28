@@ -178,5 +178,8 @@ export async function provisionPersonas(call, {profile = 'baseline', organizatio
   const ids = Object.values(users).map(user => user.id);
   if (new Set(ids).size !== ids.length) throw new Error('Disposable identities must be distinct');
   if (profile === 'lifecycle') await verifyOrdinaryPersona(call, users.lifecycle.id);
+  if (profile === 'suggestions') {
+    for (const user of Object.values(users)) await verifyOrdinaryPersona(call, user.id);
+  }
   return {users, lifetimes};
 }

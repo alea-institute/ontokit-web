@@ -79,6 +79,7 @@ let suggestionFailure: "create" | "save" | null;
 let suggestionSubmitStatus: number;
 let resumableSessions: object[];
 let sessionListStatus: number;
+let reopenStatus: number;
 let suggestionSubmissions: unknown[];
 let suggestionBodies: { content: string; entity_iri: string; entity_label: string }[];
 let anonymousFailure: "create" | "save" | "submit" | "discard" | null;
@@ -176,7 +177,7 @@ beforeEach(() => {
   trustCapabilities = { tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 };
   projectStatus = 200; deleted = false; deleteFailure = false; referenceTotal = 1; referenceStatus = 200;
   saveStatus = 200; sourceStatus = 200; sourceContent = originalSource; sourceRevision = "base-commit"; entityResults = [];
-  savedBodies = []; suggestionBodies = []; suggestionFailure = null; suggestionSubmitStatus = 200; suggestionSubmissions = []; resumableSessions = []; sessionListStatus = 200;
+  savedBodies = []; suggestionBodies = []; suggestionFailure = null; suggestionSubmitStatus = 200; suggestionSubmissions = []; resumableSessions = []; sessionListStatus = 200; reopenStatus = 200;
   useEditorModeStore.getState().setEditorMode("developer");
   unexpected = [];
   requests.length = 0;
@@ -201,6 +202,7 @@ beforeEach(() => {
     }
     if (path.endsWith("/suggestions/sessions") && (!init?.method || init.method === "GET")) return sessionListStatus === 200 ? json({ items: resumableSessions }) : json({ detail: "Session list refused" }, sessionListStatus);
     if (path.endsWith("/suggestions/sessions")) return suggestionFailure === "create" ? json({ detail: "Session refused" }, 403) : json({ session_id: "suggestion-session", branch: "suggestion/draft", created_at: "2026-09-19T12:00:00Z", beacon_token: "fixture-beacon" });
+    if (path.endsWith("/suggestions/sessions/suggestion-session/reopen")) return reopenStatus === 200 ? json({ session_id: "suggestion-session", branch: "suggestion/draft", created_at: "2026-09-19T12:00:00Z", beacon_token: "reopened-beacon" }) : json({ detail: "Reopen refused" }, reopenStatus);
     if (path.endsWith("/suggestions/sessions/suggestion-session/submit") || path.endsWith("/suggestions/sessions/suggestion-session/resubmit")) {
       suggestionSubmissions.push(JSON.parse(String(init?.body)));
       return suggestionSubmitStatus === 200 ? json({ pr_number: 23, pr_url: "https://example.test/pull/23" }) : json({ detail: "Submission refused" }, suggestionSubmitStatus);
@@ -1231,11 +1233,85 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(useAnonymousTokenStore.getState().getToken("route-project")).toBeNull();
   });
 
+  it.each(["changes-requested", "active"])("adopts the server branch after stale source preload (%s)", async status => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    boundary.search = new URLSearchParams({ branch: "suggestion/draft" });
+    extraBranches = [{ name: "suggestion/draft", is_current: false }, { name: "suggestion/draft-v2", is_current: false }];
+    sourceContent = originalSource + '\nex:Stale a owl:Class .';
+    const view = mount();
+    await screen.findByRole("button", { name: "suggestion/draft" });
+    fireEvent.click(await screen.findByText("Person"));
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    await waitFor(() => expect((screen.getByLabelText("Turtle source boundary") as HTMLTextAreaElement).value).toContain("ex:Stale"));
+    fireEvent.click(screen.getByRole("button", { name: "Tree" }));
+    sourceContent = originalSource + '\nex:SentBack a owl:Class .';
+    resumableSessions = [{ session_id: "suggestion-session", branch: "suggestion/draft-v2", status, changes_count: 1, entities_modified: ["Person"] }];
+    const fetcher = vi.mocked(fetch);
+    const originalFetch = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async (input, init) => {
+      const response = await originalFetch(input, init);
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith("/reopen") || (path.endsWith("/suggestions/sessions") && init?.method === "POST")) {
+        return json({ ...await response.json(), branch: "suggestion/draft-v2" });
+      }
+      return response;
+    });
+    boundary.search.set("resumeSession", "suggestion-session");
+    view.rerender(<EditorPage />);
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && new URLSearchParams(r.search).get("branch") === "suggestion/draft-v2")).toBe(true));
+    fireEvent.click(await screen.findByText("Person"));
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await editAndSave(label, "Revised branch label");
+    await screen.findByText('Suggested update to "Revised branch label"');
+    expect(suggestionBodies.at(-1)?.content).toContain("ex:SentBack");
+    expect(suggestionBodies.at(-1)?.content).not.toContain("ex:Stale");
+    expect(requests.filter(r => r.path.endsWith("/revisions/file")).at(-1)?.search).toContain("suggestion%2Fdraft-v2");
+    expect(requests.find(r => r.path.endsWith("/suggestion-session/save"))).toMatchObject({ method: "PUT" });
+    expect(screen.getByRole("button", { name: "suggestion/draft-v2" })).toBeDefined();
+    expect(requests.some(r => r.path.endsWith("/discard"))).toBe(false);
+  });
+
+  it.each(["pending", "completed"])("keeps resumed suggestions usable during and after resubmit (%s)", async phase => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft", classIri: iri });
+    extraBranches = [{ name: "suggestion/draft", is_current: false }];
+    resumableSessions = [{ session_id: "suggestion-session", branch: "suggestion/draft", status: "changes-requested", changes_count: 1, entities_modified: ["Person"] }];
+    const fetcher = vi.mocked(fetch);
+    const originalFetch = fetcher.getMockImplementation()!;
+    let finish!: (response: Response) => void;
+    fetcher.mockImplementation((input, init) => new URL(String(input)).pathname.endsWith("/resubmit")
+      ? new Promise<Response>(resolve => { finish = resolve; }) : originalFetch(input, init));
+    const view = mount();
+    fireEvent.click(await screen.findByRole("button", { name: /Resubmit Suggestions/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
+    await waitFor(() => expect(finish).toBeDefined());
+    if (phase === "pending") {
+      expect(screen.getByText("Resubmit Suggestions").closest("button")?.hasAttribute("disabled")).toBe(true);
+    }
+    await act(async () => finish(json({ pr_number: 23, pr_url: null })));
+    await screen.findByText("Suggestions submitted as PR #23");
+    if (phase === "completed") {
+      const replacement = boundary.replace.mock.calls.at(-1)?.[0] as string;
+      const next = new URL(replacement, "https://example.test").searchParams;
+      expect(next.has("resumeSession")).toBe(false);
+      expect(next.get("branch")).toBe("suggestion/draft");
+      expect(next.get("classIri")).toBe(iri);
+      boundary.search = next;
+      view.rerender(<EditorPage />);
+      const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+      await editAndSave(label, "Fresh suggestion");
+      await screen.findByText('Suggested update to "Fresh suggestion"');
+      expect(requests.filter(r => r.path.endsWith("/suggestions/sessions") && r.method === "POST")).toHaveLength(1);
+      expect(suggestionBodies.at(-1)?.entity_label).toBe("Fresh suggestion");
+    }
+  });
+
   it.each([200, 403])("resumes a cold session URL and resubmits (HTTP %i)", async status => {
     projectResponse = { ...projectResponse, user_role: "suggester" };
     boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft" });
     extraBranches = [{ name: "suggestion/draft", is_current: false }];
-    resumableSessions = [{ session_id: "suggestion-session", status: "changes-requested" }];
+    resumableSessions = [{ session_id: "suggestion-session", branch: "suggestion/draft", status: "changes-requested", changes_count: 0, entities_modified: [], last_activity: "2026-09-19T12:00:00Z" }];
     mount();
     await screen.findByRole("button", { name: "suggestion/draft" });
     await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && new URLSearchParams(r.search).get("branch") === "suggestion/draft")).toBe(true));
@@ -1271,7 +1347,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     projectResponse = { ...projectResponse, user_role: "suggester" };
     boundary.search = new URLSearchParams({ branch: "suggestion/draft" });
     extraBranches = [{ name: "suggestion/draft", is_current: false }];
-    resumableSessions = [{ session_id: "suggestion-session", status: "changes-requested" }];
+    resumableSessions = [{ session_id: "suggestion-session", branch: "suggestion/draft", status: "changes-requested", changes_count: 0, entities_modified: [], last_activity: "2026-09-19T12:00:00Z" }];
     const view = mount();
     await screen.findByRole("button", { name: "suggestion/draft" });
     await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && new URLSearchParams(r.search).get("branch") === "suggestion/draft")).toBe(true));
@@ -1305,14 +1381,40 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(savedBodies).toEqual([]);
   });
 
-  it.each(["submitted", "missing", "forbidden"])("reports an unavailable resumed session (%s) without changing source", async state => {
+  it("reloads an active revision with its saved changes and resubmit control", async () => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft" });
+    extraBranches = [{ name: "suggestion/draft", is_current: false }];
+    resumableSessions = [{ session_id: "suggestion-session", branch: "suggestion/draft", status: "active", changes_count: 2, entities_modified: ["Person"], last_activity: "2026-09-19T12:00:00Z" }];
+    mount();
+    expect(await screen.findByRole("button", { name: /Resubmit Suggestions/ })).toBeDefined();
+    expect(requests.filter(r => r.path.endsWith("/suggestions/sessions") && r.method === "POST")).toHaveLength(1);
+    expect(requests.some(r => r.path.endsWith("/reopen"))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: /Resubmit Suggestions/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+    expect(within(dialog).getByText("Person")).toBeDefined();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
+    await screen.findByText("Suggestions submitted as PR #23");
+    expect(requests.find(r => r.path.endsWith("/suggestion-session/resubmit"))).toMatchObject({ method: "POST" });
+  });
+
+  it.each(["submitted", "missing", "forbidden", "reopen-refused"])("reports an unavailable resumed session (%s) without changing source", async state => {
     projectResponse = { ...projectResponse, user_role: "suggester" };
     boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft" });
     extraBranches = [{ name: "suggestion/draft", is_current: false }];
     resumableSessions = state === "submitted" ? [{ session_id: "suggestion-session", status: "submitted" }] : [];
+    if (state === "reopen-refused") {
+      resumableSessions = [{ session_id: "suggestion-session", branch: "suggestion/draft", status: "changes-requested", changes_count: 2, entities_modified: ["Person"] }];
+      reopenStatus = 409;
+    }
     sessionListStatus = state === "forbidden" ? 403 : 200;
     mount();
-    await screen.findByText(state === "forbidden" ? "Failed to verify suggestion session status." : "This suggestion session is no longer available for editing.");
+    const errorBanner = await screen.findByText(/The editor is read-only/);
+    expect(errorBanner.getAttribute("role")).toBe("alert");
+    expect(errorBanner.textContent).toContain(state === "forbidden" ? "Failed to verify suggestion session status." : state === "reopen-refused" ? "Reopen refused" : "This suggestion session is no longer available for editing.");
+    fireEvent.click(await screen.findByText("Person"));
+    expect(screen.queryByPlaceholderText("Label text")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Suggest Edit" })).toBeNull();
     expect(requests.filter(r => r.path.endsWith("/suggestions/sessions"))).toHaveLength(1);
     expect(screen.queryByRole("button", { name: /Resubmit Suggestions/ })).toBeNull();
     expect(savedBodies).toEqual([]); expect(suggestionBodies).toEqual([]);

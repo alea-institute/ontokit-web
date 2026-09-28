@@ -245,3 +245,51 @@ lifecycle receipt with a recorded disagreement is not accepted either.
 refuses direct writes from its anonymous identity with 403. Public browsing and
 anonymous proposals remain available; project creation, import and source save
 are unavailable. The disabled profile verifies these refusals on a disposable stack.
+
+## Suggestions profile (D10)
+
+`npm run test:e2e:suggestions -- --api-source /absolute/path/to/ontokit-api`
+selects `suggestions`: required authentication, real Zitadel/Login and exactly four
+fresh ordinary personas (`owner`, `suggester`, `editor`, `unrelated`). Bootstrap checks
+each persona against identity administration; the API must have an empty superadmin
+allowlist. The owner has ordinary account privileges and owns only its test projects.
+
+The registry owns only `browser/suggestions.spec.ts`, in the `suggestions` Playwright
+project. Baseline ignores it. `SUGGESTION_CASES` declares eight journeys; its first seven
+form this profile's exact inventory. The eighth is registered in optional-configured. The inventories are
+baseline 21, lifecycle 4, optional-configured 6, optional-anonymous 2 and disabled 3.
+The browser specs are delivered by U6; fresh-stack acceptance remains a host gate.
+
+`e2e/fixtures/suggestions.ts` exposes `test`, `expect`, `run`, `ownerApi`, `suggesterApi`,
+`editorApi` and `unrelatedApi`. A worker fixture completes four genuine browser OIDC
+flows before the cases; it adds no setup test to the inventory. Session files and browser
+storage stay under the private run directory and are deleted at worker teardown; outer
+owned-volume/process cleanup still applies on failure. `authPath(run, persona)` exposes
+the corresponding private browser storage file for independent browser contexts.
+
+The spec creates run-tagged ontology fixtures through the owner's HTTP API, retains
+returned IDs for exact-ID cleanup and calls `addSuggestionMembers(ownerApi, run, id)`.
+That helper POSTs `suggester` and `editor` memberships to `/api/v1/projects/{id}/members`
+and checks the responses. It neither seeds roles in the database nor grants unrelated
+membership. There are no launcher-seeded suggestion projects.
+
+For refusals, use `directProbe(api, name, {projectId, sessionId?, data?})` followed by
+`recordProbe(name, observed)`. The helper binds the request method and endpoint to the
+current case's inventory and accepts only the authenticated persona API fixtures.
+`untrusted-mint` is a PUT to the suggestion session's save endpoint with content that
+introduces a new entity. The `mode-evidence` annotation format matches D09: fixed probe
+name, API tier, method, endpoint template, observed status and authorization presence.
+Receipts discard extra fields; missing, duplicate, misplaced or wrong-status/tier probes
+fail acceptance. No subject, token, concrete project ID or response body enters receipts.
+
+An accepted receipt requires seven unique cases, zero skips/retries/errors, agreeing
+required/provider-configured modes, all seven services (Postgres, Redis, MinIO, API,
+worker, Zitadel, Login), source fingerprints, migration heads and complete cleanup.
+Only the optional one-shot migrate service may accompany that service set.
+
+Failure points match the applicable identity-backed launcher paths: `after-dependencies`,
+`after-workflow`, `identity-pat`, `identity-issuer`, `identity-callback` and
+`web-mode-mismatch`. Like baseline, this unseeded profile rejects `before-browser`;
+that stop exists only on the D09 seeded path. API mismatch and lifecycle clock probes
+are also rejected before allocation. Run profile, evidence and identity unit checks
+before U6's fresh-stack acceptance; unit reports do not establish live acceptance.

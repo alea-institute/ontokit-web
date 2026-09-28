@@ -3,10 +3,11 @@ import path from "node:path";
 import { randomBytes } from "node:crypto";
 
 export type Persona = "owner" | "unrelated";
+export type SuggestionPersona = "owner" | "suggester" | "editor" | "unrelated";
 export type LifecyclePersona = "lifecycle";
 export type ModePersona = "owner";
 export type ModeProfile = "optional-configured" | "optional-anonymous" | "disabled";
-export type Profile = "baseline" | "lifecycle" | ModeProfile;
+export type Profile = "baseline" | "lifecycle" | "suggestions" | ModeProfile;
 export interface RunUser { id: string; email: string; password: string }
 interface RunOrigins {
   id: string;
@@ -23,6 +24,11 @@ export interface RunConfig extends RunBase {
   profile: "baseline";
   users: Record<Persona, RunUser>;
 }
+export interface SuggestionsRunConfig extends RunBase {
+  profile: "suggestions";
+  users: Record<SuggestionPersona, RunUser>;
+}
+export type AuthenticatedRunConfig = RunConfig | SuggestionsRunConfig;
 /** OIDC lifetimes read back from the disposable provider, in seconds. */
 export interface LifecycleLifetimes {
   accessTokenLifetime: number;
@@ -66,7 +72,7 @@ export interface ProviderlessRunConfig extends RunOrigins {
   fixtures: SeededProjects;
 }
 export type ModeRunConfig = OptionalConfiguredRunConfig | ProviderlessRunConfig;
-export type AnyRunConfig = RunConfig | LifecycleRunConfig | ModeRunConfig;
+export type AnyRunConfig = RunConfig | LifecycleRunConfig | ModeRunConfig | SuggestionsRunConfig;
 
 // Mirrors PROFILE_REGISTRY in scripts/e2e/auth-modes.mjs; the loader re-checks agreement.
 const MODE_PROFILES: Record<ModeProfile, { mode: ObservedAuthMode["mode"]; provider: boolean }> = {
@@ -116,11 +122,14 @@ export function loadRunConfig(): AnyRunConfig {
     validateModeRun(run as ModeRunConfig);
     return run;
   }
-  const provider = run as RunConfig | LifecycleRunConfig;
+  const provider = run as RunConfig | LifecycleRunConfig | SuggestionsRunConfig;
   for (const value of [provider.issuer, provider.login]) loopback(value);
   if (!provider.ordinaryUserPolicyVerified) throw new Error("Fresh ordinary identities were not verified");
   if (run.profile === "baseline") {
     if (Object.keys(run.users ?? {}).sort().join() !== "owner,unrelated" || !validUser(run.users.owner) || !validUser(run.users.unrelated) || run.users.owner.id === run.users.unrelated.id) throw new Error("Fresh ordinary identities were not verified");
+  } else if (run.profile === "suggestions") {
+    const users = Object.values(run.users ?? {});
+    if (Object.keys(run.users ?? {}).sort().join() !== "editor,owner,suggester,unrelated" || users.some(user => !validUser(user)) || new Set(users.map(user => user.id)).size !== 4) throw new Error("Fresh ordinary identities were not verified");
   } else if (run.profile === "lifecycle") {
     const lifecycle = run.lifecycle;
     if (Object.keys(run.users ?? {}).join() !== "lifecycle" || !validUser(run.users.lifecycle)) throw new Error("Fresh ordinary identities were not verified");
@@ -150,8 +159,13 @@ export function loadLifecycleRun(): LifecycleRunConfig {
   if (run.profile !== "lifecycle") throw new Error("This suite requires the lifecycle E2E profile");
   return run;
 }
-export const authPath = (run: RunConfig, persona: Persona) => path.join(run.dir, "auth", `${persona}.json`);
-export const sessionPath = (run: RunConfig, persona: Persona) => path.join(run.dir, "auth", `${persona}-session.json`);
+export function loadSuggestionsRun(): SuggestionsRunConfig {
+  const run = loadRunConfig();
+  if (run.profile !== "suggestions") throw new Error("This suite requires the suggestions E2E profile");
+  return run;
+}
+export const authPath = (run: AuthenticatedRunConfig, persona: SuggestionPersona) => path.join(run.dir, "auth", `${persona}.json`);
+export const sessionPath = (run: AuthenticatedRunConfig, persona: SuggestionPersona) => path.join(run.dir, "auth", `${persona}-session.json`);
 
 /**
  * Sets the owned Next process clock offset (KTD3). Writes the same private control

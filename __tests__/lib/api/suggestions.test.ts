@@ -56,6 +56,25 @@ describe("suggestionsApi", () => {
     });
   });
 
+  describe("reopen", () => {
+    it("posts an authenticated reopen and returns the fresh beacon token", async () => {
+      const session = { session_id: "s1", branch: "suggest/s1", created_at: "2026-01-01", beacon_token: "fresh" };
+      mockOk(session);
+      expect(await suggestionsApi.reopen("p1", "s1", "tok")).toEqual(session);
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toContain("/api/v1/projects/p1/suggestions/sessions/s1/reopen");
+      expect(options.method).toBe("POST");
+      expect(options.headers.get("Authorization")).toBe("Bearer tok");
+      expect(options.body).toBeUndefined();
+    });
+
+    it.each([400, 403, 409, 500])("surfaces %s without replaying reopen", async status => {
+      mockError(status, "Refused", "Cannot reopen");
+      await expect(suggestionsApi.reopen("p1", "s1", "tok")).rejects.toThrow(ApiError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // --- save ---
 
   describe("save", () => {

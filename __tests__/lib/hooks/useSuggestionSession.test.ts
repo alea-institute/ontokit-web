@@ -11,6 +11,7 @@ vi.mock("@/lib/api/suggestions", () => ({
     discard: vi.fn(),
     listSessions: vi.fn(),
     resubmit: vi.fn(),
+    reopen: vi.fn(),
   },
 }));
 
@@ -29,7 +30,7 @@ const BASE_OPTIONS = {
 };
 
 beforeEach(() => {
-  vi.clearAllMocks();
+  vi.resetAllMocks();
 });
 
 describe("useSuggestionSession", () => {
@@ -369,17 +370,18 @@ describe("useSuggestionSession", () => {
     expect(result.current.sessionId).toBeNull();
   });
 
-  it("resumeSession sets session state from external data", () => {
+  it("resumeSession adopts the full verified session snapshot", () => {
     const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
 
     act(() => {
-      result.current.resumeSession("sess-2", "suggest/sess-2");
+      result.current.resumeSession({ sessionId: "sess-2", branch: "suggest/sess-2", beaconToken: "fresh-beacon", changesCount: 3, entitiesModified: ["Person"] });
     });
 
     expect(result.current.sessionId).toBe("sess-2");
     expect(result.current.branch).toBe("suggest/sess-2");
-    expect(result.current.beaconToken).not.toBe("sess-2");
-    expect(result.current.beaconToken).toBeNull();
+    expect(result.current.beaconToken).toBe("fresh-beacon");
+    expect(result.current.changesCount).toBe(3);
+    expect(result.current.entitiesModified).toEqual(["Person"]);
     expect(result.current.status).toBe("active");
     expect(result.current.isResumed).toBe(true);
   });
@@ -395,7 +397,7 @@ describe("useSuggestionSession", () => {
     await act(async () => { await result.current.startSession(); });
     expect(result.current.beaconToken).toBe("signed-beacon-token");
 
-    act(() => { result.current.resumeSession("sess-2", "suggest/sess-2"); });
+    act(() => { result.current.resumeSession({ sessionId: "sess-2", branch: "suggest/sess-2", beaconToken: null }); });
 
     expect(result.current.beaconToken).toBeNull();
   });
@@ -409,7 +411,7 @@ describe("useSuggestionSession", () => {
     const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
 
     act(() => {
-      result.current.resumeSession("sess-2", "suggest/sess-2");
+      result.current.resumeSession({ sessionId: "sess-2", branch: "suggest/sess-2", beaconToken: null });
     });
     await act(async () => {
       await result.current.saveToSession("content", "http://ex.org/A", "A");
@@ -436,7 +438,7 @@ describe("useSuggestionSession", () => {
     );
 
     act(() => {
-      result.current.resumeSession("sess-2", "suggest/sess-2");
+      result.current.resumeSession({ sessionId: "sess-2", branch: "suggest/sess-2", beaconToken: null });
     });
 
     await act(async () => {
@@ -449,7 +451,13 @@ describe("useSuggestionSession", () => {
     expect(result.current.isResumed).toBe(false);
   });
 
-  it("auto-resumes session when resumeSessionId is provided and session is changes-requested", async () => {
+  it("reopens a changes-requested session before enabling edits and restores its saved state", async () => {
+    vi.mocked(suggestionsApi.reopen).mockResolvedValue({
+      session_id: "sess-resume",
+      branch: "suggest/sess-resume",
+      created_at: "2024-01-01",
+      beacon_token: "fresh-resume-beacon",
+    });
     mockedListSessions.mockResolvedValue({
       items: [
         {
@@ -473,12 +481,42 @@ describe("useSuggestionSession", () => {
 
     await waitFor(() => expect(result.current.status).toBe("active"));
     expect(result.current.sessionId).toBe("sess-resume");
-    expect(result.current.beaconToken).not.toBe("sess-resume");
-    expect(result.current.beaconToken).toBeNull();
+    expect(suggestionsApi.reopen).toHaveBeenCalledExactlyOnceWith("proj-1", "sess-resume", "token-123");
+    expect(result.current.beaconToken).toBe("fresh-resume-beacon");
+    expect(result.current.changesCount).toBe(3);
     expect(result.current.isResumed).toBe(true);
   });
 
-  it("does not auto-resume when session is not changes-requested", async () => {
+  it.each(["resume", "different-session"])("reloads an active resume only when createSession returns the requested id (%s)", async returnedId => {
+    mockedListSessions.mockResolvedValue({ items: [{
+      session_id: "resume", branch: "suggest/resume", status: "active",
+      changes_count: 3, entities_modified: ["Person"],
+    }] });
+    mockedCreateSession.mockResolvedValue({ session_id: returnedId, branch: "suggest/resume", beacon_token: "renewed-beacon", created_at: "2026-01-01" });
+    const onError = vi.fn();
+    const { result } = renderHook(() => useSuggestionSession({
+      ...BASE_OPTIONS, viewerId: "viewer", resumeSessionId: "resume", resumeBranch: "stale-branch", onError,
+    }));
+    await waitFor(() => expect(mockedCreateSession).toHaveBeenCalledExactlyOnceWith("proj-1", "token-123"));
+    expect(suggestionsApi.reopen).not.toHaveBeenCalled();
+    if (returnedId === "resume") {
+      await waitFor(() => expect(result.current).toMatchObject({ status: "active", sessionId: "resume", branch: "suggest/resume", beaconToken: "renewed-beacon", changesCount: 3, entitiesModified: ["Person"], isResumed: true }));
+      expect(onError).not.toHaveBeenCalled();
+    } else {
+      await waitFor(() => expect(result.current.status).toBe("error"));
+      expect(result.current).toMatchObject({ sessionId: null, beaconToken: null, isActive: false, isResumed: false });
+      expect(onError).toHaveBeenCalledOnce();
+      await act(async () => {
+        expect(await result.current.startSession()).toBeNull();
+        expect(await result.current.saveToSession("draft", "iri", "Person")).toBe(false);
+        await result.current.resubmitSession();
+      });
+      expect(mockedSave).not.toHaveBeenCalled();
+      expect(mockedResubmit).not.toHaveBeenCalled();
+    }
+  });
+
+  it("does not auto-resume when session is not editable", async () => {
     mockedListSessions.mockResolvedValue({
       items: [
         {
@@ -507,6 +545,68 @@ describe("useSuggestionSession", () => {
         "This suggestion session is no longer available for editing.",
       ),
     );
-    expect(result.current.status).toBe("idle");
+    expect(result.current.status).toBe("error");
+    expect(result.current.isActive).toBe(false);
   });
+  it.each(["Not owner", "Wrong status", "Another session is active"])("keeps a failed reopen read-only: %s", async message => {
+    mockedListSessions.mockResolvedValue({ items: [{
+      session_id: "resume", branch: "suggest/resume", status: "changes-requested",
+      changes_count: 2, entities_modified: ["Person"],
+    }] });
+    vi.mocked(suggestionsApi.reopen).mockRejectedValue(new Error(message));
+    const onError = vi.fn();
+    const { result } = renderHook(() => useSuggestionSession({
+      ...BASE_OPTIONS, resumeSessionId: "resume", resumeBranch: "suggest/resume", onError,
+    }));
+    await waitFor(() => expect(result.current.error).toBe(message));
+    expect(result.current).toMatchObject({ status: "error", sessionId: null, beaconToken: null, isActive: false });
+    await act(async () => {
+      expect(await result.current.startSession()).toBeNull();
+      expect(await result.current.saveToSession("draft", "iri", "Person")).toBe(false);
+      await result.current.resubmitSession();
+    });
+    expect(mockedCreateSession).not.toHaveBeenCalled();
+    expect(mockedSave).not.toHaveBeenCalled();
+    expect(mockedResubmit).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledExactlyOnceWith(message);
+  });
+
+  it.each(["before", "after"])("recovers when obsolete credentials fail %s token renewal during reopen", async timing => {
+    mockedListSessions.mockResolvedValue({ items: [{ session_id: "resume", status: "changes-requested", branch: "branch", changes_count: 2, entities_modified: ["Person"] }] });
+    let reject!: (reason: Error) => void;
+    vi.mocked(suggestionsApi.reopen).mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }))
+      .mockResolvedValueOnce({ session_id: "resume", branch: "branch", beacon_token: "fresh", created_at: "2026-01-01" });
+    const { result, rerender } = renderHook(({ token }) => useSuggestionSession({ ...BASE_OPTIONS, accessToken: token, viewerId: "viewer", resumeSessionId: "resume", resumeBranch: "branch" }), { initialProps: { token: "old" } });
+    await waitFor(() => expect(suggestionsApi.reopen).toHaveBeenCalledOnce());
+    if (timing === "after") rerender({ token: "renewed" });
+    await act(async () => reject(new Error("Expired")));
+    if (timing === "before") rerender({ token: "renewed" });
+    await waitFor(() => expect(result.current).toMatchObject({ isActive: true, beaconToken: "fresh", changesCount: 2 }));
+    expect(suggestionsApi.reopen).toHaveBeenLastCalledWith("proj-1", "resume", "renewed");
+  });
+
+  it("waits for reopen and preserves its fresh token across credential renewal without reopening twice", async () => {
+    mockedListSessions.mockResolvedValue({ items: [{
+      session_id: "resume", branch: "suggest/resume", status: "changes-requested",
+      changes_count: 3, entities_modified: ["Person"],
+    }] });
+    let finish!: (value: Awaited<ReturnType<typeof suggestionsApi.reopen>>) => void;
+    vi.mocked(suggestionsApi.reopen).mockImplementation(() => new Promise(resolve => { finish = resolve; }));
+    const { result, rerender } = renderHook(({ token }) => useSuggestionSession({
+      ...BASE_OPTIONS, accessToken: token, viewerId: "viewer", resumeSessionId: "resume", resumeBranch: "stale-url-branch",
+    }), { initialProps: { token: "old" } });
+    await waitFor(() => expect(suggestionsApi.reopen).toHaveBeenCalledOnce());
+    expect(result.current).toMatchObject({ status: "resuming", isActive: false, sessionId: null });
+    await act(async () => {
+      expect(await result.current.startSession()).toBeNull();
+      expect(await result.current.saveToSession("draft", "iri", "Person")).toBe(false);
+    });
+    rerender({ token: "renewed" });
+    await act(async () => finish({ session_id: "resume", branch: "suggest/resume", beacon_token: "fresh", created_at: "2026-01-01" }));
+    expect(result.current).toMatchObject({ isActive: true, isResumed: true, branch: "suggest/resume", changesCount: 3, entitiesModified: ["Person"], beaconToken: "fresh" });
+    rerender({ token: "renewed-again" });
+    expect(suggestionsApi.reopen).toHaveBeenCalledOnce();
+    expect(mockedListSessions).toHaveBeenCalledOnce();
+  });
+
 });
