@@ -1,0 +1,209 @@
+{
+  "version": 3,
+  "profile": "suggestions",
+  "run": "c134894abdb3f4789cc7fc4f97dcaacf",
+  "startedAt": "2026-09-28T04:28:55.080Z",
+  "finishedAt": "2026-09-28T04:33:05.486Z",
+  "sources": {
+    "api": {
+      "revision": "19b62d2c47ffb712851a1362bdfa46d15e7be334",
+      "sha256": "4dadd369954593ae93c22de4b2e0276c85067b8d49e18ce78ac85ef5ad8952fc"
+    },
+    "web": {
+      "revision": "2c120996ff2d5ff39b7e1d7e419aaaf6948045d7",
+      "sha256": "53c917afb985357e203e5c8edd1fcfbc4d970421e1f1f3f25103bc24532110eb"
+    }
+  },
+  "images": [
+    {
+      "service": "worker",
+      "id": "sha256:1b28133e37a88771879e4f542265b7ce124c371408b5b6f7274c2f772e4786bd",
+      "reference": "ontokit-e2e-c134894abdb3f4789cc7fc4f97dcaacf/api:run"
+    },
+    {
+      "service": "api",
+      "id": "sha256:1b28133e37a88771879e4f542265b7ce124c371408b5b6f7274c2f772e4786bd",
+      "reference": "ontokit-e2e-c134894abdb3f4789cc7fc4f97dcaacf/api:run"
+    },
+    {
+      "service": "login",
+      "id": "sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648",
+      "reference": "ghcr.io/zitadel/zitadel-login@sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648"
+    },
+    {
+      "service": "zitadel",
+      "id": "sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64",
+      "reference": "ghcr.io/zitadel/zitadel@sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:1b28133e37a88771879e4f542265b7ce124c371408b5b6f7274c2f772e4786bd",
+      "reference": "ontokit-e2e-c134894abdb3f4789cc7fc4f97dcaacf/api:run"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:1b28133e37a88771879e4f542265b7ce124c371408b5b6f7274c2f772e4786bd",
+      "reference": "ontokit-e2e-c134894abdb3f4789cc7fc4f97dcaacf/api:run"
+    },
+    {
+      "service": "redis",
+      "id": "sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2",
+      "reference": "redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2"
+    },
+    {
+      "service": "postgres",
+      "id": "sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38",
+      "reference": "pgvector/pgvector@sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38"
+    },
+    {
+      "service": "minio",
+      "id": "sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e",
+      "reference": "minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e"
+    }
+  ],
+  "migrationHeads": [
+    "i7j8k9l0m1n2"
+  ],
+  "tests": {
+    "passed": 7,
+    "skipped": 0,
+    "failed": 0,
+    "flaky": 0,
+    "mandatory": [
+      {
+        "file": "browser/suggestions.spec.ts",
+        "title": "suggester edits an existing class label, saves and submits for owner triage",
+        "project": "suggestions"
+      },
+      {
+        "file": "browser/suggestions.spec.ts",
+        "title": "owner approval merges the label, removes the session branch and notifies the suggester",
+        "project": "suggestions"
+      },
+      {
+        "file": "browser/suggestions.spec.ts",
+        "title": "requested changes notify the suggester who resumes and resubmits revision two on the same pull request for owner approval and merge",
+        "project": "suggestions"
+      },
+      {
+        "file": "browser/suggestions.spec.ts",
+        "title": "editor rejection closes the pull request and notifies the suggester",
+        "project": "suggestions"
+      },
+      {
+        "file": "browser/suggestions.spec.ts",
+        "title": "private non-member create and untrusted entity mint are refused by the API",
+        "project": "suggestions"
+      },
+      {
+        "file": "browser/suggestions.spec.ts",
+        "title": "editor approval merges a suggestion through the suggestion review path",
+        "project": "suggestions"
+      },
+      {
+        "file": "browser/suggestions.spec.ts",
+        "title": "public non-member capabilities agree with session create and submission succeeds",
+        "project": "suggestions"
+      }
+    ],
+    "cases": [
+      {
+        "title": "suggester edits an existing class label, saves and submits for owner triage",
+        "evidence": [
+          {
+            "probe": "submitted-save",
+            "tier": "api",
+            "method": "PUT",
+            "path": "/api/v1/projects/{id}/suggestions/sessions/{sid}/save",
+            "status": 400,
+            "authorization": true
+          },
+          {
+            "probe": "suggester-approve",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects/{id}/suggestions/sessions/{sid}/approve",
+            "status": 403,
+            "authorization": true
+          }
+        ]
+      },
+      {
+        "title": "owner approval merges the label, removes the session branch and notifies the suggester",
+        "evidence": [
+          {
+            "probe": "merged-approve",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects/{id}/suggestions/sessions/{sid}/approve",
+            "status": 400,
+            "authorization": true
+          },
+          {
+            "probe": "creator-self-approve",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects/{id}/suggestions/sessions/{sid}/approve",
+            "status": 403,
+            "authorization": true
+          }
+        ]
+      },
+      {
+        "title": "requested changes notify the suggester who resumes and resubmits revision two on the same pull request for owner approval and merge",
+        "evidence": []
+      },
+      {
+        "title": "editor rejection closes the pull request and notifies the suggester",
+        "evidence": []
+      },
+      {
+        "title": "private non-member create and untrusted entity mint are refused by the API",
+        "evidence": [
+          {
+            "probe": "private-non-member-create",
+            "tier": "api",
+            "method": "POST",
+            "path": "/api/v1/projects/{id}/suggestions/sessions",
+            "status": 403,
+            "authorization": true
+          },
+          {
+            "probe": "untrusted-mint",
+            "tier": "api",
+            "method": "PUT",
+            "path": "/api/v1/projects/{id}/suggestions/sessions/{sid}/save",
+            "status": 403,
+            "authorization": true
+          }
+        ]
+      },
+      {
+        "title": "editor approval merges a suggestion through the suggestion review path",
+        "evidence": []
+      },
+      {
+        "title": "public non-member capabilities agree with session create and submission succeeds",
+        "evidence": []
+      }
+    ]
+  },
+  "lifecycle": null,
+  "authModes": {
+    "web": {
+      "mode": "required",
+      "providerConfigured": true
+    },
+    "api": {
+      "mode": "required",
+      "providerConfigured": true
+    }
+  },
+  "acceptance": {
+    "scope": "local-verification",
+    "hostedAcceptance": false
+  },
+  "workflowPassed": true,
+  "cleanup": "complete",
+  "acceptedRun": true
+}
