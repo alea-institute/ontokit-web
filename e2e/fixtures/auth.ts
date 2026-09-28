@@ -2,7 +2,7 @@ import { test as base, expect, type APIRequestContext, type Browser, type Page }
 import fs from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
-import { loadRun, authPath, sessionPath, type Persona, type RunConfig, type RunUser } from "./run";
+import { loadRun, authPath, sessionPath, type SuggestionPersona, type AuthenticatedRunConfig, type RunConfig, type RunUser } from "./run";
 
 export interface Session { accessToken: string; user: { id: string; email: string }; error?: string }
 /**
@@ -33,24 +33,30 @@ export async function enterProviderCredentials(page: Page, {login, web, user}: {
   }
   await expect(page).toHaveURL(url => url.origin === web, {timeout: 45_000});
 }
-async function completeSignIn(page: Page, run: RunConfig, persona: Persona): Promise<Session> {
+function personaUser(run: AuthenticatedRunConfig, persona: SuggestionPersona): RunUser {
+  if (run.profile === "baseline" && persona !== "owner" && persona !== "unrelated") throw new Error("Persona is not available in this profile");
+  const user = (run.users as Partial<Record<SuggestionPersona, RunUser>>)[persona];
+  if (!user) throw new Error("Persona is not available in this profile");
+  return user;
+}
+async function completeSignIn(page: Page, run: AuthenticatedRunConfig, persona: SuggestionPersona): Promise<Session> {
   await page.goto(`${run.web}/auth/signin?callbackUrl=${encodeURIComponent(`${run.web}/`)}`);
   await page.getByRole("button", { name: "Sign in with Zitadel" }).click();
   await expect(page).toHaveURL(url => url.origin === new URL(run.login).origin);
-  await enterProviderCredentials(page, {login: run.login, web: run.web, user: run.users[persona]});
+  await enterProviderCredentials(page, {login: run.login, web: run.web, user: personaUser(run, persona)});
   await expect(page).toHaveURL(url => url.origin === run.web && url.pathname === "/", {timeout: 45_000});
   const response = await page.request.get(`${run.web}/api/auth/session`);
   expect(response.status()).toBe(200);
   const session = await response.json() as Session;
   // Never assert on the token's value: failed assertions can serialize secrets.
   expect(Boolean(session.accessToken && !session.error)).toBe(true);
-  expect(session.user.id).toBe(run.users[persona].id);
-  expect(session.user.email).toBe(run.users[persona].email);
+  expect(session.user.id).toBe(personaUser(run, persona).id);
+  expect(session.user.email).toBe(personaUser(run, persona).email);
   return session;
 }
 // Failed locator operations do not report the surrounding Login UI. Capture only
 // bounded diagnostic state inside the private run log; never print it to stdout.
-async function recordSignInFailure(page: Page, run: RunConfig, persona: Persona) {
+async function recordSignInFailure(page: Page, run: AuthenticatedRunConfig, persona: SuggestionPersona) {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let inspection: unknown;
   try {
@@ -73,14 +79,14 @@ async function recordSignInFailure(page: Page, run: RunConfig, persona: Persona)
     await file.write(`\nPrivate sign-in failure: ${JSON.stringify({persona, origin: url.origin, pathname: url.pathname.slice(0, 2048), query: url.search.slice(0, 8192), inspection})}\n`);
   } finally { await file.close(); }
 }
-export async function signIn(page: Page, run: RunConfig, persona: Persona): Promise<Session> {
+export async function signIn(page: Page, run: AuthenticatedRunConfig, persona: SuggestionPersona): Promise<Session> {
   try { return await completeSignIn(page, run, persona); }
   catch (error) {
     try { await recordSignInFailure(page, run, persona); } catch { /* Original failure and outer cleanup take precedence. */ }
     throw error;
   }
 }
-export async function saveAuthenticatedPersona(browser: Browser, run: RunConfig, persona: Persona) {
+export async function saveAuthenticatedPersona(browser: Browser, run: AuthenticatedRunConfig, persona: SuggestionPersona) {
   const context = await browser.newContext();
   try {
     const page = await context.newPage();
@@ -89,7 +95,7 @@ export async function saveAuthenticatedPersona(browser: Browser, run: RunConfig,
     await fs.writeFile(sessionPath(run, persona), JSON.stringify(session), {mode: 0o600});
   } finally { await context.close(); }
 }
-export async function loadSession(run: RunConfig, persona: Persona): Promise<Session> {
+export async function loadSession(run: AuthenticatedRunConfig, persona: SuggestionPersona): Promise<Session> {
   return JSON.parse(await fs.readFile(sessionPath(run, persona), "utf8")) as Session;
 }
 export const test = base.extend<{ run: RunConfig; ownerApi: APIRequestContext; unrelatedApi: APIRequestContext; anonymousApi: APIRequestContext }>({

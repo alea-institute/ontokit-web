@@ -168,10 +168,34 @@ export const MODE_CASES = Object.freeze({
       probe('source-save-disabled', 'api', 'PUT', 'source', 403, false)]},
   ],
 });
+// D10: cases 1–7 belong to suggestions. Case 8 is declared for U6 to append to
+// optional-configured; declaring it here deliberately does not change that inventory.
+const suggestionProbe = (name, method, suffix, status) => Object.freeze({
+  probe: name, tier: 'api', method,
+  path: `/api/v1/projects/{id}/suggestions/sessions${suffix}`,
+  status, authorization: true,
+});
+export const SUGGESTION_CASES = Object.freeze([
+  {profile: 'suggestions', title: 'suggester edits an existing class label, saves and submits for owner triage', probes: [
+    suggestionProbe('submitted-save', 'PUT', '/{sid}/save', 400),
+    suggestionProbe('suggester-approve', 'POST', '/{sid}/approve', 403)]},
+  {profile: 'suggestions', title: 'owner approval merges the label, removes the session branch and notifies the suggester', probes: [
+    suggestionProbe('merged-approve', 'POST', '/{sid}/approve', 400),
+    suggestionProbe('creator-self-approve', 'POST', '/{sid}/approve', 403)]},
+  {profile: 'suggestions', title: 'requested changes notify the suggester who resumes and resubmits revision two on the same pull request for owner approval and merge', probes: []},
+  {profile: 'suggestions', title: 'editor rejection closes the pull request and notifies the suggester', probes: []},
+  {profile: 'suggestions', title: 'private non-member create and untrusted entity mint are refused by the API', probes: [
+    suggestionProbe('private-non-member-create', 'POST', '', 403),
+    suggestionProbe('untrusted-mint', 'PUT', '/{sid}/save', 403)]},
+  {profile: 'suggestions', title: 'editor approval merges a suggestion through the suggestion review path', probes: []},
+  {profile: 'suggestions', title: 'public non-member capabilities agree with session create and submission succeeds', probes: []},
+  {profile: 'optional-configured', title: 'anonymous visitor submits a proposal on the owner public project and the signed-in owner sees it in triage', probes: []},
+].map(c => Object.freeze({...c, probes: Object.freeze(c.probes)})));
+const PROBE_CASES = Object.freeze({...MODE_CASES, suggestions: SUGGESTION_CASES.filter(c => c.profile === 'suggestions')});
 const MODE_FIELDS = ['probe', 'tier', 'method', 'path', 'status', 'authorization'];
 /** Rebuilds each mode case's probes from untrusted input; null unless exactly the table. */
 function modeCases(profile, evidenceByTest) {
-  const table = MODE_CASES[profile];
+  const table = PROBE_CASES[profile];
   if (!table || evidenceByTest.length !== table.length) return null;
   const cases = [];
   for (const [i, entries] of evidenceByTest.entries()) {
@@ -190,7 +214,10 @@ export const MODE_REQUIRED_TESTS = Object.freeze(Object.fromEntries(Object.entri
   const {specs: [file], projects: [project]} = profileSpec(profile);
   return [profile, Object.freeze(titles.map(({title}) => Object.freeze({file, title, project})))];
 })));
-export const PROFILE_INVENTORIES = Object.freeze({baseline: REQUIRED_TESTS, lifecycle: LIFECYCLE_REQUIRED_TESTS, ...MODE_REQUIRED_TESTS});
+export const SUGGESTION_REQUIRED_TESTS = Object.freeze(PROBE_CASES.suggestions.map(({title}) => Object.freeze({
+  file: profileSpec('suggestions').specs[0], title, project: 'suggestions',
+})));
+export const PROFILE_INVENTORIES = Object.freeze({baseline: REQUIRED_TESTS, lifecycle: LIFECYCLE_REQUIRED_TESTS, ...MODE_REQUIRED_TESTS, suggestions: SUGGESTION_REQUIRED_TESTS});
 const PROFILE_PROJECTS = Object.fromEntries(Object.keys(PROFILE_INVENTORIES).map(profile => [profile, PROFILE_REGISTRY[profile].projects]));
 // Only baseline tolerates additional dynamic tests; every other profile is exact-count.
 const exactCount = profile => profile !== 'baseline';
@@ -293,7 +320,7 @@ export function validateReport(report, {profile} = {}) {
   const matches = inventory.map(required => found.filter(t => t.file === required.file && t.title === required.title && t.project === required.project));
   if (matches.some(m => m.length !== 1)) fail();
   if (profile !== 'lifecycle' && found.some(t => t.evidence.length)) fail();
-  const modeProfile = Object.hasOwn(MODE_CASES, profile);
+  const modeProfile = Object.hasOwn(PROBE_CASES, profile);
   if (!modeProfile && found.some(t => t.modeEvidence.length)) fail();
   // Only checked, fixed inventory names are durable; additional dynamic titles stay private.
   const summary = {profile, passed: stats.expected, skipped: 0, failed: 0, flaky: 0, mandatory: inventory.map(t => ({...t}))};
@@ -339,7 +366,7 @@ function sanitizedTests(profile, tests) {
   const inventory = PROFILE_INVENTORIES[profile];
   if (!Number.isSafeInteger(tests.passed) || tests.passed < inventory.length || (exactCount(profile) && tests.passed !== inventory.length)) return null;
   const summary = {passed: tests.passed, skipped: 0, failed: 0, flaky: 0, mandatory: inventory.map(t => ({...t}))};
-  if (Object.hasOwn(MODE_CASES, profile)) {
+  if (Object.hasOwn(PROBE_CASES, profile)) {
     const modeInput = Array.isArray(tests.cases) && tests.cases.length === inventory.length ? tests.cases : null;
     if (!modeInput || modeInput.some((c, i) => c?.title !== inventory[i].title)) return null;
     const cases = modeCases(profile, modeInput.map(c => c.evidence));
@@ -386,7 +413,7 @@ export function sanitizedEvidence(manifest, {cleanup, workflowPassed, startedAt,
   const authModes = sanitizedAuthModes(profile, manifest.authModes);
   // New profiles must record agreement; baseline/lifecycle keep their D06/D08 rules but a
   // recorded disagreement (or malformed record) still refuses acceptance.
-  const modesOk = profile && !Object.hasOwn(MODE_REQUIRED_TESTS, profile) ? (manifest.authModes === undefined || !!authModes) : !!authModes;
+  const modesOk = profile && !Object.hasOwn(PROBE_CASES, profile) ? (manifest.authModes === undefined || !!authModes) : !!authModes;
   const time = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
   return {version: 3, profile, run: /^[a-f0-9]{32}$/.test(manifest.id) ? manifest.id : null,
     startedAt: time(startedAt), finishedAt: time(finishedAt), sources, images, migrationHeads, tests, lifecycle, authModes,

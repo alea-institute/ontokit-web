@@ -161,3 +161,29 @@ merge, lexical search, real worker lint, rejected writes without mutation and th
 browser workflow. B11 broader auth/editor/suggestion scenarios, B12 collaboration and
 WebSocket contracts, and B13 browser CI/Firefox/schema/retention work remain separate.
 Local test success does not activate hosted DEV or complete D02/B02–B03.
+
+## Suggestions profile (D10)
+
+```sh
+npm run test:e2e:suggestions -- --api-source /absolute/path/to/ontokit-api
+```
+
+This required-auth profile uses a fresh stack with Zitadel/Login and four ordinary
+personas: owner, suggester, editor and unrelated. Only `browser/suggestions.spec.ts`
+runs, with an exact seven-case inventory. Baseline and all D09 inventories remain
+unchanged by this registration. `SUGGESTION_CASES` additionally declares U6's eighth
+journey for optional-configured without registering that extra case yet.
+
+Use the `test` fixture in `fixtures/suggestions.ts` for genuine OIDC browser storage
+and the four authenticated API contexts. Create run-tagged projects as the owner and
+use `addSuggestionMembers(ownerApi, run, projectId)` to add suggester and editor roles
+through HTTP. Delete only returned fixture IDs; the outer launcher must still finish
+owned-resource cleanup. Notifications and queued index changes need bounded polling.
+
+Refusal probes record API tier, endpoint template, method, observed status and presence
+of authorization through `directProbe` and `recordProbe`. A receipt accepts only the
+fixed case/probe inventory, agreeing modes, the exact required service set and complete
+cleanup. Credentials stay private. The browser spec and repeated fresh-stack delivery
+proof are U6 work; this profile registration alone does not prove the suggestion chain.
+See the [maintainer guide](../scripts/e2e/README.md#suggestions-profile-d10) for fixture
+interfaces, probe names, failure points and receipt rules.

@@ -15,6 +15,7 @@ const spec = file => Object.freeze(file);
 export const PROFILE_REGISTRY = Object.freeze({
   // D06: every spec not owned by another profile, plus the setup/teardown projects.
   baseline: Object.freeze({apiMode: 'required', webMode: 'required', identity: true, personas: Object.freeze(['owner', 'unrelated']), seed: null, specs: null, projects: Object.freeze(['chromium', 'stack setup', 'stack teardown'])}),
+  suggestions: Object.freeze({apiMode: 'required', webMode: 'required', identity: true, personas: Object.freeze(['owner', 'suggester', 'editor', 'unrelated']), seed: null, specs: Object.freeze([spec('browser/suggestions.spec.ts')]), projects: Object.freeze(['suggestions'])}),
   lifecycle: Object.freeze({apiMode: 'required', webMode: 'required', identity: true, personas: Object.freeze(['lifecycle']), seed: null, specs: Object.freeze([spec('browser/auth-lifecycle.spec.ts')]), projects: Object.freeze(['lifecycle'])}),
   'optional-configured': Object.freeze({apiMode: 'optional', webMode: 'optional', identity: true, personas: Object.freeze(['owner']), seed: Object.freeze({persona: 'owner'}), specs: Object.freeze([spec('browser/auth-mode-optional-configured.spec.ts')]), projects: Object.freeze(['optional-configured'])}),
   'optional-anonymous': Object.freeze({apiMode: 'optional', webMode: 'optional', identity: false, personas: Object.freeze([]), seed: Object.freeze({persona: null}), specs: Object.freeze([spec('browser/auth-mode-optional-anonymous.spec.ts')]), projects: Object.freeze(['optional-anonymous'])}),
@@ -70,12 +71,12 @@ export const FAIL_POINTS = Object.freeze({
   // the seeded D09 profiles reach that stop; baseline and lifecycle would run green.
   'before-browser': ({profile, lifecycleProbe}) => !lifecycleProbe && MODE_PROFILES.includes(profile),
   // Build the web copy with a neighbouring profile's auth env; the gate must reject it.
-  'web-mode-mismatch': ({profile, lifecycleProbe}) => !lifecycleProbe && MODE_PROFILES.includes(profile),
+  'web-mode-mismatch': ({profile, lifecycleProbe}) => !lifecycleProbe && (MODE_PROFILES.includes(profile) || profile === 'suggestions'),
   // Start the API with a neighbouring mode; provider-less profiles only, because
   // identity bootstrap independently asserts optional-configured's API mode.
   'api-mode-mismatch': ({profile, lifecycleProbe}) => !lifecycleProbe && ['optional-anonymous', 'disabled'].includes(profile),
 });
-const WEB_MISMATCH = Object.freeze({'optional-configured': {webMode: 'optional', identity: false}, 'optional-anonymous': {webMode: 'disabled', identity: false}, disabled: {webMode: 'optional', identity: false}});
+const WEB_MISMATCH = Object.freeze({suggestions: {webMode: 'optional', identity: true}, 'optional-configured': {webMode: 'optional', identity: false}, 'optional-anonymous': {webMode: 'disabled', identity: false}, disabled: {webMode: 'optional', identity: false}});
 const API_MISMATCH = Object.freeze({'optional-anonymous': 'disabled', disabled: 'optional'});
 /** Rejects a profile/flag combination the launcher does not support. */
 export function assertLaunch({profile, failAt, lifecycleProbe = false}) {

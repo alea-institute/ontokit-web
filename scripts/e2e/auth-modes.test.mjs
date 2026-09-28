@@ -165,7 +165,7 @@ test('baseline discovery ignores every spec owned by another profile', () => {
   const ignored = file => chromium.testIgnore.some(pattern => path.matchesGlob(`/tmp/run/web/e2e/${file}`, pattern));
   for (const file of foreignSpecs('baseline')) assert.equal(ignored(file), true, file);
   for (const file of ['api/projects.spec.ts', 'browser/ontology-workflow.spec.ts', 'auth-foundation.spec.ts', 'browser/x-auth-mode-disabled.spec.ts.bak']) assert.equal(ignored(file), false, file);
-  assert.equal(foreignSpecs('baseline').length, 4);
+  assert.equal(foreignSpecs('baseline').length, 5);
 });
 test('each non-baseline profile discovers exactly its own spec', () => {
   for (const profile of ['lifecycle', ...MODE_PROFILES]) {
@@ -305,4 +305,42 @@ test('provider-less browser specs visit the auth-error route inside their existi
     const source = await readFile(new URL(`browser/${spec}`, e2eRoot), 'utf8');
     assert.match(source, /\["\/auth\/error\?error=Configuration", "Sign-in is unavailable"\]/, `${spec} visits /auth/error`);
   }
+});
+
+test('suggestions owns only its spec and uses required mode with four ordinary personas', () => {
+  const p = profileSpec('suggestions');
+  assert.deepEqual([p.apiMode, p.webMode, p.identity, p.seed], ['required', 'required', true, null]);
+  assert.deepEqual(p.personas, ['owner', 'suggester', 'editor', 'unrelated']);
+  assert.deepEqual(p.specs, ['browser/suggestions.spec.ts']);
+  assert.deepEqual(playwrightProjects('suggestions'), [{name: 'suggestions', testMatch: '**/browser/suggestions.spec.ts'}]);
+  assert.equal(specOwner('browser/suggestions.spec.ts'), 'suggestions');
+  assert.ok(playwrightProjects('baseline')[2].testIgnore.includes('**/browser/suggestions.spec.ts'));
+  assert.deepEqual(serviceSet('suggestions'), serviceSet('baseline'));
+  for (const failAt of ['after-dependencies', 'after-workflow', 'identity-pat', 'identity-issuer', 'identity-callback', 'web-mode-mismatch']) {
+    assert.equal(assertLaunch({profile: 'suggestions', failAt}), 'suggestions');
+  }
+  for (const failAt of ['before-browser', 'api-mode-mismatch', 'clock-preflight', 'lifecycle-readback']) {
+    assert.throws(() => assertLaunch({profile: 'suggestions', failAt}), /combination/);
+  }
+  const mismatch = webAuthEnv('suggestions', {identity, ...inputs, failAt: 'web-mode-mismatch'});
+  assert.notEqual(mismatch.AUTH_MODE, 'required');
+});
+test('suggestions launcher reaches Playwright without seeding or lifecycle overrides', async () => {
+  const {ctx, calls} = fakeCtx('suggestions');
+  await assert.rejects(fullStack(ctx, ctx.deps), /stop after playwright/);
+  assert.ok(calls.includes('identity'));
+  assert.ok(calls.includes('build required true'));
+  assert.equal(calls.includes('seed'), false);
+  assert.ok(calls.indexOf('read-api') < calls.indexOf('playwright'));
+});
+test('suggestions config requires exactly four distinct verified users', async () => {
+  const users = Object.fromEntries(['owner', 'suggester', 'editor', 'unrelated'].map(role => [role, user(role)]));
+  const good = {profile: 'suggestions', ...idp, users};
+  await withRunConfig(good, load => assert.deepEqual(load().users, users));
+  for (const bad of [
+    {...good, users: {owner: users.owner, unrelated: users.unrelated}},
+    {...good, users: {...users, editor: users.owner}},
+    {...good, users: {...users, extra: user('extra')}},
+    {...good, ordinaryUserPolicyVerified: false},
+  ]) await withRunConfig(bad, load => assert.throws(load, /ordinary identities/));
 });

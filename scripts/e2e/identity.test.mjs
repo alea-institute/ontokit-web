@@ -91,3 +91,37 @@ test('provider-less profiles never provision identities or start identity servic
     assert.equal(called, false);
   }
 });
+
+test('suggestions provisions exactly four distinct ordinary humans and verifies every persona', async () => {
+  const { provisionPersonas } = await import('./bootstrap-identity.mjs');
+  const created = [], checked = [];
+  const call = async (endpoint, body) => {
+    if (endpoint === '/v2/users/new') {
+      created.push(body);
+      return {id: `user-${created.length}`};
+    }
+    checked.push(endpoint);
+    if (endpoint === '/auth/v1/users/me') return {user: {id: 'bootstrap-admin'}};
+    return {result: [{userId: 'bootstrap-admin'}]};
+  };
+  const {users, lifetimes} = await provisionPersonas(call, {profile: 'suggestions', organizationId: 'org', runId: 'a'.repeat(32)});
+  assert.deepEqual(Object.keys(users), ['owner', 'suggester', 'editor', 'unrelated']);
+  assert.equal(new Set(Object.values(users).map(u => u.id)).size, 4);
+  assert.equal(lifetimes, null);
+  assert.equal(created.length, 4);
+  assert.ok(created.every(u => u.human && !u.machine && !u.roles));
+  assert.equal(checked.filter(e => e === '/admin/v1/members/_search').length, 4);
+  assert.equal(checked.filter(e => e === '/management/v1/orgs/me/members/_search').length, 4);
+});
+test('suggestions refuses any persona with administrative membership', async () => {
+  const { provisionPersonas } = await import('./bootstrap-identity.mjs');
+  for (let elevated = 1; elevated <= 4; elevated++) {
+    let next = 0;
+    const call = async endpoint => {
+      if (endpoint === '/v2/users/new') return {id: `user-${++next}`};
+      if (endpoint === '/auth/v1/users/me') return {user: {id: 'bootstrap-admin'}};
+      return {result: [{userId: 'bootstrap-admin'}, {userId: `user-${elevated}`}]};
+    };
+    await assert.rejects(provisionPersonas(call, {profile: 'suggestions', organizationId: 'org', runId: 'a'.repeat(32)}), /administrative membership/);
+  }
+});
