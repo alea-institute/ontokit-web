@@ -370,17 +370,18 @@ describe("useSuggestionSession", () => {
     expect(result.current.sessionId).toBeNull();
   });
 
-  it("resumeSession sets session state from external data", () => {
+  it("resumeSession adopts the full verified session snapshot", () => {
     const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
 
     act(() => {
-      result.current.resumeSession("sess-2", "suggest/sess-2");
+      result.current.resumeSession({ sessionId: "sess-2", branch: "suggest/sess-2", beaconToken: "fresh-beacon", changesCount: 3, entitiesModified: ["Person"] });
     });
 
     expect(result.current.sessionId).toBe("sess-2");
     expect(result.current.branch).toBe("suggest/sess-2");
-    expect(result.current.beaconToken).not.toBe("sess-2");
-    expect(result.current.beaconToken).toBeNull();
+    expect(result.current.beaconToken).toBe("fresh-beacon");
+    expect(result.current.changesCount).toBe(3);
+    expect(result.current.entitiesModified).toEqual(["Person"]);
     expect(result.current.status).toBe("active");
     expect(result.current.isResumed).toBe(true);
   });
@@ -396,7 +397,7 @@ describe("useSuggestionSession", () => {
     await act(async () => { await result.current.startSession(); });
     expect(result.current.beaconToken).toBe("signed-beacon-token");
 
-    act(() => { result.current.resumeSession("sess-2", "suggest/sess-2"); });
+    act(() => { result.current.resumeSession({ sessionId: "sess-2", branch: "suggest/sess-2", beaconToken: null }); });
 
     expect(result.current.beaconToken).toBeNull();
   });
@@ -410,7 +411,7 @@ describe("useSuggestionSession", () => {
     const { result } = renderHook(() => useSuggestionSession(BASE_OPTIONS));
 
     act(() => {
-      result.current.resumeSession("sess-2", "suggest/sess-2");
+      result.current.resumeSession({ sessionId: "sess-2", branch: "suggest/sess-2", beaconToken: null });
     });
     await act(async () => {
       await result.current.saveToSession("content", "http://ex.org/A", "A");
@@ -437,7 +438,7 @@ describe("useSuggestionSession", () => {
     );
 
     act(() => {
-      result.current.resumeSession("sess-2", "suggest/sess-2");
+      result.current.resumeSession({ sessionId: "sess-2", branch: "suggest/sess-2", beaconToken: null });
     });
 
     await act(async () => {

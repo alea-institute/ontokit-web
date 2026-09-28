@@ -353,20 +353,37 @@ export default function EditorPage() {
     resumeBranch: isSuggestionMode ? resumeBranchParam : undefined,
     onSubmitted: (prNumber) => {
       toast.success(`Suggestions submitted as PR #${prNumber}`);
+      if (resumeSessionParam) {
+        const next = new URLSearchParams(searchParamsString);
+        next.delete("resumeSession");
+        if (activeBranch) next.set("branch", activeBranch);
+        const qs = next.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname);
+      }
     },
     onError: (msg) => toast.error("Suggestion error", msg),
   });
 
   const isResumeReadOnly = isSuggestionMode && !!resumeSessionParam
-    && (suggestionSession.sessionId !== resumeSessionParam || !suggestionSession.isActive);
+    && (suggestionSession.sessionId !== resumeSessionParam || (!suggestionSession.isActive && suggestionSession.status !== "submitting"));
   const canEditSuggestion = isSuggestionMode && !isResumeReadOnly;
 
-  // The reopened response is authoritative even when the history link is stale.
+  // Adopt each verified snapshot once, without undoing later branch navigation.
+  const adoptedSuggestionRef = useRef<string | null>(null);
   useEffect(() => {
-    if (suggestionSession.isResumed && suggestionSession.branch) {
+    if (!suggestionSession.isResumed || !suggestionSession.branch) {
+      adoptedSuggestionRef.current = null;
+      return;
+    }
+    const adoptionKey = JSON.stringify([suggestionSession.sessionId, suggestionSession.branch]);
+    if (adoptedSuggestionRef.current === adoptionKey) return;
+    adoptedSuggestionRef.current = adoptionKey;
+    // The reopened response is authoritative even when the history link is stale.
+    if (suggestionSession.branch !== activeBranch) {
+      resetSourceState();
       setActiveBranch(suggestionSession.branch);
     }
-  }, [suggestionSession.isResumed, suggestionSession.branch]);
+  }, [suggestionSession.isResumed, suggestionSession.sessionId, suggestionSession.branch, activeBranch, resetSourceState]);
 
   // Beacon safety net for browser close
   useSuggestionBeacon({
@@ -1308,7 +1325,7 @@ export default function EditorPage() {
   }
 
   return (
-    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch}>
+    <BranchProvider projectId={projectId} accessToken={session?.accessToken} initialBranch={initialBranch} adoptedBranch={suggestionSession.isResumed ? suggestionSession.branch ?? undefined : undefined}>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
         {sourceRevisionConflict && (

@@ -256,10 +256,9 @@ allowlist. The owner has ordinary account privileges and owns only its test proj
 
 The registry owns only `browser/suggestions.spec.ts`, in the `suggestions` Playwright
 project. Baseline ignores it. `SUGGESTION_CASES` declares eight journeys; its first seven
-form this profile's exact inventory. The eighth belongs to optional-configured and is
-reserved for U6 to register there. This harness change leaves the existing inventories
-at baseline 21, lifecycle 4, optional-configured 5, optional-anonymous 2 and disabled 3.
-The browser spec and fresh-stack acceptance are delivered separately by U6.
+form this profile's exact inventory. The eighth is registered in optional-configured. The inventories are
+baseline 21, lifecycle 4, optional-configured 6, optional-anonymous 2 and disabled 3.
+The browser specs are delivered by U6; fresh-stack acceptance remains a host gate.
 
 `e2e/fixtures/suggestions.ts` exposes `test`, `expect`, `run`, `ownerApi`, `suggesterApi`,
 `editorApi` and `unrelatedApi`. A worker fixture completes four genuine browser OIDC

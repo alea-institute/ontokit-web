@@ -16,6 +16,14 @@ export type SuggestionStatus =
   | "submitted"    // PR created successfully
   | "error";
 
+export interface SuggestionSessionSnapshot {
+  sessionId: string;
+  branch: string;
+  beaconToken: string | null;
+  changesCount?: number;
+  entitiesModified?: string[];
+}
+
 export interface UseSuggestionSessionReturn {
   sessionId: string | null;
   branch: string | null;
@@ -32,7 +40,7 @@ export interface UseSuggestionSessionReturn {
   saveToSession: (content: string, entityIri: string, entityLabel: string) => Promise<boolean>;
   submitSession: (summary?: string) => Promise<void>;
   discardSession: () => Promise<void>;
-  resumeSession: (sessionId: string, branch: string) => void;
+  resumeSession: (session: SuggestionSessionSnapshot) => void;
   resubmitSession: (summary?: string) => Promise<void>;
 }
 
@@ -284,21 +292,22 @@ export function useSuggestionSession({
   }, [sessionId, accessToken, projectId, isCurrent, beginTerminal, ownsTerminal]);
 
   /** Adopt an existing session after the resume flow has verified and reopened it. */
-  const resumeSession = useCallback((sid: string, branchName: string) => {
-    if (!isCurrent()) return;
-    if (terminalRef.current?.sessionId === sid) return;
+  const resumeSession = useCallback((session: SuggestionSessionSnapshot) => {
+    // Adoption belongs to the account, so token renewal during reopen is safe.
+    if (ownerRef.current !== owner || !owner.live) return;
+    if (terminalRef.current?.sessionId === session.sessionId) return;
     terminalRef.current = null;
-    sessionIdRef.current = sid;
-    branchRef.current = branchName;
-    setSessionId(sid);
-    setBranch(branchName);
-    setBeaconToken(null);
-    setChangesCount(0);
-    setEntitiesModified([]);
+    sessionIdRef.current = session.sessionId;
+    branchRef.current = session.branch;
+    setSessionId(session.sessionId);
+    setBranch(session.branch);
+    setBeaconToken(session.beaconToken);
+    setChangesCount(session.changesCount ?? 0);
+    setEntitiesModified(session.entitiesModified ?? []);
     setStatus("active");
     setError(null);
     setIsResumed(true);
-  }, [isCurrent]);
+  }, [owner]);
 
   /** Resubmit a resumed session after addressing requested changes. */
   const resubmitSession = useCallback(async (summary?: string) => {
@@ -389,15 +398,13 @@ export function useSuggestionSession({
             throw new Error("The active suggestion session does not match the requested session.");
           }
           // Use the server's branch and fresh token; URL parameters are only hints.
-          sessionIdRef.current = reopened.session_id;
-          branchRef.current = reopened.branch;
-          setSessionId(reopened.session_id);
-          setBranch(reopened.branch);
-          setBeaconToken(reopened.beacon_token);
-          setChangesCount(session.changes_count);
-          setEntitiesModified(session.entities_modified);
-          setStatus("active");
-          setIsResumed(true);
+          resumeSession({
+            sessionId: reopened.session_id,
+            branch: reopened.branch,
+            beaconToken: reopened.beacon_token,
+            changesCount: session.changes_count,
+            entitiesModified: session.entities_modified,
+          });
         } else {
           throw new Error("This suggestion session is no longer available for editing.");
         }
@@ -417,7 +424,7 @@ export function useSuggestionSession({
         setError(msg);
         onError?.(msg);
       });
-  }, [resumeSessionId, resumeBranch, accessToken, projectId, onError, owner, resumeRetry]);
+  }, [resumeSessionId, resumeBranch, accessToken, projectId, onError, owner, resumeRetry, resumeSession]);
 
   return {
     sessionId,

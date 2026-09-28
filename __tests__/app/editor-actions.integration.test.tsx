@@ -1233,6 +1233,80 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(useAnonymousTokenStore.getState().getToken("route-project")).toBeNull();
   });
 
+  it.each(["changes-requested", "active"])("adopts the server branch after stale source preload (%s)", async status => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    boundary.search = new URLSearchParams({ branch: "suggestion/draft" });
+    extraBranches = [{ name: "suggestion/draft", is_current: false }, { name: "suggestion/draft-v2", is_current: false }];
+    sourceContent = originalSource + '\nex:Stale a owl:Class .';
+    const view = mount();
+    await screen.findByRole("button", { name: "suggestion/draft" });
+    fireEvent.click(await screen.findByText("Person"));
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    await waitFor(() => expect((screen.getByLabelText("Turtle source boundary") as HTMLTextAreaElement).value).toContain("ex:Stale"));
+    fireEvent.click(screen.getByRole("button", { name: "Tree" }));
+    sourceContent = originalSource + '\nex:SentBack a owl:Class .';
+    resumableSessions = [{ session_id: "suggestion-session", branch: "suggestion/draft-v2", status, changes_count: 1, entities_modified: ["Person"] }];
+    const fetcher = vi.mocked(fetch);
+    const originalFetch = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async (input, init) => {
+      const response = await originalFetch(input, init);
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith("/reopen") || (path.endsWith("/suggestions/sessions") && init?.method === "POST")) {
+        return json({ ...await response.json(), branch: "suggestion/draft-v2" });
+      }
+      return response;
+    });
+    boundary.search.set("resumeSession", "suggestion-session");
+    view.rerender(<EditorPage />);
+    await waitFor(() => expect(requests.some(r => r.path.endsWith("/ontology/tree") && new URLSearchParams(r.search).get("branch") === "suggestion/draft-v2")).toBe(true));
+    fireEvent.click(await screen.findByText("Person"));
+    const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+    await editAndSave(label, "Revised branch label");
+    await screen.findByText('Suggested update to "Revised branch label"');
+    expect(suggestionBodies.at(-1)?.content).toContain("ex:SentBack");
+    expect(suggestionBodies.at(-1)?.content).not.toContain("ex:Stale");
+    expect(requests.filter(r => r.path.endsWith("/revisions/file")).at(-1)?.search).toContain("suggestion%2Fdraft-v2");
+    expect(requests.find(r => r.path.endsWith("/suggestion-session/save"))).toMatchObject({ method: "PUT" });
+    expect(screen.getByRole("button", { name: "suggestion/draft-v2" })).toBeDefined();
+    expect(requests.some(r => r.path.endsWith("/discard"))).toBe(false);
+  });
+
+  it.each(["pending", "completed"])("keeps resumed suggestions usable during and after resubmit (%s)", async phase => {
+    projectResponse = { ...projectResponse, user_role: "suggester" };
+    boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft", classIri: iri });
+    extraBranches = [{ name: "suggestion/draft", is_current: false }];
+    resumableSessions = [{ session_id: "suggestion-session", branch: "suggestion/draft", status: "changes-requested", changes_count: 1, entities_modified: ["Person"] }];
+    const fetcher = vi.mocked(fetch);
+    const originalFetch = fetcher.getMockImplementation()!;
+    let finish!: (response: Response) => void;
+    fetcher.mockImplementation((input, init) => new URL(String(input)).pathname.endsWith("/resubmit")
+      ? new Promise<Response>(resolve => { finish = resolve; }) : originalFetch(input, init));
+    const view = mount();
+    fireEvent.click(await screen.findByRole("button", { name: /Resubmit Suggestions/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
+    await waitFor(() => expect(finish).toBeDefined());
+    if (phase === "pending") {
+      expect(screen.getByText("Resubmit Suggestions").closest("button")?.hasAttribute("disabled")).toBe(true);
+    }
+    await act(async () => finish(json({ pr_number: 23, pr_url: null })));
+    await screen.findByText("Suggestions submitted as PR #23");
+    if (phase === "completed") {
+      const replacement = boundary.replace.mock.calls.at(-1)?.[0] as string;
+      const next = new URL(replacement, "https://example.test").searchParams;
+      expect(next.has("resumeSession")).toBe(false);
+      expect(next.get("branch")).toBe("suggestion/draft");
+      expect(next.get("classIri")).toBe(iri);
+      boundary.search = next;
+      view.rerender(<EditorPage />);
+      const label = await screen.findByPlaceholderText("Label text") as HTMLInputElement;
+      await editAndSave(label, "Fresh suggestion");
+      await screen.findByText('Suggested update to "Fresh suggestion"');
+      expect(requests.filter(r => r.path.endsWith("/suggestions/sessions") && r.method === "POST")).toHaveLength(1);
+      expect(suggestionBodies.at(-1)?.entity_label).toBe("Fresh suggestion");
+    }
+  });
+
   it.each([200, 403])("resumes a cold session URL and resubmits (HTTP %i)", async status => {
     projectResponse = { ...projectResponse, user_role: "suggester" };
     boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft" });
