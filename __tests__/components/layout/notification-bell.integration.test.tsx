@@ -86,6 +86,7 @@ describe("NotificationBell through notification API", () => {
   });
 
   it.each<[Partial<Notification>, string]>([
+    [{ type: "suggestion_submitted" }, "/projects/project-1/suggestions/review"],
     [{ type: "suggestion_auto_submitted" }, "/projects/project-1/suggestions/review"],
     [{ type: "suggestion_approved" }, "/projects/project-1/suggestions"],
     [{ type: "suggestion_rejected" }, "/projects/project-1/suggestions"],

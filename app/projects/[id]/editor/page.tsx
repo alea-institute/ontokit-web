@@ -357,6 +357,17 @@ export default function EditorPage() {
     onError: (msg) => toast.error("Suggestion error", msg),
   });
 
+  const isResumeReadOnly = isSuggestionMode && !!resumeSessionParam
+    && (suggestionSession.sessionId !== resumeSessionParam || !suggestionSession.isActive);
+  const canEditSuggestion = isSuggestionMode && !isResumeReadOnly;
+
+  // The reopened response is authoritative even when the history link is stale.
+  useEffect(() => {
+    if (suggestionSession.isResumed && suggestionSession.branch) {
+      setActiveBranch(suggestionSession.branch);
+    }
+  }, [suggestionSession.isResumed, suggestionSession.branch]);
+
   // Beacon safety net for browser close
   useSuggestionBeacon({
     projectId,
@@ -1348,12 +1359,13 @@ export default function EditorPage() {
             </div>
             <div className="flex items-center gap-2">
               {/* Submit Suggestions button */}
-              {isSuggestionMode && suggestionSession.changesCount > 0 && (
+              {canEditSuggestion && suggestionSession.changesCount > 0 && (
                 <Button
                   variant="primary"
                   size="sm"
                   className="gap-2 bg-amber-600 hover:bg-amber-700"
                   onClick={() => setSubmitDialogOpen(true)}
+                  disabled={suggestionSession.status === "saving" || suggestionSession.status === "submitting"}
                 >
                   <Lightbulb className="h-4 w-4" />
                   {suggestionSession.isResumed ? "Resubmit Suggestions" : "Submit Suggestions"}
@@ -1519,6 +1531,12 @@ export default function EditorPage() {
           </div>
         </div>
 
+        {isResumeReadOnly && suggestionSession.error && (
+          <div role="alert" className="border-b border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+            {suggestionSession.error} The editor is read-only. Return to My Suggestions to try again.
+          </div>
+        )}
+
         {/* Main Editor Layout — mode-dependent */}
         <div className="relative flex h-[calc(100vh-4rem-3.5rem)]">
           <div className="flex-1 flex overflow-hidden">
@@ -1531,9 +1549,9 @@ export default function EditorPage() {
                   canEdit={isAnonymousProposalMode ? true : !!canEdit}
                   userRole={project?.user_role}
                   entityNavigationRef={entityNavigationRef}
-                  canSuggest={!!canSuggest}
+                  canSuggest={!!canSuggest && !isResumeReadOnly}
                   trustGate={trustGate}
-                  isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
+                  isSuggestionMode={isAnonymousProposalMode || canEditSuggestion}
                   nodes={nodes}
                   isTreeLoading={isTreeLoading}
                   treeError={treeError}
@@ -1607,10 +1625,10 @@ export default function EditorPage() {
                 activeBranch={isAnonymousProposalMode && anonymousSuggestion.branch ? anonymousSuggestion.branch : activeBranch}
                 canEdit={isAnonymousProposalMode ? true : !!canEdit}
                 userRole={project?.user_role}
-                canSuggest={!!canSuggest}
+                canSuggest={!!canSuggest && !isResumeReadOnly}
                 trustGate={trustGate}
                 entityNavigationRef={entityNavigationRef}
-                isSuggestionMode={isAnonymousProposalMode ? true : isSuggestionMode}
+                isSuggestionMode={isAnonymousProposalMode || canEditSuggestion}
                 nodes={nodes}
                 isTreeLoading={isTreeLoading}
                 treeError={treeError}

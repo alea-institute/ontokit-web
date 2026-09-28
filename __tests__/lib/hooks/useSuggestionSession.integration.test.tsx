@@ -1,5 +1,6 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useSuggestionBeacon } from '@/lib/hooks/useSuggestionBeacon';
 import { useSuggestionSession } from '@/lib/hooks/useSuggestionSession';
 import { saveSuggestionUpdate } from '@/lib/editor/suggestionSessionPersistence';
 import { jsonResponse } from '../../fixtures/llm-hook-harness';
@@ -13,11 +14,15 @@ function setup(resumeStatus?: string, initialFailure = '') {
     if (path.endsWith('/submit') || path.endsWith('/resubmit')) return jsonResponse({ pr_number: 7, pr_url: '/review/7', status: 'submitted' });
     if (path.endsWith('/discard')) return new Response(null, { status: 204 });
     if (init?.method === 'POST') return jsonResponse({ session_id: 'session', branch: 'suggestions/one', beacon_token: 'synthetic-beacon', created_at: '2026-01-01T00:00:00Z' });
-    return jsonResponse({ items: [{ session_id: 'session', status: resumeStatus }] });
+    return jsonResponse({ items: [{ session_id: 'session', status: resumeStatus, branch: 'suggestions/one', changes_count: 1, entities_modified: ['Original'] }] });
   });
   vi.stubGlobal('fetch', fetcher);
   const onSubmitted = vi.fn(); const onError = vi.fn();
-  return { fetcher, onSubmitted, onError, fail: (suffix: string) => { failure = suffix; }, ...renderHook(({ token }: { token?: string }) => useSuggestionSession({ projectId: 'project', accessToken: token, resumeSessionId: resumeStatus ? 'session' : undefined, resumeBranch: resumeStatus ? 'suggestions/one' : undefined, onSubmitted, onError }), { initialProps: { token: 'token' as string | undefined } }) };
+  return { fetcher, onSubmitted, onError, fail: (suffix: string) => { failure = suffix; }, ...renderHook(({ token }: { token?: string }) => {
+    const session = useSuggestionSession({ projectId: 'project', accessToken: token, resumeSessionId: resumeStatus ? 'session' : undefined, resumeBranch: resumeStatus ? 'suggestions/one' : undefined, onSubmitted, onError });
+    useSuggestionBeacon({ projectId: 'project', sessionId: session.sessionId, beaconToken: session.beaconToken, enabled: session.isActive, getCurrentContent: () => 'revised' });
+    return session;
+  }, { initialProps: { token: 'token' as string | undefined } }) };
 }
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -51,7 +56,7 @@ describe('authenticated suggestion session persistence chain', () => {
   it('reports verification failure without restoring or writing the unverified session', async () => {
     const { result, onError, fetcher, rerender, fail } = setup('changes-requested', '/sessions');
     await waitFor(() => expect(onError).toHaveBeenCalledExactlyOnceWith('Failed to verify suggestion session status.'));
-    expect(result.current).toMatchObject({ sessionId: null, branch: null, isResumed: false, status: 'idle' });
+    expect(result.current).toMatchObject({ sessionId: null, branch: null, isResumed: false, status: 'error' });
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(fetcher.mock.calls[0][1]?.method).toBe('GET');
     expect(new Headers(fetcher.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer token');
@@ -87,10 +92,12 @@ describe('authenticated suggestion session persistence chain', () => {
   it('verifies a resumable session, edits it and resubmits without creating a new branch', async () => {
     const { result, fetcher, onSubmitted } = setup('changes-requested');
     await waitFor(() => expect(result.current.isResumed).toBe(true));
-    expect(result.current.beaconToken).toBeNull();
+    expect(result.current).toMatchObject({ beaconToken: 'synthetic-beacon', changesCount: 1, entitiesModified: ['Original'] });
+    expect(fetcher.mock.calls.map(([url]) => new URL(String(url)).pathname)).toEqual(['/api/v1/projects/project/suggestions/sessions', '/api/v1/projects/project/suggestions/sessions/session/reopen']);
     await act(() => result.current.saveToSession('revised', 'iri', 'Label'));
+    expect(result.current).toMatchObject({ changesCount: 2, entitiesModified: ['Original', 'Label'], isResumed: true });
     await act(() => result.current.resubmitSession('Addressed feedback'));
-    expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(2);
     expect(String(fetcher.mock.calls.at(-1)![0])).toContain('/resubmit');
     expect(onSubmitted).toHaveBeenCalledExactlyOnceWith(7, '/review/7');
     expect(result.current.isResumed).toBe(false);
@@ -125,4 +132,35 @@ describe('authenticated suggestion session persistence chain', () => {
     await act(() => result.current.discardSession());
     expect(result.current).toMatchObject({ status: 'idle', sessionId: null, branch: null, isResumed: false, error: null });
   });
+  it.each(['changes-requested', 'active'])('flushes the resumed %s draft using the fresh server-issued beacon token', async status => {
+    const sendBeacon = vi.fn(() => true);
+    const original = Object.getOwnPropertyDescriptor(navigator, 'sendBeacon');
+    Object.defineProperty(navigator, 'sendBeacon', { configurable: true, value: sendBeacon });
+    try {
+      const { result, fetcher } = setup(status);
+      await waitFor(() => expect(result.current.isActive).toBe(true));
+      expect(fetcher.mock.calls.filter(([url]) => String(url).endsWith('/reopen'))).toHaveLength(status === 'active' ? 0 : 1);
+      act(() => window.dispatchEvent(new Event('beforeunload')));
+      expect(sendBeacon).toHaveBeenCalledOnce();
+      const [url, payload] = sendBeacon.mock.calls[0] as unknown as [string, Blob];
+      expect(url).toContain('/suggestions/beacon?token=synthetic-beacon');
+      expect(JSON.parse(await payload.text())).toEqual({ session_id: 'session', content: 'revised' });
+    } finally {
+      if (original) Object.defineProperty(navigator, 'sendBeacon', original);
+      else Reflect.deleteProperty(navigator, 'sendBeacon');
+    }
+  });
+
+  it('keeps rejected reopen read-only through the real API and persistence helper', async () => {
+    const { result, onError, fetcher } = setup('changes-requested', '/reopen');
+    await waitFor(() => expect(onError).toHaveBeenCalledWith('Session unavailable'));
+    expect(result.current).toMatchObject({ status: 'error', isActive: false, sessionId: null, beaconToken: null });
+    const onSaved = vi.fn();
+    await act(async () => {
+      await expect(saveSuggestionUpdate({ isSessionActive: false, session: result.current, content: 'draft', entityIri: 'iri', entityLabel: 'Label', onSaved })).rejects.toThrow();
+    });
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
 });

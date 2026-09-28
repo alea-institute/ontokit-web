@@ -88,10 +88,10 @@ it('clears authenticated session ownership when the viewer changes without signi
   expect(result.current).toMatchObject({ sessionId: null, branch: null, beaconToken: null, status: 'idle', isResumed: false });
 });
 it('verifies a new resume selection and ignores the previous selection response', async () => {
-  const old = deferred(); const next = deferred(); vi.stubGlobal('fetch', vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(next.promise));
+  const old = deferred(); const next = deferred(); vi.stubGlobal('fetch', vi.fn().mockReturnValueOnce(old.promise).mockReturnValueOnce(next.promise).mockResolvedValueOnce(json({ session_id: 'current', branch: 'branch-current', beacon_token: 'fresh', created_at: '2026-01-01' })));
   const { result, rerender } = renderHook(({ resumeSessionId }) => useSuggestionSession({ projectId: 'a', accessToken: 'token', resumeSessionId, resumeBranch: `branch-${resumeSessionId}` }), { initialProps: { resumeSessionId: 'old' } });
   rerender({ resumeSessionId: 'current' });
-  await act(async () => { next.resolve(json({ items: [{ session_id: 'current', status: 'changes-requested' }] })); });
+  await act(async () => { next.resolve(json({ items: [{ session_id: 'current', branch: 'branch-current', status: 'changes-requested', changes_count: 2, entities_modified: ['Person'] }] })); });
   expect(result.current.sessionId).toBe('current');
   await act(async () => { old.resolve(json({ items: [{ session_id: 'old', status: 'changes-requested' }] })); });
   expect(result.current.sessionId).toBe('current');
@@ -163,7 +163,7 @@ it.each(['viewer', 'project', 'session', 'unmount'])('rejects terminal completio
 });
 
 it('does not reverify and reopen a resumed session during credential renewal and submission', async () => {
-  const gate = deferred(); const fetcher = vi.fn().mockResolvedValueOnce(json({ items: [{ session_id: 'session', status: 'changes-requested' }] })).mockReturnValueOnce(gate.promise); vi.stubGlobal('fetch', fetcher);
+  const gate = deferred(); const fetcher = vi.fn().mockResolvedValueOnce(json({ items: [{ session_id: 'session', branch: 'branch', status: 'changes-requested', changes_count: 2, entities_modified: ['Person'] }] })).mockResolvedValueOnce(json({ session_id: 'session', branch: 'branch', beacon_token: 'fresh', created_at: '2026-01-01' })).mockReturnValueOnce(gate.promise); vi.stubGlobal('fetch', fetcher);
   const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken, resumeSessionId: 'session', resumeBranch: 'branch', onError: () => {} }), { initialProps: { accessToken: 'old' } });
   await act(async () => {});
   expect(result.current.sessionId).toBe('session');
@@ -172,7 +172,7 @@ it('does not reverify and reopen a resumed session during credential renewal and
   expect(result.current.status).toBe('submitting');
   await act(async () => { gate.resolve(json({ pr_number: 9, pr_url: null })); await pending; });
   expect(result.current).toMatchObject({ sessionId: null, status: 'submitted' });
-  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher).toHaveBeenCalledTimes(3);
 });
 
 it('ignores verification that began before the same session was submitted', async () => {

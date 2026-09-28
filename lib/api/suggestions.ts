@@ -169,6 +169,14 @@ export interface AnonymousSubmitPayload {
 // --- API ---
 
 export const suggestionsApi = {
+  /** Reopen a sent-back session and obtain a fresh beacon token. */
+  reopen: (projectId: string, sessionId: string, token: string) =>
+    api.post<SuggestionSession>(
+      `/api/v1/projects/${projectId}/suggestions/sessions/${sessionId}/reopen`,
+      undefined,
+      { headers: { Authorization: `Bearer ${token}` }, retryOn5xx: false },
+    ),
+
   /**
    * Create a new suggestion session (branch).
    * Called on first edit by a suggester.
