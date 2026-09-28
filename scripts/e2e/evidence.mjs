@@ -138,38 +138,7 @@ const probe = (name, tier, method, path, status, authorization) => Object.freeze
 const PROPOSAL = probe('anonymous-proposal-session', 'api', 'POST', 'proposal', 201, false);
 const FOREIGN_ANON = probe('foreign-private-anonymous', 'api', 'GET', 'project', 403, false);
 const PROVIDERS = probe('providers-empty', 'web', 'GET', 'providers', 200, false);
-export const MODE_CASES = Object.freeze({
-  'optional-configured': [
-    {title: 'anonymous visitor sees header sign-in and the public project but neither private fixture', probes: []},
-    {title: 'foreign private denial Sign In completes real OIDC, returns to the original URL and stays denied', probes: [
-      FOREIGN_ANON, probe('foreign-private-signed-in', 'api', 'GET', 'project', 403, true)]},
-    {title: 'anonymous visitor starts a proposal session on a public project that the API accepts', probes: [PROPOSAL]},
-    {title: 'after real sign-in the persona-owned private project is visible and a project create succeeds', probes: [
-      probe('persona-private-anonymous', 'api', 'GET', 'project', 403, false),
-      probe('persona-private-signed-in', 'api', 'GET', 'project', 200, true),
-      probe('project-create-signed-in', 'api', 'POST', 'projects', 201, true)]},
-    {title: 'sign-out returns the application to the anonymous state', probes: []},
-  ],
-  'optional-anonymous': [
-    {title: 'providers are empty and no sign-in control appears on any reachable inventoried route', probes: [PROVIDERS, FOREIGN_ANON]},
-    {title: 'public browsing and an anonymous proposal work while private access and API create are refused', probes: [
-      PROPOSAL, FOREIGN_ANON, probe('project-create-anonymous', 'api', 'POST', 'projects', 401, false)]},
-  ],
-  disabled: [
-    {title: 'providers are empty and no authentication UI appears on any reachable inventoried route', probes: [PROVIDERS, FOREIGN_ANON]},
-    {title: 'public browsing and proposal work while PR create and duplicate check are refused and PR Party is absent', probes: [
-      PROPOSAL,
-      probe('pull-request-create', 'api', 'POST', 'pullRequests', 403, false),
-      probe('duplicate-check', 'api', 'POST', 'duplicateCheck', 403, false),
-      probe('pr-party-queue', 'api', 'GET', 'prPartyQueue', 404, false)]},
-    {title: 'project create, import and source save are refused by the API and the web explains they are unavailable', probes: [
-      probe('project-create-disabled', 'api', 'POST', 'projects', 403, false),
-      probe('project-import-disabled', 'api', 'POST', 'import', 403, false),
-      probe('source-save-disabled', 'api', 'PUT', 'source', 403, false)]},
-  ],
-});
-// D10: cases 1–7 belong to suggestions. Case 8 is declared for U6 to append to
-// optional-configured; declaring it here deliberately does not change that inventory.
+// D10: seven dedicated cases; the anonymous chain extends optional-configured by one.
 const suggestionProbe = (name, method, suffix, status) => Object.freeze({
   probe: name, tier: 'api', method,
   path: `/api/v1/projects/{id}/suggestions/sessions${suffix}`,
@@ -191,6 +160,37 @@ export const SUGGESTION_CASES = Object.freeze([
   {profile: 'suggestions', title: 'public non-member capabilities agree with session create and submission succeeds', probes: []},
   {profile: 'optional-configured', title: 'anonymous visitor submits a proposal on the owner public project and the signed-in owner sees it in triage', probes: []},
 ].map(c => Object.freeze({...c, probes: Object.freeze(c.probes)})));
+export const MODE_CASES = Object.freeze({
+  'optional-configured': [
+    {title: 'anonymous visitor sees header sign-in and the public project but neither private fixture', probes: []},
+    {title: 'foreign private denial Sign In completes real OIDC, returns to the original URL and stays denied', probes: [
+      FOREIGN_ANON, probe('foreign-private-signed-in', 'api', 'GET', 'project', 403, true)]},
+    {title: 'anonymous visitor starts a proposal session on a public project that the API accepts', probes: [PROPOSAL]},
+    {title: 'after real sign-in the persona-owned private project is visible and a project create succeeds', probes: [
+      probe('persona-private-anonymous', 'api', 'GET', 'project', 403, false),
+      probe('persona-private-signed-in', 'api', 'GET', 'project', 200, true),
+      probe('project-create-signed-in', 'api', 'POST', 'projects', 201, true)]},
+    {title: 'sign-out returns the application to the anonymous state', probes: []},
+    SUGGESTION_CASES[7],
+  ],
+  'optional-anonymous': [
+    {title: 'providers are empty and no sign-in control appears on any reachable inventoried route', probes: [PROVIDERS, FOREIGN_ANON]},
+    {title: 'public browsing and an anonymous proposal work while private access and API create are refused', probes: [
+      PROPOSAL, FOREIGN_ANON, probe('project-create-anonymous', 'api', 'POST', 'projects', 401, false)]},
+  ],
+  disabled: [
+    {title: 'providers are empty and no authentication UI appears on any reachable inventoried route', probes: [PROVIDERS, FOREIGN_ANON]},
+    {title: 'public browsing and proposal work while PR create and duplicate check are refused and PR Party is absent', probes: [
+      PROPOSAL,
+      probe('pull-request-create', 'api', 'POST', 'pullRequests', 403, false),
+      probe('duplicate-check', 'api', 'POST', 'duplicateCheck', 403, false),
+      probe('pr-party-queue', 'api', 'GET', 'prPartyQueue', 404, false)]},
+    {title: 'project create, import and source save are refused by the API and the web explains they are unavailable', probes: [
+      probe('project-create-disabled', 'api', 'POST', 'projects', 403, false),
+      probe('project-import-disabled', 'api', 'POST', 'import', 403, false),
+      probe('source-save-disabled', 'api', 'PUT', 'source', 403, false)]},
+  ],
+});
 const PROBE_CASES = Object.freeze({...MODE_CASES, suggestions: SUGGESTION_CASES.filter(c => c.profile === 'suggestions')});
 const MODE_FIELDS = ['probe', 'tier', 'method', 'path', 'status', 'authorization'];
 /** Rebuilds each mode case's probes from untrusted input; null unless exactly the table. */

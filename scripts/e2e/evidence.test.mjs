@@ -381,12 +381,12 @@ test('mode evidence in a baseline or lifecycle report prevents acceptance', () =
   const l = lifecycle(); specOf(l, 'R1').tests[0].annotations.push(...annotateMode([MODE_CASES.disabled[0].probes[0]]));
   rejects(l, 'lifecycle');
 });
-test('every mode inventory title is exactly one test title in its registry spec', () => {
-  for (const profile of MODE_PROFILES) {
+test('every mode and suggestion inventory matches its browser spec titles in order', () => {
+  for (const profile of [...MODE_PROFILES, 'suggestions']) {
     const file = new URL(`../../e2e/${PROFILE_INVENTORIES[profile][0].file}`, import.meta.url);
     const source = readFileSync(file, 'utf8');
     const titles = [...source.matchAll(/\btest\(\s*"([^"]+)"/g)].map(m => m[1]);
-    assert.deepEqual(titles.sort(), MODE_CASES[profile].map(c => c.title).sort(), profile);
+    assert.deepEqual(titles, PROFILE_INVENTORIES[profile].map(c => c.title), profile);
   }
 });
 test('the one-shot migrate job is allowed but not required; unknown services are refused', () => {
@@ -399,7 +399,7 @@ test('the one-shot migrate job is allowed but not required; unknown services are
   }
 });
 
-// D10 declares eight journeys; U6 adds journey eight to optional-configured later.
+// D10: seven dedicated journeys and one additional optional-configured journey.
 const suggestionTable = async () => (await import('./evidence.mjs')).SUGGESTION_CASES;
 async function suggestionReport() {
   const table = (await suggestionTable()).filter(c => c.profile === 'suggestions');
@@ -408,11 +408,14 @@ async function suggestionReport() {
     tests: [passing('suggestions', annotateMode(c.probes))],
   }))}]};
 }
-test('suggestions declares eight journeys and owns exactly seven without changing its neighbours', async () => {
+test('suggestions owns seven journeys and extends only optional-configured by one', async () => {
   const table = await suggestionTable();
   assert.equal(table.length, 8);
   assert.deepEqual(table.map(c => c.profile), [...Array(7).fill('suggestions'), 'optional-configured']);
   assert.equal(PROFILE_INVENTORIES.suggestions.length, 7);
+  assert.equal(PROFILE_INVENTORIES['optional-configured'].length, 6);
+  assert.equal(PROFILE_INVENTORIES['optional-configured'].at(-1).title, table[7].title);
+  assert.equal(validateReport(modeReport('optional-configured'), {profile: 'optional-configured'}).passed, 6);
   assert.equal(PROFILE_INVENTORIES.baseline.length, 21);
   assert.equal(PROFILE_INVENTORIES.lifecycle.length, 4);
   assert.equal(PROFILE_INVENTORIES['optional-anonymous'].length, 2);

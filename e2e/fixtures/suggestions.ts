@@ -1,6 +1,6 @@
 // D10: genuine OIDC personas and HTTP membership setup for the suggestions profile.
 // All credentials stay in the private run directory; only fixed probe labels enter receipts.
-import { test as base, expect, type APIRequestContext, type PlaywrightWorkerArgs } from "@playwright/test";
+import { test as base, expect, type APIRequestContext, type Page, type PlaywrightWorkerArgs } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { SUGGESTION_CASES } from "../../scripts/e2e/evidence.mjs";
@@ -85,3 +85,36 @@ export async function directProbe(api: APIRequestContext, name: string, {project
   return {tier: "api", method: spec.method, path: spec.path, status: response.status(), authorization: true, json: () => response.json()};
 }
 export { expect };
+
+/** Shared UI path for authenticated suggestions and optional-mode proposals. */
+export async function saveExistingLabel(page: Page, apiOrigin: string, projectId: string, label: string, anonymous = false) {
+  const prefix = `/api/v1/projects/${projectId}/suggestions/${anonymous ? "anonymous/" : ""}sessions/`;
+  const input = page.getByPlaceholder("Label text", {exact: true});
+  await expect(input).toHaveCount(1);
+  await input.fill(label);
+  await input.press("Tab"); // Persist the draft on blur before the explicit Git save.
+  const save = page.getByRole("status").getByRole("button", {name: "Save", exact: true});
+  await expect(save).toBeEnabled();
+  const [response] = await Promise.all([
+    page.waitForResponse(r => new URL(r.url()).origin === apiOrigin && new URL(r.url()).pathname.startsWith(prefix)
+      && new URL(r.url()).pathname.endsWith("/save") && r.request().method() === "PUT"),
+    save.click(),
+  ]);
+  expect(response.status()).toBe(200);
+  const result = await response.json() as {branch: string; changes_count: number};
+  expect(result.changes_count).toBeGreaterThan(0);
+  await expect(page.getByRole("status").filter({hasText: /^Saved/})).toBeVisible();
+  return {sessionId: new URL(response.url()).pathname.slice(prefix.length, -"/save".length), branch: result.branch};
+}
+
+/** Each project has one submission, identified by its unique edited label. */
+export async function openTriage(page: Page, web: string, projectId: string, label: string) {
+  await page.goto(`${web}/projects/${projectId}/suggestions/review`);
+  const triage = page.getByRole("group", {name: "Filter suggestions by contributor tier"}).getByRole("button", {name: "Triage", exact: true});
+  await triage.click();
+  await expect(triage).toHaveAttribute("aria-pressed", "true");
+  const row = page.getByRole("main").getByRole("button").filter({hasText: label});
+  await expect(row).toHaveCount(1);
+  await row.click();
+  await expect(page.getByRole("tabpanel", {name: "Summary", exact: true})).toContainText(label);
+}

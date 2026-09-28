@@ -1,5 +1,8 @@
 // D09 U5: optional mode with an active provider (R4, R5). Real browser, real API and
-// real disposable Zitadel. Each case starts in a fresh, anonymous browser context.
+// real disposable Zitadel. D10 retains the anonymous proposal context from case 3
+// for the final submission case: exactly one anonymous create per fresh stack.
+import type { BrowserContext, Page } from "@playwright/test";
+import { saveExistingLabel, openTriage } from "../fixtures/suggestions";
 import { randomUUID } from "node:crypto";
 import { seededProject } from "../fixtures/projects";
 import {
@@ -9,6 +12,12 @@ import {
 
 const test = modeTest("optional-configured");
 const PROFILE = "optional-configured";
+// The last case continues the proposal created by the existing D09 case.
+test.describe.configure({mode: "serial"});
+let proposalContext: BrowserContext | undefined;
+let proposalPage: Page | undefined;
+let proposalSessionId: string | undefined;
+test.afterAll(async () => { await proposalContext?.close(); });
 
 test("anonymous visitor sees header sign-in and the public project but neither private fixture", async ({page, run}) => {
   const publicId = seededProject(run, "publicProject");
@@ -43,9 +52,13 @@ test("foreign private denial Sign In completes real OIDC, returns to the origina
   await expect(page.getByRole("heading", {level: 1, name: fixtureName(run, "foreignPrivateProject")})).toHaveCount(0);
 });
 
-test("anonymous visitor starts a proposal session on a public project that the API accepts", async ({page, run, anonymousApi}) => {
+test("anonymous visitor starts a proposal session on a public project that the API accepts", async ({browser, run, anonymousApi}) => {
   test.setTimeout(150_000);
+  proposalContext = await browser.newContext();
+  proposalPage = await proposalContext.newPage();
+  const page = proposalPage;
   const response = await startProposal(page, run, anonymousApi, seededProject(run, "publicProject"));
+  proposalSessionId = (await response.json() as {session_id: string}).session_id;
   recordProbe(PROFILE, "anonymous-proposal-session", await observed(response));
   expect(await sessionUserId(page, run)).toBeNull();
 });
@@ -106,4 +119,36 @@ test("sign-out returns the application to the anonymous state", async ({page, ru
   await gotoResolved(page, `${run.web}/`, p => projectLink(p, seededProject(run, "publicProject")));
   await expect(headerSignIn(page)).toBeVisible();
   await expect(projectLink(page, personaId)).toHaveCount(0);
+});
+
+test("anonymous visitor submits a proposal on the owner public project and the signed-in owner sees it in triage", async ({page, run}) => {
+  test.setTimeout(180_000);
+  if (!proposalPage || !proposalSessionId) throw new Error("The preceding anonymous proposal case must create the session");
+  const projectId = seededProject(run, "publicProject");
+  const label = "D10 anonymous proposed Person";
+  expect(await sessionUserId(proposalPage, run)).toBeNull();
+  const saved = await saveExistingLabel(proposalPage, run.api, projectId, label, true);
+  expect(saved.sessionId).toBe(proposalSessionId);
+  await proposalPage.getByRole("button", {name: /^Submit Proposal/}).click();
+  const credit = proposalPage.getByRole("dialog", {name: "Want credit for your suggestions?", exact: true});
+  const [submitted] = await Promise.all([
+    apiCall(proposalPage, run, "POST", `${projectPath(projectId)}/suggestions/anonymous/sessions/${saved.sessionId}/submit`, {authorized: false}),
+    credit.getByRole("button", {name: "Skip", exact: true}).click(),
+  ]);
+  expect(submitted.status()).toBe(200);
+  const submission = await submitted.json() as {pr_number: number; status: string};
+  expect(submission.status).toBe("submitted");
+  expect(submission.pr_number).toBeGreaterThan(0);
+  await expect(proposalPage.getByRole("dialog", {name: "Thank you — your proposal is in", exact: true})).toBeVisible();
+  expect(await sessionUserId(proposalPage, run)).toBeNull();
+
+  await gotoResolved(page, `${run.web}/`, headerSignIn);
+  await headerSignIn(page).click();
+  await completeProviderSignIn(page, run);
+  await expect(page).toHaveURL(url => url.origin === run.web && url.pathname === "/", {timeout: 45_000});
+  expect(await sessionUserId(page, run)).toBe(run.users.owner.id);
+  await openTriage(page, run.web, projectId, label);
+  const detail = page.getByRole("tabpanel", {name: "Summary", exact: true});
+  await expect(detail).toContainText("Anonymous");
+  await expect(detail.getByRole("link", {name: `PR #${submission.pr_number}`, exact: true})).toBeVisible();
 });

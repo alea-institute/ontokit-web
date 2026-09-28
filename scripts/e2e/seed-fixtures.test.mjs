@@ -55,9 +55,11 @@ test('provider-less seeding returns exactly one public and one foreign private p
     assert.equal(saves[0].fixtures, null, 'intent is recorded before the container creates anything');
   }
 });
-test('optional-configured also seeds a persona-owned private project owned by the persona subject', async () => {
+test('optional-configured public and private persona fixtures belong to the owner, with foreign private isolation', async () => {
   const {result} = await seed('optional-configured', {personaSubject: PERSONA});
   assert.deepEqual(Object.keys(result).sort(), ['foreignPrivateProject', 'personaPrivateProject', 'publicProject']);
+  assert.equal(result.publicProject.owner, PERSONA);
+  assert.equal(result.publicProject.isPublic, true);
   assert.equal(result.personaPrivateProject.owner, PERSONA);
   assert.equal(result.personaPrivateProject.isPublic, false);
   assert.notEqual(result.foreignPrivateProject.owner, PERSONA);
@@ -125,6 +127,8 @@ test('cleanup purges this run by exact ID and tag, never another run', async () 
     m => { m.seed.fixtures.publicProject.tag = runTag(OTHER, 'publicProject'); },
     m => { m.seed.fixtures.foreignPrivateProject.owner = foreignOwner(OTHER); },
     m => { m.seed.fixtures.publicProject.owner = 'anonymous'; },
+    m => { m.seed.fixtures.publicProject.owner = '987654321098765432'; },
+    m => { m.seed.fixtures.publicProject.owner = foreignOwner(RUN); },
     m => { m.seed.fixtures.personaPrivateProject.owner = foreignOwner(RUN); },
     m => { m.seed.fixtures.publicProject.id = '*'; },
     m => { m.seed.fixtures.unknownProject = m.seed.fixtures.publicProject; },
