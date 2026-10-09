@@ -35,4 +35,44 @@ describe("individual updates through the real writer, parser and detail extracto
     expect(parseBlockTriples(updated, iri)?.find(triple => triple.predicate === property)?.object).toEqual({ type: "literal", value: "https://example.test/reference", lang: "en" });
   });
 
+  it("round-trips a form payload built by the extractor without losing what the form cannot show", () => {
+    const source = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:player a owl:NamedIndividual ;
+    rdfs:label "Player"@en ;
+    skos:altLabel "Spieler"@de ;
+    ex:flag true ;
+    ex:origin [ a ex:Place ] .
+`;
+    const playerIri = "http://example.org/ont#player";
+    const detail = extractIndividualDetail(source, playerIri)!;
+    const updated = updateIndividualInTurtle(source, playerIri, {
+      ...detail,
+      labels: [{ value: "Player (renamed)", lang: "en" }],
+    });
+    expect(updated).toContain("ex:flag true");
+    expect(updated).toContain("ex:origin [ a ex:Place ]");
+    const reparsed = extractIndividualDetail(updated, playerIri)!;
+    expect(reparsed.labels).toEqual([{ value: "Player (renamed)", lang: "en" }]);
+    expect(reparsed.annotations).toEqual(detail.annotations);
+    expect(updateIndividualInTurtle(updated, playerIri, { ...reparsed })).toBe(updated);
+  });
+
+  it("keeps an altLabel the payload omits (AE3)", () => {
+    const source = TURTLE_FIXTURE.replace(
+      'rdfs:label "Fido"@en ;',
+      'rdfs:label "Fido"@en ;\n    skos:altLabel "Spieler"@de ;',
+    );
+    const updated = updateIndividualInTurtle(source, iri, {
+      ...original,
+      labels: [{ value: "Fido the Second", lang: "en" }],
+      annotations: [],
+    });
+    expect(extractIndividualDetail(updated, iri)?.annotations).toEqual([
+      { property_iri: "http://www.w3.org/2004/02/skos/core#altLabel", values: [{ value: "Spieler", lang: "de" }] },
+    ]);
+  });
 });
