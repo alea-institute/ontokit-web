@@ -82,20 +82,6 @@ export function useCollaborationStatus({
       ws.onerror = () => {
         // Error will trigger onclose, so we don't need to do much here
       };
-
-      // Handle messages from the lint WebSocket
-      ws.onmessage = (event) => {
-        if (wsRef.current !== ws || isClosingRef.current) return;
-        try {
-          const data = JSON.parse(event.data);
-          // Lint WebSocket sends messages about lint run status
-          // We don't need to do anything special with them here,
-          // but we could emit events if needed in the future
-          console.log("[WebSocket] Lint update:", data.type);
-        } catch {
-          // Ignore parse errors
-        }
-      };
     } catch {
       setStatus("disconnected");
     }

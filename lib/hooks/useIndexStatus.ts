@@ -14,6 +14,8 @@ export function useIndexStatus(
   return useQuery({
     queryKey: indexQueryKeys.status(projectId, accessToken),
     queryFn: () => projectOntologyApi.getIndexStatus(projectId, accessToken),
+    // Index notifications are best effort; reconcile even if an update is lost.
+    refetchInterval: 15_000,
     enabled: (options?.enabled ?? true) && !!projectId && !!accessToken,
   });
 }
