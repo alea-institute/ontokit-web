@@ -25,20 +25,21 @@ import {
   esc,
   iriTurtleForms,
   parseExistingTurtleBlock,
-  scanToBlockEnd,
-  escapeRegex,
+  pruneDeletedLiteralAxioms,
+  carriedPredicateObjectText,
+  isStructuralObjectText,
+  RDF_TYPE_IRI,
+  OWL_NAMED_INDIVIDUAL_IRI,
+  OWL_DEPRECATED_IRI,
+  OWL_SAME_AS_IRI,
+  OWL_DIFFERENT_FROM_IRI,
   type ParsedDeclarations,
+  type RetainedLiteralTarget,
 } from "@/lib/ontology/turtleUtils";
 import {
   extractIndividualDetail,
   type PropertyAssertion,
 } from "@/lib/ontology/entityDetailExtractors";
-
-const RDF_TYPE_IRI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
-const OWL_NAMED_INDIVIDUAL_IRI = "http://www.w3.org/2002/07/owl#NamedIndividual";
-const OWL_DEPRECATED_IRI = "http://www.w3.org/2002/07/owl#deprecated";
-const OWL_SAME_AS_IRI = "http://www.w3.org/2002/07/owl#sameAs";
-const OWL_DIFFERENT_FROM_IRI = "http://www.w3.org/2002/07/owl#differentFrom";
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -59,15 +60,10 @@ export interface TurtleIndividualUpdateData {
 
 // ── Block generator ───────────────────────────────────────────────────
 
-/**
- * The block parser surfaces blank-node and collection objects as pseudo-IRIs
- * ("[ ... ]", "( ... )"). They cannot be regenerated from the form payload,
- * so they are never written from it; the existing text is carried instead.
- */
-function isStructuralObject(target: string): boolean {
-  const trimmed = target.trim();
-  return trimmed.startsWith("[") || trimmed.startsWith("(");
-}
+// The block parser surfaces blank-node and collection objects as pseudo-IRIs
+// ("[ ... ]", "( ... )"). They cannot be regenerated from the form payload,
+// so they are never written from it; the existing text is carried instead.
+const isStructuralObject = isStructuralObjectText;
 
 function dataAssertionObject(
   value: string,
@@ -96,7 +92,7 @@ function genIndividualBlock(
   po.push(`a ${typeTokens.join(", ")}`);
 
   if (data.deprecated) {
-    po.push(`${toTurtle("http://www.w3.org/2002/07/owl#deprecated", rev)} true`);
+    po.push(`${toTurtle(OWL_DEPRECATED_IRI, rev)} true`);
   }
 
   for (const l of data.labels) {
@@ -115,11 +111,11 @@ function genIndividualBlock(
   }
 
   for (const s of data.sameAsIris) {
-    po.push(`${toTurtle("http://www.w3.org/2002/07/owl#sameAs", rev)} ${toTurtle(s, rev)}`);
+    po.push(`${toTurtle(OWL_SAME_AS_IRI, rev)} ${toTurtle(s, rev)}`);
   }
 
   for (const d of data.differentFromIris) {
-    po.push(`${toTurtle("http://www.w3.org/2002/07/owl#differentFrom", rev)} ${toTurtle(d, rev)}`);
+    po.push(`${toTurtle(OWL_DIFFERENT_FROM_IRI, rev)} ${toTurtle(d, rev)}`);
   }
 
   // Object property assertions
@@ -239,20 +235,6 @@ function describedPredicateForms(
 }
 
 /**
- * An existing predicate-object entry is carried verbatim when its predicate
- * is undescribed, or when its object is a blank node or collection the
- * payload cannot express.
- */
-function shouldCarry(
-  entry: { predicate: string; text: string },
-  described: Set<string>,
-): boolean {
-  if (!described.has(entry.predicate)) return true;
-  const objects = entry.text.slice(entry.predicate.length).trim();
-  return entry.predicate !== "a" && isStructuralObject(objects);
-}
-
-/**
  * Literal objects the regenerated block still holds, keyed by the Turtle
  * spellings of their property, for axiom-provenance retention.
  */
@@ -260,8 +242,8 @@ function retainedLiteralTargets(
   data: TurtleIndividualUpdateData,
   declarations: ParsedDeclarations,
   rev: Map<string, string>,
-): Array<{ propertyForms: string[]; target: string }> {
-  const retained: Array<{ propertyForms: string[]; target: string }> = [];
+): RetainedLiteralTarget[] {
+  const retained: RetainedLiteralTarget[] = [];
   const forms = (iri: string) =>
     iriTurtleForms(iri, declarations.prefixes, declarations.base);
   const addLocalized = (propertyIri: string, values: LocalizedString[]) => {
@@ -282,63 +264,6 @@ function retainedLiteralTargets(
     retained.push({ propertyForms: forms(a.propertyIri), target: dataAssertionObject(a.value, a, rev) });
   }
   return retained;
-}
-
-/**
- * Drop `owl:Axiom` provenance blocks for literals the payload deleted.
- *
- * Only axioms on a described predicate with a literal target are candidates:
- * an axiom annotating a carried predicate, or an IRI-valued target, describes
- * a triple this save did not touch and is kept.
- */
-function pruneDeletedLiteralAxioms(
-  lines: string[],
-  individualIri: string,
-  described: Set<string>,
-  retained: Array<{ propertyForms: string[]; target: string }>,
-  declarations: ParsedDeclarations,
-): string {
-  const sourceForms = iriTurtleForms(individualIri, declarations.prefixes, declarations.base);
-  const remove = new Set<number>();
-  const has = (block: string, key: string, value: string) =>
-    // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- the only dynamic segment is quoted by escapeRegex
-    new RegExp(`owl:${key}\\s+${escapeRegex(value)}(?=\\s*[;.])`, "u").test(block);
-
-  for (let start = 0; start < lines.length; start++) {
-    const trimmed = lines[start].trim();
-    if (
-      !trimmed ||
-      trimmed.startsWith("#") ||
-      trimmed.startsWith("@") ||
-      /^(PREFIX|BASE)\s/i.test(trimmed)
-    ) {
-      continue;
-    }
-
-    const blockStart = start;
-    const end = scanToBlockEnd(lines, start);
-    const block = lines.slice(blockStart, end + 1).join("\n");
-    start = end;
-    if (!/(?:^|[;\s])a\s+owl:Axiom\b/u.test(block)) continue;
-    if (!sourceForms.some((form) => has(block, "annotatedSource", form))) continue;
-
-    const propertyForm = [...described].find(
-      (form) => form !== "a" && has(block, "annotatedProperty", form),
-    );
-    if (!propertyForm) continue;
-    if (!/owl:annotatedTarget\s+["']/u.test(block)) continue;
-
-    const stillExists = retained.some(
-      ({ propertyForms, target }) =>
-        propertyForms.includes(propertyForm) && has(block, "annotatedTarget", target),
-    );
-    if (stillExists) continue;
-
-    for (let line = blockStart; line <= end; line++) remove.add(line);
-    if (end + 1 < lines.length && lines[end + 1].trim() === "") remove.add(end + 1);
-  }
-
-  return lines.filter((_, index) => !remove.has(index)).join("\n");
 }
 
 // ── Public API ────────────────────────────────────────────────────────
@@ -370,8 +295,8 @@ export function updateIndividualInTurtle(
   );
   const described = describedPredicateForms(source, individualIri, data, declarations);
   const carriedPredicateObjects = existing.predicateObjects
-    .filter((entry) => shouldCarry(entry, described))
-    .map(({ text }) => text);
+    .map((entry) => carriedPredicateObjectText(entry, described))
+    .filter((text): text is string => text !== null);
   const newBlock = genIndividualBlock(
     individualIri,
     data,

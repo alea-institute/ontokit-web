@@ -9,19 +9,23 @@
  * is the class, and every reified `owl:Axiom` whose `owl:annotatedSource` is
  * the class. References to the class from other entities are left untouched;
  * the delete dialog makes the editor acknowledge them first.
+ *
+ * Removal is exact: a statement that shares a line with another statement
+ * loses only its own characters, so neighbouring data is never erased.
  */
 
 import {
   assertSafeTurtleIri,
   escapeRegex,
   iriTurtleForms,
+  isSubjectOfStatement,
+  iterateStatements,
   parseDeclarations,
-  scanToBlockEnd,
+  OWL_ANNOTATED_SOURCE_IRI,
+  OWL_AXIOM_IRI,
+  RDF_TYPE_IRI,
+  type TurtleStatement,
 } from "@/lib/ontology/turtleUtils";
-
-const RDF_TYPE_IRI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
-const OWL_AXIOM_IRI = "http://www.w3.org/2002/07/owl#Axiom";
-const OWL_ANNOTATED_SOURCE_IRI = "http://www.w3.org/2002/07/owl#annotatedSource";
 
 // Characters that may follow a complete term inside a statement.
 const TERM_END = "(?=[\\s;,.\\]]|$)";
@@ -30,23 +34,20 @@ function alternation(forms: string[]): string {
   return forms.map(escapeRegex).join("|");
 }
 
-function startsWithTerm(trimmed: string, forms: string[]): boolean {
-  return forms.some((form) => {
-    if (!trimmed.startsWith(form)) return false;
-    const after = trimmed[form.length];
-    return !after || /\s/.test(after);
-  });
-}
-
 /**
  * Remove a class's own statements from Turtle source.
  *
  * Matches the class as a full IRI, any prefixed name (including `:local`) and
- * a `@base`-relative IRI. Every statement that is not removed keeps its bytes,
- * and one blank separator line is dropped with each removed statement so the
- * surrounding layout stays intact. An absent class returns `source` unchanged.
+ * a `@base`-relative IRI. Every statement that is not removed keeps its bytes.
+ * A statement that owns its lines is removed line-wise, together with the
+ * serializer header comment naming the class and one blank separator line,
+ * so the surrounding layout stays intact. A statement that shares a line
+ * with another statement is removed as its exact character span, keeping
+ * the rest of the line. An absent class returns `source` unchanged.
  *
  * @throws Error if `classIri` contains characters that are unsafe in Turtle
+ * @throws Error if one of the class's statements is not terminated by `.`,
+ *   so its exact extent cannot be determined; the caller keeps the source
  */
 export function removeClassFromTurtle(source: string, classIri: string): string {
   assertSafeTurtleIri(classIri);
@@ -66,36 +67,38 @@ export function removeClassFromTurtle(source: string, classIri: string): string 
     `(?:^|[\\s;\\[])(?:${alternation(annotatedSourceForms)})\\s+(?:${alternation(classForms)})${TERM_END}`,
   );
 
-  const lines = source.split("\n");
-  const statements: Array<{ start: number; end: number }> = [];
-
-  for (let i = 0; i < lines.length; i++) {
-    const trimmed = lines[i].trim();
-    if (
-      !trimmed ||
-      trimmed.startsWith("#") ||
-      trimmed.startsWith("@") ||
-      /^(PREFIX|BASE)\s/i.test(trimmed)
-    ) {
-      continue;
+  const statements: TurtleStatement[] = [];
+  for (const statement of iterateStatements(source)) {
+    const { text } = statement;
+    const owned =
+      isSubjectOfStatement(text, classForms) ||
+      ((text.startsWith("[") || text.startsWith("_:")) &&
+        isAxiom.test(text) &&
+        annotatesClass.test(text));
+    if (!owned) continue;
+    if (!statement.terminated) {
+      throw new Error(
+        `Cannot delete "${classIri}": one of its statements is not terminated by ".", ` +
+          "so it cannot be removed without risking other data. The source was not changed.",
+      );
     }
-
-    const end = scanToBlockEnd(lines, i);
-    if (startsWithTerm(trimmed, classForms)) {
-      statements.push({ start: i, end });
-    } else if (trimmed.startsWith("[") || trimmed.startsWith("_:")) {
-      const block = lines.slice(i, end + 1).join("\n");
-      if (isAxiom.test(block) && annotatesClass.test(block)) {
-        statements.push({ start: i, end });
-      }
-    }
-    // Skip the whole statement so objects never read as subjects.
-    i = end;
+    statements.push(statement);
   }
 
   if (statements.length === 0) return source;
 
-  const remove = new Set<number>();
+  const lines = source.split("\n");
+  const lineStarts: number[] = [];
+  for (let index = 0, offset = 0; index < lines.length; index++) {
+    lineStarts.push(offset);
+    offset += lines[index].length + 1;
+  }
+
+  const removeLines = new Set<number>();
+  const deleted = new Uint8Array(source.length);
+  const cut = (from: number, to: number) => deleted.fill(1, from, to);
+  const touchedLines = new Set<number>();
+
   // The empty element after a final newline is the file's terminator, not a
   // separator line, so it is never removed.
   const lastSeparator = source.endsWith("\n") ? lines.length - 2 : lines.length - 1;
@@ -105,19 +108,84 @@ export function removeClassFromTurtle(source: string, classIri: string): string 
   const headerComment = new RegExp(
     `^#+\\s*<?${escapeRegex(classIri)}>?\\s*$`,
   );
+  const isHorizontalSpace = (offset: number) => source[offset] === " " || source[offset] === "\t";
 
-  for (const { start, end } of statements) {
-    let first = start;
+  for (const statement of statements) {
+    const { startLine, endLine } = statement;
+
+    if (!statement.startsLine || !statement.endsLine) {
+      // Shares a line with another statement: remove exactly its span plus
+      // the spacing that separated it from its neighbour.
+      let from = statement.startsLine ? lineStarts[startLine] : statement.start;
+      let to = statement.end + 1;
+      if (statement.startsLine) {
+        while (to < source.length && isHorizontalSpace(to)) to++;
+      } else {
+        while (from > 0 && isHorizontalSpace(from - 1)) from--;
+      }
+      cut(from, to);
+      for (let line = startLine; line <= endLine; line++) touchedLines.add(line);
+      continue;
+    }
+
+    let first = startLine;
     // OWL API serializers head each entity with a comment naming its IRI.
     if (first > 0 && headerComment.test(lines[first - 1].trim())) first--;
-    for (let line = first; line <= end; line++) remove.add(line);
+    for (let line = first; line <= endLine; line++) removeLines.add(line);
 
-    if (isBlank(end + 1) && !remove.has(end + 1)) {
-      remove.add(end + 1);
-    } else if (isBlank(first - 1) && !remove.has(first - 1)) {
-      remove.add(first - 1);
+    if (isBlank(endLine + 1) && !removeLines.has(endLine + 1)) {
+      removeLines.add(endLine + 1);
+    } else if (isBlank(first - 1) && !removeLines.has(first - 1)) {
+      removeLines.add(first - 1);
     }
   }
 
-  return lines.filter((_, index) => !remove.has(index)).join("\n");
+  // A line whose every statement was cut is removed whole, not left blank,
+  // and takes one blank separator line with it like a line-wise removal.
+  const consumed = [...touchedLines]
+    .filter((line) => {
+      const start = lineStarts[line];
+      const text = lines[line];
+      for (let k = 0; k < text.length; k++) {
+        if (!deleted[start + k] && !/\s/.test(text[k])) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => a - b);
+  consumed.forEach((line, index) => {
+    removeLines.add(line);
+    if (consumed[index + 1] === line + 1) return;
+    let first = line;
+    while (first > 0 && consumed.includes(first - 1)) first--;
+    // A run that continues into a surviving part of a cut statement's line
+    // is not a whole statement, so the layout around it stays.
+    if (touchedLines.has(line + 1) || touchedLines.has(first - 1)) return;
+    if (isBlank(line + 1) && !removeLines.has(line + 1)) {
+      removeLines.add(line + 1);
+    } else if (isBlank(first - 1) && !removeLines.has(first - 1)) {
+      removeLines.add(first - 1);
+    }
+  });
+
+  // Delete whole lines exactly as `lines.filter(...).join("\n")` would: each
+  // run of removed lines takes its trailing newline, or the preceding one
+  // when the run ends the source.
+  const sorted = [...removeLines].sort((a, b) => a - b);
+  for (let index = 0; index < sorted.length; ) {
+    const runStart = sorted[index];
+    let runEnd = runStart;
+    while (index + 1 < sorted.length && sorted[index + 1] === runEnd + 1) runEnd = sorted[++index];
+    index++;
+    if (runEnd < lines.length - 1) {
+      cut(lineStarts[runStart], lineStarts[runEnd + 1]);
+    } else {
+      cut(Math.max(0, lineStarts[runStart] - 1), source.length);
+    }
+  }
+
+  let result = "";
+  for (let offset = 0; offset < source.length; offset++) {
+    if (!deleted[offset]) result += source[offset];
+  }
+  return result;
 }

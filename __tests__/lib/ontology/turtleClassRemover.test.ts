@@ -165,6 +165,62 @@ describe("removeClassFromTurtle", () => {
     expect(result).not.toContain("annotatedSource");
   });
 
+  describe("statements that share a line", () => {
+    it("keeps a statement after the class on the same line", () => {
+      const source = `${PREFIXES}\n\n:Foo a owl:Class . :Bar a owl:Class .\n\n${SIBLING}\n`;
+      expect(removeClassFromTurtle(source, FOO)).toBe(
+        `${PREFIXES}\n\n:Bar a owl:Class .\n\n${SIBLING}\n`,
+      );
+    });
+
+    it("keeps a statement before the class on the same line", () => {
+      const source = `${PREFIXES}\n\n:Bar a owl:Class . :Foo a owl:Class .\n\n${SIBLING}\n`;
+      expect(removeClassFromTurtle(source, FOO)).toBe(
+        `${PREFIXES}\n\n:Bar a owl:Class .\n\n${SIBLING}\n`,
+      );
+    });
+
+    it("keeps a statement that follows the terminating '.' of a multi-line class block", () => {
+      const source = [
+        PREFIXES,
+        "",
+        ":Foo a owl:Class ;",
+        '  rdfs:label "Foo"@en . :Bar a owl:Class ;',
+        '  rdfs:label "Bar"@en .',
+        "",
+        SIBLING,
+        "",
+      ].join("\n");
+      const result = removeClassFromTurtle(source, FOO);
+      expect(result).toBe(
+        `${PREFIXES}\n\n:Bar a owl:Class ;\n  rdfs:label "Bar"@en .\n\n${SIBLING}\n`,
+      );
+      expect(parseBlockTriples(result, "http://example.org/ont#Bar")).toHaveLength(2);
+      expect(result).not.toMatch(FOO_TERM);
+    });
+
+    it("keeps a statement that shares a line with a removed axiom", () => {
+      const axiom =
+        '[] a owl:Axiom ; owl:annotatedSource :Foo ; owl:annotatedProperty rdfs:label ; owl:annotatedTarget "Foo"@en .';
+      const source = `${PREFIXES}\n\n:Foo a owl:Class .\n\n:Bar a owl:Class . ${axiom}\n\n${SIBLING}\n`;
+      const result = removeClassFromTurtle(source, FOO);
+      expect(result).toBe(`${PREFIXES}\n\n:Bar a owl:Class .\n\n${SIBLING}\n`);
+      expect(result).not.toContain("owl:Axiom");
+    });
+
+    it("removes the whole line when the class and its axiom are all it holds", () => {
+      const axiom =
+        '[] a owl:Axiom ; owl:annotatedSource :Foo ; owl:annotatedProperty rdfs:label ; owl:annotatedTarget "Foo"@en .';
+      const source = `${PREFIXES}\n\n:Foo a owl:Class . ${axiom}\n\n${SIBLING}\n`;
+      expect(removeClassFromTurtle(source, FOO)).toBe(`${PREFIXES}\n\n${SIBLING}\n`);
+    });
+
+    it("refuses an unterminated class statement instead of guessing its extent", () => {
+      const source = `${PREFIXES}\n\n${SIBLING}\n\n:Foo a owl:Class ;\n  rdfs:label "Foo"@en\n`;
+      expect(() => removeClassFromTurtle(source, FOO)).toThrow(/not terminated/);
+    });
+  });
+
   it("rejects an IRI that could escape a Turtle IRI reference", () => {
     expect(() => removeClassFromTurtle(PREFIXES, "http://example.org/ont#Foo> .")).toThrow(/unsafe/);
   });

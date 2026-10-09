@@ -285,6 +285,10 @@ ex:Dog a owl:Class ;
       expect(result).toContain('ontokit:recordDigest "cat-digest"');
     });
 
+    // Corrected 2026-10-09: this test used to send `annotations: []` and
+    // assert the altLabel's axiom was dropped, although an omitted altLabel
+    // is carried through unchanged; that pinned the provenance-loss bug.
+    // Deleting the literal now means describing altLabel with no values.
     it("drops the deleted translated literal's axiom and retains the others", () => {
       const result = updateClassInTurtle(sourceWithAxioms, "http://example.org/ont#Dog", {
         labels: [
@@ -293,12 +297,114 @@ ex:Dog a owl:Class ;
         ],
         comments: [],
         parent_iris: [],
-        annotations: [],
+        annotations: [{ property_iri: "http://www.w3.org/2004/02/skos/core#altLabel", values: [] }],
       });
 
+      expect(result).not.toContain('"Toutou"@fr');
       expect(result).toContain('ontokit:recordDigest "label-digest"');
       expect(result).not.toContain('ontokit:recordDigest "alt-digest"');
       expect(result).toContain('ontokit:recordDigest "cat-digest"');
+    });
+
+    it("keeps the provenance of a carried altLabel when an unrelated field changes", () => {
+      const result = updateClassInTurtle(sourceWithAxioms, "http://example.org/ont#Dog", {
+        labels: [
+          { value: "Dog", lang: "en" },
+          { value: "Chien", lang: "fr" },
+        ],
+        comments: [{ value: "A new comment", lang: "en" }],
+        parent_iris: [],
+        annotations: [],
+      });
+
+      expect(result).toContain('skos:altLabel "Toutou"@fr');
+      expect(result).toContain('rdfs:comment "A new comment"@en');
+      expect(result).toContain('ontokit:recordDigest "label-digest"');
+      expect(result).toContain('ontokit:recordDigest "alt-digest"');
+      expect(result).toContain('ontokit:recordDigest "cat-digest"');
+    });
+
+    const OWL_NS = "http://www.w3.org/2002/07/owl#";
+    const fullIriSource = `@prefix ex: <http://example.org/ont#> .
+@prefix ontokit: <https://ontokit.org/ns#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+
+ex:Dog a owl:Class ;
+    rdfs:label "Dog"@en ;
+    rdfs:subClassOf ex:Animal ;
+    skos:altLabel "Toutou"@fr .
+
+[] a <${OWL_NS}Axiom> ;
+    <${OWL_NS}annotatedSource> <http://example.org/ont#Dog> ;
+    <${OWL_NS}annotatedProperty> <http://www.w3.org/2004/02/skos/core#altLabel> ;
+    <${OWL_NS}annotatedTarget> "Toutou"@fr ;
+    ontokit:recordDigest "full-iri-alt-digest" .
+
+[] a owl:Axiom ;
+    owl:annotatedSource ex:Dog ;
+    owl:annotatedProperty rdfs:subClassOf ;
+    owl:annotatedTarget ex:Animal ;
+    ontokit:recordDigest "parent-digest" .
+`;
+    const fullIriData = {
+      labels: [{ value: "Dog (renamed)", lang: "en" }],
+      comments: [],
+      parent_iris: ["http://example.org/ont#Animal"],
+    };
+
+    it("keeps full-IRI axioms and IRI-valued targets the save did not touch", () => {
+      const result = updateClassInTurtle(fullIriSource, "http://example.org/ont#Dog", fullIriData);
+
+      expect(result).toContain('rdfs:label "Dog (renamed)"@en');
+      expect(result).toContain('skos:altLabel "Toutou"@fr');
+      expect(result).toContain('ontokit:recordDigest "full-iri-alt-digest"');
+      expect(result).toContain('ontokit:recordDigest "parent-digest"');
+    });
+
+    it("drops a full-IRI axiom once its literal is deleted, keeping the IRI-target axiom", () => {
+      const result = updateClassInTurtle(fullIriSource, "http://example.org/ont#Dog", {
+        ...fullIriData,
+        annotations: [{ property_iri: "http://www.w3.org/2004/02/skos/core#altLabel", values: [] }],
+      });
+
+      expect(result).not.toContain('"Toutou"@fr');
+      expect(result).not.toContain("full-iri-alt-digest");
+      expect(result).toContain('ontokit:recordDigest "parent-digest"');
+    });
+  });
+
+  describe("blank-node objects on described predicates", () => {
+    const restrictionSource = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:Dog a owl:Class ;
+    rdfs:label "Dog"@en ;
+    rdfs:subClassOf ex:Animal, [ a owl:Restriction ; owl:onProperty ex:hasOwner ; owl:someValuesFrom ex:Person ] ;
+    owl:equivalentClass [ a owl:Class ; owl:unionOf ( ex:Hound ex:Pup ) ] .
+`;
+    const data = {
+      labels: [{ value: "Dog (renamed)", lang: "en" }],
+      comments: [],
+      parent_iris: ["http://example.org/ont#Mammal"],
+    };
+
+    it("keeps restrictions and class expressions while replacing the parent IRIs", () => {
+      const result = updateClassInTurtle(restrictionSource, "http://example.org/ont#Dog", data);
+
+      expect(result).toContain("rdfs:subClassOf ex:Mammal");
+      expect(result).not.toContain("ex:Animal");
+      expect(result).toContain(
+        "rdfs:subClassOf [ a owl:Restriction ; owl:onProperty ex:hasOwner ; owl:someValuesFrom ex:Person ]",
+      );
+      expect(result).toContain("owl:equivalentClass [ a owl:Class ; owl:unionOf ( ex:Hound ex:Pup ) ]");
+    });
+
+    it("is idempotent", () => {
+      const once = updateClassInTurtle(restrictionSource, "http://example.org/ont#Dog", data);
+      expect(updateClassInTurtle(once, "http://example.org/ont#Dog", data)).toBe(once);
     });
   });
 

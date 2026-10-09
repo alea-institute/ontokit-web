@@ -85,4 +85,20 @@ describe("Docker release fidelity", () => {
     expect(workflowJob("publish_docker")).toMatch(/needs: \[[^\]]*docker-auth-smoke[^\]]*\]/);
   });
 
+  it("gates every publish job on the same verification jobs, hermetic e2e suites included", () => {
+    const publishJobs = [...distributionWorkflow.matchAll(/^  (publish[a-zA-Z0-9_-]*):\n/gm)].map(
+      (match) => match[1],
+    );
+    expect(publishJobs).toEqual(expect.arrayContaining(["publish_github", "publish_docker"]));
+    for (const job of publishJobs) {
+      const needs = workflowJob(job)
+        .match(/needs: \[([^\]]*)\]/)?.[1]
+        .split(",")
+        .map((name) => name.trim());
+      expect(needs, job).toEqual(
+        expect.arrayContaining(["lint", "type-check", "test", "e2e-unit", "build"]),
+      );
+    }
+  });
+
 });

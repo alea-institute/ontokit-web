@@ -16,15 +16,18 @@ import {
   literal,
   isIriValue,
   iriTurtleForms,
-  scanToBlockEnd,
   escapeRegex,
+  pruneDeletedLiteralAxioms,
+  carriedPredicateObjectText,
+  RDF_TYPE_IRI,
+  OWL_CLASS_IRI,
+  OWL_DEPRECATED_IRI,
+  type RetainedLiteralTarget,
 } from "@/lib/ontology/turtleUtils";
 
 const RDFS_LABEL_IRI = "http://www.w3.org/2000/01/rdf-schema#label";
 const RDFS_COMMENT_IRI = "http://www.w3.org/2000/01/rdf-schema#comment";
-const RDF_TYPE_IRI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 const RDFS_SUBCLASS_IRI = "http://www.w3.org/2000/01/rdf-schema#subClassOf";
-const OWL_DEPRECATED_IRI = "http://www.w3.org/2002/07/owl#deprecated";
 const OWL_EQUIVALENT_CLASS_IRI = "http://www.w3.org/2002/07/owl#equivalentClass";
 const OWL_DISJOINT_WITH_IRI = "http://www.w3.org/2002/07/owl#disjointWith";
 
@@ -76,16 +79,20 @@ function describedPredicateForms(
   return forms;
 }
 
+/**
+ * Literal objects the regenerated block still holds, keyed by the Turtle
+ * spellings of their property, for axiom-provenance retention.
+ */
 function retainedLiteralPatterns(
   data: TurtleClassUpdateData,
-  prefixes: ReturnType<typeof parseDeclarations>["prefixes"],
-): Array<{ propertyForms: string[]; target: string }> {
-  const patterns: Array<{ propertyForms: string[]; target: string }> = [];
+  declarations: ReturnType<typeof parseDeclarations>,
+): RetainedLiteralTarget[] {
+  const patterns: RetainedLiteralTarget[] = [];
   const add = (propertyIri: string, values: LocalizedString[]) => {
     for (const value of values) {
       if (!value.value.trim() || (!value.lang && isIriValue(value.value))) continue;
       patterns.push({
-        propertyForms: iriTurtleForms(propertyIri, prefixes),
+        propertyForms: iriTurtleForms(propertyIri, declarations.prefixes, declarations.base),
         target: literal(value.value, value.lang),
       });
     }
@@ -97,59 +104,6 @@ function retainedLiteralPatterns(
     add(annotation.property_iri, annotation.values);
   }
   return patterns;
-}
-
-function pruneDeletedLiteralAxioms(
-  lines: string[],
-  classIri: string,
-  data: TurtleClassUpdateData,
-  declarations: ReturnType<typeof parseDeclarations>,
-): string {
-  const { prefixes, base } = declarations;
-  const sourceForms = iriTurtleForms(classIri, prefixes, base);
-  const retained = retainedLiteralPatterns(data, prefixes);
-  const remove = new Set<number>();
-
-  for (let start = 0; start < lines.length; start++) {
-    const trimmed = lines[start].trim();
-    if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("@")) continue;
-
-    const end = scanToBlockEnd(lines, start);
-    const block = lines.slice(start, end + 1).join("\n");
-    if (!/(?:^|[;\s])a\s+owl:Axiom\b/.test(block)) {
-      start = end;
-      continue;
-    }
-
-    const annotatesClass = sourceForms.some((form) =>
-      // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- form is quoted by escapeRegex before interpolation
-      new RegExp(`owl:annotatedSource\\s+${escapeRegex(form)}(?=\\s*[;.])`).test(block),
-    );
-    if (!annotatesClass) {
-      start = end;
-      continue;
-    }
-
-    const stillExists = retained.some(({ propertyForms, target }) => {
-      const hasProperty = propertyForms.some((form) =>
-        // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- form is quoted by escapeRegex before interpolation
-        new RegExp(`owl:annotatedProperty\\s+${escapeRegex(form)}(?=\\s*[;.])`).test(block),
-      );
-      return (
-        hasProperty &&
-        // nosemgrep: javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp -- target is quoted by escapeRegex before interpolation
-        new RegExp(`owl:annotatedTarget\\s+${escapeRegex(target)}(?=\\s*[;.])`).test(block)
-      );
-    });
-
-    if (!stillExists) {
-      for (let line = start; line <= end; line++) remove.add(line);
-      if (end + 1 < lines.length && lines[end + 1].trim() === "") remove.add(end + 1);
-    }
-    start = end;
-  }
-
-  return lines.filter((_, index) => !remove.has(index)).join("\n");
 }
 
 // ── Types ─────────────────────────────────────────────────────────────
@@ -178,7 +132,7 @@ function genBlock(
 ): string {
   const po: string[] = [];
 
-  po.push(`a ${toTurtle("http://www.w3.org/2002/07/owl#Class", rev)}`);
+  po.push(`a ${toTurtle(OWL_CLASS_IRI, rev)}`);
 
   if (data.deprecated) {
     po.push(`${toTurtle(OWL_DEPRECATED_IRI, rev)} true`);
@@ -270,9 +224,12 @@ export function updateClassInTurtle(
     lines.slice(block.startLine, block.endLine + 1).join("\n"),
   );
   const described = describedPredicateForms(data, declarations);
+  // Undescribed predicates are carried whole; for described ones (e.g.
+  // rdfs:subClassOf) the blank-node restrictions and collections the form
+  // cannot express are carried beside the payload's IRIs.
   const carriedPredicateObjects = existing.predicateObjects
-    .filter(({ predicate }) => !described.has(predicate))
-    .map(({ text }) => text);
+    .map((entry) => carriedPredicateObjectText(entry, described))
+    .filter((text): text is string => text !== null);
   const normalizedData = {
     ...data,
     labels: preserveExistingUntaggedLabels(data.labels, existing, declarations),
@@ -287,10 +244,13 @@ export function updateClassInTurtle(
   const before = lines.slice(0, block.startLine);
   const after = lines.slice(block.endLine + 1);
 
+  // Only axioms whose literal this save removed from a described predicate
+  // are pruned; provenance on carried or untouched triples survives.
   return pruneDeletedLiteralAxioms(
     [...before, newBlock, ...after],
     classIri,
-    normalizedData,
+    described,
+    retainedLiteralPatterns(normalizedData, declarations),
     declarations,
   );
 }

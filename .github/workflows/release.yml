@@ -115,7 +115,7 @@ jobs:
 
   publish_github:
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/ontokit-web-')
-    needs: [lint, type-check, test, build]
+    needs: [lint, type-check, test, e2e-unit, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -126,7 +126,7 @@ jobs:
 
   publish_docker:
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/ontokit-web-')
-    needs: [lint, type-check, test, build, docker-build, docker-auth-smoke]
+    needs: [lint, type-check, test, e2e-unit, build, docker-build, docker-auth-smoke]
     runs-on: ubuntu-latest
     permissions:
       contents: read

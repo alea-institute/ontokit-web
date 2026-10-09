@@ -10,6 +10,10 @@ import {
   isIriValue,
   escapeRegex,
   esc,
+  isSubjectOfStatement,
+  iterateStatements,
+  scanStatementEnd,
+  splitObjectList,
 } from "@/lib/ontology/turtleUtils";
 import {
   TURTLE_FIXTURE,
@@ -470,5 +474,74 @@ describe("isIriValue", () => {
 
   it("returns false for empty string", () => {
     expect(isIriValue("")).toBe(false);
+  });
+});
+
+// ── Shared statement helpers ──────────────────────────────────────────
+
+describe("splitObjectList", () => {
+  it("splits at depth-0 commas only", () => {
+    expect(
+      splitObjectList(
+        ' ex:a, "x, y"@en, [ ex:p "1,2" ; ex:q [ ex:r ex:s, ex:t ] ], ( ex:b, ex:c ), <http://x.test/a,b>, """long, string""", "esc \\" , q" ',
+      ),
+    ).toEqual([
+      "ex:a",
+      '"x, y"@en',
+      '[ ex:p "1,2" ; ex:q [ ex:r ex:s, ex:t ] ]',
+      "( ex:b, ex:c )",
+      "<http://x.test/a,b>",
+      '"""long, string"""',
+      '"esc \\" , q"',
+    ]);
+  });
+
+  it("ignores commas in comments and drops empty items", () => {
+    expect(splitObjectList("ex:a , # note, with comma\n ex:b")).toEqual([
+      "ex:a",
+      "# note, with comma\n ex:b",
+    ]);
+    expect(splitObjectList("  ")).toEqual([]);
+  });
+});
+
+describe("isSubjectOfStatement", () => {
+  it("matches a whole first token only", () => {
+    expect(isSubjectOfStatement("ex:Foo a owl:Class .", ["ex:Foo"])).toBe(true);
+    expect(isSubjectOfStatement("ex:FooBar a owl:Class .", ["ex:Foo"])).toBe(false);
+    expect(isSubjectOfStatement("ex:Bar rdfs:seeAlso ex:Foo .", ["ex:Foo"])).toBe(false);
+    expect(isSubjectOfStatement("ex:Foo", ["ex:Foo"])).toBe(true);
+  });
+});
+
+describe("iterateStatements", () => {
+  it("reports statements at character precision, skipping directives and comments", () => {
+    const source = [
+      "@prefix ex: <http://example.org/ont#> .",
+      "PREFIX owl: <http://www.w3.org/2002/07/owl#>",
+      "# ex:Fake a owl:Class .",
+      "ex:A a owl:Class . ex:B a owl:Class ;",
+      '  rdfs:label "B. b"@en .  # trailing',
+      "ex:C a owl:Class",
+    ].join("\n");
+    const statements = [...iterateStatements(source)];
+    expect(statements.map((s) => s.text.split(" ")[0])).toEqual(["ex:A", "ex:B", "ex:C"]);
+    expect(statements.map((s) => [s.startLine, s.endLine])).toEqual([[3, 3], [3, 4], [5, 5]]);
+    expect(statements.map((s) => [s.startsLine, s.endsLine, s.terminated])).toEqual([
+      [true, false, true],
+      [false, true, true],
+      [true, true, false],
+    ]);
+    expect(source[statements[1].end]).toBe(".");
+    expect(statements[1].text.endsWith('"B. b"@en .')).toBe(true);
+  });
+});
+
+describe("scanStatementEnd", () => {
+  it("finds the terminator past strings, IRIs, brackets and comments", () => {
+    const source = 'ex:A ex:p "a . b", <http://x.test/a. b>, [ ex:q 1.5 ] ; # c . d\n  ex:r """x .\n y""" . ex:B';
+    const end = scanStatementEnd(source, 0);
+    expect(source.slice(end - 5, end + 1)).toBe('y""" .');
+    expect(scanStatementEnd("ex:A ex:p ex:b", 0)).toBe(-1);
   });
 });

@@ -374,6 +374,81 @@ describe("AddEntityDialog", () => {
       );
     });
 
+    it("lets an untouched numeric IRI follow a late next id and namespace, keeping the label", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(
+        <AddEntityDialog {...defaultProps} iriPattern="numeric" nextNumeric={undefined} ontologyNamespace="" />
+      );
+
+      await user.type(screen.getByPlaceholderText("e.g., Privileged Altar"), "Counted Thing");
+      await user.click(screen.getByText("Advanced"));
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe("1");
+      expect(screen.getByText("Sequential numeric IRI (next: 1)")).toBeDefined();
+
+      // The namespace and the next id arrive in separate renders.
+      rerender(
+        <AddEntityDialog {...defaultProps} iriPattern="numeric" nextNumeric={undefined} ontologyNamespace={LATE_NS} />
+      );
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe("https://example.test/1");
+      rerender(
+        <AddEntityDialog {...defaultProps} iriPattern="numeric" nextNumeric={42} ontologyNamespace={LATE_NS} />
+      );
+
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe("https://example.test/42");
+      expect(screen.getByText("Sequential numeric IRI (next: 42)")).toBeDefined();
+      expect(
+        (screen.getByPlaceholderText("e.g., Privileged Altar") as HTMLInputElement).value
+      ).toBe("Counted Thing");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      expect(defaultProps.onConfirm).toHaveBeenCalledWith({
+        iri: "https://example.test/42",
+        label: "Counted Thing",
+        entityType: "class",
+        parentIri: undefined,
+      });
+    });
+
+    it("keeps a hand-edited numeric IRI when the next id arrives late", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(
+        <AddEntityDialog {...defaultProps} iriPattern="numeric" nextNumeric={undefined} ontologyNamespace="" />
+      );
+
+      await user.click(screen.getByText("Advanced"));
+      const iriInput = screen.getByLabelText("IRI");
+      await user.clear(iriInput);
+      await user.type(iriInput, "https://example.test/7");
+
+      rerender(
+        <AddEntityDialog {...defaultProps} iriPattern="numeric" nextNumeric={42} ontologyNamespace={LATE_NS} />
+      );
+
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe("https://example.test/7");
+    });
+
+    it("derives the IRI from the label again after a manual edit, close and reopen", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(<AddEntityDialog {...defaultProps} iriPattern="named" />);
+
+      await user.click(screen.getByText("Advanced"));
+      const iriInput = screen.getByLabelText("IRI");
+      await user.clear(iriInput);
+      await user.type(iriInput, "http://custom.iri/Manual");
+
+      rerender(<AddEntityDialog {...defaultProps} iriPattern="named" open={false} />);
+      rerender(<AddEntityDialog {...defaultProps} iriPattern="named" open />);
+
+      await user.type(screen.getByPlaceholderText("e.g., Privileged Altar"), "Fresh Cell");
+      await user.click(screen.getByText("Advanced"));
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe(
+        "http://example.org/ontology#FreshCell"
+      );
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      expect(defaultProps.onConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({ iri: "http://example.org/ontology#FreshCell", label: "Fresh Cell" })
+      );
+    });
+
     it("still resets the form when the dialog is closed and reopened", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const { rerender } = render(<AddEntityDialog {...defaultProps} iriPattern="named" />);

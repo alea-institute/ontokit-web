@@ -35,6 +35,29 @@ describe("individual updates through the real writer, parser and detail extracto
     expect(parseBlockTriples(updated, iri)?.find(triple => triple.predicate === property)?.object).toEqual({ type: "literal", value: "https://example.test/reference", lang: "en" });
   });
 
+  it("keeps the blank-node half of a mixed object list through an extractor-built payload", () => {
+    const source = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:knows a owl:ObjectProperty .
+
+ex:player a owl:NamedIndividual ;
+    rdfs:label "Player"@en ;
+    ex:knows ex:coach, [ a ex:Person ; rdfs:label "Anonymous, Jr."@en ] .
+`;
+    const playerIri = "http://example.org/ont#player";
+    const detail = extractIndividualDetail(source, playerIri)!;
+    const updated = updateIndividualInTurtle(source, playerIri, {
+      ...detail,
+      labels: [{ value: "Player (renamed)", lang: "en" }],
+    });
+    expect(updated).toContain('ex:knows [ a ex:Person ; rdfs:label "Anonymous, Jr."@en ]');
+    expect(updated).toContain("ex:knows ex:coach");
+    const triples = parseBlockTriples(updated, playerIri)!;
+    expect(triples.filter((triple) => triple.predicate === "http://example.org/ont#knows")).toHaveLength(2);
+  });
+
   it("round-trips a form payload built by the extractor without losing what the form cannot show", () => {
     const source = `@prefix ex: <http://example.org/ont#> .
 @prefix owl: <http://www.w3.org/2002/07/owl#> .

@@ -379,6 +379,52 @@ ex:coach a owl:NamedIndividual ;
       expect(block).toContain('ex:origin [ a ex:Place ; rdfs:label "Somewhere"@en ]');
     });
 
+    describe("mixed object lists on a described predicate", () => {
+      const KNOWS = "http://example.org/ont#knows";
+      const mixedSource = (objects: string) => `${PREAMBLE}
+ex:player a owl:NamedIndividual ;
+    rdfs:label "Player"@en ;
+    ex:knows ${objects} .
+`;
+      const save = (objects: string) =>
+        updateIndividualInTurtle(mixedSource(objects), IRI, {
+          ...formData,
+          labels: [{ value: "Player", lang: "en" }],
+          typeIris: [],
+          objectPropertyAssertions: [{ propertyIri: KNOWS, targetIri: "http://example.org/ont#rival" }],
+          dataPropertyAssertions: [],
+        });
+
+      it("keeps the blank node and takes the IRI part from the payload", () => {
+        const result = save("ex:coach, [ ex:q 1 ]");
+        expect(result).toContain("ex:knows ex:rival");
+        expect(result).toContain("ex:knows [ ex:q 1 ]");
+        expect(result).not.toContain("ex:coach");
+        expect(result.match(/\[ ex:q 1 \]/g)).toHaveLength(1);
+      });
+
+      it("does not split inside nested brackets, collections or quoted commas", () => {
+        const structural = '[ ex:q [ ex:r "x, y" ], ( ex:c, ex:d ) ], ( "p, q" ex:e )';
+        const result = save(`ex:coach, ${structural}, ex:mentor`);
+        expect(result).toContain("ex:knows ex:rival");
+        expect(result).toContain(`ex:knows ${structural}`);
+        expect(result).not.toContain("ex:coach");
+        expect(result).not.toContain("ex:mentor");
+      });
+
+      it("is idempotent once the structural half has been split out", () => {
+        const once = save("ex:coach, [ ex:q 1 ]");
+        const twice = updateIndividualInTurtle(once, IRI, {
+          ...formData,
+          labels: [{ value: "Player", lang: "en" }],
+          typeIris: [],
+          objectPropertyAssertions: [{ propertyIri: KNOWS, targetIri: "http://example.org/ont#rival" }],
+          dataPropertyAssertions: [],
+        });
+        expect(twice).toBe(once);
+      });
+    });
+
     it("replaces a described predicate instead of duplicating it", () => {
       const block = playerBlock(updateIndividualInTurtle(SOURCE, IRI, {
         ...formData,
