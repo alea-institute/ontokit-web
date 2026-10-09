@@ -46,6 +46,8 @@ describe("DeleteImpactAnalysis", () => {
     });
     // After loading is done and total is 0, component returns null
     expect(container.textContent).toBe("");
+    // #364: a confirmed zero-reference lookup unblocks deletion.
+    expect(onAcknowledge).toHaveBeenLastCalledWith(true);
   });
 
   it("shows error state on fetch failure", async () => {

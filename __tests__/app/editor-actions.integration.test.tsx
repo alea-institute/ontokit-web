@@ -17,6 +17,8 @@ const boundary = vi.hoisted(() => ({
   search: new URLSearchParams(),
   monacoProps: {} as Record<string, unknown>,
   mountMonaco: null as null | ((props: { value: string; onMount: (editor: unknown, monaco: unknown) => void }) => void),
+  // Like @monaco-editor/react, a changed `value` prop is pushed into the model.
+  syncMonacoValue: null as null | ((value: string) => void),
 }));
 vi.mock("next-auth/react", () => ({ useSession: () => boundary.session, signIn: boundary.signIn, signOut: vi.fn() }));
 vi.mock("next/navigation", () => ({
@@ -38,6 +40,7 @@ vi.mock("@monaco-editor/react", async () => {
       boundary.monacoProps = props;
       const initialProps = useRef(props);
       useEffect(() => { boundary.mountMonaco?.(initialProps.current); }, []);
+      useEffect(() => { boundary.syncMonacoValue?.(props.value); }, [props.value]);
       return <textarea aria-label="Turtle source boundary" value={props.value} onChange={(event) => props.onChange(event.target.value)} />;
     },
   };
@@ -64,7 +67,6 @@ let projectResponse: object;
 let trustStatus: number;
 let trustCapabilities: { tier: string; can_mint_entities: boolean; accepted_count: number; promotion_threshold: number };
 let deleted: boolean;
-let deleteFailure: boolean;
 let referenceTotal: number;
 let referenceStatus: number;
 let projectStatus: number;
@@ -159,6 +161,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   boundary.monacoProps = {};
   boundary.mountMonaco = null;
+  boundary.syncMonacoValue = null;
   boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; lintIssues = []; extraBranches = [];
   sessionStorage.removeItem("ontokit:branch:route-project");
   llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
@@ -175,7 +178,7 @@ beforeEach(() => {
   projectResponse = { id: "route-project", name: "Route ontology", source_file_path: "ontology.ttl", user_role: "owner", is_public: false };
   trustStatus = 200;
   trustCapabilities = { tier: "reviewer", can_mint_entities: true, accepted_count: 0, promotion_threshold: 3 };
-  projectStatus = 200; deleted = false; deleteFailure = false; referenceTotal = 1; referenceStatus = 200;
+  projectStatus = 200; deleted = false; referenceTotal = 1; referenceStatus = 200;
   saveStatus = 200; sourceStatus = 200; sourceContent = originalSource; sourceRevision = "base-commit"; entityResults = [];
   savedBodies = []; suggestionBodies = []; suggestionFailure = null; suggestionSubmitStatus = 200; suggestionSubmissions = []; resumableSessions = []; sessionListStatus = 200; reopenStatus = 200;
   useEditorModeStore.getState().setEditorMode("developer");
@@ -217,7 +220,8 @@ beforeEach(() => {
     if (path.endsWith("/ontology/tree/" + encodeURIComponent("https://example.test/OldParent") + "/children")) return json({ nodes: [{ iri, label: "Person", child_count: 0 }], total_classes: 1 });
     if (path.endsWith("/ontology/tree")) return json({ nodes: deleted ? [] : [nestPerson ? { iri: "https://example.test/OldParent", label: "Old parent", child_count: 1 } : { iri, label: "Person", child_count: 0 }, ...extraTreeNodes], total_classes: deleted ? 0 : 1 + extraTreeNodes.length });
     if (path.endsWith('/ontology/classes/' + encodeURIComponent(iri))) {
-      if (init?.method === 'DELETE') { if (deleteFailure) return json({ detail: 'Delete refused' }, 403); deleted = true; return new Response(null, { status: 204 }); }
+      // The API serves no project-scoped class write (alea#56); any non-GET here is a regression.
+      if (init?.method && init.method !== 'GET') { unexpected.push(init.method + ' ' + path); return json({ detail: 'Method Not Allowed' }, 405); }
       return json({ iri, labels: [{ value: 'Person', lang: 'en' }], comments: [], parent_iris: classParents, parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     }
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Sibling"))) return json({ iri: "https://example.test/Sibling", labels: [{ value: "Sibling", lang: "en" }], comments: [], parent_iris: [], parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
@@ -246,7 +250,7 @@ beforeEach(() => {
     if (path.endsWith("/source")) {
       savedBodies.push(JSON.parse(String(init?.body)));
       if (saveStatus === 403) return json({ detail: "Save refused" }, 403);
-      if (saveStatus === 200) { sourceContent = (savedBodies.at(-1) as { content: string }).content; sourceRevision = "saved-commit"; }
+      if (saveStatus === 200) { sourceContent = (savedBodies.at(-1) as { content: string }).content; sourceRevision = "saved-commit"; deleted ||= !/^ex:Person\s/m.test(sourceContent); }
       return saveStatus === 409
         ? json({ detail: { code: "SOURCE_REVISION_CONFLICT", message: "Source changed", base_revision: "base-commit", current_revision: "other-commit", branch: "main" } }, 409)
         : json({ commit_hash: "saved-commit" });
@@ -385,20 +389,36 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     fireEvent.keyDown(input, { key: 's', ctrlKey: true });
     expect(document.activeElement).not.toBe(input); expect(savedBodies).toEqual([]);
   });
-  it.each([false, true])('requires reference acknowledgement and reconciles the tree after delete (failure: %s)', async failure => {
-    deleteFailure = failure; mount(); fireEvent.contextMenu(await screen.findByText('Person'));
+  // alea#56: delete commits the Turtle removal through the revision-guarded
+  // source save; the API never served a project-scoped class DELETE.
+  it.each([200, 403, 409])('requires reference acknowledgement and commits the delete through source save (HTTP %i)', async status => {
+    saveStatus = status;
+    const sibling = 'ex:Sibling a owl:Class ;\n  rdfs:label "Sibling"@en .';
+    const axiom = '[] a owl:Axiom ;\n  owl:annotatedSource ex:Person ;\n  owl:annotatedProperty rdfs:label ;\n  owl:annotatedTarget "Person"@en .';
+    sourceContent = originalSource.replace('ex:Person a <http://www.w3.org/2002/07/owl#Class> .', 'ex:Person a owl:Class ;\n  rdfs:label "Person"@en ;\n' + ['de', 'es', 'fr', 'it', 'ja', 'nl', 'pt', 'ru', 'zh'].map(lang => '  <http://www.w3.org/2004/02/skos/core#altLabel> "Person ' + lang + '"@' + lang + ' ;').join('\n') + '\n  rdfs:comment "Has nine translations"@en .') + '\n\n' + axiom + '\n\n' + sibling + '\n';
+    mount(); fireEvent.contextMenu(await screen.findByText('Person'));
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete Class' });
     const acknowledgement = await within(dialog).findByLabelText('I understand this will create dangling references');
     expect(within(dialog).getByRole('button', { name: 'Delete' }).hasAttribute('disabled')).toBe(true);
     fireEvent.click(acknowledgement); fireEvent.click(within(dialog).getByRole('button', { name: 'Delete' }));
-    await screen.findByText(failure ? 'Failed to delete class' : 'Deleted "Person"');
-    const request = requests.find(r => r.method === 'DELETE')!;
-    expect(request.authorization).toBe('Bearer route-fixture-token');
-    expect(new URLSearchParams(request.search).get('branch')).toBe('main');
-    expect(new URLSearchParams(request.search).get('commit_message')).toBe('Delete class Person');
-    if (failure) expect(await screen.findByText('Person')).toBeDefined();
-    else await waitFor(() => expect(screen.queryByText('Person')).toBeNull());
+    await screen.findByText(status === 200 ? 'Deleted "Person"' : 'Failed to delete class');
+    const writes = requests.filter(r => ['POST', 'PUT', 'PATCH', 'DELETE'].includes(r.method));
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({ path: '/api/v1/projects/route-project/source', method: 'PUT', authorization: 'Bearer route-fixture-token' });
+    expect(new URLSearchParams(writes[0].search).get('branch')).toBe('main');
+    const body = savedBodies[0] as { content: string; commit_message: string; base_revision: string };
+    expect(body.commit_message).toBe('Delete class Person');
+    expect(body.base_revision).toBe('base-commit');
+    expect(body.content).not.toContain('ex:Person');
+    expect(body.content).not.toContain('owl:annotatedSource');
+    expect(body.content).toContain('\n' + sibling + '\n');
+    expect(parseBlockTriples(body.content, iri)).toBeNull();
+    expect(parseBlockTriples(body.content, 'https://example.test/Sibling')).toEqual(parseBlockTriples(sourceContent, 'https://example.test/Sibling'));
+    if (status === 409) await screen.findByText('A newer source revision is available.');
+    if (status === 200) await waitFor(() => expect(screen.queryByText('Person')).toBeNull());
+    // A refused or stale write rolls back the optimistic tree removal.
+    else expect(await screen.findByText('Person')).toBeDefined();
     expect(requests.filter(r => r.path.endsWith('/ontology/tree')).length).toBeGreaterThanOrEqual(2);
   });
 
@@ -410,7 +430,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     await within(dialog).findByRole("button", { name: "Retry" });
     const button = within(dialog).getByRole("button", { name: "Delete" });
     expect(button.hasAttribute("disabled")).toBe(true);
-    expect(requests.some(request => request.method === "DELETE")).toBe(false);
+    expect(savedBodies).toEqual([]);
     referenceStatus = 200;
     fireEvent.click(within(dialog).getByRole("button", { name: "Retry" }));
     await waitFor(() => expect(button.hasAttribute("disabled")).toBe(false));
@@ -440,7 +460,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     mount(); fireEvent.contextMenu(await screen.findByText('Person')); fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete' }));
     const dialog = await screen.findByRole('dialog', { name: 'Delete Class' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-    expect(screen.getByText('Person')).toBeDefined(); expect(requests.some(r => r.method === 'DELETE')).toBe(false);
+    expect(screen.getByText('Person')).toBeDefined(); expect(requests.some(r => r.method !== 'GET')).toBe(false); expect(savedBodies).toEqual([]);
   });
 
 
@@ -1484,19 +1504,30 @@ describe('editor route real tree actions and keyboard orchestration', () => {
       text = props.value;
       props.onMount(editor, monaco);
     };
+    boundary.syncMonacoValue = (value) => { text = value; };
     mount(); await screen.findByText("Person");
     fireEvent.click(screen.getByRole("button", { name: "Source" }));
     // The first textarea can precede the branch source response. Wait for the
-    // loaded document and its mounted editor before exercising the imperative path.
+    // mounted editor's model to hold the branch source before exercising the
+    // imperative path (alea#54).
     await waitFor(() => {
       expect((screen.getByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement).value).toBe(sourceContent);
       expect(editor.onMouseDown).toHaveBeenCalled();
+      expect(model.getValue()).toBe(sourceContent);
     });
     fireEvent.keyDown(document, { key: "n", ctrlKey: true });
     const dialog = await screen.findByRole("dialog", { name: "Add Entity" });
+    // alea#54: the page derives the ontology namespace from the indexed branch
+    // source asynchronously, and the open dialog resets its fields (collapsing
+    // Advanced) when that namespace arrives. Under load the reset could land
+    // after the label was typed, leaving Create disabled. Wait for the derived
+    // namespace before typing; after detection the dialog no longer resets.
+    await waitFor(() => {
+      if (!within(dialog).queryByLabelText("IRI")) fireEvent.click(within(dialog).getByRole("button", { name: "Advanced" }));
+      expect((within(dialog).getByLabelText("IRI") as HTMLInputElement).value.startsWith("https://example.test/")).toBe(true);
+    });
     fireEvent.change(within(dialog).getByLabelText("Label"), { target: { value: "Inserted entity" } });
     fireEvent.change(within(dialog).getByLabelText("Type"), { target: { value: entityType } });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Advanced" }));
     fireEvent.change(within(dialog).getByLabelText("IRI"), { target: { value: "https://example.test/NewEntity" } });
     const create = within(dialog).getByRole("button", { name: "Create" });
     await waitFor(() => expect(create.hasAttribute("disabled")).toBe(false));

@@ -622,41 +622,6 @@ export const projectOntologyApi = {
     ),
 
   /**
-   * Update a class in the ontology (labels, comments, parent classes)
-   */
-  updateClass: (
-    projectId: string,
-    classIri: string,
-    data: ClassUpdatePayload,
-    commitMessage: string,
-    token: string,
-    branch?: string
-  ) =>
-    api.patch<OWLClassDetail>(
-      `/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}`,
-      { ...data, commit_message: commitMessage },
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        params: { branch },
-      }
-    ),
-
-  /**
-   * Delete a class from the ontology
-   */
-  deleteClass: (
-    projectId: string,
-    classIri: string,
-    commitMessage: string,
-    token: string,
-    branch?: string
-  ) =>
-    api.delete(`/api/v1/projects/${projectId}/ontology/classes/${encodeURIComponent(classIri)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-      params: { commit_message: commitMessage, branch },
-    }),
-
-  /**
    * Trigger a reindex of the ontology's PostgreSQL search index.
    * Only available to project owners and admins.
    * Returns 202 Accepted when the reindex job is queued.
