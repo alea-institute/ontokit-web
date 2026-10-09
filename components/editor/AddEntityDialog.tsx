@@ -77,9 +77,17 @@ export function AddEntityDialog({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const iriManuallyEdited = useRef(false);
+  // Subclass creation locks the type to Class, including when the parent
+  // arrives after the dialog opened; derive it rather than syncing state.
+  const effectiveEntityType: EntityType = parentIri ? "class" : entityType;
 
-  // Generate a stable UUID IRI once when the dialog opens
-  const stableUuidIriRef = useRef("");
+  // UUID local name, generated once per dialog session. Only the namespace
+  // half of a UUID IRI follows the ontologyNamespace prop.
+  const uuidLocalNameRef = useRef("");
+  // Tracks the previous `open` value so the form resets only on the
+  // closed -> open transition, never when derived props (namespace, IRI
+  // pattern, next numeric id, parent) arrive or change while it is open.
+  const wasOpenRef = useRef(false);
 
   // Generate IRI based on current state
   const generateIri = useCallback(
@@ -94,42 +102,35 @@ export function AddEntityDialog({
           return ontologyNamespace + String(nextNumeric ?? 1);
         case "uuid":
         default:
-          return stableUuidIriRef.current;
+          return ontologyNamespace + uuidLocalNameRef.current;
       }
     },
     [iriPattern, nextNumeric, ontologyNamespace],
   );
 
-  // Reset state when dialog opens
+  // Reset the form only when the dialog opens. The page derives the
+  // namespace and IRI pattern asynchronously (after indexing the source), so
+  // those props can change while the user is already typing; resetting on
+  // them would wipe the user's input.
   useEffect(() => {
-    if (open) {
+    if (open && !wasOpenRef.current) {
       setLabel("");
-      setEntityType(parentIri ? "class" : "class");
+      setEntityType("class");
       setShowAdvanced(false);
       iriManuallyEdited.current = false;
-
-      // Generate a fresh UUID IRI for this dialog session
-      stableUuidIriRef.current = ontologyNamespace + uuidToBase62();
-
-      // Set initial IRI
-      const initialIri = iriPattern === "uuid"
-        ? stableUuidIriRef.current
-        : iriPattern === "numeric"
-          ? ontologyNamespace + String(nextNumeric ?? 1)
-          : ontologyNamespace + "...";
-      setIri(initialIri);
-
+      // Fresh UUID local name for this dialog session
+      uuidLocalNameRef.current = uuidToBase62();
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [open, iriPattern, nextNumeric, ontologyNamespace, parentIri]);
+    wasOpenRef.current = open;
+  }, [open]);
 
-  // Update IRI reactively when label changes (named pattern only)
+  // Keep an untouched IRI derived from the label, namespace, pattern and
+  // next numeric id. An IRI the user edited by hand is never overwritten.
   useEffect(() => {
-    if (!open) return;
-    if (iriPattern === "named" && !iriManuallyEdited.current) {
-      setIri(generateIri(label));
-    }
-  }, [label, open, iriPattern, generateIri]);
+    if (!open || iriManuallyEdited.current) return;
+    setIri(generateIri(label));
+  }, [label, open, generateIri]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,7 +144,7 @@ export function AddEntityDialog({
     onConfirm({
       iri: trimmedIri,
       label: trimmedLabel,
-      entityType,
+      entityType: effectiveEntityType,
       parentIri,
     });
     onOpenChange(false);
@@ -226,7 +227,7 @@ export function AddEntityDialog({
               </label>
               <select
                 id="entity-type"
-                value={entityType}
+                value={effectiveEntityType}
                 onChange={(e) => setEntityType(e.target.value as EntityType)}
                 disabled={!!parentIri || mintingLocked}
                 className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100"

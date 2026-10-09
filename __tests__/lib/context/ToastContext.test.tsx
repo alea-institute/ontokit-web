@@ -211,4 +211,69 @@ describe("ToastContext", () => {
       expect(result.current.toasts).toHaveLength(1);
     });
   });
+  describe("timer cleanup", () => {
+    it("clears pending auto-dismiss timers on unmount so none fire afterwards", () => {
+      const { result, unmount } = renderHook(() => useToast(), { wrapper });
+
+      act(() => {
+        result.current.success("One");
+        result.current.addToast({ type: "info", title: "Two", duration: 1000 });
+      });
+      expect(vi.getTimerCount()).toBe(2);
+
+      // Detect any state update attempted after unmount: React only calls the
+      // filter updater if a timer callback actually runs.
+      const filterSpy = vi.spyOn(Array.prototype, "filter");
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+
+      vi.advanceTimersByTime(60000);
+      expect(filterSpy).not.toHaveBeenCalled();
+      filterSpy.mockRestore();
+    });
+
+    it("clears the auto-dismiss timer when a toast is removed manually", () => {
+      const { result } = renderHook(() => useToast(), { wrapper });
+
+      let id = "";
+      act(() => {
+        id = result.current.success("Dismiss me");
+      });
+      expect(vi.getTimerCount()).toBe(1);
+
+      act(() => {
+        result.current.removeToast(id);
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("clears all auto-dismiss timers when toasts are cleared", () => {
+      const { result } = renderHook(() => useToast(), { wrapper });
+
+      act(() => {
+        result.current.success("A");
+        result.current.error("B");
+      });
+      expect(vi.getTimerCount()).toBe(2);
+
+      act(() => {
+        result.current.clearToasts();
+      });
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("drops a timer from tracking once it has fired", () => {
+      const { result, unmount } = renderHook(() => useToast(), { wrapper });
+
+      act(() => {
+        result.current.addToast({ type: "info", title: "Quick", duration: 1000 });
+      });
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(result.current.toasts).toHaveLength(0);
+      expect(vi.getTimerCount()).toBe(0);
+      unmount();
+    });
+  });
 });

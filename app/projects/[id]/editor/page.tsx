@@ -41,6 +41,7 @@ import {
 } from "@/lib/editor/generatedEntityPersistence";
 import { saveSuggestionUpdate } from "@/lib/editor/suggestionSessionPersistence";
 import { updateClassInTurtle } from "@/lib/ontology/turtleClassUpdater";
+import { removeClassFromTurtle } from "@/lib/ontology/turtleClassRemover";
 import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import {
@@ -732,6 +733,9 @@ export default function EditorPage() {
     setDeleteDialogOpen(true);
   }, []);
 
+  // Routes through source save, like form edits: the API serves no
+  // project-scoped class DELETE, so the class's own statements are removed
+  // from the Turtle text and committed via PUT /source under the revision guard.
   const handleDeleteConfirm = useCallback(async () => {
     if (!deleteTargetIri || !canWrite) return;
 
@@ -739,23 +743,29 @@ export default function EditorPage() {
     removeOptimisticNode(deleteTargetIri);
 
     try {
-      const token = session?.accessToken;
-      if (!token) throw new Error("Not authenticated");
-      await projectOntologyApi.deleteClass(
-        projectId,
-        deleteTargetIri,
+      if (!session?.accessToken) throw new Error("Not authenticated");
+      if (!activeBranch) throw new Error("No branch selected");
+
+      const snapshot = await getDirectSourceSnapshot();
+      const modifiedSource = removeClassFromTurtle(snapshot.content, deleteTargetIri);
+      if (modifiedSource === snapshot.content) {
+        throw new Error(
+          `Could not find class "${deleteTargetIri}" in ontology source.`,
+        );
+      }
+
+      await saveDirectSource(
+        modifiedSource,
         `Delete class ${deleteTargetLabel}`,
-        token,
-        activeBranch
+        snapshot.revision,
       );
       toast.success(`Deleted "${deleteTargetLabel}"`);
-      // Invalidate the paired source snapshot and its scope so the next form
-      // edit must re-fetch content and revision from the authoritative branch.
-      resetSourceState();
       // Reload tree to ensure consistency
       loadRootClasses();
-      queryClient.invalidateQueries({ queryKey: branchQueryKeys.list(projectId, session?.accessToken) });
+      refreshAfterDirectEntitySave();
     } catch (err) {
+      // A stale revision is captured by the source guard, which shows the
+      // conflict recovery UI; the toast explains why the class came back.
       toast.error(
         "Failed to delete class",
         err instanceof Error ? err.message : "Unknown error"
@@ -763,7 +773,7 @@ export default function EditorPage() {
       // Reload tree to restore state
       loadRootClasses();
     }
-  }, [deleteTargetIri, deleteTargetLabel, session, canWrite, projectId, activeBranch, removeOptimisticNode, toast, loadRootClasses, queryClient, resetSourceState]);
+  }, [deleteTargetIri, deleteTargetLabel, session?.accessToken, canWrite, activeBranch, removeOptimisticNode, toast, loadRootClasses, getDirectSourceSnapshot, saveDirectSource, refreshAfterDirectEntitySave]);
 
   // Handle update class (form-based editing)
   // Routes through source save: modifies the Turtle text and commits via PUT /source

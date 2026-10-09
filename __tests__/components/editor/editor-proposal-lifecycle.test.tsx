@@ -63,7 +63,6 @@ const lifecycle = vi.hoisted(() => ({
   resetSourceState: vi.fn(),
   reloadSourceContent: vi.fn(),
   getFileAtVersion: vi.fn(),
-  deleteClass: vi.fn(),
   persistGeneratedEntity: vi.fn(),
   saveDirectSource: vi.fn(),
   captureSourceConflict: vi.fn(),
@@ -135,17 +134,6 @@ vi.mock("@/components/ui/confirm-dialog", () => ({
 vi.mock("@/lib/api/revisions", () => ({
   revisionsApi: { getFileAtVersion: lifecycle.getFileAtVersion },
 }));
-
-vi.mock("@/lib/api/client", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/api/client")>();
-  return {
-    ...actual,
-    projectOntologyApi: {
-      ...actual.projectOntologyApi,
-      deleteClass: lifecycle.deleteClass,
-    },
-  };
-});
 
 vi.mock("@/lib/editor/generatedEntityPersistence", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/editor/generatedEntityPersistence")>();
@@ -322,7 +310,6 @@ describe("anonymous proposal submission lifecycle", () => {
     lifecycle.resetSourceState.mockReset();
     lifecycle.reloadSourceContent.mockReset();
     lifecycle.getFileAtVersion.mockReset();
-    lifecycle.deleteClass.mockReset().mockResolvedValue(undefined);
     lifecycle.persistGeneratedEntity.mockReset();
     lifecycle.saveDirectSource.mockReset().mockResolvedValue({ commit_hash: "revision-saved" });
     lifecycle.captureSourceConflict.mockReset();
@@ -411,47 +398,62 @@ describe("anonymous proposal submission lifecycle", () => {
     expect(lifecycle.setSourceContent).not.toHaveBeenCalled();
   });
 
-  it("resets the paired snapshot after delete so the next form edit refetches", async () => {
-    configureDirectEditor("stale source", "revision-stale");
-    lifecycle.getFileAtVersion.mockResolvedValue({
-      content: "fresh source",
-      revision: "revision-fresh",
-    });
-    const rendered = renderWithQueryClient(<EditorPage />);
-    selectMainBranch();
-    lifecycle.resetSourceState.mockClear();
+  const DELETE_SOURCE = [
+    "@prefix : <https://example.org/> .",
+    "@prefix owl: <http://www.w3.org/2002/07/owl#> .",
+    "",
+    ":Deleted a owl:Class .",
+    "",
+    ":Kept a owl:Class .",
+    "",
+  ].join("\n");
+  const AFTER_DELETE = [
+    "@prefix : <https://example.org/> .",
+    "@prefix owl: <http://www.w3.org/2002/07/owl#> .",
+    "",
+    ":Kept a owl:Class .",
+    "",
+  ].join("\n");
 
+  async function confirmDelete(iri = "https://example.org/Deleted", label = "Deleted") {
     act(() => {
-      lifecycle.standardEditorLayoutProps?.onDeleteClass(
-        "https://example.org/Deleted",
-        "Deleted",
-      );
+      lifecycle.standardEditorLayoutProps?.onDeleteClass(iri, label);
     });
     await act(async () => {
       await lifecycle.deleteConfirmProps?.onConfirm();
     });
+  }
 
-    expect(lifecycle.resetSourceState).toHaveBeenCalledTimes(1);
+  it("commits a delete through the revision-guarded source save with the paired snapshot", async () => {
+    configureDirectEditor(DELETE_SOURCE, "revision-paired");
+    renderWithQueryClient(<EditorPage />);
+    selectMainBranch();
+    lifecycle.resetSourceState.mockClear();
 
-    lifecycle.viewerOverrides = {
-      ...lifecycle.viewerOverrides,
-      sourceContent: "",
-      sourceRevision: null,
-    };
-    rendered.rerender(<EditorPage />);
+    await confirmDelete();
 
-    await act(async () => {
-      await lifecycle.standardEditorLayoutProps?.onUpdateClass(
-        "https://example.org/Kept",
-        {
-          labels: [{ value: "Updated" }],
-          comments: [],
-          parent_iris: [],
-          annotations: [],
-          deprecated: false,
-        },
-      );
+    expect(lifecycle.saveDirectSource).toHaveBeenCalledTimes(1);
+    expect(lifecycle.saveDirectSource).toHaveBeenCalledWith(
+      AFTER_DELETE,
+      "Delete class Deleted",
+      "revision-paired",
+    );
+    expect(lifecycle.getFileAtVersion).not.toHaveBeenCalled();
+    // The guard pairs the saved content with its new commit; discarding that
+    // snapshot would force a needless refetch before the next edit.
+    expect(lifecycle.resetSourceState).not.toHaveBeenCalled();
+  });
+
+  it("fetches branch source and its revision for a delete when no snapshot is paired", async () => {
+    configureDirectEditor("", null);
+    lifecycle.getFileAtVersion.mockResolvedValue({
+      content: DELETE_SOURCE,
+      revision: "revision-fresh",
     });
+    renderWithQueryClient(<EditorPage />);
+    selectMainBranch();
+
+    await confirmDelete();
 
     expect(lifecycle.getFileAtVersion).toHaveBeenCalledWith(
       "project-1",
@@ -460,10 +462,20 @@ describe("anonymous proposal submission lifecycle", () => {
       undefined,
     );
     expect(lifecycle.saveDirectSource).toHaveBeenCalledWith(
-      "fresh source\n# modified",
-      "Update class Updated",
+      AFTER_DELETE,
+      "Delete class Deleted",
       "revision-fresh",
     );
+  });
+
+  it("does not commit a delete for a class missing from the source", async () => {
+    configureDirectEditor(AFTER_DELETE, "revision-paired");
+    renderWithQueryClient(<EditorPage />);
+    selectMainBranch();
+
+    await confirmDelete();
+
+    expect(lifecycle.saveDirectSource).not.toHaveBeenCalled();
   });
 
   it("blocks generated direct persistence while source conflict recovery is pending", async () => {

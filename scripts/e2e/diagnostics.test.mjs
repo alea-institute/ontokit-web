@@ -83,6 +83,7 @@ test('expiry still refuses unsafe or symlinked private roots', async () => {
   try {
     const unsafe = path.join(base, 'unsafe');
     await mkdir(unsafe, {mode: 0o755});
+    await chmod(unsafe, 0o755); // mkdir's mode is masked by umask; set it explicitly
     await assert.rejects(expireDiagnostics({root: unsafe}), /Unsafe private directory/);
     const linked = path.join(base, 'linked');
     await symlink(unsafe, linked);

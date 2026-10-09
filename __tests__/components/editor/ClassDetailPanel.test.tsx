@@ -24,7 +24,6 @@ let translationError: Error | null = null;
 vi.mock("@/lib/api/client", () => ({
   projectOntologyApi: {
     getClassDetail: vi.fn(),
-    updateClass: vi.fn(),
     searchEntities: vi.fn(),
   },
 }));

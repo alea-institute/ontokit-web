@@ -45,6 +45,19 @@ jobs:
           # best-effort on forks without CODECOV_TOKEN
           fail_ci_if_error: false
 
+  e2e-unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-node
+      # Hermetic node suites (no docker, browser or network); umask 077 matches scripts/e2e/run.mjs.
+      - run: |
+          umask 077
+          npm run test:e2e:ownership
+          npm run test:e2e:profiles
+          npm run test:e2e:evidence
+          npm run test:e2e:identity
+
   build:
     runs-on: ubuntu-latest
     steps:
@@ -102,7 +115,7 @@ jobs:
 
   publish_github:
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/ontokit-web-')
-    needs: [lint, type-check, test, build]
+    needs: [lint, type-check, test, e2e-unit, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -113,7 +126,7 @@ jobs:
 
   publish_docker:
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/ontokit-web-')
-    needs: [lint, type-check, test, build, docker-build, docker-auth-smoke]
+    needs: [lint, type-check, test, e2e-unit, build, docker-build, docker-auth-smoke]
     runs-on: ubuntu-latest
     permissions:
       contents: read

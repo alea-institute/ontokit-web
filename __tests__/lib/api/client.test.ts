@@ -810,33 +810,11 @@ describe("projectOntologyApi", () => {
     expect(url).toContain("entity_types=class");
   });
 
-  it("updateClass sends PATCH with auth and data", async () => {
-    const data = {
-      labels: [{ value: "Test", lang: "en" }],
-      comments: [],
-      parent_iris: [],
-    };
-    await projectOntologyApi.updateClass("p1", "http://ex.org/C", data, "update labels", "tok", "dev");
-    const [url, options] = mockFetch.mock.calls[0];
-    expect(url).toContain("/api/v1/projects/p1/ontology/classes/");
-    expect(url).toContain("branch=dev");
-    expect(options.method).toBe("PATCH");
-    const body = JSON.parse(options.body as string);
-    expect(body.commit_message).toBe("update labels");
-    expect(body.labels).toEqual([{ value: "Test", lang: "en" }]);
-    const headers = options.headers as Headers;
-    expect(headers.get("Authorization")).toBe("Bearer tok");
-  });
-
-  it("deleteClass sends DELETE with commit_message param", async () => {
-    await projectOntologyApi.deleteClass("p1", "http://ex.org/C", "remove class", "tok", "dev");
-    const [url, options] = mockFetch.mock.calls[0];
-    expect(url).toContain(encodeURIComponent("http://ex.org/C"));
-    expect(url).toContain("commit_message=remove+class");
-    expect(url).toContain("branch=dev");
-    expect(options.method).toBe("DELETE");
-    const headers = options.headers as Headers;
-    expect(headers.get("Authorization")).toBe("Bearer tok");
+  // alea#56: the API serves no project-scoped class PATCH or DELETE. Class
+  // edits and deletes commit through saveSource, so these must not return.
+  it("exposes no project-scoped class PATCH or DELETE call", () => {
+    expect(projectOntologyApi).not.toHaveProperty("updateClass");
+    expect(projectOntologyApi).not.toHaveProperty("deleteClass");
   });
 
   it("reindex sends POST with auth", async () => {

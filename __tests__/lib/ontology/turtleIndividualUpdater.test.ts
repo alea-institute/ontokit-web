@@ -283,4 +283,218 @@ describe("updateIndividualInTurtle", () => {
     );
     expect(result).toContain("ex:fido a owl:NamedIndividual .");
   });
+
+  describe("preserves predicates the payload does not describe (#361)", () => {
+    const IRI = "http://example.org/ont#player";
+    const PREAMBLE = `@prefix ex: <http://example.org/ont#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix ontokit: <https://ontokit.org/ns#> .
+
+ex:hasScore a owl:DatatypeProperty .
+
+ex:knows a owl:ObjectProperty .
+`;
+    const SOURCE = `${PREAMBLE}
+ex:player a owl:NamedIndividual, ex:Person ;
+    rdfs:label "Player"@en ;
+    skos:altLabel "Spieler"@de, "Joueur"@fr, "Jugador"@es ;
+    skos:altLabel "Giocatore"@it ;
+    ex:customNote "kept verbatim" ;
+    ex:flag true ;
+    ex:origin [ a ex:Place ; rdfs:label "Somewhere"@en ] ;
+    ex:knows ex:coach ;
+    ex:hasScore "7"^^xsd:integer .
+
+ex:coach a owl:NamedIndividual ;
+    rdfs:label "Coach"@en .
+
+[] a owl:Axiom ;
+    owl:annotatedSource ex:player ;
+    owl:annotatedProperty skos:altLabel ;
+    owl:annotatedTarget "Spieler"@de ;
+    ontokit:recordDigest "alt-digest" .
+
+[] a owl:Axiom ;
+    owl:annotatedSource ex:player ;
+    owl:annotatedProperty rdfs:label ;
+    owl:annotatedTarget "Player"@en ;
+    ontokit:recordDigest "label-digest" .
+`;
+    const formData = {
+      labels: [{ value: "Player (renamed)", lang: "en" }],
+      comments: [],
+      definitions: [],
+      typeIris: ["http://example.org/ont#Person"],
+      sameAsIris: [],
+      differentFromIris: [],
+      objectPropertyAssertions: [
+        { propertyIri: "http://example.org/ont#knows", targetIri: "http://example.org/ont#coach" },
+      ],
+      dataPropertyAssertions: [
+        {
+          propertyIri: "http://example.org/ont#hasScore",
+          value: "7",
+          datatype: "http://www.w3.org/2001/XMLSchema#integer",
+        },
+      ],
+    };
+    const playerBlock = (source: string) => {
+      const start = source.indexOf("ex:player a");
+      return source.slice(start, source.indexOf(" .\n", start) + 2);
+    };
+
+    it("keeps altLabels in every language when only the label changes (AE3)", () => {
+      const result = updateIndividualInTurtle(SOURCE, IRI, formData);
+      const block = playerBlock(result);
+      expect(block).toContain('rdfs:label "Player (renamed)"@en');
+      expect(block).not.toContain('"Player"@en');
+      expect(block).toContain('skos:altLabel "Spieler"@de, "Joueur"@fr, "Jugador"@es');
+      expect(block).toContain('skos:altLabel "Giocatore"@it');
+    });
+
+    it("keeps an unknown custom predicate and an undeclared boolean", () => {
+      const block = playerBlock(updateIndividualInTurtle(SOURCE, IRI, formData));
+      expect(block).toContain('ex:customNote "kept verbatim"');
+      expect(block).toContain("ex:flag true");
+    });
+
+    it("keeps a blank-node object on a carried predicate", () => {
+      const block = playerBlock(updateIndividualInTurtle(SOURCE, IRI, formData));
+      expect(block).toContain('ex:origin [ a ex:Place ; rdfs:label "Somewhere"@en ]');
+    });
+
+    it("does not choke on the blank-node pseudo-assertion the extractor surfaces", () => {
+      const result = updateIndividualInTurtle(SOURCE, IRI, {
+        ...formData,
+        objectPropertyAssertions: [
+          ...formData.objectPropertyAssertions,
+          { propertyIri: "http://example.org/ont#origin", targetIri: '[ a ex:Place ; rdfs:label "Somewhere"@en ]' },
+        ],
+      });
+      const block = playerBlock(result);
+      expect(block.match(/ex:origin/g)).toHaveLength(1);
+      expect(block).toContain('ex:origin [ a ex:Place ; rdfs:label "Somewhere"@en ]');
+    });
+
+    describe("mixed object lists on a described predicate", () => {
+      const KNOWS = "http://example.org/ont#knows";
+      const mixedSource = (objects: string) => `${PREAMBLE}
+ex:player a owl:NamedIndividual ;
+    rdfs:label "Player"@en ;
+    ex:knows ${objects} .
+`;
+      const save = (objects: string) =>
+        updateIndividualInTurtle(mixedSource(objects), IRI, {
+          ...formData,
+          labels: [{ value: "Player", lang: "en" }],
+          typeIris: [],
+          objectPropertyAssertions: [{ propertyIri: KNOWS, targetIri: "http://example.org/ont#rival" }],
+          dataPropertyAssertions: [],
+        });
+
+      it("keeps the blank node and takes the IRI part from the payload", () => {
+        const result = save("ex:coach, [ ex:q 1 ]");
+        expect(result).toContain("ex:knows ex:rival");
+        expect(result).toContain("ex:knows [ ex:q 1 ]");
+        expect(result).not.toContain("ex:coach");
+        expect(result.match(/\[ ex:q 1 \]/g)).toHaveLength(1);
+      });
+
+      it("does not split inside nested brackets, collections or quoted commas", () => {
+        const structural = '[ ex:q [ ex:r "x, y" ], ( ex:c, ex:d ) ], ( "p, q" ex:e )';
+        const result = save(`ex:coach, ${structural}, ex:mentor`);
+        expect(result).toContain("ex:knows ex:rival");
+        expect(result).toContain(`ex:knows ${structural}`);
+        expect(result).not.toContain("ex:coach");
+        expect(result).not.toContain("ex:mentor");
+      });
+
+      it("is idempotent once the structural half has been split out", () => {
+        const once = save("ex:coach, [ ex:q 1 ]");
+        const twice = updateIndividualInTurtle(once, IRI, {
+          ...formData,
+          labels: [{ value: "Player", lang: "en" }],
+          typeIris: [],
+          objectPropertyAssertions: [{ propertyIri: KNOWS, targetIri: "http://example.org/ont#rival" }],
+          dataPropertyAssertions: [],
+        });
+        expect(twice).toBe(once);
+      });
+    });
+
+    it("replaces a described predicate instead of duplicating it", () => {
+      const block = playerBlock(updateIndividualInTurtle(SOURCE, IRI, {
+        ...formData,
+        annotations: [{
+          property_iri: "http://www.w3.org/2004/02/skos/core#altLabel",
+          values: [{ value: "Spielerin", lang: "de" }],
+        }],
+        objectPropertyAssertions: [
+          { propertyIri: "http://example.org/ont#knows", targetIri: "http://example.org/ont#referee" },
+        ],
+      }));
+      expect(block.match(/skos:altLabel/g)).toHaveLength(1);
+      expect(block).toContain('skos:altLabel "Spielerin"@de');
+      expect(block).not.toContain("Spieler\"@de");
+      expect(block).not.toContain("Giocatore");
+      expect(block.match(/ex:knows/g)).toHaveLength(1);
+      expect(block).toContain("ex:knows ex:referee");
+      expect(block.match(/ex:hasScore/g)).toHaveLength(1);
+      expect(block.match(/rdfs:label/g)).toHaveLength(2); // own label + blank-node label
+    });
+
+    it("honours removal of every assertion for a property the form shows", () => {
+      const block = playerBlock(updateIndividualInTurtle(SOURCE, IRI, {
+        ...formData,
+        objectPropertyAssertions: [],
+        dataPropertyAssertions: [],
+      }));
+      expect(block).not.toContain("ex:knows");
+      expect(block).not.toContain("ex:hasScore");
+      expect(block).toContain('ex:customNote "kept verbatim"');
+    });
+
+    it("works for full-IRI and :local subject forms and keeps the subject spelling", () => {
+      const fullSource = SOURCE.replace("ex:player a", "<http://example.org/ont#player> a");
+      const fullResult = updateIndividualInTurtle(fullSource, IRI, formData);
+      expect(fullResult).toContain("<http://example.org/ont#player> a owl:NamedIndividual, ex:Person ;");
+      expect(fullResult).toContain('skos:altLabel "Giocatore"@it');
+      expect(fullResult).toContain('ex:customNote "kept verbatim"');
+
+      const localSource = SOURCE
+        .replace("@prefix ex: <http://example.org/ont#> .", "@prefix : <http://example.org/ont#> .\n@prefix ex: <http://example.org/ont#> .")
+        .replace("ex:player a", ":player a");
+      const localResult = updateIndividualInTurtle(localSource, IRI, formData);
+      expect(localResult).toContain(":player a owl:NamedIndividual");
+      expect(localResult).toContain('skos:altLabel "Giocatore"@it');
+      expect(localResult).toContain('ex:customNote "kept verbatim"');
+    });
+
+    it("is idempotent: saving the same payload twice is byte-identical", () => {
+      const once = updateIndividualInTurtle(SOURCE, IRI, formData);
+      const twice = updateIndividualInTurtle(once, IRI, formData);
+      expect(twice).toBe(once);
+    });
+
+    it("leaves sibling blocks byte-identical", () => {
+      const result = updateIndividualInTurtle(SOURCE, IRI, formData);
+      expect(result.startsWith(PREAMBLE)).toBe(true);
+      expect(result).toContain('ex:coach a owl:NamedIndividual ;\n    rdfs:label "Coach"@en .\n');
+    });
+
+    it("keeps provenance for carried literals and drops it only for deleted described literals", () => {
+      const result = updateIndividualInTurtle(SOURCE, IRI, formData);
+      expect(result).toContain('ontokit:recordDigest "alt-digest"');
+      expect(result).not.toContain('ontokit:recordDigest "label-digest"');
+
+      const kept = updateIndividualInTurtle(SOURCE, IRI, {
+        ...formData,
+        labels: [{ value: "Player", lang: "en" }],
+      });
+      expect(kept).toContain('ontokit:recordDigest "label-digest"');
+    });
+  });
 });
