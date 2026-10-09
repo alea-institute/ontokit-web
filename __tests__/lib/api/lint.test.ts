@@ -411,8 +411,7 @@ describe("createLintWebSocket", () => {
 
     expect(onMessage).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Failed to parse WebSocket message:",
-      expect.any(Error)
+      "Failed to parse WebSocket message"
     );
 
     consoleSpy.mockRestore();

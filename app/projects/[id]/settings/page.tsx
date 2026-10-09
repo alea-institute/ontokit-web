@@ -191,7 +191,10 @@ export default function ProjectSettingsPage() {
   // Local index state (for optimistic updates during reindex)
   const [indexStatus, setIndexStatus] = useState<IndexStatusResponse | null>(null);
   useEffect(() => {
-    if (indexQueryData) setIndexStatus(indexQueryData);
+    if (indexQueryData) {
+      setIndexStatus(indexQueryData);
+      setIsReindexing(indexQueryData.status === "indexing");
+    }
   }, [indexQueryData, indexUpdatedAt]);
 
   const [isReindexing, setIsReindexing] = useState(false);
@@ -214,7 +217,10 @@ export default function ProjectSettingsPage() {
           queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, token) });
         }
       },
-      session.accessToken
+      session.accessToken,
+      () => {
+        void queryClient.invalidateQueries({ queryKey: indexQueryKeys.status(projectId, session.accessToken) });
+      },
     );
 
     // Small delay to avoid spurious connections during Strict Mode remounts

@@ -1,5 +1,7 @@
 "use client";
 
+import { NotificationSocketManager } from "@/lib/api/notificationSocket";
+
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   XCircle,
@@ -98,15 +100,10 @@ export function HealthCheckPanel({
   // Clear lint results
   const [isClearing, setIsClearing] = useState(false);
 
-  // Track whether the quality WebSocket is connected
-  const qualityWsConnected = useRef(false);
   const scopeRef = useRef(0);
   const lintRequestRef = useRef(0);
   const consistencyRequestRef = useRef(0);
   const duplicatesRequestRef = useRef(0);
-  // Safety timeout refs for WS path (so they can be cleared on completion/unmount)
-  const consistencyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const duplicatesTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Invalidate all work when its project, branch, credentials or panel changes.
   useEffect(() => {
@@ -128,13 +125,13 @@ export function HealthCheckPanel({
   }, [projectId, branch, accessToken, isOpen]);
 
   // Fetch lint status and issues
-  const fetchData = useCallback(async (issueFilter?: IssueFilter) => {
+  const fetchData = useCallback(async (issueFilter?: IssueFilter, background = false) => {
     if (!isOpen) return;
 
     const scope = scopeRef.current;
     const request = ++lintRequestRef.current;
     const isCurrent = () => scope === scopeRef.current && request === lintRequestRef.current;
-    setIsLoading(true);
+    if (!background) setIsLoading(true);
     setError(null);
 
     try {
@@ -223,7 +220,6 @@ export function HealthCheckPanel({
 
     // Track if this effect is still active (handles React Strict Mode double-invoke)
     let isActive = true;
-    let ws: WebSocket | null = null;
 
     const handleMessage = (message: LintWebSocketMessage) => {
       if (!isActive) return;
@@ -235,36 +231,23 @@ export function HealthCheckPanel({
       }
     };
 
-    // Small delay to avoid spurious connections during Strict Mode remounts
-    const timeoutId = setTimeout(() => {
-      if (isActive) {
-        ws = createLintWebSocket(
-          projectId,
-          handleMessage,
-          () => {
-            if (isActive) {
-              setIsRunning(false);
-              setError("Lint WebSocket connection failed");
-            }
-          },
-          (event) => {
-            if (isActive && event.code !== 1000) {
-              setIsRunning(false);
-            }
-          },
-          accessToken
-        );
-      }
-    }, 100);
-
+    const manager = new NotificationSocketManager<LintWebSocketMessage>(
+      (message, error, close, open) => createLintWebSocket(projectId, message, error, close, accessToken, open),
+      handleMessage,
+      () => { if (isActive) void fetchDataRef.current(); },
+      () => { if (isActive) { setIsRunning(false); setError("Lint WebSocket connection failed"); } },
+      () => { if (isActive) setIsRunning(false); },
+    );
+    const timeoutId = setTimeout(() => manager.connect(), 100);
+    // Poll while open as well: lint pubsub notifications are not a replay log.
+    const recoveryTimer = setInterval(() => { if (isActive) void fetchDataRef.current(undefined, true); }, 15_000);
     return () => {
       isActive = false;
       clearTimeout(timeoutId);
-      if (ws) {
-        ws.close();
-      }
+      clearInterval(recoveryTimer);
+      manager.disconnect();
     };
-  }, [isOpen, projectId, accessToken]);
+  }, [isOpen, projectId, accessToken, branch]);
 
   const handleClearResults = async () => {
     if (!accessToken) return;
@@ -313,7 +296,7 @@ export function HealthCheckPanel({
   };
 
   // Trigger consistency check as a background job.
-  // Same WS-first / polling-fallback pattern as duplicate detection.
+  // Socket events provide fast updates; polling recovers missed completion.
   const handleRunConsistencyCheck = async () => {
     if (!accessToken) return;
     setIsCheckingConsistency(true);
@@ -338,21 +321,7 @@ export function HealthCheckPanel({
 
     if (!isCurrent()) return;
 
-    // When WS is connected the effect handler manages loading state
-    if (qualityWsConnected.current) {
-      if (consistencyTimeoutRef.current) clearTimeout(consistencyTimeoutRef.current);
-      consistencyTimeoutRef.current = setTimeout(() => {
-        if (!isCurrent()) return;
-        consistencyTimeoutRef.current = null;
-        setIsCheckingConsistency((prev) => {
-          if (prev) setConsistencyError("Consistency check timed out — try again later");
-          return false;
-        });
-      }, 60_000);
-      return;
-    }
-
-    // Fallback: poll for job result with exponential backoff
+    // Reconcile by job ID even while connected: notifications can be missed.
     try {
       let delay = 1000;
       const maxDelay = 5000;
@@ -373,6 +342,8 @@ export function HealthCheckPanel({
         }
         const completed = result as ConsistencyCheckResult;
         setConsistencyIssues(completed.issues);
+        setIsCheckingConsistency(false);
+        consistencyRequestRef.current++;
         return;
       }
       setConsistencyError("Consistency check timed out — try again later");
@@ -388,9 +359,7 @@ export function HealthCheckPanel({
   };
 
   // Trigger duplicate detection as a background job.
-  // If the quality WebSocket is connected, it will deliver the result via
-  // duplicates_complete/duplicates_failed events. Otherwise, fall back to
-  // polling the job-result endpoint.
+  // Progress events are supplemented by authenticated job-result polling.
   const handleDetectDuplicates = async () => {
     if (!accessToken) return;
     setIsDetectingDuplicates(true);
@@ -415,23 +384,7 @@ export function HealthCheckPanel({
 
     if (!isCurrent()) return;
 
-    // When WS is connected the effect handler manages loading state.
-    // Add a safety timeout so the spinner doesn't stay forever if the
-    // WS message is lost (network hiccup, Redis pubsub gap, etc.).
-    if (qualityWsConnected.current) {
-      if (duplicatesTimeoutRef.current) clearTimeout(duplicatesTimeoutRef.current);
-      duplicatesTimeoutRef.current = setTimeout(() => {
-        if (!isCurrent()) return;
-        duplicatesTimeoutRef.current = null;
-        setIsDetectingDuplicates((prev) => {
-          if (prev) setDuplicatesError("Duplicate detection timed out — try again later");
-          return false;
-        });
-      }, 60_000);
-      return;
-    }
-
-    // Fallback: poll for job result with exponential backoff
+    // Reconcile by job ID even while connected: notifications can be missed.
     try {
       let delay = 1000;
       const maxDelay = 5000;
@@ -454,6 +407,8 @@ export function HealthCheckPanel({
         // 200 OK: job complete — narrow to DuplicateDetectionResult
         const completed = result as DuplicateDetectionResult;
         setDuplicateClusters(completed.clusters);
+        setIsDetectingDuplicates(false);
+        duplicatesRequestRef.current++;
         return;
       }
       setDuplicatesError("Duplicate detection timed out — try again later");
@@ -504,7 +459,6 @@ export function HealthCheckPanel({
     if (!isOpen || !accessToken) return;
 
     let isActive = true;
-    let ws: WebSocket | null = null;
 
     const resolvedBranch = branch ?? "main";
 
@@ -518,10 +472,7 @@ export function HealthCheckPanel({
       } else if (message.type === "consistency_complete") {
         const request = ++consistencyRequestRef.current;
         const isCurrent = () => isActive && request === consistencyRequestRef.current;
-        if (consistencyTimeoutRef.current) {
-          clearTimeout(consistencyTimeoutRef.current);
-          consistencyTimeoutRef.current = null;
-        }
+
         qualityApi.getConsistencyIssues(projectId, accessToken, branch)
           .then((r) => { if (isCurrent()) setConsistencyIssues(r.issues); })
           .catch((err) => {
@@ -530,10 +481,7 @@ export function HealthCheckPanel({
           .finally(() => { if (isCurrent()) setIsCheckingConsistency(false); });
       } else if (message.type === "consistency_failed") {
         consistencyRequestRef.current++;
-        if (consistencyTimeoutRef.current) {
-          clearTimeout(consistencyTimeoutRef.current);
-          consistencyTimeoutRef.current = null;
-        }
+
         setIsCheckingConsistency(false);
         setConsistencyError(message.error ?? "Consistency check failed");
       } else if (message.type === "duplicates_started") {
@@ -541,10 +489,7 @@ export function HealthCheckPanel({
       } else if (message.type === "duplicates_complete") {
         const request = ++duplicatesRequestRef.current;
         const isCurrent = () => isActive && request === duplicatesRequestRef.current;
-        if (duplicatesTimeoutRef.current) {
-          clearTimeout(duplicatesTimeoutRef.current);
-          duplicatesTimeoutRef.current = null;
-        }
+
         qualityApi.getLatestDuplicates(projectId, accessToken, branch)
           .then((r) => { if (isCurrent()) setDuplicateClusters(r.clusters); })
           .catch((err) => {
@@ -553,41 +498,38 @@ export function HealthCheckPanel({
           .finally(() => { if (isCurrent()) setIsDetectingDuplicates(false); });
       } else if (message.type === "duplicates_failed") {
         duplicatesRequestRef.current++;
-        if (duplicatesTimeoutRef.current) {
-          clearTimeout(duplicatesTimeoutRef.current);
-          duplicatesTimeoutRef.current = null;
-        }
+
         setIsDetectingDuplicates(false);
         setDuplicatesError(message.error ?? "Duplicate detection failed");
       }
     };
 
-    const timeoutId = setTimeout(() => {
-      if (isActive) {
-        ws = createQualityWebSocket(
-          projectId,
-          handleQualityMessage,
-          () => { if (isActive) qualityWsConnected.current = false; },
-          () => { if (isActive) qualityWsConnected.current = false; },
-          accessToken,
-          () => { if (isActive) qualityWsConnected.current = true; }
-        );
-      }
-    }, 100);
+    let opened = false;
+    const manager = new NotificationSocketManager<QualityWebSocketMessage>(
+      (message, error, close, open) => createQualityWebSocket(projectId, message, error, close, accessToken, open),
+      handleQualityMessage,
+      () => {
+        if (!isActive) return;
+        // Reload cached findings after a reconnect, including updates from other clients.
+        if (opened) {
+          const consistencyRequest = consistencyRequestRef.current;
+          const duplicatesRequest = duplicatesRequestRef.current;
+          qualityApi.getConsistencyIssues(projectId, accessToken, branch)
+            .then(r => { if (isActive && consistencyRequest === consistencyRequestRef.current) setConsistencyIssues(r.issues); })
+            .catch(() => { if (isActive && consistencyRequest === consistencyRequestRef.current) setConsistencyError("Failed to recover consistency results"); });
+          qualityApi.getLatestDuplicates(projectId, accessToken, branch)
+            .then(r => { if (isActive && duplicatesRequest === duplicatesRequestRef.current) setDuplicateClusters(r.clusters); })
+            .catch(() => { if (isActive && duplicatesRequest === duplicatesRequestRef.current) setDuplicatesError("Failed to recover duplicate results"); });
+        }
+        opened = true;
+      },
+    );
+    const timeoutId = setTimeout(() => manager.connect(), 100);
 
     return () => {
       isActive = false;
-      qualityWsConnected.current = false;
-      if (consistencyTimeoutRef.current) {
-        clearTimeout(consistencyTimeoutRef.current);
-        consistencyTimeoutRef.current = null;
-      }
-      if (duplicatesTimeoutRef.current) {
-        clearTimeout(duplicatesTimeoutRef.current);
-        duplicatesTimeoutRef.current = null;
-      }
       clearTimeout(timeoutId);
-      if (ws) ws.close();
+      manager.disconnect();
     };
   }, [isOpen, projectId, accessToken, branch]);
 

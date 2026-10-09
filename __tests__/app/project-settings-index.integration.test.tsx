@@ -15,6 +15,11 @@ function mount(options: { status?: string | null; source?: boolean } = {}) {
   const sockets: Socket[] = [];
   class Socket extends EventTarget {
     static OPEN = 1; static CONNECTING = 0; readyState = 1; close = vi.fn();
+    onopen: (() => void) | null = null;
+    onerror: ((event: Event) => void) | null = null;
+    onclose: ((event: CloseEvent) => void) | null = null;
+    open() { this.readyState = 1; this.onopen?.(); }
+    restart() { this.readyState = 3; this.onerror?.(new Event("error")); this.onclose?.({ code: 1001 } as CloseEvent); }
     onmessage: ((event: MessageEvent) => void) | null = null;
     constructor(readonly url: string) { super(); sockets.push(this); }
     message(type: string) { this.onmessage?.(new MessageEvent('message', { data: JSON.stringify({ type, project_id: 'project' }) })); }
@@ -45,9 +50,41 @@ function mount(options: { status?: string | null; source?: boolean } = {}) {
 }
 async function section() { return within((await screen.findByRole('heading', { name: 'Ontology Search Index' })).closest('section')!); }
 async function socket(h: ReturnType<typeof mount>) { await waitFor(() => expect(h.sockets.some(s => s.url.includes('/index-ws'))).toBe(true)); return h.sockets.find(s => s.url.includes('/index-ws'))!; }
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('settings index rebuild through real HTTP, query invalidation and websocket parsing', () => {
+  it('recovers index completion missed during restart through authenticated HTTP and clears the rebuild spinner', async () => {
+    const h = mount(); const ui = await section(); await ui.findByText('Index up to date');
+    const first = await socket(h); act(() => first.open());
+    fireEvent.click(ui.getByRole('button', { name: 'Rebuild Index' }));
+    await screen.findByText('Reindex job queued. The index will update in the background.');
+    vi.useFakeTimers(); act(() => first.restart());
+    h.status('ready'); h.entityCount(2500);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+    expect(h.sockets).toHaveLength(2);
+    const replacement = h.sockets[1];
+    expect(new URL(replacement.url).searchParams.get('token')).toBe('fixture-token');
+    await act(async () => { replacement.open(); await vi.advanceTimersByTimeAsync(50); });
+    expect(ui.getByText('2,500 entities indexed')).toBeDefined();
+    expect(ui.getByRole('button', { name: 'Rebuild Index' }).hasAttribute('disabled')).toBe(false);
+    const calls = h.fetcher.mock.calls.filter(([url]) => String(url).endsWith('/ontology/index-status'));
+    expect(calls.length).toBeGreaterThan(1);
+    expect(new Headers(calls.at(-1)![1]?.headers).get('Authorization')).toBe('Bearer fixture-token');
+    act(() => first.message('index_started'));
+    expect(ui.queryByText('Indexing in progress...')).toBeNull();
+    h.unmount(); await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(h.sockets).toHaveLength(2); expect(replacement.close).toHaveBeenCalledOnce();
+  });
+
+  it('recovers a missed index update even when the socket remains connected', async () => {
+    const h = mount(); const ui = await section(); await ui.findByText('Index up to date');
+    const ws = await socket(h); act(() => ws.open());
+    vi.useFakeTimers(); h.status('failed');
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_050); });
+    expect(ui.getByText('Index failed')).toBeDefined();
+    expect(ui.getByText('Invalid ontology')).toBeDefined();
+  });
+
   it.each([['ready', 'Index up to date'], ['indexing', 'Indexing in progress...'], ['pending', 'Index pending'], ['failed', 'Index failed']])('shows the %s index state and its metadata', async (status, label) => {
     mount({ status }); const ui = await section(); await ui.findByText(label);
     expect(ui.getByText('1,234 entities indexed')).toBeDefined(); expect(ui.getByText('abcdef1')).toBeDefined();

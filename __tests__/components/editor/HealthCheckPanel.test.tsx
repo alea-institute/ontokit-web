@@ -759,7 +759,7 @@ describe("HealthCheckPanel", () => {
     }
   });
 
-  it("shows consistency timeout on WS path when WS message is lost", async () => {
+  it("times out a still-pending consistency job when WS messages are lost", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       mockCreateQualityWebSocket.mockImplementation(
@@ -769,6 +769,7 @@ describe("HealthCheckPanel", () => {
         }
       );
       mockQualityApi.triggerConsistencyCheck.mockResolvedValue({ job_id: "cons-ws-lost" });
+      mockQualityApi.getConsistencyJobResult.mockResolvedValue({ status: "pending", job_id: "cons-ws-lost" });
 
       setup();
       await waitFor(() => {
@@ -786,7 +787,7 @@ describe("HealthCheckPanel", () => {
         screen.getByText("Run Check")
       );
 
-      await vi.advanceTimersByTimeAsync(61_000);
+      await vi.advanceTimersByTimeAsync(100_000);
 
       await waitFor(() => {
         expect(
@@ -1570,7 +1571,7 @@ describe("HealthCheckPanel", () => {
     });
   });
 
-  it("shows timeout error on WS path when WS message is lost", async () => {
+  it("times out a still-pending duplicate job when WS messages are lost", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     try {
       // Connect WS and trigger onOpen so qualityWsConnected = true
@@ -1581,6 +1582,7 @@ describe("HealthCheckPanel", () => {
         }
       );
       mockQualityApi.triggerDuplicateDetection.mockResolvedValue({ job_id: "dup-ws-lost" });
+      mockQualityApi.getDuplicateJobResult.mockResolvedValue({ status: "pending", job_id: "dup-ws-lost" });
 
       setup();
 
@@ -1602,7 +1604,7 @@ describe("HealthCheckPanel", () => {
       );
 
       // WS message never arrives — advance past the 60s safety timeout
-      await vi.advanceTimersByTimeAsync(61_000);
+      await vi.advanceTimersByTimeAsync(100_000);
 
       await waitFor(() => {
         expect(

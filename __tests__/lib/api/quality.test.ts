@@ -261,8 +261,7 @@ describe("createQualityWebSocket", () => {
 
     expect(onMessage).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Unexpected quality WebSocket payload, type:",
-      "unknown_event"
+      "Unexpected quality WebSocket payload"
     );
     consoleSpy.mockRestore();
   });
@@ -276,8 +275,7 @@ describe("createQualityWebSocket", () => {
 
     expect(onMessage).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Failed to parse quality WebSocket message:",
-      expect.any(SyntaxError)
+      "Failed to parse quality WebSocket message"
     );
     consoleSpy.mockRestore();
   });
