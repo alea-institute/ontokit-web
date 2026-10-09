@@ -243,4 +243,158 @@ describe("AddEntityDialog", () => {
       "http://example.org/ontology#RedBloodCell"
     );
   });
+  describe("derived props arriving while open (namespace detected after indexing)", () => {
+    const LATE_NS = "https://example.test/";
+
+    it("preserves a typed label when the namespace prop changes", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(
+        <AddEntityDialog {...defaultProps} iriPattern="named" ontologyNamespace="" />
+      );
+
+      const labelInput = screen.getByPlaceholderText("e.g., Privileged Altar");
+      await user.type(labelInput, "Red Blood Cell");
+
+      rerender(
+        <AddEntityDialog {...defaultProps} iriPattern="named" ontologyNamespace={LATE_NS} />
+      );
+
+      expect((labelInput as HTMLInputElement).value).toBe("Red Blood Cell");
+      expect(screen.getByRole("button", { name: "Create" })).not.toHaveProperty("disabled", true);
+    });
+
+    it("keeps Advanced expanded and the chosen type when the namespace changes", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(<AddEntityDialog {...defaultProps} ontologyNamespace="" />);
+
+      await user.selectOptions(screen.getByLabelText("Type"), "objectProperty");
+      await user.click(screen.getByText("Advanced"));
+
+      rerender(<AddEntityDialog {...defaultProps} ontologyNamespace={LATE_NS} />);
+
+      expect(screen.getByLabelText("IRI")).toBeDefined();
+      expect((screen.getByLabelText("Type") as HTMLSelectElement).value).toBe("objectProperty");
+    });
+
+    it("lets an untouched named IRI follow the new namespace", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(
+        <AddEntityDialog {...defaultProps} iriPattern="named" ontologyNamespace="" />
+      );
+
+      await user.click(screen.getByText("Advanced"));
+      await user.type(screen.getByPlaceholderText("e.g., Privileged Altar"), "Red Blood Cell");
+
+      rerender(
+        <AddEntityDialog {...defaultProps} iriPattern="named" ontologyNamespace={LATE_NS} />
+      );
+
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe(
+        "https://example.test/RedBloodCell"
+      );
+    });
+
+    it("lets an untouched UUID IRI follow the new namespace, keeping its local name", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(<AddEntityDialog {...defaultProps} ontologyNamespace="" />);
+
+      await user.click(screen.getByText("Advanced"));
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe("TestBase62Uuid");
+
+      rerender(<AddEntityDialog {...defaultProps} ontologyNamespace={LATE_NS} />);
+
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe(
+        "https://example.test/TestBase62Uuid"
+      );
+    });
+
+    it("preserves a hand-edited IRI when the namespace changes", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(
+        <AddEntityDialog {...defaultProps} iriPattern="named" ontologyNamespace="" />
+      );
+
+      await user.type(screen.getByPlaceholderText("e.g., Privileged Altar"), "Thing");
+      await user.click(screen.getByText("Advanced"));
+      const iriInput = screen.getByLabelText("IRI");
+      await user.clear(iriInput);
+      await user.type(iriInput, "http://custom.iri/Foo");
+
+      rerender(
+        <AddEntityDialog {...defaultProps} iriPattern="named" ontologyNamespace={LATE_NS} />
+      );
+
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe(
+        "http://custom.iri/Foo"
+      );
+      expect(
+        (screen.getByPlaceholderText("e.g., Privileged Altar") as HTMLInputElement).value
+      ).toBe("Thing");
+    });
+
+    it("submits the label typed before the namespace arrived, with the derived IRI", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(
+        <AddEntityDialog {...defaultProps} iriPattern="named" ontologyNamespace="" />
+      );
+
+      await user.type(screen.getByPlaceholderText("e.g., Privileged Altar"), "Red Blood Cell");
+      rerender(
+        <AddEntityDialog {...defaultProps} iriPattern="named" ontologyNamespace={LATE_NS} />
+      );
+      await user.click(screen.getByRole("button", { name: "Create" }));
+
+      expect(defaultProps.onConfirm).toHaveBeenCalledWith({
+        iri: "https://example.test/RedBloodCell",
+        label: "Red Blood Cell",
+        entityType: "class",
+        parentIri: undefined,
+      });
+    });
+
+    it("locks the type to Class when a parent arrives after the user chose another type", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(<AddEntityDialog {...defaultProps} />);
+
+      await user.type(screen.getByPlaceholderText("e.g., Privileged Altar"), "Child");
+      await user.selectOptions(screen.getByLabelText("Type"), "objectProperty");
+
+      rerender(<AddEntityDialog {...defaultProps} parentIri="http://example.org/ontology#Animal" />);
+
+      expect((screen.getByLabelText("Type") as HTMLSelectElement).value).toBe("class");
+      expect(
+        (screen.getByPlaceholderText("e.g., Privileged Altar") as HTMLInputElement).value
+      ).toBe("Child");
+      await user.click(screen.getByRole("button", { name: "Create" }));
+      expect(defaultProps.onConfirm).toHaveBeenCalledWith(
+        expect.objectContaining({
+          entityType: "class",
+          parentIri: "http://example.org/ontology#Animal",
+        })
+      );
+    });
+
+    it("still resets the form when the dialog is closed and reopened", async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { rerender } = render(<AddEntityDialog {...defaultProps} iriPattern="named" />);
+
+      await user.type(screen.getByPlaceholderText("e.g., Privileged Altar"), "Stale");
+      await user.click(screen.getByText("Advanced"));
+      const iriInput = screen.getByLabelText("IRI");
+      await user.clear(iriInput);
+      await user.type(iriInput, "http://custom.iri/Stale");
+
+      rerender(<AddEntityDialog {...defaultProps} iriPattern="named" open={false} />);
+      rerender(<AddEntityDialog {...defaultProps} iriPattern="named" open />);
+
+      expect(
+        (screen.getByPlaceholderText("e.g., Privileged Altar") as HTMLInputElement).value
+      ).toBe("");
+      expect(screen.queryByLabelText("IRI")).toBeNull();
+      await user.click(screen.getByText("Advanced"));
+      expect((screen.getByLabelText("IRI") as HTMLInputElement).value).toBe(
+        "http://example.org/ontology#..."
+      );
+    });
+  });
 });
