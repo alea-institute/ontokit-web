@@ -48,7 +48,10 @@ describe('notification socket transport boundaries', () => {
     ws.onerror?.(Object.assign(new Event('error'), { url: ws.url }));
     ws.onmessage?.({ data: token } as MessageEvent);
     ws.onmessage?.({ data: JSON.stringify({ type: token }) } as MessageEvent);
-    const output = logs.flatMap(log => log.mock.calls).map(call => call.map(String).join(' ')).join('\n');
+    const calls = logs.flatMap(log => log.mock.calls);
+    // No raw Event, socket, payload or parse exception may reach the console.
+    for (const call of calls) expect(call.every(value => typeof value === "string")).toBe(true);
+    const output = calls.map(call => call.join(" ")).join("\n");
     expect(output).not.toContain(token);
     expect(output).not.toContain(encodeURIComponent(token));
   });
