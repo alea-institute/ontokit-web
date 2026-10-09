@@ -169,18 +169,15 @@ export function createQualityWebSocket(
       if (isQualityWebSocketMessage(data)) {
         onMessage(data);
       } else {
-        const type = typeof data === "object" && data !== null
-          ? (data as Record<string, unknown>).type ?? "(no type)"
-          : typeof data;
-        console.warn("Unexpected quality WebSocket payload, type:", type);
+        console.warn("Unexpected quality WebSocket payload");
       }
-    } catch (e) {
-      console.error("Failed to parse quality WebSocket message:", e);
+    } catch {
+      console.error("Failed to parse quality WebSocket message");
     }
   };
 
   ws.onerror = (error) => {
-    console.error("Quality WebSocket error:", error);
+    console.error("Quality WebSocket error");
     onError?.(error);
   };
 

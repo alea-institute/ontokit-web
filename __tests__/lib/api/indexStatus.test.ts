@@ -130,8 +130,7 @@ describe("createIndexWebSocket", () => {
 
     expect(onMessage).not.toHaveBeenCalled();
     expect(consoleSpy).toHaveBeenCalledWith(
-      "Failed to parse index WebSocket message:",
-      expect.any(Error)
+      "Failed to parse index WebSocket message"
     );
 
     consoleSpy.mockRestore();

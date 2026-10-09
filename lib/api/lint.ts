@@ -3,6 +3,7 @@
  */
 
 import { api } from "./client";
+import { NotificationSocketManager } from "./notificationSocket";
 import { getWebSocketUrl } from "./websocketUrl";
 
 // Types
@@ -262,7 +263,8 @@ export function createLintWebSocket(
   onMessage: (message: LintWebSocketMessage) => void,
   onError?: (error: Event) => void,
   onClose?: (event: CloseEvent) => void,
-  token?: string
+  token?: string,
+  onOpen?: () => void
 ): WebSocket {
   const wsUrl = getWebSocketUrl();
 
@@ -273,15 +275,17 @@ export function createLintWebSocket(
     try {
       const data = JSON.parse(event.data) as LintWebSocketMessage;
       onMessage(data);
-    } catch (e) {
-      console.error("Failed to parse WebSocket message:", e);
+    } catch {
+      console.error("Failed to parse WebSocket message");
     }
   };
 
   ws.onerror = (error) => {
-    console.error("WebSocket error:", error);
+    console.error("WebSocket error");
     onError?.(error);
   };
+
+  ws.onopen = () => onOpen?.();
 
   ws.onclose = (event) => {
     onClose?.(event);
@@ -293,61 +297,17 @@ export function createLintWebSocket(
 /**
  * Hook-friendly WebSocket manager with auto-reconnect
  */
-export class LintWebSocketManager {
-  private ws: WebSocket | null = null;
-  private projectId: string;
-  private onMessage: (message: LintWebSocketMessage) => void;
-  private token?: string;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
-  private isClosing = false;
-
+export class LintWebSocketManager extends NotificationSocketManager<LintWebSocketMessage> {
   constructor(
     projectId: string,
     onMessage: (message: LintWebSocketMessage) => void,
-    token?: string
+    token?: string,
+    onOpen?: () => void,
   ) {
-    this.projectId = projectId;
-    this.onMessage = onMessage;
-    this.token = token;
-  }
-
-  connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      return;
-    }
-
-    this.isClosing = false;
-    this.ws = createLintWebSocket(
-      this.projectId,
-      this.onMessage,
-      () => this.handleReconnect(),
-      (event) => {
-        if (!this.isClosing && event.code !== 1000) {
-          this.handleReconnect();
-        }
-      },
-      this.token
+    super(
+      (message, error, close, open) => createLintWebSocket(projectId, message, error, close, token, open),
+      onMessage,
+      onOpen,
     );
-  }
-
-  disconnect(): void {
-    this.isClosing = true;
-    this.reconnectAttempts = 0;
-    if (this.ws) {
-      this.ws.close(1000, "Client closing connection");
-      this.ws = null;
-    }
-  }
-
-  private handleReconnect(): void {
-    if (this.isClosing) return;
-
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-      setTimeout(() => this.connect(), delay);
-    }
   }
 }
