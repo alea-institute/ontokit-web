@@ -28,7 +28,11 @@ test('excludes credentials, auth state, caches and traversal from source copies'
 import { mkdtemp, mkdir, writeFile, rm, symlink, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ROOT, privateDirectory, loadManifest, processIdentity } from './ownership.mjs';
-import { ownedCommand } from './runtime.mjs';
+import { ownedCommand, networkEnv } from './runtime.mjs';
+test('only allowlisted network routing variables reach owned commands', () => {
+  const source = {HTTPS_PROXY: 'http://127.0.0.1:3128', no_proxy: 'localhost', NODE_EXTRA_CA_CERTS: '/etc/ca.pem', NEXTAUTH_SECRET: 'x', DATABASE_URL: 'postgres://x', HTTP_PROXY: 'bad\nvalue', https_proxy: ''};
+  assert.deepEqual(networkEnv(source), {HTTPS_PROXY: 'http://127.0.0.1:3128', no_proxy: 'localhost', NODE_EXTRA_CA_CERTS: '/etc/ca.pem'});
+});
 import { cleanupProcesses, cleanup } from './cleanup.mjs';
 test('recovery refuses symlinked manifests and directory identity mismatches', async () => {
   await privateDirectory(ROOT);

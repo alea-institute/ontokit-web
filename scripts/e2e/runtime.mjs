@@ -11,7 +11,11 @@ export function setDockerEndpoint(endpoint) {
   dockerEndpoint = endpoint;
 }
 export const getDockerEndpoint = () => dockerEndpoint;
-export const baseEnv = () => ({PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', DOCKER_HOST: dockerEndpoint});
+// Network routing only (never application configuration): hosts behind an egress proxy
+// or a TLS-inspecting gateway need these for npm and the Playwright browser download.
+export const NETWORK_ENV = Object.freeze(['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NO_PROXY', 'no_proxy', 'NODE_EXTRA_CA_CERTS']);
+export const networkEnv = (source = process.env) => Object.fromEntries(NETWORK_ENV.filter(name => typeof source[name] === 'string' && source[name] && !source[name].includes('\n')).map(name => [name, source[name]]));
+export const baseEnv = () => ({PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin', LANG: 'C.UTF-8', DOCKER_HOST: dockerEndpoint, ...networkEnv()});
 export function docker(args) { return execFileSync('docker', args, {env: baseEnv(), encoding: 'utf8', timeout: 60_000, stdio: ['ignore', 'pipe', 'pipe']}).trim(); }
 export async function prerequisites(api, web) {
   if (process.platform !== 'linux' || !api || !path.isAbsolute(api)) throw new Error('An explicit absolute --api-source checkout is required on Linux');
