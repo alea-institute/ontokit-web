@@ -12,7 +12,7 @@ export interface Segment {
 /** Locales whose native script is not Latin. */
 const NON_LATIN = new Set(["he", "hi", "ja", "zh", "ar", "ru", "el", "ko", "th", "uk"]);
 
-const INVISIBLE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f­؜​-‏‪-‮⁠-⁤⁦-⁩﻿�]/u;
+const INVISIBLE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f\u00ad\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\ufeff\ufffd]/u;
 
 /** Characters that are invisible, control or bidi formatting, plus U+FFFD. */
 export function isInvisible(ch: string): boolean {
