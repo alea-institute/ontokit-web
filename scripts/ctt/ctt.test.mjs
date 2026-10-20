@@ -137,3 +137,31 @@ test('import reads an export file or fetched pages through one path', async () =
 test('text extraction decodes entities and drops markup', () => {
   assert.equal(textOf('<p>a&amp;b &#39;c&#x27; <mark>d</mark>\n e</p>'), "a&b 'c' d e");
 });
+
+test('untrusted export text cannot break out of literals, the header comment or the sense count', () => {
+  const good = snapshot();
+  const hostile = structuredClone(good);
+  hostile.terms[0].label = 'a"b\\c\nd\re';
+  hostile.communities[0].label = '"> . <urn:x> <urn:y> <urn:z> .';
+  const ttl = snapshotToTurtle(hostile);
+  assert.match(ttl, /rdfs:label "a\\"b\\\\c\\nd\\re"@en/);
+  assert.match(ttl, /rdfs:label "\\"> \. <urn:x> <urn:y> <urn:z> \."@en/);
+  for (const date of ['2026\n<urn:x> <urn:y> <urn:z> .\n#', '19 October']) {
+    const injected = structuredClone(good);
+    injected.source.build.date = date;
+    assert.throws(() => validateSnapshot(injected), /YYYY-MM-DD|at most 10 characters/);
+  }
+  const commit = structuredClone(good);
+  commit.source.build.commit = 'abc1234\n#';
+  assert.throws(() => validateSnapshot(commit), /hex commit/);
+  const senses = structuredClone(good);
+  senses.terms.find(t => t.slug === 'lumen').senses.push({substitutes: ['extra']});
+  assert.throws(() => validateSnapshot(senses), /senses disagrees with senseCount/);
+});
+
+test('merge also refuses SPARQL-style and commented prefix rebinding', () => {
+  const moduleTtl = snapshotToTurtle(snapshot());
+  assert.throws(() => mergeTurtle('PREFIX ctt: <https://other.example/>\n', moduleTtl), /rebind prefix "ctt:"/);
+  assert.throws(() => mergeTurtle('@prefix ctt: <https://other.example/> . # legacy\n', moduleTtl), /rebind prefix "ctt:"/);
+  assert.throws(() => mergeTurtle('prefix owl: <http://example.org/owl#>\n', moduleTtl), /rebind prefix "owl:"/);
+});

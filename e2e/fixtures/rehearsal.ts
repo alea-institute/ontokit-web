@@ -13,6 +13,8 @@ const PERSONAS: RehearsalPersona[] = ["owner", "suggester", "editor"];
 // Real ontologies take minutes, not seconds, to normalize and index.
 const IMPORT_TIMEOUT = 600_000;
 const INDEX_TIMEOUT = 1_200_000;
+// Two imports, two index waits, three interactive sign-ins and teardown, with headroom.
+const SETUP_TIMEOUT = 2 * IMPORT_TIMEOUT + 2 * INDEX_TIMEOUT + 600_000;
 export interface RehearsalProject { id: string; name: string }
 interface RehearsalWorker {
   rehearsalSetup: { run: RehearsalRunConfig; folio: RehearsalProject; catholic: RehearsalProject };
@@ -84,13 +86,21 @@ export const test = base.extend<RehearsalFixtures, RehearsalWorker>({
       await provide({run, folio, catholic});
     } finally {
       // Exact-ID teardown of what this run created; isolated volume cleanup still follows.
+      // Attempt every delete before asserting, so one failure never strands the other copy.
+      const failures: string[] = [];
       if (owner) {
-        for (const id of created) expect([204, 404]).toContain((await owner.delete(`${projectsPath}/${id}`)).status());
+        for (const id of created) {
+          try {
+            const status = (await owner.delete(`${projectsPath}/${id}`)).status();
+            if (![204, 404].includes(status)) failures.push(`${id}: ${status}`);
+          } catch { failures.push(`${id}: request failed`); }
+        }
         await owner.dispose();
       }
       await fs.rm(authDir, {recursive: true, force: true});
+      expect(failures, "Exact-ID rehearsal project teardown").toEqual([]);
     }
-  }, {scope: "worker", timeout: 2_700_000}],
+  }, {scope: "worker", timeout: SETUP_TIMEOUT}],
   run: async ({rehearsalSetup}, provide) => { await provide(rehearsalSetup.run); },
   folio: async ({rehearsalSetup}, provide) => { await provide(rehearsalSetup.folio); },
   catholic: async ({rehearsalSetup}, provide) => { await provide(rehearsalSetup.catholic); },

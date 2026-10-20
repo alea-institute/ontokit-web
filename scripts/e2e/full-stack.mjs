@@ -27,7 +27,8 @@ async function prepareWeb(ctx, env, webSource) {
   await ownedCommand(ctx, 'npm', ['run', 'build'], {cwd: webSource, env, timeout: 600_000});
 }
 function startWeb(ctx, serverEnv, webSource) {
-  return ownedCommand(ctx, process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(ctx.manifest.ports.web)], {cwd: webSource, env: serverEnv, timeout: 10_800_000})
+  // The rehearsal imports two real ontologies, so its server must outlive a 2 h Playwright budget.
+  return ownedCommand(ctx, process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(ctx.manifest.ports.web)], {cwd: webSource, env: serverEnv, timeout: ctx.profile === 'rehearsal' ? 10_800_000 : 3_600_000})
     .then(() => { throw new Error('Owned web server exited unexpectedly'); });
 }
 function runPlaywright(ctx, env, webSource, runFile, timeout) {

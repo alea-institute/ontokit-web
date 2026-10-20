@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pages } from '../ctt/fixtures/pages.mjs';
@@ -149,5 +149,58 @@ test('hosted preflight stops before any run directory exists when the host is no
     await assert.rejects(runHosted({targetFile: file, fetchImpl: down, runPlaywright: async () => assert.fail('must not run')}), /health returned 502/);
     const noProvider = async url => new Response(JSON.stringify(String(url).endsWith('/providers') ? {} : {ok: true}), {headers: {'content-type': 'application/json'}});
     await assert.rejects(runHosted({targetFile: file, fetchImpl: noProvider, runPlaywright: async () => assert.fail('must not run')}), /does not offer Zitadel/);
+  });
+});
+
+test('verify rejects a regenerated file whose manifest hash was updated to match', async () => withCache(async cache => {
+  const manifest = await prepareSources({cache, fetchImpl: fakeFetch().fetchImpl, upstream, targets});
+  const file = path.join(cache, manifest.files.catholicCtt.file);
+  const forged = (await readFile(file, 'utf8')) + '\n<urn:x> <urn:y> <urn:z> .\n';
+  await writeFile(file, forged);
+  manifest.files.catholicCtt.sha256 = sha256(Buffer.from(forged));
+  await writeFile(path.join(cache, 'manifest.json'), JSON.stringify(manifest));
+  await assert.rejects(verifySources(cache, upstream), /not the Catholic OS file merged with the CTT module/);
+  manifest.files.catholicCtt.file = manifest.files.cttModule.file;
+  await writeFile(path.join(cache, 'manifest.json'), JSON.stringify(manifest));
+  await assert.rejects(verifySources(cache, upstream), /catholicCtt source entry is invalid/);
+}));
+
+test('hosted targets on loopback or private networks are refused', async () => {
+  for (const web of ['https://localhost', 'https://127.0.0.1', 'https://10.0.0.5', 'https://192.168.1.2', 'https://172.20.0.1', 'https://[::1]']) {
+    await withTarget({...hostedTarget, web}, async file => assert.rejects(readTarget(file), /web must be a remote host/));
+  }
+});
+
+test('hosted runs remove the credential directory and never put secrets in the receipt', async () => {
+  const serving = async url => new Response(JSON.stringify(String(url).endsWith('/providers') ? {zitadel: {}} : {ok: true}), {headers: {'content-type': 'application/json'}});
+  await withTarget(hostedTarget, async file => {
+    let runDir;
+    const failing = async env => {
+      runDir = path.dirname(env.ONTOKIT_E2E_CONFIG);
+      const config = JSON.parse(await readFile(env.ONTOKIT_E2E_CONFIG, 'utf8'));
+      assert.equal(config.rehearsal.target, 'hosted');
+      assert.equal(config.users.owner.password, 'pw');
+      return 1; // Playwright failed and wrote no report.
+    };
+    const stage = async destination => {
+      await mkdir(destination, {mode: 0o700});
+      const paths = {folio: path.join(destination, 'FOLIO.owl'), catholicCtt: path.join(destination, 'c.ttl')};
+      for (const target of Object.values(paths)) await writeFile(target, 'x');
+      return {paths, manifest: {
+        files: {folio: {...UPSTREAM.folio}, catholic: {...UPSTREAM.catholic}, catholicCtt: {sha256: 'e'.repeat(64)}},
+        ctt: {source: {site: 'https://ctt.jaces.com/', build: {date: '2026-10-19', commit: 'f66099a'}}, calibration: 'uncalibrated', terms: 250, communities: 24, falseFriends: 6},
+      }};
+    };
+    const {receipt, file: receiptFile, failure} = await runHosted({targetFile: file, fetchImpl: serving, runPlaywright: failing, stage});
+    try {
+      assert.ok(failure);
+      assert.ok(runDir, 'Playwright was reached');
+      assert.equal(receipt.rehearsal.folio.commit, UPSTREAM.folio.commit);
+      assert.equal(receipt.passed, false);
+      assert.deepEqual(receipt.acceptance, {scope: 'hosted-rehearsal', hostedAcceptance: false});
+      await assert.rejects(readFile(path.join(runDir, 'playwright-run.json')), {code: 'ENOENT'});
+      const text = await readFile(receiptFile, 'utf8');
+      for (const secret of ['"pw"', 'password', '@example.org', 'auth.example.org']) assert.equal(text.includes(secret), false, secret);
+    } finally { await rm(receiptFile, {force: true}); }
   });
 });

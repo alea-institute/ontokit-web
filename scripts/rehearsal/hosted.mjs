@@ -13,28 +13,40 @@
 // imports run-tagged copies of both ontologies and deletes them afterwards.
 import { randomBytes } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
-import { lstat, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, stageSources, sourceEvidence, TARGETS } from './sources.mjs';
-import { validateReport } from '../e2e/evidence.mjs';
+import { validateReport, sanitizedRehearsal } from '../e2e/evidence.mjs';
 import { networkEnv } from '../e2e/runtime.mjs';
+import { RUNTIME_ROOT, privateDirectory } from '../e2e/ownership.mjs';
 
 const PERSONAS = ['owner', 'suggester', 'editor'];
 const RECEIPTS = path.join(ROOT, '.e2e-runs', 'receipts');
 
+// A hosted receipt must describe a remote host, never this machine or a private network.
+const LOCAL_HOST = /^(localhost|.*\.localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|169\.254\.\d+\.\d+|\[.*\])$/i;
 function httpsOrigin(value, field) {
   let url;
   try { url = new URL(value); } catch { throw new Error(`Hosted target ${field} must be an HTTPS origin`); }
   if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error(`Hosted target ${field} must be an HTTPS origin`);
+  if (LOCAL_HOST.test(url.hostname)) throw new Error(`Hosted target ${field} must be a remote host`);
   return url.origin;
 }
 /** Reads and validates the private target file; returns normalized origins and users. */
 export async function readTarget(file) {
   if (!file || !path.isAbsolute(file)) throw new Error('--target must be an absolute path to the private hosted target file');
-  const stat = await lstat(file);
-  if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0 || stat.uid !== process.getuid()) throw new Error('Hosted target file must be a regular file, mode 0600, owned by you');
-  const raw = JSON.parse(await readFile(file, 'utf8'));
+  // Open once without following links, then check the opened file itself.
+  let handle;
+  try { handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW); }
+  catch { throw new Error('Hosted target file must be a regular file, mode 0600, owned by you'); }
+  let raw;
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || (stat.mode & 0o077) !== 0 || stat.uid !== process.getuid()) throw new Error('Hosted target file must be a regular file, mode 0600, owned by you');
+    raw = JSON.parse(await handle.readFile('utf8'));
+  } finally { await handle.close(); }
   const target = {web: httpsOrigin(raw.web, 'web'), api: httpsOrigin(raw.api, 'api'), issuer: httpsOrigin(raw.issuer, 'issuer'), login: httpsOrigin(raw.login, 'login'), users: {}};
   if (Object.keys(raw.users ?? {}).sort().join() !== [...PERSONAS].sort().join()) throw new Error(`Hosted target users must be exactly ${PERSONAS.join(', ')}`);
   for (const persona of PERSONAS) {
@@ -59,27 +71,36 @@ const webRevision = () => {
     return {revision, dirty};
   } catch { return {revision: null, dirty: null}; }
 };
+/** Runs Playwright; SIGINT/SIGTERM are forwarded so fixture teardown deletes the run's projects. */
 function playwright(env) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(ROOT, 'node_modules/@playwright/test/cli.js'), 'test'], {cwd: ROOT, env, stdio: 'inherit'});
-    child.on('error', reject);
-    child.on('exit', code => resolve(code));
+    const forward = signal => () => { child.kill(signal); };
+    const handlers = {SIGINT: forward('SIGINT'), SIGTERM: forward('SIGTERM')};
+    for (const [signal, handler] of Object.entries(handlers)) process.on(signal, handler);
+    const done = () => { for (const [signal, handler] of Object.entries(handlers)) process.off(signal, handler); };
+    child.on('error', error => { done(); reject(error); });
+    child.on('exit', code => { done(); resolve(code); });
   });
 }
 
 /** Runs the rehearsal against the target and writes a sanitized hosted receipt. */
-export async function runHosted({targetFile, fetchImpl = fetch, runPlaywright = playwright} = {}) {
+export async function runHosted({targetFile, fetchImpl = fetch, runPlaywright = playwright, stage = stageSources} = {}) {
   const target = await readTarget(targetFile);
   await preflight(target, fetchImpl);
   const id = randomBytes(16).toString('hex');
-  const parent = `/tmp/ontokit-e2e-${process.getuid()}`;
-  const dir = path.join(parent, id);
-  await mkdir(parent, {recursive: true, mode: 0o700});
+  const dir = path.join(RUNTIME_ROOT, id);
+  // Owner, mode and symlink checks on both levels before any credential is written.
+  await privateDirectory(RUNTIME_ROOT);
   await mkdir(dir, {mode: 0o700});
+  await privateDirectory(dir);
   const startedAt = new Date().toISOString();
   let tests = null, failure = null, manifest = null;
+  // An interrupt still reaches the finally below: Playwright gets the signal, tears down, exits.
+  const interrupted = () => { failure ??= new Error('Interrupted'); };
+  process.on('SIGINT', interrupted); process.on('SIGTERM', interrupted);
   try {
-    const staged = await stageSources(path.join(dir, 'rehearsal'));
+    const staged = await stage(path.join(dir, 'rehearsal'));
     manifest = staged.manifest;
     const runFile = path.join(dir, 'playwright-run.json');
     await writeFile(runFile, JSON.stringify({
@@ -95,20 +116,23 @@ export async function runHosted({targetFile, fetchImpl = fetch, runPlaywright = 
     tests = validateReport(report, {profile: 'rehearsal'});
     if (code !== 0) throw new Error('Playwright reported a failure');
   } catch (error) {
-    failure = error;
+    failure ??= error;
   } finally {
+    process.off('SIGINT', interrupted); process.off('SIGTERM', interrupted);
     await rm(dir, {recursive: true, force: true});
   }
-  const passed = !failure && !!tests;
+  const rehearsal = manifest && sanitizedRehearsal('rehearsal', sourceEvidence(manifest));
+  if (manifest && !rehearsal) failure ??= new Error('Rehearsal source evidence is malformed');
+  const passed = !failure && !!tests && !!rehearsal;
   const receipt = {
     version: 1, kind: 'hosted-rehearsal', run: id, startedAt, finishedAt: new Date().toISOString(),
     host: {web: target.web, api: target.api}, web: webRevision(),
     tests: tests && {passed: tests.passed, skipped: 0, failed: 0, flaky: 0, mandatory: tests.mandatory},
-    rehearsal: manifest && sourceEvidence(manifest),
+    rehearsal,
     acceptance: {scope: 'hosted-rehearsal', hostedAcceptance: passed},
     passed,
   };
-  await mkdir(RECEIPTS, {recursive: true, mode: 0o700});
+  await privateDirectory(RECEIPTS);
   const file = path.join(RECEIPTS, `hosted-${id}.json`);
   await writeFile(file, JSON.stringify(receipt, null, 2) + '\n', {mode: 0o600, flag: 'wx'});
   return {receipt, file, failure};

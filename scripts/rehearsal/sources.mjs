@@ -8,6 +8,7 @@ import { copyFile, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promis
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { importCtt } from '../ctt/import.mjs';
+import { mergeTurtle } from '../ctt/turtle.mjs';
 import { DEFAULT_BASE } from '../ctt/turtle.mjs';
 import { TARGETS, UPSTREAM } from './pins.mjs';
 
@@ -25,6 +26,7 @@ export const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 async function download(url, fetchImpl) {
   const response = await fetchImpl(url, {redirect: 'error', signal: AbortSignal.timeout(300_000)});
   if (!response.ok) throw new Error(`Rehearsal source download returned ${response.status}`);
+  if (Number(response.headers.get('content-length') ?? 0) > MAX_DOWNLOAD_BYTES) throw new Error('Rehearsal source is larger than the import limit');
   const bytes = Buffer.from(await response.arrayBuffer());
   if (bytes.length > MAX_DOWNLOAD_BYTES) throw new Error('Rehearsal source is larger than the import limit');
   return bytes;
@@ -86,12 +88,18 @@ export async function verifySources(cache = CACHE, upstream = UPSTREAM) {
   catch { throw new Error('Rehearsal sources are not prepared; run npm run rehearsal:sources'); }
   if (manifest?.version !== MANIFEST_VERSION) throw new Error('Rehearsal source manifest has an unknown version');
   for (const [name, spec] of Object.entries(upstream)) if (manifest.files?.[name]?.sha256 !== spec.sha256) throw new Error(`Rehearsal ${name} source is not the pinned upstream file`);
+  const contents = {};
   for (const name of [...Object.keys(upstream), ...Object.keys(GENERATED)]) {
     const entry = manifest.files?.[name];
-    if (!entry || path.basename(entry.file) !== entry.file) throw new Error(`Rehearsal ${name} source entry is invalid`);
+    if (!entry || entry.file !== (GENERATED[name] ?? upstream[name].file)) throw new Error(`Rehearsal ${name} source entry is invalid`);
     const bytes = await readFile(path.join(cache, entry.file)).catch(() => null);
     if (!bytes || sha256(bytes) !== entry.sha256) throw new Error(`Rehearsal ${name} source does not match its manifest`);
+    contents[name] = bytes.toString('utf8');
   }
+  // The generated files hash only against this manifest, so rebuild the merge from its inputs.
+  let merged;
+  try { merged = mergeTurtle(contents.catholic, contents.cttModule); } catch { merged = null; }
+  if (merged !== contents.catholicCtt) throw new Error('Rehearsal catholicCtt is not the Catholic OS file merged with the CTT module');
   if (manifest.ctt?.calibration !== 'uncalibrated' && manifest.ctt?.calibration !== 'calibrated') throw new Error('Rehearsal CTT calibration is unknown');
   return manifest;
 }

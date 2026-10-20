@@ -404,7 +404,7 @@ function sanitizedAuthModes(profile, value) {
  * Rehearsal inputs: pinned upstream commits and hashes, the merged Catholic+CTT hash and
  * the CTT build and counts. Null unless the upstream pins match and every field is well formed.
  */
-function sanitizedRehearsal(profile, value) {
+export function sanitizedRehearsal(profile, value) {
   if (profile !== 'rehearsal' || !value) return null;
   const out = {};
   for (const name of ['folio', 'catholic']) {

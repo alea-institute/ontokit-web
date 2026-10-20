@@ -55,10 +55,13 @@ export function validateSnapshot(input) {
   try { site = new URL(source.site); } catch { throw invalid('source.site must be an absolute URL'); }
   if (site.protocol !== 'https:') throw invalid('source.site must use https');
   if (!CALIBRATION.includes(input.calibration)) throw invalid('calibration must be uncalibrated or calibrated');
+  // The build stamp is written into a Turtle comment; only these exact shapes are allowed.
   const build = source.build ? {
-    ...(source.build.date ? {date: text(source.build.date, 'source.build.date', 40)} : {}),
-    ...(source.build.commit ? {commit: text(source.build.commit, 'source.build.commit', 64)} : {}),
+    ...(source.build.date ? {date: text(source.build.date, 'source.build.date', 10)} : {}),
+    ...(source.build.commit ? {commit: text(source.build.commit, 'source.build.commit', 40)} : {}),
   } : {};
+  if (build.date && !/^\d{4}-\d{2}-\d{2}$/.test(build.date)) throw invalid('source.build.date must be YYYY-MM-DD');
+  if (build.commit && !/^[0-9a-f]{7,40}$/.test(build.commit)) throw invalid('source.build.commit must be a hex commit');
   if (Number.isNaN(Date.parse(source.retrievedAt))) throw invalid('source.retrievedAt must be a timestamp');
 
   if (!Array.isArray(input.communities) || !input.communities.length) throw invalid('communities must be a non-empty list');
@@ -80,6 +83,7 @@ export function validateSnapshot(input) {
     if (t.verdict === 'no-verdict' ? senseCount !== null : senseCount === null || senseCount < 1) throw invalid(`${field}.senseCount disagrees with its verdict`);
     if (t.verdict === 'one-sense' && senseCount !== 1) throw invalid(`${field} one-sense verdict needs exactly one sense`);
     const senses = t.senses === undefined ? [] : (Array.isArray(t.senses) ? t.senses : [null]).map((s, j) => sense(s, `${field}.senses[${j}]`));
+    if (senses.length && senseCount !== null && senses.length !== senseCount) throw invalid(`${field}.senses disagrees with senseCount`);
     const examples = t.examples === undefined ? [] : (Array.isArray(t.examples) ? t.examples : [null]).map((e, j) => example(e, `${field}.examples[${j}]`));
     const falseFriend = t.falseFriend === undefined || t.falseFriend === null ? null : {
       pairCount: count(t.falseFriend?.pairCount, `${field}.falseFriend.pairCount`),

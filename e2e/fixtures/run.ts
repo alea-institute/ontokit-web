@@ -109,6 +109,8 @@ function hostedOrigin(value: unknown) {
   let url: URL;
   try { url = new URL(String(value)); } catch { throw new Error("Hosted rehearsal URLs must be explicit HTTPS origins"); }
   if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("Hosted rehearsal URLs must be explicit HTTPS origins");
+  // Mirrors scripts/rehearsal/hosted.mjs: a hosted run never targets this machine or a private network.
+  if (/^(localhost|.*\.localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|169\.254\.\d+\.\d+|\[.*\])$/i.test(url.hostname)) throw new Error("Hosted rehearsal URLs must be remote HTTPS origins");
 }
 function validateRehearsalRun(run: RehearsalRunConfig) {
   const users = Object.values(run.users ?? {});

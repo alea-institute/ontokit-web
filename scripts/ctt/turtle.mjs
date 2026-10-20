@@ -122,7 +122,8 @@ export function snapshotToTurtle(input, {base = DEFAULT_BASE, includeExamples = 
  */
 export function mergeTurtle(host, module) {
   if (typeof host !== 'string' || typeof module !== 'string') throw new Error('Turtle merge needs two documents');
-  const bindings = text => new Map([...text.matchAll(/^\s*@prefix\s+([A-Za-z][\w.-]*)?:\s*<([^>]*)>\s*\.\s*$/gm)].map(m => [m[1] ?? '', m[2]]));
+  // Both Turtle forms: `@prefix p: <ns> .` and SPARQL-style `PREFIX p: <ns>`, with trailing comments.
+  const bindings = text => new Map([...text.matchAll(/^\s*(?:@prefix|PREFIX)\s+([A-Za-z][\w.-]*)?:\s*<([^>]*)>\s*\.?\s*(?:#.*)?$/gim)].map(m => [m[1] ?? '', m[2]]));
   const hostPrefixes = bindings(host);
   for (const [prefix, ns] of bindings(module)) {
     if (hostPrefixes.has(prefix) && hostPrefixes.get(prefix) !== ns) throw new Error(`Turtle merge would rebind prefix "${prefix}:"`);

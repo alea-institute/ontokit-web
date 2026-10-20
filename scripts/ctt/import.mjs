@@ -23,9 +23,10 @@ export async function fetchPages({site = CTT_SITE, fetchImpl = fetch} = {}) {
   for (const [name, route] of Object.entries(CTT_PAGES)) {
     const response = await fetchImpl(new URL(route, site), {headers: {accept: 'text/html'}, redirect: 'error', signal: AbortSignal.timeout(30_000)});
     if (!response.ok || !/text\/html/.test(response.headers.get('content-type') ?? '')) throw new Error(`CTT ${name} page returned ${response.status}`);
-    const body = await response.text();
-    if (body.length > MAX_PAGE_BYTES) throw new Error(`CTT ${name} page is unexpectedly large`);
-    pages[name] = body;
+    if (Number(response.headers.get('content-length') ?? 0) > MAX_PAGE_BYTES) throw new Error(`CTT ${name} page is unexpectedly large`);
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length > MAX_PAGE_BYTES) throw new Error(`CTT ${name} page is unexpectedly large`);
+    pages[name] = bytes.toString('utf8');
   }
   return pages;
 }
