@@ -163,7 +163,7 @@ The catalog owns the full requirement wording and source status. This ledger own
 | B31 | Provide source/type/branch/trust/dedup/steward filtering, evidence, provenance and corroboration in the import review queue | Queued | See catalog; assign a bounded deliverable when reached |
 | B32 | Materialize approved imports through the existing ontology-change/PR workflow and release the result back to consumers | Queued | See catalog; assign a bounded deliverable when reached |
 | B33 | Supply the producer client and prove one feeder end to end | Queued | See catalog; assign a bounded deliverable when reached |
-| B34 | Add Enrich unmapped spans, Intake gaps, Mapper unmatched nodes, Insights coverage gaps, and Generative-FOLIO/hydration batches | Queued | See catalog; assign a bounded deliverable when reached |
+| B34 | Add Enrich unmapped spans, Intake gaps, Mapper unmatched nodes, Insights coverage gaps, and Generative-FOLIO/hydration batches | Implementing (hydration review slice integrated) | 2026-10-20: `/hydration-review` reviews a Generative-FOLIO digest bundle locally ([plan](2026-10-20-hydration-review-viewer-plan.md)); hosted acceptance and the Enrich/Intake/Mapper/Insights feeders remain open |
 | B35 | Enable and prove Google sign-in through Zitadel, including same-email account linking and continued password login | Queued | See catalog; assign a bounded deliverable when reached |
 | B36 | Show contributors their acceptance history and progress toward trust; offer appropriate public contribution credit | Queued | See catalog; assign a bounded deliverable when reached |
 | B37 | Complete verification of the optional commit-attribution email | Queued | See catalog; assign a bounded deliverable when reached |
