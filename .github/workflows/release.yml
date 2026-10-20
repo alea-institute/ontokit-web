@@ -57,6 +57,7 @@ jobs:
           npm run test:e2e:profiles
           npm run test:e2e:evidence
           npm run test:e2e:identity
+          npm run test:ctt
 
   build:
     runs-on: ubuntu-latest

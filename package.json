@@ -24,7 +24,11 @@
     "test:e2e:optional-configured": "node scripts/e2e/run.mjs --profile optional-configured",
     "test:e2e:optional-anonymous": "node scripts/e2e/run.mjs --profile optional-anonymous",
     "test:e2e:suggestions": "node scripts/e2e/run.mjs --profile suggestions",
-    "test:e2e:disabled": "node scripts/e2e/run.mjs --profile disabled"
+    "test:e2e:disabled": "node scripts/e2e/run.mjs --profile disabled",
+    "test:e2e:rehearsal": "node scripts/e2e/run.mjs --profile rehearsal",
+    "rehearsal:sources": "node scripts/rehearsal/sources.mjs",
+    "rehearsal:hosted": "node scripts/rehearsal/hosted.mjs",
+    "test:ctt": "node --test scripts/ctt/ctt.test.mjs scripts/rehearsal/rehearsal.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

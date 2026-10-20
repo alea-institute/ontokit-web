@@ -7,7 +7,8 @@ export type SuggestionPersona = "owner" | "suggester" | "editor" | "unrelated";
 export type LifecyclePersona = "lifecycle";
 export type ModePersona = "owner";
 export type ModeProfile = "optional-configured" | "optional-anonymous" | "disabled";
-export type Profile = "baseline" | "lifecycle" | "suggestions" | ModeProfile;
+export type Profile = "baseline" | "lifecycle" | "suggestions" | "rehearsal" | ModeProfile;
+export type RehearsalPersona = "owner" | "suggester" | "editor";
 export interface RunUser { id: string; email: string; password: string }
 interface RunOrigins {
   id: string;
@@ -28,7 +29,24 @@ export interface SuggestionsRunConfig extends RunBase {
   profile: "suggestions";
   users: Record<SuggestionPersona, RunUser>;
 }
-export type AuthenticatedRunConfig = RunConfig | SuggestionsRunConfig;
+/** One class the rehearsal edits or inspects, as `scripts/rehearsal/sources.mjs` pins it. */
+export interface RehearsalTarget { iri: string; label: string; edited?: string }
+export type RehearsalTargets = Record<"folio" | "catholic" | "cttRoot" | "cttFalseFriends" | "cttTerm", RehearsalTarget>;
+/**
+ * BAIF rehearsal. `isolated` runs on the launcher's disposable stack (loopback origins);
+ * `hosted` runs against a serving host with personas that already exist there.
+ */
+export interface RehearsalRunConfig extends RunBase {
+  profile: "rehearsal";
+  users: Record<RehearsalPersona, RunUser>;
+  rehearsal: {
+    target: "isolated" | "hosted";
+    sources: { folio: string; catholicCtt: string };
+    targets: RehearsalTargets;
+    ctt: { calibration: "uncalibrated" | "calibrated"; terms: number; falseFriends: number; communities: number };
+  };
+}
+export type AuthenticatedRunConfig = RunConfig | SuggestionsRunConfig | RehearsalRunConfig;
 /** OIDC lifetimes read back from the disposable provider, in seconds. */
 export interface LifecycleLifetimes {
   accessTokenLifetime: number;
@@ -72,7 +90,7 @@ export interface ProviderlessRunConfig extends RunOrigins {
   fixtures: SeededProjects;
 }
 export type ModeRunConfig = OptionalConfiguredRunConfig | ProviderlessRunConfig;
-export type AnyRunConfig = RunConfig | LifecycleRunConfig | ModeRunConfig | SuggestionsRunConfig;
+export type AnyRunConfig = RunConfig | LifecycleRunConfig | ModeRunConfig | SuggestionsRunConfig | RehearsalRunConfig;
 
 // Mirrors PROFILE_REGISTRY in scripts/e2e/auth-modes.mjs; the loader re-checks agreement.
 const MODE_PROFILES: Record<ModeProfile, { mode: ObservedAuthMode["mode"]; provider: boolean }> = {
@@ -85,6 +103,30 @@ function loopback(value: unknown) {
   let url: URL;
   try { url = new URL(String(value)); } catch { throw new Error("E2E URLs must be explicit loopback origins"); }
   if (url.protocol !== "http:" || url.hostname !== "localhost" || !url.port || url.username || url.password) throw new Error("E2E URLs must be explicit loopback origins");
+}
+/** Hosted rehearsal origins: HTTPS only, no credentials in the URL. */
+function hostedOrigin(value: unknown) {
+  let url: URL;
+  try { url = new URL(String(value)); } catch { throw new Error("Hosted rehearsal URLs must be explicit HTTPS origins"); }
+  if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash) throw new Error("Hosted rehearsal URLs must be explicit HTTPS origins");
+}
+function validateRehearsalRun(run: RehearsalRunConfig) {
+  const users = Object.values(run.users ?? {});
+  if (Object.keys(run.users ?? {}).sort().join() !== "editor,owner,suggester" || users.some(user => !validUser(user)) || new Set(users.map(user => user.id)).size !== 3) throw new Error("Rehearsal personas were not verified");
+  const r = run.rehearsal;
+  if (!r || !["isolated", "hosted"].includes(r.target)) throw new Error("Rehearsal target is invalid");
+  for (const file of [r.sources?.folio, r.sources?.catholicCtt]) {
+    if (typeof file !== "string" || path.dirname(file) !== path.join(run.dir, "rehearsal")) throw new Error("Rehearsal sources must be staged in this run's private directory");
+  }
+  for (const key of ["folio", "catholic", "cttRoot", "cttFalseFriends", "cttTerm"] as const) {
+    const target = r.targets?.[key];
+    if (!target || typeof target.iri !== "string" || !/^https?:\/\//.test(target.iri) || typeof target.label !== "string" || !target.label) throw new Error("Rehearsal targets are invalid");
+  }
+  if (!r.targets.folio.edited || !r.targets.catholic.edited) throw new Error("Rehearsal edit targets are invalid");
+  if (!["uncalibrated", "calibrated"].includes(r.ctt?.calibration) || !(r.ctt.terms > 0) || !(r.ctt.falseFriends > 0)) throw new Error("Rehearsal CTT summary is invalid");
+  // The isolated launcher only ever produces loopback origins; hosted runs only HTTPS.
+  for (const value of [run.web, run.api, run.issuer, run.login]) (r.target === "isolated" ? loopback : hostedOrigin)(value);
+  if (!run.ordinaryUserPolicyVerified && r.target === "isolated") throw new Error("Fresh ordinary identities were not verified");
 }
 function validateModeRun(run: ModeRunConfig) {
   const expected = MODE_PROFILES[run.profile];
@@ -117,6 +159,10 @@ export function loadRunConfig(): AnyRunConfig {
   const run = JSON.parse(fs.readFileSync(file, "utf8")) as AnyRunConfig;
   const expected = `/tmp/ontokit-e2e-${process.getuid?.()}/${run.id}`;
   if (!RUN_ID.test(run.id) || run.id !== process.env.ONTOKIT_E2E_RUN || run.dir !== expected || path.dirname(file) !== expected) throw new Error("E2E config does not belong to this invocation");
+  if (run.profile === "rehearsal") {
+    validateRehearsalRun(run);
+    return run;
+  }
   for (const value of [run.web, run.api]) loopback(value);
   if (Object.hasOwn(MODE_PROFILES, run.profile)) {
     validateModeRun(run as ModeRunConfig);
@@ -162,6 +208,11 @@ export function loadLifecycleRun(): LifecycleRunConfig {
 export function loadSuggestionsRun(): SuggestionsRunConfig {
   const run = loadRunConfig();
   if (run.profile !== "suggestions") throw new Error("This suite requires the suggestions E2E profile");
+  return run;
+}
+export function loadRehearsalRun(): RehearsalRunConfig {
+  const run = loadRunConfig();
+  if (run.profile !== "rehearsal") throw new Error("This suite requires the rehearsal E2E profile");
   return run;
 }
 export const authPath = (run: AuthenticatedRunConfig, persona: SuggestionPersona) => path.join(run.dir, "auth", `${persona}.json`);

@@ -9,6 +9,7 @@ import { saveManifest } from './ownership.mjs';
 import { assertProfile } from './bootstrap-identity.mjs';
 import { profileSpec, webAuthEnv, readCompiledMode, parseApiMode, assertModeAgreement, API_MODE_PROBE } from './auth-modes.mjs';
 import { seedFixtures, purgeSeededFixtures, fixtureIds } from './seed-fixtures.mjs';
+import { stageSources, sourceEvidence, TARGETS } from '../rehearsal/sources.mjs';
 import { clock, clockPreflight, nextServerEnv, assertNoClockOverride, validateSpecimen, LIFECYCLE_GRACE_SECONDS, AUTHJS_VERIFIER_TOLERANCE_SECONDS, AUTHJS_SESSION_MAX_AGE_SECONDS } from './auth-lifecycle.mjs';
 
 /** Reads the running API container's mode (KTD2): settings plus the serving process env. */
@@ -26,7 +27,7 @@ async function prepareWeb(ctx, env, webSource) {
   await ownedCommand(ctx, 'npm', ['run', 'build'], {cwd: webSource, env, timeout: 600_000});
 }
 function startWeb(ctx, serverEnv, webSource) {
-  return ownedCommand(ctx, process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(ctx.manifest.ports.web)], {cwd: webSource, env: serverEnv, timeout: 3_600_000})
+  return ownedCommand(ctx, process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(ctx.manifest.ports.web)], {cwd: webSource, env: serverEnv, timeout: 10_800_000})
     .then(() => { throw new Error('Owned web server exited unexpectedly'); });
 }
 function runPlaywright(ctx, env, webSource, runFile, timeout) {
@@ -34,6 +35,7 @@ function runPlaywright(ctx, env, webSource, runFile, timeout) {
 }
 const DEFAULT_DEPS = {
   bootstrapIdentity, readyHttp, prepareWeb, startWeb, runPlaywright, seedFixtures, purgeSeededFixtures, probeApiMode,
+  stageRehearsalSources: ctx => stageSources(path.join(ctx.dir, 'rehearsal')),
   readCompiledMode: (_ctx, webSource) => readCompiledMode(path.join(webSource, '.next', 'required-server-files.json')),
   saveManifest: ctx => saveManifest(ctx.manifestDir, ctx.manifest),
   writePrivate: (file, value) => writeFile(file, JSON.stringify(value), {mode: 0o600}),
@@ -48,6 +50,15 @@ export async function fullStack(ctx, overrides = {}) {
   const phase = async value => { ctx.manifest.status = value; await deps.saveManifest(ctx); console.log(`Isolated stack phase: ${value}`); };
   const web = `http://localhost:${ctx.manifest.ports.web}`;
   const api = `http://localhost:${ctx.manifest.ports.api}`;
+  // Rehearsal inputs are verified before any build, so a stale cache fails fast.
+  let rehearsal = null;
+  if (profile === 'rehearsal') {
+    await phase('staging-rehearsal-sources');
+    const staged = await deps.stageRehearsalSources(ctx);
+    ctx.manifest.rehearsal = sourceEvidence(staged.manifest);
+    await deps.saveManifest(ctx);
+    rehearsal = {target: 'isolated', sources: staged.paths, targets: TARGETS, ctt: ctx.manifest.rehearsal.ctt};
+  }
   // KTD3: only baseline, lifecycle and optional-configured start Zitadel and Login.
   let identity = null;
   if (spec.identity) {
@@ -116,7 +127,7 @@ export async function fullStack(ctx, overrides = {}) {
     await phase(`${profile}-workflow-verified`);
     return;
   }
-  const runConfig = {profile, id: ctx.manifest.id, dir: ctx.dir, issuer: identity.issuer, login: identity.login, web: identity.web, api: identity.api, users: identity.users, ordinaryUserPolicyVerified: true};
+  const runConfig = {profile, id: ctx.manifest.id, dir: ctx.dir, issuer: identity.issuer, login: identity.login, web: identity.web, api: identity.api, users: identity.users, ordinaryUserPolicyVerified: true, ...(rehearsal ? {rehearsal} : {})};
   if (profile === 'lifecycle') {
     await Promise.race([server, lifecyclePreflight(ctx, {identity, env, webSource, runFile, runConfig, phase})]);
     // U3: the lifecycle project runs only auth-lifecycle.spec.ts against this stack.
@@ -136,7 +147,8 @@ export async function fullStack(ctx, overrides = {}) {
   }
   await deps.writePrivate(runFile, runConfig);
   await phase('testing');
-  await Promise.race([server, deps.runPlaywright(ctx, env, webSource, runFile, 900_000)]);
+  // Importing and indexing two real ontologies takes far longer than the tiny fixture.
+  await Promise.race([server, deps.runPlaywright(ctx, env, webSource, runFile, rehearsal ? 7_200_000 : 900_000)]);
   const report = JSON.parse(await readFile(path.join(ctx.dir, 'playwright-report.json'), 'utf8'));
   ctx.manifest.tests = validateReport(report, {profile});
   console.log(`Verified browser tests: ${report.stats.expected} passed, ${report.stats.skipped} skipped, ${report.stats.unexpected} failed`);

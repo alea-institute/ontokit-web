@@ -165,10 +165,10 @@ test('baseline discovery ignores every spec owned by another profile', () => {
   const ignored = file => chromium.testIgnore.some(pattern => path.matchesGlob(`/tmp/run/web/e2e/${file}`, pattern));
   for (const file of foreignSpecs('baseline')) assert.equal(ignored(file), true, file);
   for (const file of ['api/projects.spec.ts', 'browser/ontology-workflow.spec.ts', 'auth-foundation.spec.ts', 'browser/x-auth-mode-disabled.spec.ts.bak']) assert.equal(ignored(file), false, file);
-  assert.equal(foreignSpecs('baseline').length, 5);
+  assert.equal(foreignSpecs('baseline').length, 6);
 });
 test('each non-baseline profile discovers exactly its own spec', () => {
-  for (const profile of ['lifecycle', ...MODE_PROFILES]) {
+  for (const profile of ['lifecycle', 'rehearsal', ...MODE_PROFILES]) {
     const projects = playwrightProjects(profile);
     assert.equal(projects.length, 1);
     assert.equal(projects[0].name, PROFILE_REGISTRY[profile].projects[0]);
@@ -245,6 +245,23 @@ async function withRunConfig(config, check) {
   const saved = {config: process.env.ONTOKIT_E2E_CONFIG, run: process.env.ONTOKIT_E2E_RUN};
   try {
     await writeFile(file, JSON.stringify({id, dir, web: inputs.web, api: inputs.api, ordinaryUserPolicyVerified: true, ...config}), {mode: 0o600});
+    process.env.ONTOKIT_E2E_CONFIG = file; process.env.ONTOKIT_E2E_RUN = id;
+    await check((await loadRunModule()).loadRunConfig);
+  } finally {
+    for (const [key, value] of [['ONTOKIT_E2E_CONFIG', saved.config], ['ONTOKIT_E2E_RUN', saved.run]]) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+    await rm(dir, {recursive: true, force: true});
+  }
+}
+/** Like withRunConfig, for configs that must name paths inside the run's private directory. */
+async function withRunConfigDir(build, check) {
+  const id = randomBytes(16).toString('hex');
+  const dir = `/tmp/ontokit-e2e-${process.getuid()}/${id}`;
+  await mkdir(path.dirname(dir), {recursive: true, mode: 0o700});
+  await mkdir(dir, {mode: 0o700});
+  const file = path.join(dir, 'playwright-run.json');
+  const saved = {config: process.env.ONTOKIT_E2E_CONFIG, run: process.env.ONTOKIT_E2E_RUN};
+  try {
+    await writeFile(file, JSON.stringify({id, dir, web: inputs.web, api: inputs.api, ordinaryUserPolicyVerified: true, ...build(dir)}), {mode: 0o600});
     process.env.ONTOKIT_E2E_CONFIG = file; process.env.ONTOKIT_E2E_RUN = id;
     await check((await loadRunModule()).loadRunConfig);
   } finally {
@@ -343,4 +360,45 @@ test('suggestions config requires exactly four distinct verified users', async (
     {...good, users: {...users, extra: user('extra')}},
     {...good, ordinaryUserPolicyVerified: false},
   ]) await withRunConfig(bad, load => assert.throws(load, /ordinary identities/));
+});
+
+// ---- BAIF rehearsal profile ----
+const rehearsalTargets = Object.fromEntries(['folio', 'catholic', 'cttRoot', 'cttFalseFriends', 'cttTerm'].map(key => [key, {iri: `https://example.org/${key}`, label: key, ...(['folio', 'catholic'].includes(key) ? {edited: `${key} edited`} : {})}]));
+test('rehearsal launcher stages verified sources before identity and records them', async () => {
+  const staged = [];
+  const evidence = {files: {
+    folio: {repository: 'alea-institute/FOLIO', commit: 'a'.repeat(40), sha256: 'b'.repeat(64)},
+    catholic: {repository: 'CatholicOS/ontology-semantic-canon', commit: 'c'.repeat(40), sha256: 'd'.repeat(64)},
+    catholicCtt: {sha256: 'e'.repeat(64)},
+  }, ctt: {source: {site: 'https://ctt.jaces.com/', build: {date: '2026-10-19', commit: 'f66099a'}}, calibration: 'uncalibrated', terms: 250, communities: 24, falseFriends: 6}};
+  let written;
+  const {ctx, calls} = fakeCtx('rehearsal', {
+    stageRehearsalSources: async c => { calls.push('stage'); staged.push(c.dir); return {manifest: evidence, paths: {folio: `${c.dir}/rehearsal/FOLIO.owl`, catholicCtt: `${c.dir}/rehearsal/catholic-os-ctt.ttl`}}; },
+    writePrivate: async (_file, value) => { calls.push('write-config'); written = value; },
+  });
+  await assert.rejects(fullStack(ctx, ctx.deps), /stop after playwright/);
+  assert.equal(calls[0], 'stage');
+  assert.ok(calls.indexOf('stage') < calls.indexOf('identity'));
+  assert.deepEqual(staged, [ctx.dir]);
+  assert.deepEqual(ctx.manifest.rehearsal.ctt, {site: 'https://ctt.jaces.com/', build: {date: '2026-10-19', commit: 'f66099a'}, calibration: 'uncalibrated', terms: 250, communities: 24, falseFriends: 6});
+  assert.equal(written.rehearsal.target, 'isolated');
+  assert.equal(written.rehearsal.sources.folio, `${ctx.dir}/rehearsal/FOLIO.owl`);
+  const failing = fakeCtx('rehearsal', {stageRehearsalSources: async () => { throw new Error('Rehearsal sources are not prepared'); }});
+  await assert.rejects(fullStack(failing.ctx, failing.ctx.deps), /not prepared/);
+  assert.equal(failing.calls.includes('identity'), false, 'a bad cache stops before any service work');
+});
+test('rehearsal config accepts loopback isolated runs and HTTPS hosted runs only', async () => {
+  const users = Object.fromEntries(['owner', 'suggester', 'editor'].map(role => [role, user(role)]));
+  const ctt = {calibration: 'uncalibrated', terms: 250, falseFriends: 6, communities: 24};
+  const config = (dir, target, origins = {}) => ({profile: 'rehearsal', ...idp, users, ...origins,
+    rehearsal: {target, targets: rehearsalTargets, ctt, sources: {folio: `${dir}/rehearsal/FOLIO.owl`, catholicCtt: `${dir}/rehearsal/c.ttl`}}});
+  const hosted = {web: 'https://ontokit.example.org', api: 'https://api.ontokit.example.org', issuer: 'https://auth.example.org', login: 'https://auth.example.org'};
+  await withRunConfigDir(dir => config(dir, 'isolated'), load => assert.equal(load().rehearsal.target, 'isolated'));
+  await withRunConfigDir(dir => config(dir, 'hosted', hosted), load => assert.equal(load().rehearsal.target, 'hosted'));
+  await withRunConfigDir(dir => config(dir, 'isolated', hosted), load => assert.throws(load, /loopback/));
+  await withRunConfigDir(dir => config(dir, 'hosted'), load => assert.throws(load, /HTTPS origins/));
+  await withRunConfigDir(dir => config(dir, 'hosted', {...hosted, api: 'https://user:pw@api.example.org'}), load => assert.throws(load, /HTTPS origins/));
+  await withRunConfigDir(() => config('/tmp/elsewhere', 'isolated'), load => assert.throws(load, /private directory/));
+  await withRunConfigDir(dir => ({...config(dir, 'isolated'), users: {owner: users.owner, suggester: users.suggester, editor: users.owner}}), load => assert.throws(load, /personas/));
+  await withRunConfigDir(dir => ({...config(dir, 'isolated'), rehearsal: {...config(dir, 'isolated').rehearsal, target: 'staging'}}), load => assert.throws(load, /target is invalid/));
 });
