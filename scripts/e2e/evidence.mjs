@@ -1,4 +1,5 @@
 import { PROFILE_REGISTRY, profileSpec, specOwner, serviceSet } from './auth-modes.mjs';
+import { UPSTREAM } from '../rehearsal/pins.mjs';
 
 // Explicit acceptance inventory: deleting a spec cannot silently lower the gate.
 export const REQUIRED_TESTS = [
@@ -217,7 +218,17 @@ export const MODE_REQUIRED_TESTS = Object.freeze(Object.fromEntries(Object.entri
 export const SUGGESTION_REQUIRED_TESTS = Object.freeze(PROBE_CASES.suggestions.map(({title}) => Object.freeze({
   file: profileSpec('suggestions').specs[0], title, project: 'suggestions',
 })));
-export const PROFILE_INVENTORIES = Object.freeze({baseline: REQUIRED_TESTS, lifecycle: LIFECYCLE_REQUIRED_TESTS, ...MODE_REQUIRED_TESTS, suggestions: SUGGESTION_REQUIRED_TESTS});
+// BAIF rehearsal: four exact cases on the real FOLIO and Catholic OS+CTT ontologies.
+export const REHEARSAL_CASES = Object.freeze([
+  'contributor signs in through the provider and browses the FOLIO class tree, search and class detail',
+  'contributor proposes a FOLIO label edit that the reviewer approves and merges',
+  'contributor browses the Catholic OS ontology and finds CTT terms marked uncalibrated',
+  'contributor proposes a Catholic OS edit that the reviewer approves and merges',
+]);
+export const REHEARSAL_REQUIRED_TESTS = Object.freeze(REHEARSAL_CASES.map(title => Object.freeze({
+  file: profileSpec('rehearsal').specs[0], title, project: 'rehearsal',
+})));
+export const PROFILE_INVENTORIES = Object.freeze({baseline: REQUIRED_TESTS, lifecycle: LIFECYCLE_REQUIRED_TESTS, ...MODE_REQUIRED_TESTS, suggestions: SUGGESTION_REQUIRED_TESTS, rehearsal: REHEARSAL_REQUIRED_TESTS});
 const PROFILE_PROJECTS = Object.fromEntries(Object.keys(PROFILE_INVENTORIES).map(profile => [profile, PROFILE_REGISTRY[profile].projects]));
 // Only baseline tolerates additional dynamic tests; every other profile is exact-count.
 const exactCount = profile => profile !== 'baseline';
@@ -389,6 +400,29 @@ function sanitizedAuthModes(profile, value) {
   const web = side(value.web), api = side(value.api);
   return web && api ? {web, api} : null;
 }
+/**
+ * Rehearsal inputs: pinned upstream commits and hashes, the merged Catholic+CTT hash and
+ * the CTT build and counts. Null unless the upstream pins match and every field is well formed.
+ */
+export function sanitizedRehearsal(profile, value) {
+  if (profile !== 'rehearsal' || !value) return null;
+  const out = {};
+  for (const name of ['folio', 'catholic']) {
+    const pin = UPSTREAM[name], entry = value[name];
+    if (entry?.repository !== pin.repository || entry.commit !== pin.commit || entry.sha256 !== pin.sha256) return null;
+    out[name] = {repository: pin.repository, commit: pin.commit, sha256: pin.sha256};
+  }
+  if (!hash(value.catholicCtt?.sha256)) return null;
+  out.catholicCtt = {sha256: value.catholicCtt.sha256};
+  const ctt = value.ctt;
+  if (ctt?.site !== 'https://ctt.jaces.com/' || !['uncalibrated', 'calibrated'].includes(ctt.calibration)) return null;
+  for (const field of ['terms', 'communities', 'falseFriends']) if (!Number.isSafeInteger(ctt[field]) || ctt[field] <= 0) return null;
+  const build = {};
+  if (ctt.build?.date !== undefined) { if (!/^\d{4}-\d{2}-\d{2}$/.test(ctt.build.date)) return null; build.date = ctt.build.date; }
+  if (ctt.build?.commit !== undefined) { if (!/^[0-9a-f]{7,40}$/.test(ctt.build.commit)) return null; build.commit = ctt.build.commit; }
+  out.ctt = {site: ctt.site, build, calibration: ctt.calibration, terms: ctt.terms, communities: ctt.communities, falseFriends: ctt.falseFriends};
+  return out;
+}
 export function sanitizedEvidence(manifest, {cleanup, workflowPassed, startedAt, finishedAt}) {
   const profile = Object.hasOwn(PROFILE_INVENTORIES, manifest.profile) ? manifest.profile : null;
   const sources = {};
@@ -411,16 +445,18 @@ export function sanitizedEvidence(manifest, {cleanup, workflowPassed, startedAt,
   const tests = sanitizedTests(profile, manifest.tests);
   const lifecycle = profile === 'lifecycle' ? sanitizedLifecycle(manifest.lifecycle) : null;
   const authModes = sanitizedAuthModes(profile, manifest.authModes);
+  const rehearsal = sanitizedRehearsal(profile, manifest.rehearsal);
   // New profiles must record agreement; baseline/lifecycle keep their D06/D08 rules but a
   // recorded disagreement (or malformed record) still refuses acceptance.
   const modesOk = profile && !Object.hasOwn(PROBE_CASES, profile) ? (manifest.authModes === undefined || !!authModes) : !!authModes;
   const time = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
   return {version: 3, profile, run: /^[a-f0-9]{32}$/.test(manifest.id) ? manifest.id : null,
     startedAt: time(startedAt), finishedAt: time(finishedAt), sources, images, migrationHeads, tests, lifecycle, authModes,
+    ...(profile === 'rehearsal' ? {rehearsal} : {}),
     // R8: this harness only ever proves local verification; hosted acceptance is separate.
     acceptance: {scope: 'local-verification', hostedAcceptance: false},
     workflowPassed: workflowPassed === true, cleanup: cleanup === 'complete' ? 'complete' : 'failed',
-    acceptedRun: workflowPassed === true && cleanup === 'complete' && !!profile && !!tests && (profile !== 'lifecycle' || !!lifecycle) && modesOk &&
+    acceptedRun: workflowPassed === true && cleanup === 'complete' && !!profile && !!tests && (profile !== 'lifecycle' || !!lifecycle) && (profile !== 'rehearsal' || !!rehearsal) && modesOk &&
       // KTD3: each profile's own service set; provider-less profiles run no Zitadel or Login.
       Object.keys(sources).length === 2 && servicesExact && serviceSet(profile).every(service => images.some(image => image.service === service)) && migrationHeads.length > 0};
 }

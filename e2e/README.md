@@ -115,6 +115,39 @@ refuses direct writes from its anonymous identity with 403. Public browsing and
 anonymous proposals remain available; project creation, import and source save
 are unavailable. The disabled profile verifies these refusals on a disposable stack.
 
+## BAIF rehearsal profile (FOLIO, Catholic OS and CTT)
+
+```sh
+NODE_USE_ENV_PROXY=1 npm run rehearsal:sources   # pinned FOLIO + Catholic OS, live CTT import
+npm run test:e2e:rehearsal -- --api-source /absolute/path/to/ontokit-api
+```
+
+`rehearsal:sources` downloads `FOLIO.owl` and the Catholic OS Turtle at pinned commits and
+checks their SHA-256 values. It imports CTT from its public pages
+([CTT import](../docs/ctt-import.md)), merges it into Catholic OS, and writes the result to
+the ignored `.e2e-runs/rehearsal-sources/` with a hash manifest. The launcher re-verifies
+every hash before identity bootstrap and copies the two import files into the private run
+directory. Personas are `owner` (steward), `suggester` (contributor) and `editor` (reviewer).
+A worker fixture imports both real ontologies as public projects and waits for each index.
+Four exact cases then run: sign-in and FOLIO browsing, a FOLIO edit reviewed and merged,
+Catholic OS browsing with CTT terms marked uncalibrated, and a Catholic OS edit reviewed and
+merged. The receipt adds a `rehearsal` block: upstream commits and hashes, the merged-file
+hash, and the CTT build and counts. A run is never accepted without that block.
+
+The same spec runs against a serving host:
+
+```sh
+npm run rehearsal:hosted -- --target /absolute/path/hosted-target.json
+```
+
+The target file must be mode 0600 and hold HTTPS origins plus three existing persona
+accounts (see `scripts/rehearsal/hosted.mjs`). It writes
+`.e2e-runs/receipts/hosted-<id>.json` with `acceptance.scope: "hosted-rehearsal"`.
+The credentials never leave the private run directory, which is removed afterwards.
+
+Behind an egress proxy or a TLS-inspecting gateway, the launcher passes only `HTTP(S)_PROXY`,
+`NO_PROXY` and `NODE_EXTRA_CA_CERTS` to owned commands. It never passes application settings.
+
 ## Lifecycle and recovery
 
 For full ownership, confinement and opt-in private diagnostic details see

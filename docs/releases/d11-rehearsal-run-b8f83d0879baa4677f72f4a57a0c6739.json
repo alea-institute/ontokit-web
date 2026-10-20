@@ -1,0 +1,139 @@
+{
+  "version": 3,
+  "profile": "rehearsal",
+  "run": "b8f83d0879baa4677f72f4a57a0c6739",
+  "startedAt": "2026-10-20T19:59:50.274Z",
+  "finishedAt": "2026-10-20T20:10:18.676Z",
+  "sources": {
+    "api": {
+      "revision": "c682a2f29ff81cfb91d20e406efd8ba51d292524",
+      "sha256": "b63706117bf0c0b75ae6b5413df8ad7dc55cde32d4f1648c12d5b702ddc1cbf4"
+    },
+    "web": {
+      "revision": "f642426be6fde0c833831ab21cc1b8155f8ca2eb",
+      "sha256": "fbf1d7baa9bfa050b772b04ac0628abdca28ed39858dd014572a6c6bf667db8e"
+    }
+  },
+  "images": [
+    {
+      "service": "api",
+      "id": "sha256:c5f3dbeaea383bb7fa2b6022be9a3a50b2283f145d1fe154e9dec53a3e7c6c71",
+      "reference": "ontokit-e2e-b8f83d0879baa4677f72f4a57a0c6739/api:run"
+    },
+    {
+      "service": "worker",
+      "id": "sha256:c5f3dbeaea383bb7fa2b6022be9a3a50b2283f145d1fe154e9dec53a3e7c6c71",
+      "reference": "ontokit-e2e-b8f83d0879baa4677f72f4a57a0c6739/api:run"
+    },
+    {
+      "service": "login",
+      "id": "sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648",
+      "reference": "ghcr.io/zitadel/zitadel-login@sha256:7c210b79ae78ae74d76092154fa664601852ce79675a747a1085c2656b195648"
+    },
+    {
+      "service": "zitadel",
+      "id": "sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64",
+      "reference": "ghcr.io/zitadel/zitadel@sha256:f3738fd984131d3f02e386d37fa480d1a30e42b7d4202e2b322f12f7cf556b64"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:c5f3dbeaea383bb7fa2b6022be9a3a50b2283f145d1fe154e9dec53a3e7c6c71",
+      "reference": "ontokit-e2e-b8f83d0879baa4677f72f4a57a0c6739/api:run"
+    },
+    {
+      "service": "migrate",
+      "id": "sha256:c5f3dbeaea383bb7fa2b6022be9a3a50b2283f145d1fe154e9dec53a3e7c6c71",
+      "reference": "ontokit-e2e-b8f83d0879baa4677f72f4a57a0c6739/api:run"
+    },
+    {
+      "service": "redis",
+      "id": "sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2",
+      "reference": "redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2"
+    },
+    {
+      "service": "postgres",
+      "id": "sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38",
+      "reference": "pgvector/pgvector@sha256:7ae6051efd0e60444282c27c7e141af07f322ce033300e727a49c3dd11075e38"
+    },
+    {
+      "service": "minio",
+      "id": "sha256:32c504bea4574d8f29d719b37bc0dad920ecf3e22b81dc5cea0bb105af2ce10f",
+      "reference": "cgr.dev/chainguard/minio@sha256:32c504bea4574d8f29d719b37bc0dad920ecf3e22b81dc5cea0bb105af2ce10f"
+    }
+  ],
+  "migrationHeads": [
+    "i7j8k9l0m1n2"
+  ],
+  "tests": {
+    "passed": 4,
+    "skipped": 0,
+    "failed": 0,
+    "flaky": 0,
+    "mandatory": [
+      {
+        "file": "browser/rehearsal.spec.ts",
+        "title": "contributor signs in through the provider and browses the FOLIO class tree, search and class detail",
+        "project": "rehearsal"
+      },
+      {
+        "file": "browser/rehearsal.spec.ts",
+        "title": "contributor proposes a FOLIO label edit that the reviewer approves and merges",
+        "project": "rehearsal"
+      },
+      {
+        "file": "browser/rehearsal.spec.ts",
+        "title": "contributor browses the Catholic OS ontology and finds CTT terms marked uncalibrated",
+        "project": "rehearsal"
+      },
+      {
+        "file": "browser/rehearsal.spec.ts",
+        "title": "contributor proposes a Catholic OS edit that the reviewer approves and merges",
+        "project": "rehearsal"
+      }
+    ]
+  },
+  "lifecycle": null,
+  "authModes": {
+    "web": {
+      "mode": "required",
+      "providerConfigured": true
+    },
+    "api": {
+      "mode": "required",
+      "providerConfigured": true
+    }
+  },
+  "rehearsal": {
+    "folio": {
+      "repository": "alea-institute/FOLIO",
+      "commit": "a8f0d29f8ee78e3bf358ffa5f69edba74c076240",
+      "sha256": "44657b4ed844f5f9c9c48869184606b4fc671471a8263d79d241de87809fa239"
+    },
+    "catholic": {
+      "repository": "CatholicOS/ontology-semantic-canon",
+      "commit": "935bc5ac8acbe005ab1ba7cd8dfe920d81302890",
+      "sha256": "58d55f92863e21cb26078f43b254818e69c4f591df2aa33fc25730bd869dcc27"
+    },
+    "catholicCtt": {
+      "sha256": "aa12838c2ff684d717d6b9ccee7f849e296655dcfe18a744f9f545f16b7006f3"
+    },
+    "ctt": {
+      "site": "https://ctt.jaces.com/",
+      "build": {
+        "date": "2026-10-19",
+        "commit": "f66099a"
+      },
+      "calibration": "uncalibrated",
+      "terms": 250,
+      "communities": 24,
+      "falseFriends": 6
+    }
+  },
+  "acceptance": {
+    "scope": "local-verification",
+    "hostedAcceptance": false
+  },
+  "workflowPassed": true,
+  "cleanup": "complete",
+  "acceptedRun": true
+}
