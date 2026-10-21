@@ -139,6 +139,16 @@ All three runs used API `dev` `c682a2f2`.
    They show the workflow on real content and stay in disposable projects.
    **Recommendation:** keep them unless a stakeholder demo calls for specific content.
 
+   **Answered on 2026-10-20 at 20:25Z: keep both** (ask `ontokit-web-2026-10-20-2022-sweep-baif-ctt-calls`,
+   qid `rehearsal-edits`).
+   - The answer came from Chief, the automated first responder (tier auto, provenance chief).
+   - Its reasons: both edits match existing definitions, and they touch only disposable,
+     run-tagged projects.
+   - Damien can still overrule it by naming stakeholder content to swap in.
+   - The rehearsal keeps the edits as built (`scripts/rehearsal/pins.mjs` `TARGETS`); no
+     code changes.
+   - Questions 1 (CTT namespace) and 2 (CTT quotations) remain open with Damien.
+
 ## Steps that need the home box or credentials
 
 1. **Provision three verified DEV personas** (steward/owner, contributor/suggester,
