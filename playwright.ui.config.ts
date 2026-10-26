@@ -3,13 +3,15 @@ import { execFileSync } from "node:child_process";
 
 // A separate, synthetic-data UI run. It never imports full-stack target files.
 const existingURL = process.env.OW4_UI_BASE_URL;
-const port = existingURL ? null : Number(execFileSync(process.execPath, ["-e", `
+const port = existingURL ? null : Number(process.env.OW4_UI_PORT || execFileSync(process.execPath, ["-e", `
   const server = require('node:net').createServer();
   server.listen(0, '127.0.0.1', () => {
-    console.log(server.address().port);
+    process.stdout.write(String(server.address().port));
     server.close();
   });
 `], { encoding: "utf8" }).trim());
+// Workers reload this configuration; they must use the parent's server port.
+if (port !== null) process.env.OW4_UI_PORT = String(port);
 const baseURL = existingURL || `http://127.0.0.1:${port}`;
 if (!["127.0.0.1", "localhost"].includes(new URL(baseURL).hostname)) {
   throw new Error("OW4_UI_BASE_URL must identify a local synthetic-data server");
