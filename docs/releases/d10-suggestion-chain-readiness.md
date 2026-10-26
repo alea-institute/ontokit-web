@@ -125,3 +125,15 @@ These checks do not establish hosted persona acceptance of the chain (B02/B03).
 - Multi-tab refresh locking.
 - Deferred by plan: anonymous beacon wiring on the web; a distinct `suggestion_resubmitted` notification type.
 - Auto-submit, the auto-accept sweep, bulk review, beacon unload flush and the Redis-absent 503 path keep unit-test evidence only.
+
+
+## OW-2 hosted follow-up — 2026-10-26
+
+The dedicated hosted runner is implemented on `drawdown/ow-2`; it reuses all seven
+D10 journeys and refusal probes, adds ordinary-persona and optional-mode cases, and
+retains hosted fixtures pending separately verified backup. The
+[build receipt](../plans/evidence/2026-10-26-ow-2-hosted-uat.md) records local checks
+and the controller execution contract. The
+[actual run receipt](../plans/evidence/2026-10-26-ow-2-preflight-incomplete.json)
+is **preflight-incomplete**, with every hosted case unrun. This does not supersede
+the historical isolated acceptance above or close B02/B03 hosted acceptance.
