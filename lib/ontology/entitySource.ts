@@ -39,11 +39,10 @@ function resolveIri(value: string, base?: string): string | undefined {
 export function extractEntitySource(source: string, iri: string): EntitySourceResult {
   const prefixes: PrefixMap = {};
   let base: string | undefined;
+  let selectedForms = iriTurtleForms(iri, prefixes);
   let previousEnd = 0;
   const excerpts: EntitySourceExcerpt[] = [];
 
-  // The shared scanner skips standalone directives line-wise. Read declarations
-  // only in its gaps, never by searching inside comments or literal bodies.
   const readDeclarations = (gap: string): boolean => {
     for (const line of gap.split("\n")) {
       if (/^\s*(?:#.*)?$/.test(line)) continue;
@@ -54,6 +53,7 @@ export function extractEntitySource(source: string, iri: string): EntitySourceRe
         const namespace = resolveIri(prefix[3], base);
         if (namespace === undefined) return false;
         prefixes[prefix[2]] = namespace;
+        selectedForms = iriTurtleForms(iri, prefixes);
       } else if (baseDeclaration) {
         if (baseDeclaration[1].startsWith("@") !== !!baseDeclaration[3]) return false;
         const nextBase = resolveIri(baseDeclaration[2], base);
@@ -73,8 +73,6 @@ export function extractEntitySource(source: string, iri: string): EntitySourceRe
       return { status: "unavailable", reason: "Source is incomplete. Open full source to inspect it." };
     }
 
-    // Anonymous subjects cannot be the selected named entity. Keep their inline
-    // structures inside a matching statement, but never expand linked nodes.
     if (/^(?:\[|\(|_:)/.test(statement.text)) continue;
 
     const subject = statement.text.match(/^(<[^>]*>|[^\s]+)\s/)?.[1];
@@ -90,7 +88,7 @@ export function extractEntitySource(source: string, iri: string): EntitySourceRe
       const resolved = namespace + subject.slice(colon + 1);
       const forms = iriTurtleForms(resolved, prefixes);
       if (!forms.includes(subject)) return unsupported();
-      if (!isSubjectOfStatement(statement.text, iriTurtleForms(iri, prefixes))) continue;
+      if (!isSubjectOfStatement(statement.text, selectedForms)) continue;
     }
 
     excerpts.push({ text: statement.text, startLine: statement.startLine + 1 });

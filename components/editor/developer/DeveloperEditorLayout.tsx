@@ -440,8 +440,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     }
   }, [isSourceReady, sourceError, sourceScopeKey, isLoadingSource, isPreloading, loadSourceContent]);
 
-  // An empty successful file is ready; an error needs an explicit retry. Limit
-  // automatic attempts per scope even if the callback cannot currently fetch.
   useEffect(() => {
     if ((viewMode === "source" || (viewMode === "tree" && detailTab === "source"))
       && !isSourceReady && !sourceError && !isLoadingSource && !isPreloading

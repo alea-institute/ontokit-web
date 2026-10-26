@@ -77,12 +77,16 @@ export function useProjectViewer({
     setSourceSnapshotState((previous) => {
       const current = previous.epoch === sourceScopeEpoch ? previous : { content: "", revision: null, epoch: sourceScopeEpoch };
       const content = typeof next === "function" ? next(current.content) : next;
-      return { ...current, content };
+      return content === current.content && previous.epoch === sourceScopeEpoch
+        ? previous : { ...current, content };
     });
   }, [sourceScopeEpoch]);
   const setSourceSnapshot = useCallback((content: string, revision: string) => {
     if (sourceScopeRef.current.epoch !== sourceScopeEpoch) return;
-    setSourceSnapshotState({ content, revision, epoch: sourceScopeEpoch });
+    setSourceSnapshotState(previous => (
+      previous.content === content && previous.revision === revision && previous.epoch === sourceScopeEpoch
+        ? previous : { content, revision, epoch: sourceScopeEpoch }
+    ));
   }, [sourceScopeEpoch]);
   const [sourceLoad, setSourceLoad] = useState({ epoch: -1, loading: false, preloading: false, error: null as string | null });
   const isLoadingSource = sourceLoad.epoch === sourceScopeEpoch && sourceLoad.loading;

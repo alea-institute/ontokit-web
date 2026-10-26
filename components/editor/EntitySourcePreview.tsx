@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Copy, FileCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { extractEntitySource } from "@/lib/ontology/entitySource";
@@ -17,13 +17,10 @@ export interface EntitySourcePreviewProps {
 }
 
 export function EntitySourcePreview({ iri, sourceContent, filePath, isLoading, isReady, error, onRetry, onOpenFullSource }: EntitySourcePreviewProps) {
-  const context = useMemo(() => ({}), [iri, sourceContent, filePath, isLoading, isReady, error]);
-  const currentContext = useRef(context);
-  currentContext.current = context;
+  const context = useMemo(() => ({ iri, sourceContent, filePath, isLoading, isReady, error }), [iri, sourceContent, filePath, isLoading, isReady, error]);
   const [feedback, setFeedback] = useState<{ context: object; message: string } | null>(null);
   const result = useMemo(() => iri && isReady && !isLoading && !error
     ? extractEntitySource(sourceContent, iri) : null, [iri, sourceContent, isReady, isLoading, error]);
-  // Metadata stays on a single comment line even if a file name contains controls.
   const fileLabel = (filePath || "Current ontology file").replace(/[\r\n\u2028\u2029]/g, " ");
   const snippet = result?.status === "available"
     ? result.excerpts.map(({ text, startLine }) => `# File: ${fileLabel}, line ${startLine}\n${text}`).join("\n\n") : null;
@@ -32,10 +29,30 @@ export function EntitySourcePreview({ iri, sourceContent, filePath, isLoading, i
     if (snippet === null) return;
     try {
       await navigator.clipboard.writeText(snippet);
-      if (currentContext.current === context) setFeedback({ context, message: "Snippet copied" });
+      setFeedback({ context, message: "Snippet copied" });
     } catch {
-      if (currentContext.current === context) setFeedback({ context, message: "Could not copy. Select the snippet and copy it manually." });
+      setFeedback({ context, message: "Could not copy. Select the snippet and copy it manually." });
     }
+  }
+
+  function renderSourceBody() {
+    if (isLoading) return <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Loading entity source…</p>;
+    if (error) return (
+      <div role="alert" className="space-y-3 text-sm text-red-700 dark:text-red-300">
+        <p>Failed to load source: {error}</p>
+        <Button variant="outline" size="sm" onClick={onRetry}>Try again</Button>
+      </div>
+    );
+    if (!isReady) return <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Loading entity source…</p>;
+    if (snippet !== null) return (
+      <pre aria-label="Source excerpts" className="w-max min-w-full rounded-lg border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-6 text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><code>{snippet}</code></pre>
+    );
+    return (
+      <div className="space-y-2 text-sm text-slate-500 dark:text-slate-400">
+        <h3 className="font-medium text-slate-700 dark:text-slate-200">No direct statements available</h3>
+        <p>{result?.status === "unavailable" ? result.reason : "Source is unavailable."}</p>
+      </div>
+    );
   }
 
   if (!iri) return <div className="p-6 text-sm text-slate-500 dark:text-slate-400">Select an entity in the tree to inspect its source.</div>;
@@ -52,11 +69,7 @@ export function EntitySourcePreview({ iri, sourceContent, filePath, isLoading, i
         <p aria-live="polite" className="text-xs text-slate-600 dark:text-slate-300">{feedback?.context === context ? feedback.message : ""}</p>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-4">
-        {isLoading ? <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Loading entity source…</p>
-          : error ? <div role="alert" className="space-y-3 text-sm text-red-700 dark:text-red-300"><p>Failed to load source: {error}</p><Button variant="outline" size="sm" onClick={onRetry}>Try again</Button></div>
-          : !isReady ? <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Loading entity source…</p>
-          : snippet !== null ? <pre aria-label="Source excerpts" className="w-max min-w-full rounded-lg border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-6 text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><code>{snippet}</code></pre>
-          : <div className="space-y-2 text-sm text-slate-500 dark:text-slate-400"><h3 className="font-medium text-slate-700 dark:text-slate-200">No direct statements available</h3><p>{result?.status === "unavailable" ? result.reason : "Source is unavailable."}</p></div>}
+        {renderSourceBody()}
       </div>
     </section>
   );
