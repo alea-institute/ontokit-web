@@ -7,9 +7,10 @@ import {constants} from 'node:fs';
 import {mkdir, open, readFile, writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {setTimeout as delay} from 'node:timers/promises';
 import {RUNTIME_ROOT, privateDirectory} from './ownership.mjs';
 import {networkEnv} from './runtime.mjs';
-import {validateTarget, validateRuntimeAfter, validateHostedReport, fail} from './hosted-suggestions-contract.mjs';
+import {validateTarget, validateRuntimeAfter, validateHostedReport, hostedOutcomes, fail} from './hosted-suggestions-contract.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const RECEIPTS = path.join(ROOT, '.e2e-runs/receipts');
@@ -66,6 +67,16 @@ async function playwright(env, {dir, signal}) {
     });
   } finally { await log.close(); }
 }
+async function runtimeReadback(file, target, finished, signal) {
+  const deadline = Date.now() + 60_000;
+  while (!signal.aborted && Date.now() <= deadline) {
+    let raw;
+    try { raw = await readPrivateJson(file); } catch { /* Controller may still be writing its readback. */ }
+    if (raw && Date.parse(raw.observedAt) >= finished) return validateRuntimeAfter(target, raw, finished);
+    await delay(1000, undefined, {signal});
+  }
+  fail('RUNTIME_AFTER');
+}
 /** Missing input produces an incomplete receipt without attempting network or project writes. */
 export async function runHosted({targetFile, afterFile, fetchImpl = fetch, runPlaywright = playwright, signal: externalSignal} = {}) {
   const id = randomBytes(16).toString('hex'), dir = path.join(RUNTIME_ROOT, id);
@@ -76,7 +87,7 @@ export async function runHosted({targetFile, afterFile, fetchImpl = fetch, runPl
   process.on('SIGINT', interrupt); process.on('SIGTERM', interrupt);
   externalSignal?.addEventListener('abort', interrupt, {once: true});
   if (externalSignal?.aborted) interrupt();
-  let target, tests = null, runtimeAfter = null, failure = null, executed = false;
+  let target, tests = null, report = null, runtimeAfter = null, failure = null, executed = false;
   const startedAt = new Date().toISOString(), runner = runnerRevision();
   try {
     target = validateTarget(await readPrivateJson(targetFile));
@@ -90,13 +101,15 @@ export async function runHosted({targetFile, afterFile, fetchImpl = fetch, runPl
       ...(process.env.PLAYWRIGHT_BROWSERS_PATH ? {PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH} : {}),
       ONTOKIT_E2E_CONFIG: file, ONTOKIT_E2E_RUN: id, ONTOKIT_E2E_HOSTED: "suggestions"}, {dir, signal: controller.signal});
     const finished = Date.now();
+    try { report = JSON.parse(await readFile(path.join(dir, 'playwright-report.json'), 'utf8')); } catch { /* Missing report is an incomplete execution. */ }
     if (controller.signal.aborted) fail('INTERRUPTED');
     if (code !== 0) fail('EXECUTION');
-    tests = validateHostedReport(JSON.parse(await readFile(path.join(dir, 'playwright-report.json'), 'utf8')));
+    tests = validateHostedReport(report);
     // The controller supplies a fresh post-run readback, bound to the same origins.
     // A missing/read-before-finish attestation can never turn green.
     if (!afterFile) fail('RUNTIME_AFTER');
-    runtimeAfter = validateRuntimeAfter(target, await readPrivateJson(afterFile), finished);
+    await writeFile(path.join(dir, 'browser-finished.json'), JSON.stringify({run: id, browserFinishedAt: new Date(finished).toISOString()}), {mode: 0o600, flag: 'wx'});
+    runtimeAfter = await runtimeReadback(afterFile, target, finished, controller.signal);
   } catch (error) { failure = controller.signal.aborted ? 'HOSTED_INTERRUPTED' : failureCode(error); }
   finally {
     process.off('SIGINT', interrupt); process.off('SIGTERM', interrupt);
@@ -107,7 +120,7 @@ export async function runHosted({targetFile, afterFile, fetchImpl = fetch, runPl
     version: 1, kind: 'hosted-suggestions', run: id, startedAt, finishedAt: new Date().toISOString(), runner,
     runtimeBefore: target?.hosted.runtime ?? null, runtimeAfter,
     status: passed ? 'passed' : failure === 'HOSTED_INTERRUPTED' ? 'interrupted' : !executed || tests ? 'preflight-incomplete' : 'executed-failed',
-    failure, tests, fixtures: {disposition: 'retained', ledger: 'owned-resources.jsonl', cleanupPerformed: false},
+    failure, tests, outcomes: hostedOutcomes(report), fixtures: {disposition: 'retained', ledger: 'owned-resources.jsonl', cleanupPerformed: false},
     acceptance: {scope: 'hosted-d08-d10', chainAccepted: passed, hostedAcceptance: false},
     // Cookie expiry is deliberately still open; a chain pass is not full D08 acceptance.
     expiry: tests?.personas.find(c => c.evidence.case === 'expiry')?.evidence ?? {case: 'expiry', renewal: 'not-observed', refreshRecovery: 'not-observed', cookieExpiry: 'not-observed'},

@@ -40,11 +40,12 @@ export function validateTarget(raw, now = Date.now()) {
   if (new Set(PERSONAS.map(p => target.users[p].id)).size !== 4 || new Set(PERSONAS.map(p => target.users[p].email.toLowerCase())).size !== 4) fail('PERSONAS');
   const h = raw.hosted;
   if (!h || h.version !== 1 || h.retain !== true) fail('PREREQUISITES');
+  if (h.runtime?.webOrigin !== target.web || h.runtime?.apiOrigin !== target.api) fail('RUNTIME_TARGET');
   if (!exactKeys(h.ordinaryPersonas, PERSONAS) || PERSONAS.some(p => h.ordinaryPersonas[p]?.subject !== target.users[p].id || h.ordinaryPersonas[p]?.nonAdministrative !== true)) fail('ORDINARY_PERSONAS');
   if (!['import', 'index', 'save', 'submit'].every(k => h.noBilling?.[k] === true)) fail('NO_BILLING');
   if (!Number.isSafeInteger(h.observationWindowSeconds) || h.observationWindowSeconds < 0 || h.observationWindowSeconds > 3600 ||
       !Number.isSafeInteger(h.refreshIdleSeconds) || h.refreshIdleSeconds <= 0 || !Number.isSafeInteger(h.refreshAbsoluteSeconds) || h.refreshAbsoluteSeconds < h.refreshIdleSeconds) fail('OBSERVATION_WINDOW');
-  return {...target, hosted: {version: 1, retain: true, observationWindowSeconds: h.observationWindowSeconds, runtime: runtime(h.runtime, now),
+  return {...target, hosted: {version: 1, retain: true, observationWindowSeconds: h.observationWindowSeconds, runtime: {...runtime(h.runtime, now), webOrigin: target.web, apiOrigin: target.api},
     ordinaryPersonas: Object.fromEntries(PERSONAS.map(p => [p, {subject: target.users[p].id, nonAdministrative: true}])),
     noBilling: {import: true, index: true, save: true, submit: true}, refreshIdleSeconds: h.refreshIdleSeconds, refreshAbsoluteSeconds: h.refreshAbsoluteSeconds}};
 }
@@ -66,6 +67,27 @@ function flatten(report) {
   };
   visit(report?.suites);
   return found;
+}
+/** Failed runs still report fixed case identities and observed outcomes, never errors or free text. */
+export function hostedOutcomes(report) {
+  let all;
+  try { all = flatten(report); } catch { all = []; }
+  const inventory = [...SUGGESTION_REQUIRED_TESTS, ...HOSTED_CASES.map(c => ({file: 'browser/hosted-personas.spec.ts', title: c.title, project: 'hosted-personas'}))];
+  return inventory.map(({file, title, project}) => {
+    const specs = all.filter(s => s?.file === file && s.title === title);
+    let outcome = 'not-run';
+    if (specs.length) {
+      const t = specs[0].tests?.[0], r = t?.results?.[0];
+      outcome = 'invalid';
+      if (specs.length === 1 && specs[0].tests?.length === 1 && t.projectName === project) {
+        if (t.status === 'skipped' || t.expectedStatus === 'skipped') outcome = 'skipped';
+        else if (t.status === 'flaky' || t.results?.length > 1 || r?.retry > 0) outcome = 'flaky';
+        else if (r?.status === 'passed' && t.status === 'expected' && t.expectedStatus === 'passed' && specs[0].ok && !r.errors?.length) outcome = 'passed';
+        else if (['failed', 'timedOut', 'interrupted'].includes(r?.status)) outcome = 'failed';
+      }
+    }
+    return {file, title, project, outcome};
+  });
 }
 export function validateHostedReport(report) {
   const total = SUGGESTION_REQUIRED_TESTS.length + HOSTED_CASES.length;

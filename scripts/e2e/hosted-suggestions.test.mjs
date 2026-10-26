@@ -13,7 +13,7 @@ export function syntheticTarget(now = Date.now()) {
     users: Object.fromEntries(['owner', 'suggester', 'editor', 'unrelated'].map((p, i) => [p, {id: `${i + 1}`, email: `${p}@example.test`, password: 'synthetic-password'}])),
     hosted: {
       version: 1, retain: true, observationWindowSeconds: 60,
-      runtime: {observedAt: new Date(now).toISOString(), web: 'a'.repeat(40), api: 'b'.repeat(40), worker: 'b'.repeat(40),
+      runtime: {observedAt: new Date(now).toISOString(), webOrigin: 'https://web.example.test', apiOrigin: 'https://api.example.test', web: 'a'.repeat(40), api: 'b'.repeat(40), worker: 'b'.repeat(40),
         authModes: {web: {mode: 'optional', providerConfigured: true}, api: {mode: 'optional', providerConfigured: true}}},
       ordinaryPersonas: Object.fromEntries(['owner', 'suggester', 'editor', 'unrelated'].map((p, i) => [p, {subject: `${i + 1}`, nonAdministrative: true}])),
       noBilling: {import: true, index: true, save: true, submit: true},
@@ -106,4 +106,35 @@ test('passing browser report without a post-run deployment readback stays incomp
   assert.equal(receipt.tests.suggestions.passed, 7);
   assert.equal(receipt.acceptance.chainAccepted, false);
   assert.equal(receipt.expiry.cookieExpiry, 'not-observed');
+});
+test('matched post-run readback accepts the chain while cookie-expiry acceptance stays open', async () => {
+  const target = syntheticTarget(), file = await targetFile(target), after = path.join(path.dirname(file), 'after.json');
+  let writing;
+  const {receipt} = await runHosted({targetFile: file, afterFile: after, fetchImpl: healthy,
+    runPlaywright: async (_, {dir}) => {
+      await writeFile(path.join(dir, 'playwright-report.json'), JSON.stringify(syntheticReport()));
+      writing = new Promise(resolve => setTimeout(async () => {
+        await writeFile(after, JSON.stringify({...target.hosted.runtime, observedAt: new Date().toISOString()}), {mode: 0o600}); resolve();
+      }, 20));
+      return 0;
+    }});
+  await writing;
+  assert.equal(receipt.status, 'passed');
+  assert.equal(receipt.acceptance.chainAccepted, true);
+  assert.equal(receipt.acceptance.hostedAcceptance, false);
+  assert.equal(receipt.outcomes.length, 14);
+});
+test('failed reports retain fixed failure outcomes without assertion errors', async () => {
+  const {receipt} = await runHosted({targetFile: await targetFile(syntheticTarget()), fetchImpl: healthy,
+    runPlaywright: async (_, {dir}) => {
+      const report = syntheticReport();
+      const spec = report.suites[0].specs[0]; spec.ok = false; spec.tests[0].status = 'unexpected';
+      spec.tests[0].results[0] = {status: 'failed', retry: 0, errors: [{message: 'sentinel-secret-person'}]};
+      await writeFile(path.join(dir, 'playwright-report.json'), JSON.stringify(report));
+      return 1;
+    }});
+  assert.equal(receipt.status, 'executed-failed');
+  assert.equal(receipt.outcomes[0].outcome, 'failed');
+  assert.equal(receipt.tests, null);
+  assert.ok(!JSON.stringify(receipt).includes('sentinel'));
 });

@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import {trackProjectImport, finishSuggestionResources} from "../fixtures/suggestion-resources";
 import type { APIRequestContext, Page } from "@playwright/test";
 import { test as base, expect, addSuggestionMembers, directProbe, recordProbe, saveExistingLabel, openTriage } from "../fixtures/suggestions";
 import { authPath, type SuggestionPersona } from "../fixtures/run";
@@ -20,13 +21,16 @@ const test = base.extend<{
     try {
       await provide(async (isPublic = true) => {
         const name = `D10 ${run.id} case ${info.line}-${ids.length + 1}`;
-        const response = await ownerApi.post(`${projectsPath}/import`, {multipart: {
-          name, description: `ontokit-e2e-run:${run.id}:suggestions:${info.line}:${ids.length + 1}`,
-          is_public: String(isPublic),
-          file: {name: "tiny-ontology.ttl", mimeType: "text/turtle", buffer: await fs.readFile(tinyOntologyPath)},
-        }});
-        expect(response.status()).toBe(201);
-        const {id} = await response.json() as {id: string};
+        const marker = `ontokit-e2e-run:${run.id}:suggestions:${info.line}:${ids.length + 1}`;
+        const {id} = await trackProjectImport(run, marker, async () => {
+          const response = await ownerApi.post(`${projectsPath}/import`, {multipart: {
+            name, description: marker,
+            is_public: String(isPublic),
+            file: {name: "tiny-ontology.ttl", mimeType: "text/turtle", buffer: await fs.readFile(tinyOntologyPath)},
+          }});
+          expect(response.status()).toBe(201);
+          return await response.json() as {id: string};
+        });
         ids.push(id);
         await addSuggestionMembers(ownerApi, run, id);
         const source = await readSource(ownerApi, id);
@@ -41,7 +45,9 @@ const test = base.extend<{
         return {id, name};
       });
     } finally {
-      for (const id of ids) expect([204, 404]).toContain((await ownerApi.delete(`${projectsPath}/${id}`)).status());
+      await finishSuggestionResources(run, async () => {
+        for (const id of ids) expect([204, 404]).toContain((await ownerApi.delete(`${projectsPath}/${id}`)).status());
+      });
     }
   },
   people: async ({browser, run}, provide) => {
