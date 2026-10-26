@@ -167,7 +167,11 @@ test('ledger refuses symlinks and permissive files without modifying their targe
     const ledger = path.join(dir, 'owned-resources.jsonl'), target = path.join(dir, 'protected-data');
     await writeFile(target, 'retained', {mode: 0o600});
     if (linked) await symlink(target, ledger);
-    else await writeFile(ledger, 'retained', {mode: 0o644});
+    else {
+      await writeFile(ledger, 'retained', {mode: 0o644});
+      await chmod(ledger, 0o644); // The controller's restrictive umask must not repair the negative fixture.
+      assert.equal((await stat(ledger)).mode & 0o777, 0o644);
+    }
     await assert.rejects(() => recordResource({id: 'a'.repeat(32), dir, hosted: true}, {event: 'project-created', id: 'new-id'}));
     assert.equal(await readFile(target, 'utf8'), 'retained');
     assert.equal(await readFile(ledger, 'utf8'), 'retained');
