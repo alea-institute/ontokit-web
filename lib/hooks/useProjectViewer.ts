@@ -96,8 +96,26 @@ export function useProjectViewer({
   const sourceRequestIdRef = useRef(0);
 
   // IRI indexing
-  const [sourceIriIndex, setSourceIriIndex] = useState<Map<string, IriPosition>>(new Map());
-  const [isIndexing, setIsIndexing] = useState(false);
+  const emptySourceIriIndex = useMemo(() => new Map<string, IriPosition>(), []);
+  const [sourceIndex, setSourceIndex] = useState({
+    epoch: -1, index: emptySourceIriIndex, completedContent: null as string | null,
+  });
+  const sourceIriIndex = sourceIndex.epoch === sourceScopeEpoch ? sourceIndex.index : emptySourceIriIndex;
+  const [indexingRequest, setIndexingRequest] = useState<{ epoch: number; id: number } | null>(null);
+  const isIndexing = indexingRequest?.epoch === sourceScopeEpoch;
+  const indexingRequestIdRef = useRef(0);
+  // Keep the public setter stable for callers that invalidate after a save.
+  // Clearing an index also invalidates any build already running in that scope.
+  const setSourceIriIndex = useCallback((next: React.SetStateAction<Map<string, IriPosition>>) => {
+    const epoch = sourceScopeRef.current.epoch;
+    indexingRequestIdRef.current += 1;
+    setIndexingRequest(null);
+    setSourceIndex(previous => {
+      const current = previous.epoch === epoch ? previous.index : emptySourceIriIndex;
+      const index = typeof next === "function" ? next(current) : next;
+      return { epoch, index, completedContent: null };
+    });
+  }, [emptySourceIriIndex]);
 
   // Ontology tree
   const tree = useOntologyTree({
@@ -209,9 +227,15 @@ export function useProjectViewer({
 
   // Build IRI index in background
   useEffect(() => {
-    if (!sourceContent || sourceIriIndex.size > 0 || isIndexing) return;
+    if (!sourceContent || (sourceIndex.epoch === sourceScopeEpoch
+      && (sourceIndex.index.size > 0 || sourceIndex.completedContent === sourceContent))) return;
 
-    setIsIndexing(true);
+    const requestId = ++indexingRequestIdRef.current;
+    let cancelled = false;
+    const isCurrentRequest = () => !cancelled
+      && sourceScopeRef.current.epoch === sourceScopeEpoch
+      && indexingRequestIdRef.current === requestId;
+    setIndexingRequest({ epoch: sourceScopeEpoch, id: requestId });
 
     const buildIriIndexAsync = async (content: string): Promise<Map<string, IriPosition>> => {
       const index = new Map<string, IriPosition>();
@@ -228,6 +252,7 @@ export function useProjectViewer({
 
       const chunkSize = 5000;
       for (let start = 0; start < lines.length; start += chunkSize) {
+        if (!isCurrentRequest()) return index;
         const end = Math.min(start + chunkSize, lines.length);
 
         for (let i = start; i < end; i++) {
@@ -283,14 +308,21 @@ export function useProjectViewer({
 
     buildIriIndexAsync(sourceContent)
       .then((newIndex) => {
-        setSourceIriIndex(newIndex);
-        setIsIndexing(false);
+        if (!isCurrentRequest()) return;
+        setSourceIndex({ epoch: sourceScopeEpoch, index: newIndex, completedContent: sourceContent });
+        setIndexingRequest(null);
       })
       .catch((error) => {
+        if (!isCurrentRequest()) return;
         console.error("[ViewInSource] Indexing error:", error);
-        setIsIndexing(false);
+        setIndexingRequest(null);
       });
-  }, [sourceContent, sourceIriIndex.size, isIndexing]);
+
+    return () => {
+      cancelled = true;
+      setIndexingRequest(previous => previous?.id === requestId ? null : previous);
+    };
+  }, [sourceContent, sourceScopeEpoch, sourceIndex]);
 
   // Reset source state (used by editor when switching branches)
   const resetSourceState = useCallback(() => {
@@ -303,7 +335,7 @@ export function useProjectViewer({
     setSourceLoad({ epoch: -1, loading: false, preloading: false, error: null });
     setSourceIriIndex(new Map());
     preloadStartedRef.current = null;
-  }, []);
+  }, [setSourceIriIndex]);
 
   return {
     // Project

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { extractEntitySource } from "@/lib/ontology/entitySource";
+import { describe, expect, it, vi } from "vitest";
+import { buildEntitySourceIndex, extractEntitySource, lookupEntitySource } from "@/lib/ontology/entitySource";
 
 const ns = "https://example.org/ontology/";
 const prefixes = `@prefix ex: <${ns}> .
@@ -8,6 +8,26 @@ const prefixes = `@prefix ex: <${ns}> .
 `;
 
 describe("extractEntitySource", () => {
+  it.each([
+    '<urn:A> <urn:p> <urn:x>.<urn:B> <urn:p> <urn:y> .',
+    '@prefix ex: <urn:> .\nex:A ex:p ex:foo\\#bar .\nex:B ex:p ex:other .',
+    '@prefix ex: <urn:> .\nex:A ex:p "value".ex:B ex:p ex:other .',
+    '@prefix ex: <urn:> .\nex:A ex:p ex:foo\\.bar .\nex:B ex:p ex:other .',
+    '@prefix ex: <urn:> .\nex:A ex:p 42.ex:B ex:p ex:y .',
+    '@prefix ex: <urn:> .\nex:A ex:p 1.0.ex:B ex:p ex:y .',
+    '@prefix ex: <urn:> .\nex:A ex:p true.ex:B ex:p ex:y .',
+    '@prefix ex: <urn:> .\nex:A ex:p false.ex:B ex:p ex:y .',
+    '@prefix ex: <urn:> .\nex:A ex:p 1.0e2.ex:B ex:p ex:y .',
+  ])("never attributes a merged statement to its first subject", (source) => {
+    const result = extractEntitySource(source, "urn:A");
+    if (result.status === "available") {
+      expect(result.excerpts).toHaveLength(1);
+      expect(result.excerpts[0].text).not.toMatch(/(?:<urn:B>|ex:B)/);
+    } else {
+      expect(result.reason).toMatch(/cannot safely attribute/);
+    }
+  });
+
   it.each(["Class", "ObjectProperty", "DatatypeProperty", "AnnotationProperty", "NamedIndividual"])(
     "extracts a direct %s declaration without interpreting entity type",
     (type) => {
@@ -111,5 +131,69 @@ Escaped quote: \\". Still inside.""" ;
     expect(extractEntitySource(`  @prefix ex: <${ns}> . # namespace\n\n${text}`, ns + "Selected")).toEqual({
       status: "available", excerpts: [{ text, startLine: 3 }],
     });
+  });
+
+  it("preserves dotted names, decimals, strings and comments during lexical validation", () => {
+    const text = 'ex:Selected ex:dotted.name ex:object.name ; ex:number 3.14 ; ex:text "Escaped quote: \\"; # not a comment" .';
+    expect(extractEntitySource(prefixes + '# A comment with \\# and >.<\n' + text, ns + "Selected")).toEqual({
+      status: "available", excerpts: [{ text, startLine: 5 }],
+    });
+  });
+
+  it.each(["3.14", "1.0", "1.0e2", "42.e2", "-1.0", "+3.14", "true", "false"])("preserves ordinary literal %s", literal => {
+    const text = `ex:Selected ex:value ${literal} .`;
+    expect(extractEntitySource(prefixes + text, ns + "Selected")).toEqual({
+      status: "available", excerpts: [{ text, startLine: 4 }],
+    });
+  });
+});
+
+describe("entity source index", () => {
+  it("indexes exact subjects and declaration order once for repeated lookups", async () => {
+    const source = `@prefix ex: <${ns}> .\nex:Selected <urn:p> "first" .\n` +
+      `PREFIX ex: <https://other.example/>\nex:Selected <urn:p> "other" .\n` +
+      `<${ns}Selected> <urn:p> "last" .`;
+    const index = await buildEntitySourceIndex(source);
+    expect(index).not.toBeNull();
+    expect(index!.statements.size).toBe(2);
+    expect(lookupEntitySource(index!, ns + "Selected")).toEqual(extractEntitySource(source, ns + "Selected"));
+    expect(lookupEntitySource(index!, "https://other.example/Selected")).toEqual({
+      status: "available", excerpts: [{ text: 'ex:Selected <urn:p> "other" .', startLine: 4 }],
+    });
+    expect(lookupEntitySource(index!, ns + "Selected")).toEqual({
+      status: "available", excerpts: [
+        { text: 'ex:Selected <urn:p> "first" .', startLine: 2 },
+        { text: `<${ns}Selected> <urn:p> "last" .`, startLine: 5 },
+      ],
+    });
+    expect(lookupEntitySource(index!, "urn:missing").status).toBe("unavailable");
+  });
+
+  it("yields during large-source work and discards a cancelled partial index", async () => {
+    vi.useFakeTimers();
+    try {
+      const controller = new AbortController();
+      const source = prefixes + Array.from({ length: 1000 }, (_, i) => `ex:Entity${i} ex:label "${"x".repeat(200)}" .`).join("\n");
+      let completed = false;
+      const pending = buildEntitySourceIndex(source, controller.signal).then(result => { completed = true; return result; });
+      expect(completed).toBe(false);
+      await vi.advanceTimersToNextTimerAsync();
+      expect(completed).toBe(false);
+      expect(vi.getTimerCount()).toBe(1);
+      controller.abort();
+      await vi.runAllTimersAsync();
+      expect(await pending).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("makes unsupported source unavailable for every indexed subject", async () => {
+    const index = await buildEntitySourceIndex('<urn:A> <urn:p> <urn:x>.<urn:B> <urn:p> <urn:y> .');
+    for (const iri of ["urn:A", "urn:B"]) {
+      expect(lookupEntitySource(index!, iri)).toEqual(expect.objectContaining({
+        status: "unavailable", reason: expect.stringMatching(/cannot safely attribute/),
+      }));
+    }
   });
 });

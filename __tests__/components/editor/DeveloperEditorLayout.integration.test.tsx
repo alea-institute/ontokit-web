@@ -137,7 +137,7 @@ describe("developer layout real tree/detail integration", () => {
     fireEvent.change(input, { target: { value: "Unsaved relation" } });
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Entity source" }), { button: 0, ctrlKey: false });
     const preview = screen.getByRole("region", { name: "Entity source preview" });
-    expect(within(preview).getByLabelText("Source excerpts").textContent).toContain('rdfs:label "First relation"');
+    expect((await within(preview).findByLabelText("Source excerpts")).textContent).toContain('rdfs:label "First relation"');
     expect(within(preview).queryByText(/Unsaved relation/)).toBeNull();
     const detail = input.closest('[role="tabpanel"]')!;
     expect(detail.hasAttribute("hidden")).toBe(true);
@@ -150,7 +150,7 @@ describe("developer layout real tree/detail integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Individuals" }));
     expect(screen.getByText(/Select an entity in the tree/)).toBeDefined();
     fireEvent.click(await screen.findByText("Alice"));
-    expect(screen.getByLabelText("Source excerpts").textContent).toContain(":alice a owl:NamedIndividual");
+    expect((await screen.findByLabelText("Source excerpts")).textContent).toContain(":alice a owl:NamedIndividual");
     expect(screen.getByLabelText("Source excerpts").textContent).not.toContain(":first");
   });
 
@@ -167,7 +167,7 @@ describe("developer layout real tree/detail integration", () => {
     expect(screen.getByRole("tab", { name: "Entity source" }).getAttribute("aria-selected")).toBe("true");
   });
 
-  it("loads once per scope, retries explicitly, and suppresses mismatched branch content", () => {
+  it("loads once per scope, retries explicitly, and suppresses mismatched branch content", async () => {
     const p = props({ selectedIri: layoutNs + "first", sourceContent: "", isSourceReady: false, sourceFilePath: "ontology.ttl" });
     const { rerender } = mount(p);
     fireEvent.mouseDown(screen.getByRole("tab", { name: "Entity source" }), { button: 0, ctrlKey: false });
@@ -177,11 +177,28 @@ describe("developer layout real tree/detail integration", () => {
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(p.loadSourceContent).toHaveBeenCalledTimes(2);
     rerender(<LayoutProviders><DeveloperEditorLayout {...p} isSourceReady /></LayoutProviders>);
-    expect(screen.getByText(/No direct statements/)).toBeDefined();
+    expect(await screen.findByText(/No direct statements/)).toBeDefined();
     expect(p.loadSourceContent).toHaveBeenCalledTimes(2);
     rerender(<LayoutProviders><DeveloperEditorLayout {...p} isSourceReady sourceContent={layoutProps().sourceContent!} activeBranch="other" sourceScope={{ projectId: p.projectId, branch: "work", filePath: "ontology.ttl" }} /></LayoutProviders>);
     expect(screen.queryByLabelText("Source excerpts")).toBeNull();
     expect(p.loadSourceContent).toHaveBeenCalledTimes(3);
+  });
+
+  it("requests source again after revisiting a branch while Detail hid the preview", () => {
+    const p = props({ selectedIri: layoutNs + "first", sourceContent: "", isSourceReady: false, activeBranch: "a" });
+    const { rerender } = mount(p);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Entity source" }), { button: 0, ctrlKey: false });
+    expect(p.loadSourceContent).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Detail" }), { button: 0, ctrlKey: false });
+    rerender(<LayoutProviders><DeveloperEditorLayout {...p} activeBranch="b" isSourceReady /></LayoutProviders>);
+    rerender(<LayoutProviders><DeveloperEditorLayout {...p} isPreloading /></LayoutProviders>);
+    // A failed background preload is silent and leaves the source unready.
+    rerender(<LayoutProviders><DeveloperEditorLayout {...p} /></LayoutProviders>);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Entity source" }), { button: 0, ctrlKey: false });
+    expect(p.loadSourceContent).toHaveBeenCalledTimes(2);
+    expect(p.loadSourceContent).toHaveBeenLastCalledWith(false);
+    rerender(<LayoutProviders><DeveloperEditorLayout {...p} sourceError="Load failed" /></LayoutProviders>);
+    expect(screen.getByRole("button", { name: "Try again" })).toBeDefined();
   });
 
 });

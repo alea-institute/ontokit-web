@@ -330,6 +330,10 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   const isSourceReady = sourceMatchesScope && (props.isSourceReady ?? !!sourceContent);
   const preloadStartedRef = useRef<string | null>(null);
   const sourceRequestedRef = useRef<string | null>(null);
+  useEffect(() => {
+    preloadStartedRef.current = null;
+    sourceRequestedRef.current = null;
+  }, [sourceScopeKey]);
 
   // Panel width state (default 320px = w-80)
   const [treePanelWidth, setTreePanelWidth] = useState(320);

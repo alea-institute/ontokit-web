@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Copy, FileCode } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { extractEntitySource } from "@/lib/ontology/entitySource";
+import { buildEntitySourceIndex, lookupEntitySource, type EntitySourceIndex } from "@/lib/ontology/entitySource";
 
 export interface EntitySourcePreviewProps {
   iri: string | null;
@@ -19,8 +19,19 @@ export interface EntitySourcePreviewProps {
 export function EntitySourcePreview({ iri, sourceContent, filePath, isLoading, isReady, error, onRetry, onOpenFullSource }: EntitySourcePreviewProps) {
   const context = useMemo(() => ({ iri, sourceContent, filePath, isLoading, isReady, error }), [iri, sourceContent, filePath, isLoading, isReady, error]);
   const [feedback, setFeedback] = useState<{ context: object; message: string } | null>(null);
-  const result = useMemo(() => iri && isReady && !isLoading && !error
-    ? extractEntitySource(sourceContent, iri) : null, [iri, sourceContent, isReady, isLoading, error]);
+  const [index, setIndex] = useState<EntitySourceIndex | null>(null);
+  const shouldIndex = !!iri && isReady && !isLoading && !error;
+  useEffect(() => {
+    if (!shouldIndex || index?.source === sourceContent) return;
+    const controller = new AbortController();
+    void buildEntitySourceIndex(sourceContent, controller.signal).then(nextIndex => {
+      if (!controller.signal.aborted && nextIndex) setIndex(nextIndex);
+    });
+    return () => controller.abort();
+  }, [sourceContent, shouldIndex, index]);
+  // A source change hides the previous index during render, before effect cleanup.
+  const result = useMemo(() => iri && shouldIndex && index?.source === sourceContent
+    ? lookupEntitySource(index, iri) : null, [iri, sourceContent, shouldIndex, index]);
   const fileLabel = (filePath || "Current ontology file").replace(/[\r\n\u2028\u2029]/g, " ");
   const snippet = result?.status === "available"
     ? result.excerpts.map(({ text, startLine }) => `# File: ${fileLabel}, line ${startLine}\n${text}`).join("\n\n") : null;
@@ -44,6 +55,7 @@ export function EntitySourcePreview({ iri, sourceContent, filePath, isLoading, i
       </div>
     );
     if (!isReady) return <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Loading entity source…</p>;
+    if (!result) return <p role="status" className="text-sm text-slate-500 dark:text-slate-400">Preparing entity source…</p>;
     if (snippet !== null) return (
       <pre aria-label="Source excerpts" className="w-max min-w-full rounded-lg border border-slate-200 bg-slate-50 p-4 font-mono text-xs leading-6 text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"><code>{snippet}</code></pre>
     );

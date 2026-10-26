@@ -30,6 +30,6 @@ export default defineConfig({
   },
   projects: playwrightProjects(run.profile).map(project => ({
     ...project,
-    testIgnore: [...(project.testIgnore ?? []), "**/ui/**"],
+    testIgnore: [...("testIgnore" in project ? project.testIgnore ?? [] : []), "**/ui/**"],
   })),
 });

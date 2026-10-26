@@ -1068,6 +1068,90 @@ describe("useProjectViewer", () => {
 
   // --- IRI index building ---
 
+  it("rebuilds navigation positions when an anonymous proposal returns to the base branch", async () => {
+    mockUseProject.mockReturnValue({ project: makeProject(), isLoading: false, error: null, errorKind: null });
+    mockDerivePermissions.mockReturnValue(defaultPermissions({ canEdit: false, canSuggest: false }));
+    vi.mocked(revisionsApi.getFileAtVersion)
+      .mockResolvedValueOnce({ content: '# Proposal heading\n<urn:A> <urn:p> <urn:x> .', revision: "proposal-1" } as RevisionFileResponse);
+    const { result, rerender } = renderHook(({ proposalBranch }: { proposalBranch?: string }) => useProjectViewer({
+      projectId: "p1", sessionStatus: "unauthenticated", activeBranch: "main", proposalBranch,
+    }), { initialProps: { proposalBranch: "proposal" } as { proposalBranch?: string } });
+    await act(async () => { await result.current.loadSourceContent(); });
+    await waitFor(() => expect(result.current.sourceIriIndex.get("urn:A")?.line).toBe(2));
+    rerender({ proposalBranch: undefined });
+    expect(result.current.sourceIriIndex.size).toBe(0);
+    vi.mocked(revisionsApi.getFileAtVersion)
+      .mockResolvedValueOnce({ content: '<urn:A> <urn:p> <urn:x> .', revision: "main-1" } as RevisionFileResponse);
+    await act(async () => { await result.current.loadSourceContent(); });
+    await waitFor(() => expect(result.current.sourceIriIndex.get("urn:A")?.line).toBe(1));
+  });
+
+  it.each(["scope change", "source reset", "caller invalidation"] as const)(
+    "discards an old index build after %s without clearing the replacement build's busy state",
+    async (transition) => {
+      vi.useFakeTimers();
+      mockUseProject.mockReturnValue({ project: makeProject(), isLoading: false, error: null, errorKind: null });
+      mockDerivePermissions.mockReturnValue(defaultPermissions({ hasOntology: false }));
+      const { result, rerender, unmount } = renderHook(({ activeBranch }) => useProjectViewer({
+        projectId: "p1", sessionStatus: "authenticated", activeBranch,
+      }), { initialProps: { activeBranch: "main" } });
+      const indexSetter = result.current.setSourceIriIndex;
+      const oldContent = Array.from({ length: 5001 }, () => "<urn:Old> <urn:p> <urn:x> .").join("\n");
+      const newContent = [
+        ...Array.from({ length: 10000 }, () => "<urn:Filler> <urn:p> <urn:x> ."),
+        "<urn:New> <urn:p> <urn:x> .",
+      ].join("\n");
+
+      try {
+        act(() => { result.current.setSourceSnapshot(oldContent, "old"); });
+        expect(result.current.isIndexing).toBe(true);
+
+        if (transition === "scope change") {
+          rerender({ activeBranch: "feature" });
+          expect(result.current.isIndexing).toBe(false);
+        } else if (transition === "source reset") {
+          act(() => { result.current.resetSourceState(); });
+          expect(result.current.isIndexing).toBe(false);
+        }
+        act(() => {
+          result.current.setSourceSnapshot(newContent, "new");
+          if (transition === "caller invalidation") result.current.setSourceIriIndex(new Map());
+        });
+        expect(result.current.setSourceIriIndex).toBe(indexSetter);
+        expect(result.current.sourceIriIndex.size).toBe(0);
+        expect(result.current.isIndexing).toBe(true);
+
+        // Resume the older 5,001-line build while the replacement still has
+        // another chunk to process. Its completion must not clear that work.
+        await act(async () => { await vi.advanceTimersToNextTimerAsync(); });
+        expect(result.current.sourceIriIndex.size).toBe(0);
+        expect(result.current.isIndexing).toBe(true);
+
+        await act(async () => { await vi.runAllTimersAsync(); });
+        expect(result.current.isIndexing).toBe(false);
+        expect(result.current.sourceIriIndex.has("urn:Old")).toBe(false);
+        expect(result.current.sourceIriIndex.get("urn:New")?.line).toBe(10001);
+      } finally {
+        unmount();
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("rebuilds an empty index when later content adds a navigable subject", async () => {
+    mockUseProject.mockReturnValue({ project: makeProject(), isLoading: false, error: null, errorKind: null });
+    const { result } = renderHook(() => useProjectViewer({
+      projectId: "p1", sessionStatus: "authenticated", activeBranch: "main",
+    }));
+    await act(async () => { result.current.setSourceContent("# No subjects yet"); });
+    expect(result.current.isIndexing).toBe(false);
+    expect(result.current.sourceIriIndex.size).toBe(0);
+
+    await act(async () => { result.current.setSourceContent("<urn:A> <urn:p> <urn:x> ."); });
+    expect(result.current.isIndexing).toBe(false);
+    expect(result.current.sourceIriIndex.get("urn:A")?.line).toBe(1);
+  });
+
   it("builds sourceIriIndex from sourceContent after loading", async () => {
     const project = makeProject();
     mockUseProject.mockReturnValue({
