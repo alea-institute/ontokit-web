@@ -1,4 +1,3 @@
-// Hosted resources are retained by default. This module never deletes a project.
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { lstat, mkdir, open, readdir, realpath, rm } from 'node:fs/promises';
@@ -41,7 +40,7 @@ async function append(run, event) {
 }
 export async function createHostedRun(id) {
   for (const dir of [ROOT, RETAINED_ROOT]) await privateDirectory(dir);
-  await mkdir(runRoot(id), {mode: 0o700}); // Exclusive: never resume or overwrite another run.
+  await mkdir(runRoot(id), {mode: 0o700});
   const dir = hostedRunDir(id);
   await mkdir(dir, {mode: 0o700});
   const run = {id, dir, journal: journalPath(id)};
@@ -96,7 +95,11 @@ export async function treeDigest(dir) {
       for (const name of (await readdir(file)).sort()) await visit(path.join(file, name), path.join(relative, name));
     } else if (stat.isFile() && stat.nlink === 1) {
       const handle = await open(file, constants.O_RDONLY | constants.O_NOFOLLOW);
-      try { hash.update(createHash('sha256').update(await handle.readFile()).digest()); }
+      try {
+        const contents = createHash('sha256');
+        for await (const chunk of handle.createReadStream({autoClose: false})) contents.update(chunk);
+        hash.update(contents.digest());
+      }
       finally { await handle.close(); }
     } else fail();
   }
@@ -112,7 +115,7 @@ export async function disposePrivateRun({verifyBackup, ...run}) {
   await checkRun(run);
   const sha256 = await treeDigest(run.dir);
   let proof;
-  try { proof = await verifyBackup?.({run: run.id, dir: run.dir, sha256}); } catch { /* Retain on backup failure. */ }
+  try { proof = await verifyBackup?.({run: run.id, dir: run.dir, sha256}); } catch { proof = null; }
   const current = await treeDigest(run.dir);
   if (proof?.verified === true && proof.run === run.id && proof.sha256 === sha256 && current === sha256) {
     await rm(run.dir, {recursive: true});

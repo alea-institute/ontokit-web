@@ -7,7 +7,7 @@ import { pages } from '../ctt/fixtures/pages.mjs';
 import { prepareSources, verifySources, stageSources, sourceEvidence, sha256, rawUrl, UPSTREAM, TARGETS } from './sources.mjs';
 import { sanitizedEvidence, PROFILE_INVENTORIES, REHEARSAL_CASES } from '../e2e/evidence.mjs';
 import { profileSpec } from '../e2e/auth-modes.mjs';
-import { backup } from './test-helpers.mjs';
+import { backup, selectedRuntime, observeRuntime } from './test-helpers.mjs';
 import { readTarget, runHosted } from './hosted.mjs';
 
 const folio = Buffer.from('<rdf:RDF><owl:Class rdf:about="https://folio.example/Canon"/></rdf:RDF>');
@@ -192,7 +192,7 @@ test('hosted runs remove the credential directory and never put secrets in the r
         ctt: {source: {site: 'https://ctt.jaces.com/', build: {date: '2026-10-19', commit: 'f66099a'}}, calibration: 'uncalibrated', terms: 250, communities: 24, falseFriends: 6},
       }};
     };
-    const {receipt, file: receiptFile, failure} = await runHosted({targetFile: file, fetchImpl: serving, runPlaywright: failing, stage, verifyBackup: backup});
+    const {receipt, file: receiptFile, failure} = await runHosted({targetFile: file, fetchImpl: serving, runPlaywright: failing, stage, verifyBackup: backup, selectedRuntime, observeRuntime});
     try {
       assert.ok(failure);
       assert.ok(runDir, 'Playwright was reached');

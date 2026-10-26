@@ -106,3 +106,13 @@ test('hosted teardown makes no DELETE and retains auth; isolated teardown delete
   assert.deepEqual(calls, created.map(id => `/api/v1/projects/${id}`).concat('disposed'));
   await assert.rejects(lstat(path.join(hosted.dir, 'auth')), {code: 'ENOENT'});
 });
+
+test('an uncertain import cannot invoke a second HTTP operation or change its journal', async () => {
+  const run = await setup();
+  await assert.rejects(importWithJournal(run, 'folio', async () => { throw new Error('lost response'); }));
+  const before = await readFile(run.journal, 'utf8');
+  let calls = 0;
+  await assert.rejects(importWithJournal(run, 'folio', async () => { calls++; return {id: uuid(3)}; }));
+  assert.equal(calls, 0);
+  assert.equal(await readFile(run.journal, 'utf8'), before);
+});

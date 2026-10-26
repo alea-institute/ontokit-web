@@ -28,7 +28,7 @@
     "test:e2e:rehearsal": "node scripts/e2e/run.mjs --profile rehearsal",
     "rehearsal:sources": "node scripts/rehearsal/sources.mjs",
     "rehearsal:hosted": "node scripts/rehearsal/hosted.mjs",
-    "test:ctt": "node --test scripts/ctt/ctt.test.mjs scripts/rehearsal/rehearsal.test.mjs scripts/rehearsal/disposition.test.mjs"
+    "test:ctt": "node --test scripts/ctt/ctt.test.mjs scripts/rehearsal/rehearsal.test.mjs scripts/rehearsal/disposition.test.mjs scripts/rehearsal/hosted.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
