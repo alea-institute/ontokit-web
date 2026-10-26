@@ -1,0 +1,9 @@
+Command: OW4_UI_CHROME=1 npx playwright test --config=playwright.ui.config.ts
+Outcome: app server started; browser launch failed before page assertions or screenshots.
+Runner: Node v22.22.1; system Chrome; synthetic API/session fixtures only.
+
+[pid=16604][err] [16604:16604:1026/132658.132487:FATAL:chrome/browser/process_singleton_posix.cc:297] Check failed: . socket() failed: Permission denied (13)
+
+Playwright: 1 failed; no screenshot generated.
+The local wrapper stopped its owned development server after the failure.
+No full-stack or hosted DEV acceptance was run.
