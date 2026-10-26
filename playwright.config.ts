@@ -7,8 +7,10 @@ import { playwrightProjects } from "./scripts/e2e/auth-modes.mjs";
 // registry (KTD7): each non-baseline profile discovers only its own spec, and the
 // baseline project ignores every spec another profile owns.
 const run = loadRunConfig();
+if (run.profile === "suggestions" && run.hosted) throw new Error("Use the hosted Playwright configuration");
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: ["**/hosted-personas.spec.ts"],
   outputDir: path.join(run.dir, "test-results"),
   forbidOnly: true,
   fullyParallel: false,
