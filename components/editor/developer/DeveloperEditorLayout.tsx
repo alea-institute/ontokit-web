@@ -4,6 +4,8 @@ import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProv
 
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import dynamic from "next/dynamic";
+import * as Tabs from "@radix-ui/react-tabs";
+import { EntitySourcePreview } from "@/components/editor/EntitySourcePreview";
 import { FileCode, TreePine, Code, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -99,6 +101,9 @@ export interface DeveloperEditorLayoutProps {
 
   // Source state (managed by orchestrator)
   sourceContent: string;
+  isSourceReady?: boolean;
+  sourceScope?: { projectId: string; branch?: string; filePath?: string };
+  sourceFilePath?: string;
   setSourceContent: (content: string | ((prev: string) => string)) => void;
   isLoadingSource: boolean;
   sourceError: string | null;
@@ -178,6 +183,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     isExpandingAll,
     navigateToNode,
     sourceContent,
+    sourceFilePath,
+    sourceScope,
     setSourceContent,
     isLoadingSource,
     sourceError,
@@ -315,7 +322,14 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   }, [undoAction, toast, handleUndo, clearUndo]);
 
   const [viewMode, setViewMode] = useState<DeveloperView>("tree");
-  const preloadStartedRef = useRef(false);
+  const [detailTab, setDetailTab] = useState("detail");
+  const sourceScopeKey = JSON.stringify([projectId, activeBranch, sourceFilePath]);
+  const sourceMatchesScope = !sourceScope || (
+    sourceScope.projectId === projectId && sourceScope.branch === activeBranch && sourceScope.filePath === sourceFilePath
+  );
+  const isSourceReady = sourceMatchesScope && (props.isSourceReady ?? !!sourceContent);
+  const preloadStartedRef = useRef<string | null>(null);
+  const sourceRequestedRef = useRef<string | null>(null);
 
   // Panel width state (default 320px = w-80)
   const [treePanelWidth, setTreePanelWidth] = useState(320);
@@ -420,18 +434,22 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
   // Preload source on hover
   const handleSourceTabHover = useCallback(() => {
-    if (!sourceContent && !isLoadingSource && !isPreloading && !preloadStartedRef.current) {
-      preloadStartedRef.current = true;
+    if (!isSourceReady && !sourceError && !isLoadingSource && !isPreloading && preloadStartedRef.current !== sourceScopeKey) {
+      preloadStartedRef.current = sourceScopeKey;
       loadSourceContent(true);
     }
-  }, [sourceContent, isLoadingSource, isPreloading, loadSourceContent]);
+  }, [isSourceReady, sourceError, sourceScopeKey, isLoadingSource, isPreloading, loadSourceContent]);
 
-  // Load source when switching to source view
+  // An empty successful file is ready; an error needs an explicit retry. Limit
+  // automatic attempts per scope even if the callback cannot currently fetch.
   useEffect(() => {
-    if (viewMode === "source" && !sourceContent && !isLoadingSource && !isPreloading) {
-      loadSourceContent(false);
+    if ((viewMode === "source" || (viewMode === "tree" && detailTab === "source"))
+      && !isSourceReady && !sourceError && !isLoadingSource && !isPreloading
+      && sourceRequestedRef.current !== sourceScopeKey) {
+      sourceRequestedRef.current = sourceScopeKey;
+      void loadSourceContent(false);
     }
-  }, [viewMode, sourceContent, isLoadingSource, isPreloading, loadSourceContent]);
+  }, [viewMode, detailTab, isSourceReady, sourceError, isLoadingSource, isPreloading, sourceScopeKey, loadSourceContent]);
 
   const handleViewModeChange = useCallback((mode: DeveloperView) => {
     if (viewMode === "source" && mode !== "source" && sourceEditorRef.current) {
@@ -657,7 +675,13 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             />
 
             {/* Center Panel - Entity Details */}
-            <div className="min-w-0 flex-1 bg-white dark:bg-slate-800">
+            <Tabs.Root value={detailTab} onValueChange={setDetailTab} className="flex min-w-0 flex-1 flex-col bg-white dark:bg-slate-800">
+              <Tabs.List aria-label="Entity detail view" className="flex shrink-0 border-b border-slate-200 dark:border-slate-700">
+                {[{ value: "detail", label: "Detail" }, { value: "source", label: "Entity source" }].map(tab => (
+                  <Tabs.Trigger key={tab.value} value={tab.value} className="border-b-2 border-transparent px-4 py-2 text-sm font-medium text-slate-500 focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-primary-600 data-[state=active]:border-primary-600 data-[state=active]:text-primary-600 dark:text-slate-400 dark:data-[state=active]:border-primary-400 dark:data-[state=active]:text-primary-400">{tab.label}</Tabs.Trigger>
+                ))}
+              </Tabs.List>
+              <Tabs.Content value="detail" forceMount hidden={detailTab !== "detail"} inert={detailTab !== "detail"} className="min-h-0 flex-1 overflow-auto">
               {activeTab === "classes" ? (
                 <ClassDetailPanel
                   // Remount on selection change so internal edit-state and
@@ -738,7 +762,21 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   labelHints={treeLabelHintsRecord}
                 />
               )}
-            </div>
+              </Tabs.Content>
+              <Tabs.Content value="source" className="min-h-0 flex-1">
+                <EntitySourcePreview
+                  key={sourceScopeKey}
+                  iri={activeTab === "classes" ? selectedIri : activeTab === "properties" ? selectedPropertyIri : selectedIndividualIri}
+                  sourceContent={sourceMatchesScope ? sourceContent : ""}
+                  filePath={sourceFilePath}
+                  isReady={isSourceReady}
+                  isLoading={isLoadingSource || isPreloading}
+                  error={sourceError}
+                  onRetry={() => loadSourceContent(false)}
+                  onOpenFullSource={handleNavigateToSource}
+                />
+              </Tabs.Content>
+            </Tabs.Root>
 
           </>
         ) : (

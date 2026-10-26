@@ -688,6 +688,47 @@ describe("useProjectViewer", () => {
     expect(result.current.sourceRevision).toBeNull();
   });
 
+  it("treats a successfully loaded empty file as ready without refetching", async () => {
+    mockUseProject.mockReturnValue({ project: makeProject(), isLoading: false, error: null, errorKind: null });
+    vi.mocked(revisionsApi.getFileAtVersion).mockResolvedValueOnce({ project_id: "p1", version: "main", revision: "empty", filename: "ontology.ttl", content: "" });
+    const { result } = renderHook(() => useProjectViewer({ projectId: "p1", sessionStatus: "authenticated", activeBranch: "main" }));
+    await act(async () => { await result.current.loadSourceContent(); });
+    expect(result.current.isSourceReady).toBe(true);
+    await act(async () => { await result.current.loadSourceContent(); });
+    expect(revisionsApi.getFileAtVersion).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides old snapshots immediately when project, branch or file scope changes", async () => {
+    mockUseProject.mockReturnValue({ project: makeProject(), isLoading: false, error: null, errorKind: null });
+    const { result, rerender } = renderHook(({ projectId, activeBranch }) => useProjectViewer({ projectId, activeBranch, sessionStatus: "authenticated" }), { initialProps: { projectId: "p1", activeBranch: "main" } });
+    await act(async () => { await result.current.loadSourceContent(); });
+    const oldSetter = result.current.setSourceContent;
+    rerender({ projectId: "p1", activeBranch: "feature" });
+    expect(result.current.sourceContent).toBe("");
+    expect(result.current.isSourceReady).toBe(false);
+    act(() => { oldSetter("late main draft"); });
+    expect(result.current.sourceContent).toBe("");
+    await act(async () => { await result.current.loadSourceContent(); });
+    mockUseProject.mockReturnValue({ project: makeProject({ git_ontology_path: "other.ttl" }), isLoading: false, error: null, errorKind: null });
+    rerender({ projectId: "p1", activeBranch: "feature" });
+    expect(result.current.sourceContent).toBe("");
+    expect(result.current.isSourceReady).toBe(false);
+    await act(async () => { await result.current.loadSourceContent(); });
+    rerender({ projectId: "p2", activeBranch: "feature" });
+    expect(result.current.sourceContent).toBe("");
+    expect(result.current.isSourceReady).toBe(false);
+  });
+
+  it("loads the effective anonymous proposal branch while leaving tree branch ownership intact", async () => {
+    mockUseProject.mockReturnValue({ project: makeProject(), isLoading: false, error: null, errorKind: null });
+    mockDerivePermissions.mockReturnValue(defaultPermissions({ canEdit: false, canSuggest: false }));
+    const { result } = renderHook(() => useProjectViewer({ projectId: "p1", sessionStatus: "unauthenticated", activeBranch: "main", proposalBranch: "suggestions/anonymous" }));
+    await act(async () => { await result.current.loadSourceContent(); });
+    expect(revisionsApi.getFileAtVersion).toHaveBeenCalledWith("p1", "suggestions/anonymous", undefined, "ontology.ttl");
+    expect(result.current.sourceScope).toEqual({ projectId: "p1", branch: "suggestions/anonymous", filePath: "ontology.ttl" });
+    expect(vi.mocked(useOntologyTree).mock.lastCall?.[0].branchKey).toBe("main");
+  });
+
   it("loadSourceContent sets sourceError on failure", async () => {
     const project = makeProject();
     mockUseProject.mockReturnValue({

@@ -15,6 +15,8 @@ export interface UseProjectViewerOptions {
   accessToken?: string;
   sessionStatus: "loading" | "authenticated" | "unauthenticated";
   activeBranch?: string;
+  /** Anonymous proposal branch, used only when this project permits proposals. */
+  proposalBranch?: string;
   /** Enable WebSocket connections (lint status, collaboration). Defaults to false. */
   enableWebSocket?: boolean;
 }
@@ -24,6 +26,7 @@ export function useProjectViewer({
   accessToken,
   sessionStatus,
   activeBranch,
+  proposalBranch,
   enableWebSocket = false,
 }: UseProjectViewerOptions) {
   // Project data from shared React Query cache
@@ -52,40 +55,40 @@ export function useProjectViewer({
     { enabled: !!canEdit },
   );
 
-  // Source state
-  const [sourceSnapshot, setSourceSnapshotState] = useState<{
-    content: string;
-    revision: string | null;
-  }>({ content: "", revision: null });
-  const sourceScopeKey = `${projectId}\0${activeBranch ?? ""}`;
+  // Tag the buffer with its read scope, including anonymous suggestion branches.
+  // Render-time scope checks also cover the frame before branch-reset effects run.
+  const sourceBranch = !canEdit && !canSuggest && project?.is_public
+    ? proposalBranch ?? activeBranch : activeBranch;
+  const sourceScope = useMemo(() => ({ projectId, branch: sourceBranch, filePath: project?.git_ontology_path }), [projectId, sourceBranch, project?.git_ontology_path]);
+  const sourceScopeKey = JSON.stringify(sourceScope);
   const sourceScopeRef = useRef({ key: sourceScopeKey, epoch: 0 });
   if (sourceScopeRef.current.key !== sourceScopeKey) {
-    sourceScopeRef.current = {
-      key: sourceScopeKey,
-      epoch: sourceScopeRef.current.epoch + 1,
-    };
+    sourceScopeRef.current = { key: sourceScopeKey, epoch: sourceScopeRef.current.epoch + 1 };
   }
   const sourceScopeEpoch = sourceScopeRef.current.epoch;
-  const sourceContent = sourceSnapshot.content;
-  const sourceRevision = sourceSnapshot.revision;
+  const [sourceSnapshot, setSourceSnapshotState] = useState<{
+    content: string; revision: string | null; epoch: number;
+  }>({ content: "", revision: null, epoch: -1 });
+  const isSourceReady = sourceSnapshot.epoch === sourceScopeEpoch;
+  const sourceContent = isSourceReady ? sourceSnapshot.content : "";
+  const sourceRevision = isSourceReady ? sourceSnapshot.revision : null;
   const setSourceContent = useCallback((next: React.SetStateAction<string>) => {
+    if (sourceScopeRef.current.epoch !== sourceScopeEpoch) return;
     setSourceSnapshotState((previous) => {
-      const content = typeof next === "function" ? next(previous.content) : next;
-      return content === previous.content ? previous : { ...previous, content };
+      const current = previous.epoch === sourceScopeEpoch ? previous : { content: "", revision: null, epoch: sourceScopeEpoch };
+      const content = typeof next === "function" ? next(current.content) : next;
+      return { ...current, content };
     });
-  }, []);
+  }, [sourceScopeEpoch]);
   const setSourceSnapshot = useCallback((content: string, revision: string) => {
     if (sourceScopeRef.current.epoch !== sourceScopeEpoch) return;
-    setSourceSnapshotState((previous) => (
-      previous.content === content && previous.revision === revision
-        ? previous
-        : { content, revision }
-    ));
+    setSourceSnapshotState({ content, revision, epoch: sourceScopeEpoch });
   }, [sourceScopeEpoch]);
-  const [isLoadingSource, setIsLoadingSource] = useState(false);
-  const [sourceError, setSourceError] = useState<string | null>(null);
-  const [isPreloading, setIsPreloading] = useState(false);
-  const preloadStartedRef = useRef(false);
+  const [sourceLoad, setSourceLoad] = useState({ epoch: -1, loading: false, preloading: false, error: null as string | null });
+  const isLoadingSource = sourceLoad.epoch === sourceScopeEpoch && sourceLoad.loading;
+  const isPreloading = sourceLoad.epoch === sourceScopeEpoch && sourceLoad.preloading;
+  const sourceError = sourceLoad.epoch === sourceScopeEpoch ? sourceLoad.error : null;
+  const preloadStartedRef = useRef<number | null>(null);
   const sourceRequestIdRef = useRef(0);
 
   // IRI indexing
@@ -130,20 +133,15 @@ export function useProjectViewer({
   const fetchSourceContent = useCallback(async (
     isPreload: boolean,
   ): Promise<RevisionFileResponse | undefined> => {
-    if (!projectId || !activeBranch) return;
+    if (!projectId || !sourceBranch) return;
     const requestId = ++sourceRequestIdRef.current;
 
-    if (isPreload) {
-      setIsPreloading(true);
-    } else {
-      setIsLoadingSource(true);
-    }
-    setSourceError(null);
+    setSourceLoad({ epoch: sourceScopeEpoch, loading: !isPreload, preloading: isPreload, error: null });
 
     try {
       const response = await revisionsApi.getFileAtVersion(
         projectId,
-        activeBranch,
+        sourceBranch,
         accessToken,
         project?.git_ontology_path
       );
@@ -160,24 +158,20 @@ export function useProjectViewer({
         && requestId === sourceRequestIdRef.current
         && sourceScopeEpoch === sourceScopeRef.current.epoch
       ) {
-        setSourceError(err instanceof Error ? err.message : "Failed to load source content");
+        setSourceLoad(previous => ({ ...previous, error: err instanceof Error ? err.message : "Failed to load source content" }));
       }
     } finally {
       if (
         requestId === sourceRequestIdRef.current
         && sourceScopeEpoch === sourceScopeRef.current.epoch
       ) {
-        if (isPreload) {
-          setIsPreloading(false);
-        } else {
-          setIsLoadingSource(false);
-        }
+        setSourceLoad(previous => ({ ...previous, loading: false, preloading: false }));
       }
     }
   }, [
     projectId,
     accessToken,
-    activeBranch,
+    sourceBranch,
     project?.git_ontology_path,
     setSourceSnapshot,
     sourceScopeEpoch,
@@ -186,9 +180,9 @@ export function useProjectViewer({
   // Load once for the current branch. Content and immutable revision always
   // come from the same response so direct saves cannot mix snapshots.
   const loadSourceContent = useCallback(async (isPreload = false) => {
-    if (sourceContent) return;
+    if (isSourceReady) return;
     await fetchSourceContent(isPreload);
-  }, [sourceContent, fetchSourceContent]);
+  }, [isSourceReady, fetchSourceContent]);
 
   // Explicit reconciliation bypasses the ordinary already-loaded guard.
   const reloadSourceContent = useCallback(
@@ -198,16 +192,16 @@ export function useProjectViewer({
 
   // Background preload source content after initial page load
   useEffect(() => {
-    if (!sourceContent && !isLoadingSource && !isPreloading && !preloadStartedRef.current && hasOntology) {
+    if (!isSourceReady && !sourceError && !isLoadingSource && !isPreloading && preloadStartedRef.current !== sourceScopeEpoch && hasOntology) {
       const timer = setTimeout(() => {
-        if (!preloadStartedRef.current) {
-          preloadStartedRef.current = true;
+        if (preloadStartedRef.current !== sourceScopeEpoch) {
+          preloadStartedRef.current = sourceScopeEpoch;
           loadSourceContent(true);
         }
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [sourceContent, isLoadingSource, isPreloading, loadSourceContent, hasOntology]);
+  }, [isSourceReady, sourceError, sourceScopeEpoch, isLoadingSource, isPreloading, loadSourceContent, hasOntology]);
 
   // Build IRI index in background
   useEffect(() => {
@@ -301,12 +295,10 @@ export function useProjectViewer({
       ...sourceScopeRef.current,
       epoch: sourceScopeRef.current.epoch + 1,
     };
-    setSourceSnapshotState({ content: "", revision: null });
-    setIsLoadingSource(false);
-    setIsPreloading(false);
-    setSourceError(null);
+    setSourceSnapshotState({ content: "", revision: null, epoch: -1 });
+    setSourceLoad({ epoch: -1, loading: false, preloading: false, error: null });
     setSourceIriIndex(new Map());
-    preloadStartedRef.current = false;
+    preloadStartedRef.current = null;
   }, []);
 
   return {
@@ -356,6 +348,8 @@ export function useProjectViewer({
     selectedNodeFallback,
 
     // Source
+    isSourceReady,
+    sourceScope,
     sourceContent,
     setSourceContent,
     sourceRevision,

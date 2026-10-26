@@ -1,7 +1,8 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { DeveloperEditorLayout, type DeveloperEditorLayoutProps } from "@/components/editor/developer/DeveloperEditorLayout";
+import userEvent from "@testing-library/user-event";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
 import { layoutFetch, layoutNs, layoutProps, LayoutProviders } from "../../fixtures/editor-layout-harness";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
@@ -125,4 +126,62 @@ describe("developer layout real tree/detail integration", () => {
     expect(p.loadSourceContent).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: "Finish source scroll" })).toBeNull();
   });
+  it("keeps a real unsaved property form mounted and inert while preview follows selection", async () => {
+    const onUpdateProperty = vi.fn().mockResolvedValue(undefined);
+    const p = props({ canEdit: true, onUpdateProperty, sourceFilePath: "ontology.ttl" });
+    mount(p);
+    expect(screen.getByRole("tab", { name: "Detail" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Properties" }));
+    fireEvent.click(await screen.findByText("First relation"));
+    const input = await screen.findByDisplayValue("First relation");
+    fireEvent.change(input, { target: { value: "Unsaved relation" } });
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Entity source" }), { button: 0, ctrlKey: false });
+    const preview = screen.getByRole("region", { name: "Entity source preview" });
+    expect(within(preview).getByLabelText("Source excerpts").textContent).toContain('rdfs:label "First relation"');
+    expect(within(preview).queryByText(/Unsaved relation/)).toBeNull();
+    const detail = input.closest('[role="tabpanel"]')!;
+    expect(detail.hasAttribute("hidden")).toBe(true);
+    expect(detail.hasAttribute("inert")).toBe(true);
+    expect(onUpdateProperty).not.toHaveBeenCalled();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Detail" }), { button: 0, ctrlKey: false });
+    expect(screen.getByDisplayValue("Unsaved relation")).toBe(input);
+    expect(onUpdateProperty).not.toHaveBeenCalled();
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Entity source" }), { button: 0, ctrlKey: false });
+    fireEvent.click(screen.getByRole("button", { name: "Individuals" }));
+    expect(screen.getByText(/Select an entity in the tree/)).toBeDefined();
+    fireEvent.click(await screen.findByText("Alice"));
+    expect(screen.getByLabelText("Source excerpts").textContent).toContain(":alice a owl:NamedIndividual");
+    expect(screen.getByLabelText("Source excerpts").textContent).not.toContain(":first");
+  });
+
+  it("supports keyboard tabs and opens the exact entity in full source", async () => {
+    const user = userEvent.setup();
+    const p = props({ selectedIri: layoutNs + "first" }); mount(p);
+    screen.getByRole("tab", { name: "Detail" }).focus();
+    await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "Entity source" }).getAttribute("aria-selected")).toBe("true");
+    fireEvent.click(screen.getByRole("button", { name: "Open full source" }));
+    expect(p.setPendingScrollIri).toHaveBeenCalledWith(layoutNs + "first");
+    expect(screen.getByTestId("source-value")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Tree" }));
+    expect(screen.getByRole("tab", { name: "Entity source" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("loads once per scope, retries explicitly, and suppresses mismatched branch content", () => {
+    const p = props({ selectedIri: layoutNs + "first", sourceContent: "", isSourceReady: false, sourceFilePath: "ontology.ttl" });
+    const { rerender } = mount(p);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Entity source" }), { button: 0, ctrlKey: false });
+    expect(p.loadSourceContent).toHaveBeenCalledTimes(1);
+    rerender(<LayoutProviders><DeveloperEditorLayout {...p} sourceError="Failed once" /></LayoutProviders>);
+    expect(p.loadSourceContent).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(p.loadSourceContent).toHaveBeenCalledTimes(2);
+    rerender(<LayoutProviders><DeveloperEditorLayout {...p} isSourceReady /></LayoutProviders>);
+    expect(screen.getByText(/No direct statements/)).toBeDefined();
+    expect(p.loadSourceContent).toHaveBeenCalledTimes(2);
+    rerender(<LayoutProviders><DeveloperEditorLayout {...p} isSourceReady sourceContent={layoutProps().sourceContent!} activeBranch="other" sourceScope={{ projectId: p.projectId, branch: "work", filePath: "ontology.ttl" }} /></LayoutProviders>);
+    expect(screen.queryByLabelText("Source excerpts")).toBeNull();
+    expect(p.loadSourceContent).toHaveBeenCalledTimes(3);
+  });
+
 });
