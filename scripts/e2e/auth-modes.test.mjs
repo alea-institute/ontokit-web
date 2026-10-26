@@ -235,6 +235,7 @@ test('provider-less profiles never bootstrap identity; baseline and lifecycle st
 });
 
 // ---- Private run config shape (discriminated by profile) ----
+import { createHostedRun } from '../rehearsal/disposition.mjs';
 const loadRunModule = () => import('../../e2e/fixtures/run.ts');
 async function withRunConfig(config, check) {
   const id = randomBytes(16).toString('hex');
@@ -255,9 +256,12 @@ async function withRunConfig(config, check) {
 /** Like withRunConfig, for configs that must name paths inside the run's private directory. */
 async function withRunConfigDir(build, check) {
   const id = randomBytes(16).toString('hex');
-  const dir = `/tmp/ontokit-e2e-${process.getuid()}/${id}`;
-  await mkdir(path.dirname(dir), {recursive: true, mode: 0o700});
-  await mkdir(dir, {mode: 0o700});
+  const hosted = build('').rehearsal?.target === 'hosted';
+  const dir = hosted ? (await createHostedRun(id)).dir : `/tmp/ontokit-e2e-${process.getuid()}/${id}`;
+  if (!hosted) {
+    await mkdir(path.dirname(dir), {recursive: true, mode: 0o700});
+    await mkdir(dir, {mode: 0o700});
+  }
   const file = path.join(dir, 'playwright-run.json');
   const saved = {config: process.env.ONTOKIT_E2E_CONFIG, run: process.env.ONTOKIT_E2E_RUN};
   try {

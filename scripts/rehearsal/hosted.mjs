@@ -9,18 +9,20 @@
 //   {"web": "https://…", "api": "https://…", "issuer": "https://…", "login": "https://…",
 //    "users": {"owner": {"id", "email", "password"}, "suggester": {…}, "editor": {…}}}
 // Credentials never come from arguments or the environment, never enter the receipt,
-// and the private run directory holding them is removed when the run ends. The spec
-// imports run-tagged copies of both ontologies and deletes them afterwards.
+// and private artifacts and run-tagged projects are retained for controller recovery.
+// Removal of private artifacts requires verified backup coverage of their final contents.
 import { randomBytes } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { constants } from 'node:fs';
-import { mkdir, open, readFile, rm, writeFile } from 'node:fs/promises';
+import { open, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ROOT, stageSources, sourceEvidence, TARGETS } from './sources.mjs';
 import { validateReport, sanitizedRehearsal } from '../e2e/evidence.mjs';
 import { networkEnv } from '../e2e/runtime.mjs';
-import { RUNTIME_ROOT, privateDirectory } from '../e2e/ownership.mjs';
+import { privateDirectory } from '../e2e/ownership.mjs';
+
+import { createHostedRun, disposePrivateRun, projectDisposition } from './disposition.mjs';
 
 const PERSONAS = ['owner', 'suggester', 'editor'];
 const RECEIPTS = path.join(ROOT, '.e2e-runs', 'receipts');
@@ -71,7 +73,7 @@ const webRevision = () => {
     return {revision, dirty};
   } catch { return {revision: null, dirty: null}; }
 };
-/** Runs Playwright; SIGINT/SIGTERM are forwarded so fixture teardown deletes the run's projects. */
+/** Runs Playwright; SIGINT/SIGTERM are forwarded so fixture teardown preserves the run's projects. */
 function playwright(env) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [path.join(ROOT, 'node_modules/@playwright/test/cli.js'), 'test'], {cwd: ROOT, env, stdio: 'inherit'});
@@ -85,17 +87,14 @@ function playwright(env) {
 }
 
 /** Runs the rehearsal against the target and writes a sanitized hosted receipt. */
-export async function runHosted({targetFile, fetchImpl = fetch, runPlaywright = playwright, stage = stageSources} = {}) {
+export async function runHosted({targetFile, fetchImpl = fetch, runPlaywright = playwright, stage = stageSources, verifyBackup} = {}) {
   const target = await readTarget(targetFile);
   await preflight(target, fetchImpl);
   const id = randomBytes(16).toString('hex');
-  const dir = path.join(RUNTIME_ROOT, id);
-  // Owner, mode and symlink checks on both levels before any credential is written.
-  await privateDirectory(RUNTIME_ROOT);
-  await mkdir(dir, {mode: 0o700});
-  await privateDirectory(dir);
+  const run = await createHostedRun(id);
+  const {dir} = run;
   const startedAt = new Date().toISOString();
-  let tests = null, failure = null, manifest = null;
+  let tests = null, failure = null, manifest = null, disposition = null;
   // An interrupt still reaches the finally below: Playwright gets the signal, tears down, exits.
   const interrupted = () => { failure ??= new Error('Interrupted'); };
   process.on('SIGINT', interrupted); process.on('SIGTERM', interrupted);
@@ -119,16 +118,16 @@ export async function runHosted({targetFile, fetchImpl = fetch, runPlaywright = 
     failure ??= error;
   } finally {
     process.off('SIGINT', interrupted); process.off('SIGTERM', interrupted);
-    await rm(dir, {recursive: true, force: true});
+    disposition = {projects: await projectDisposition(run), privateArtifacts: await disposePrivateRun({...run, verifyBackup})};
   }
   const rehearsal = manifest && sanitizedRehearsal('rehearsal', sourceEvidence(manifest));
   if (manifest && !rehearsal) failure ??= new Error('Rehearsal source evidence is malformed');
-  const passed = !failure && !!tests && !!rehearsal;
+  const passed = !failure && !!tests && !!rehearsal && disposition.projects.status === 'retained';
   const receipt = {
     version: 1, kind: 'hosted-rehearsal', run: id, startedAt, finishedAt: new Date().toISOString(),
     host: {web: target.web, api: target.api}, web: webRevision(),
     tests: tests && {passed: tests.passed, skipped: 0, failed: 0, flaky: 0, mandatory: tests.mandatory},
-    rehearsal,
+    rehearsal, disposition,
     acceptance: {scope: 'hosted-rehearsal', hostedAcceptance: passed},
     passed,
   };
