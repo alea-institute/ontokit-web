@@ -2,7 +2,8 @@
 import type {Page, APIResponse} from "@playwright/test";
 import type {SuggestionsRunConfig, SuggestionPersona} from "./run";
 import fs from "node:fs/promises";
-import {recordResource} from "../../scripts/e2e/hosted-suggestions.mjs";
+import {tinyOntologyPath} from "./projects";
+import {recordResource} from "../../scripts/e2e/hosted-resources.mjs";
 
 export const isSessionCookie = (name: string) => /^(?:__Secure-|__Host-)?authjs\.session-token(?:\.\d+)?$/.test(name);
 /** Five seconds beyond the genuine boundary, plus a minute to observe recovery. */
@@ -33,7 +34,7 @@ export async function importProject(page: Page, run: SuggestionsRunConfig, isPub
   if (!run.hosted) throw new Error("HOSTED_TARGET_REQUIRED");
   const name = `OW-2 ${run.id} ${isPublic ? "public" : "private"}`;
   const description = `OW-2 hosted synthetic fixture; run=${run.id}; retained` ;
-  const buffer = await fs.readFile(new URL("./tiny-ontology.ttl", import.meta.url));
+  const buffer = await fs.readFile(tinyOntologyPath);
   // Intent is durable even if the response is lost after the server commits.
   await recordResource(run, {event: "project-import-intent", name, description, owner: run.users.owner.id});
   const response = await api(page, run, "owner", "/api/v1/projects/import", {method: "POST", multipart: {

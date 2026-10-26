@@ -9,6 +9,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {RUNTIME_ROOT, privateDirectory} from './ownership.mjs';
+import {recordResource} from './hosted-resources.mjs';
 import {networkEnv} from './runtime.mjs';
 import {validateTarget, validateRuntimeAfter, validateHostedReport, hostedOutcomes, fail} from './hosted-suggestions-contract.mjs';
 
@@ -26,18 +27,6 @@ export async function readPrivateJson(file) {
     return JSON.parse(await handle.readFile('utf8'));
   } catch { fail('PRIVATE_INPUT'); }
   finally { await handle?.close(); }
-}
-/** Fsynced append-only ledger: an import intent precedes the HTTP write; its ID follows immediately. */
-export async function recordResource(run, entry) {
-  if (!run.hosted) return;
-  await privateDirectory(run.dir);
-  const handle = await open(path.join(run.dir, 'owned-resources.jsonl'), constants.O_WRONLY | constants.O_APPEND | constants.O_CREAT | constants.O_NOFOLLOW, 0o600);
-  try {
-    const stat = await handle.stat();
-    if (!stat.isFile() || stat.uid !== process.getuid() || (stat.mode & 0o077)) fail('PRIVATE_INPUT');
-    await handle.writeFile(JSON.stringify({run: run.id, ...entry}) + '\n');
-    await handle.sync();
-  } finally { await handle.close(); }
 }
 async function preflight(target, fetchImpl, signal) {
   const get = url => fetchImpl(url, {redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(30_000)])});

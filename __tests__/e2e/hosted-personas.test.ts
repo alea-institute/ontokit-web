@@ -3,7 +3,7 @@ import {describe, expect, it, vi, beforeEach} from "vitest";
 import type {Page} from "@playwright/test";
 import type {SuggestionsRunConfig} from "../../e2e/fixtures/run";
 const {ledger} = vi.hoisted(() => ({ledger: vi.fn()}));
-vi.mock("../../scripts/e2e/hosted-suggestions.mjs", () => ({recordResource: ledger}));
+vi.mock("../../scripts/e2e/hosted-resources.mjs", () => ({recordResource: ledger}));
 import {isSessionCookie, observationDeadline, bearerClaims, importProject} from "../../e2e/fixtures/hosted-personas";
 
 describe("hosted persona safety helpers", () => {

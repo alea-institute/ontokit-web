@@ -5,7 +5,9 @@ import {SUGGESTION_CASES} from './evidence.mjs';
 import {mkdtemp, writeFile, readFile, stat} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {runHosted, recordResource} from './hosted-suggestions.mjs';
+import {runHosted} from './hosted-suggestions.mjs';
+import {recordResource} from './hosted-resources.mjs';
+import {spawnSync} from 'node:child_process';
 
 export function syntheticTarget(now = Date.now()) {
   return {
@@ -137,4 +139,14 @@ test('failed reports retain fixed failure outcomes without assertion errors', as
   assert.equal(receipt.outcomes[0].outcome, 'failed');
   assert.equal(receipt.tests, null);
   assert.ok(!JSON.stringify(receipt).includes('sentinel'));
+});
+test('real Playwright discovers exactly the hosted inventory without contacting a target', async () => {
+  let result;
+  await runHosted({targetFile: await targetFile(syntheticTarget()), fetchImpl: healthy,
+    runPlaywright: async env => {
+      result = spawnSync(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', '--config', 'playwright.hosted.config.ts', '--list'], {env, encoding: 'utf8'});
+      return 1; // Discovery is not an executed browser matrix.
+    }});
+  assert.equal(result.status, 0, 'Playwright discovery must load both specs');
+  assert.match(result.stdout, /Total: 14 tests in 2 files/);
 });

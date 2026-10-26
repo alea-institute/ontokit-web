@@ -52,7 +52,6 @@ export function validateTarget(raw, now = Date.now()) {
 export function validateRuntimeAfter(target, raw, finishedAt, now = Date.now()) {
   const after = runtime(raw, now);
   if (Date.parse(after.observedAt) < finishedAt || ['web', 'api', 'worker'].some(k => after[k] !== target.hosted.runtime[k])) fail('RUNTIME_CHANGED');
-  // Bind the readback to this target, not a different environment at the same revision.
   if (raw.webOrigin !== target.web || raw.apiOrigin !== target.api) fail('RUNTIME_TARGET');
   return after;
 }
@@ -96,7 +95,7 @@ export function validateHostedReport(report) {
   if (all.length !== total || all.some(s => !s.ok || s.tests?.length !== 1)) fail('REPORT');
   const suggestions = all.filter(s => s.file === 'browser/suggestions.spec.ts');
   let chain;
-  try { chain = validateReport({...report, stats: {...report.stats, expected: 7}, suites: [{specs: suggestions}]}, {profile: 'suggestions'}); } catch { fail('REPORT'); }
+  try { chain = validateReport({...report, stats: {...report.stats, expected: SUGGESTION_REQUIRED_TESTS.length}, suites: [{specs: suggestions}]}, {profile: 'suggestions'}); } catch { fail('REPORT'); }
   const personas = HOSTED_CASES.map(c => {
     const matches = all.filter(s => s.file === 'browser/hosted-personas.spec.ts' && s.title === c.title);
     if (matches.length !== 1) fail('REPORT');

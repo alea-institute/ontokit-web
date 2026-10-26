@@ -1,4 +1,4 @@
-import {recordResource} from '../../scripts/e2e/hosted-suggestions.mjs';
+import {recordResource} from '../../scripts/e2e/hosted-resources.mjs';
 
 type FixtureRun = {id: string; dir: string; hosted?: {retain: boolean}};
 
