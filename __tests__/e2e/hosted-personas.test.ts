@@ -4,7 +4,7 @@ import type {Page} from "@playwright/test";
 import type {SuggestionsRunConfig} from "../../e2e/fixtures/run";
 const {ledger} = vi.hoisted(() => ({ledger: vi.fn()}));
 vi.mock("../../scripts/e2e/hosted-resources.mjs", () => ({recordResource: ledger}));
-import {isSessionCookie, observationDeadline, bearerClaims, importProject} from "../../e2e/fixtures/hosted-personas";
+import {isSessionCookie, observationDeadline, bearerClaims, importProject, listed} from "../../e2e/fixtures/hosted-personas";
 
 describe("hosted persona safety helpers", () => {
   it("recognizes loopback, HTTPS secure/host prefixes and chunks", () => {
@@ -48,5 +48,20 @@ describe("hosted project retention", () => {
     const page = pageFor(events);
     await expect(importProject(page, run, false)).rejects.toThrow("synthetic ledger unavailable");
     expect(page.request.fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("hosted visibility pagination", () => {
+  const run = {api: "https://api.example.test"} as SuggestionsRunConfig;
+  it("detects a private fixture on a later page instead of reporting isolation", async () => {
+    const get = vi.fn(async (url: string) => ({status: () => 200, json: async () => new URL(url).searchParams.get("skip") === "0"
+      ? {items: Array.from({length: 100}, (_, i) => ({id: `public-${i}`})), total: 101}
+      : {items: [{id: "private-fixture"}], total: 101}}));
+    expect(await listed({request: {get}} as unknown as Page, run, "private-fixture")).toBe(true);
+    expect(get).toHaveBeenCalledTimes(2);
+  });
+  it("refuses incomplete pagination instead of declaring the private fixture hidden", async () => {
+    const get = vi.fn(async () => ({status: () => 200, json: async () => ({items: [], total: 101})}));
+    await expect(listed({request: {get}} as unknown as Page, run, "private-fixture")).rejects.toThrow("HOSTED_PROJECT_LIST_INCOMPLETE");
   });
 });

@@ -1,8 +1,9 @@
 import fs from "node:fs/promises";
 import {trackProjectImport, finishSuggestionResources} from "../fixtures/suggestion-resources";
+import {recordResource} from "../../scripts/e2e/hosted-resources.mjs";
 import type { APIRequestContext, Page } from "@playwright/test";
 import { test as base, expect, addSuggestionMembers, directProbe, recordProbe, saveExistingLabel, openTriage } from "../fixtures/suggestions";
-import { authPath, type SuggestionPersona } from "../fixtures/run";
+import { authPath, type SuggestionPersona, type SuggestionsRunConfig } from "../fixtures/run";
 import { ontologyNamespace, projectsPath, readSource, tinyOntologyPath } from "../fixtures/projects";
 import type { Notification, NotificationType } from "../../lib/api/notifications";
 import type { SuggestionSessionSummary } from "../../lib/api/suggestions";
@@ -72,24 +73,27 @@ async function selectPerson(page: Page) {
   await item.click();
   await expect(item).toHaveAttribute("aria-selected", "true");
 }
-async function edit(page: Page, run: {web: string; api: string}, id: string, label: string) {
+async function edit(page: Page, run: SuggestionsRunConfig, id: string, label: string) {
   await page.goto(`${run.web}/projects/${id}/editor`);
   await selectPerson(page);
-  return saveExistingLabel(page, run.api, id, label);
+  const saved = await saveExistingLabel(page, run.api, id, label);
+  await recordResource(run, {event: "suggestion-session", projectId: id, sessionId: saved.sessionId, branch: saved.branch});
+  return saved;
 }
 function responseFor(page: Page, api: string, path: string, method = "POST") {
   return page.waitForResponse(r => new URL(r.url()).origin === api && new URL(r.url()).pathname === path && r.request().method() === method);
 }
-async function submit(page: Page, api: string, id: string, saved: Saved, label: string, resubmit = false) {
+async function submit(page: Page, run: SuggestionsRunConfig, id: string, saved: Saved, label: string, resubmit = false) {
   await page.getByRole("button", {name: resubmit ? /^Resubmit Suggestions/ : /^Submit Suggestions/}).click();
   const dialog = page.getByRole("dialog", {name: "Submit Suggestions", exact: true});
   await dialog.getByRole("textbox", {name: "Describe your changes (optional)", exact: true}).fill(label);
   const [response] = await Promise.all([
-    responseFor(page, api, `${sessionsPath(id)}/${saved.sessionId}/${resubmit ? "resubmit" : "submit"}`),
+    responseFor(page, run.api, `${sessionsPath(id)}/${saved.sessionId}/${resubmit ? "resubmit" : "submit"}`),
     dialog.getByRole("button", {name: "Submit for Review", exact: true}).click(),
   ]);
   expect(response.status()).toBe(200);
   const result = await response.json() as {pr_number: number; status: string};
+  await recordResource(run, {event: "suggestion-pr", projectId: id, sessionId: saved.sessionId, prNumber: result.pr_number});
   expect(result.status).toBe("submitted");
   expect(result.pr_number).toBeGreaterThan(0);
   await expect(dialog).toBeHidden();
@@ -157,7 +161,7 @@ test("suggester edits an existing class label, saves and submits for owner triag
   const project = await makeProject();
   const label = "D10 submitted Person";
   const saved = await edit(people.suggester, run, project.id, label);
-  await submit(people.suggester, run.api, project.id, saved, label);
+  await submit(people.suggester, run, project.id, saved, label);
   await openTriage(people.owner, run.web, project.id, label);
   await notification(people.owner, run, project, "suggestion_submitted", "suggestions/review");
   const content = (await readSource(suggesterApi, project.id, saved.branch)).content;
@@ -170,7 +174,7 @@ test("owner approval merges the label, removes the session branch and notifies t
   const project = await makeProject();
   const label = "D10 approved Person";
   const saved = await edit(people.suggester, run, project.id, label);
-  await submit(people.suggester, run.api, project.id, saved, label);
+  await submit(people.suggester, run, project.id, saved, label);
   await openTriage(people.owner, run.web, project.id, label);
   await approve(people.owner, run.api, project.id, saved.sessionId);
   await mergedLabel(ownerApi, people.owner, run.web, project.id, label);
@@ -187,11 +191,15 @@ test("owner approval merges the label, removes the session branch and notifies t
   const created = await ownerApi.post(sessionsPath(own.id));
   expect(created.status()).toBe(201);
   const {session_id: sid} = await created.json() as {session_id: string};
+  await recordResource(run, {event: "suggestion-session", projectId: own.id, sessionId: sid});
   const source = await readSource(ownerApi, own.id);
   expect((await ownerApi.put(`${sessionsPath(own.id)}/${sid}/save`, {data: {
     content: source.content.replace('"Test Person"@en', '"D10 self Person"@en'), entity_iri: personIri, entity_label: "D10 self Person",
   }})).status()).toBe(200);
-  expect((await ownerApi.post(`${sessionsPath(own.id)}/${sid}/submit`, {data: {summary: "Self review refusal"}})).status()).toBe(200);
+  const selfSubmitted = await ownerApi.post(`${sessionsPath(own.id)}/${sid}/submit`, {data: {summary: "Self review refusal"}});
+  expect(selfSubmitted.status()).toBe(200);
+  const selfPr = await selfSubmitted.json() as {pr_number: number};
+  await recordResource(run, {event: "suggestion-pr", projectId: own.id, sessionId: sid, prNumber: selfPr.pr_number});
   recordProbe("creator-self-approve", await directProbe(ownerApi, "creator-self-approve", {projectId: own.id, sessionId: sid}));
 });
 
@@ -199,7 +207,7 @@ test("requested changes notify the suggester who resumes and resubmits revision 
   const project = await makeProject();
   const first = "D10 first revision Person", second = "D10 revised Person";
   const saved = await edit(people.suggester, run, project.id, first);
-  const pr = await submit(people.suggester, run.api, project.id, saved, first);
+  const pr = await submit(people.suggester, run, project.id, saved, first);
   expect(await session(suggesterApi, project.id, saved.sessionId)).toMatchObject({pr_number: pr, revision: 1});
   await openTriage(people.owner, run.web, project.id, first);
   await people.owner.getByRole("button", {name: "Request Changes", exact: true}).click();
@@ -220,7 +228,7 @@ test("requested changes notify the suggester who resumes and resubmits revision 
   await selectPerson(people.suggester);
   const revised = await saveExistingLabel(people.suggester, run.api, project.id, second);
   expect(revised).toEqual(saved);
-  expect(await submit(people.suggester, run.api, project.id, revised, second, true)).toBe(pr);
+  expect(await submit(people.suggester, run, project.id, revised, second, true)).toBe(pr);
   expect(await session(suggesterApi, project.id, saved.sessionId)).toMatchObject({pr_number: pr, revision: 2, status: "submitted"});
   const prs = await ownerApi.get(`${projectsPath}/${project.id}/pull-requests`);
   expect(prs.status()).toBe(200);
@@ -236,7 +244,7 @@ test("editor rejection closes the pull request and notifies the suggester", asyn
   const project = await makeProject();
   const label = "D10 rejected Person";
   const saved = await edit(people.suggester, run, project.id, label);
-  const pr = await submit(people.suggester, run.api, project.id, saved, label);
+  const pr = await submit(people.suggester, run, project.id, saved, label);
   await openTriage(people.editor, run.web, project.id, label);
   await people.editor.getByRole("button", {name: "Reject", exact: true}).click();
   const dialog = people.editor.getByRole("dialog", {name: "Reject Suggestion", exact: true});
@@ -255,7 +263,7 @@ test("editor rejection closes the pull request and notifies the suggester", asyn
   expect((await readSource(ownerApi, project.id)).content).toContain('"Test Person"@en');
 });
 
-test("private non-member create and untrusted entity mint are refused by the API", async ({makeProject, unrelatedApi, suggesterApi}) => {
+test("private non-member create and untrusted entity mint are refused by the API", async ({run, makeProject, unrelatedApi, suggesterApi}) => {
   const project = await makeProject(false);
   recordProbe("private-non-member-create", await directProbe(unrelatedApi, "private-non-member-create", {projectId: project.id}));
   const capabilities = await suggesterApi.get(`${projectsPath}/${project.id}/suggestions/capabilities`);
@@ -264,6 +272,7 @@ test("private non-member create and untrusted entity mint are refused by the API
   const created = await suggesterApi.post(sessionsPath(project.id));
   expect(created.status()).toBe(201);
   const saved = await created.json() as {session_id: string; branch: string};
+  await recordResource(run, {event: "suggestion-session", projectId: project.id, sessionId: saved.session_id, branch: saved.branch});
   const before = await readSource(suggesterApi, project.id, saved.branch);
   recordProbe("untrusted-mint", await directProbe(suggesterApi, "untrusted-mint", {projectId: project.id, sessionId: saved.session_id, data: {
     content: `${before.content}\nex:NewClass a owl:Class ; rdfs:label "New entity"@en .\n`,
@@ -277,7 +286,7 @@ test("editor approval merges a suggestion through the suggestion review path", a
   const project = await makeProject();
   const label = "D10 editor approved Person";
   const saved = await edit(people.suggester, run, project.id, label);
-  await submit(people.suggester, run.api, project.id, saved, label);
+  await submit(people.suggester, run, project.id, saved, label);
   await openTriage(people.editor, run.web, project.id, label);
   await approve(people.editor, run.api, project.id, saved.sessionId);
   await mergedLabel(editorApi, people.editor, run.web, project.id, label);
@@ -300,7 +309,7 @@ test("public non-member capabilities agree with session create and submission su
     saveExistingLabel(people.unrelated, run.api, project.id, "D10 public visitor Person"),
   ]);
   expect(created.status()).toBe(201);
-  const pr = await submit(people.unrelated, run.api, project.id, saved, "D10 public visitor Person");
+  const pr = await submit(people.unrelated, run, project.id, saved, "D10 public visitor Person");
   expect(await session(unrelatedApi, project.id, saved.sessionId)).toMatchObject({status: "submitted", pr_number: pr});
   await openTriage(people.owner, run.web, project.id, "D10 public visitor Person");
 });

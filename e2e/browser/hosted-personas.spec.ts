@@ -1,5 +1,6 @@
 import {test as base, expect, type Page} from "@playwright/test";
 import {setTimeout as delay} from "node:timers/promises";
+import {recordResource} from "../../scripts/e2e/hosted-resources.mjs";
 import {HOSTED_CASES} from "../../scripts/e2e/hosted-suggestions-contract.mjs";
 import {enterProviderCredentials} from "../fixtures/auth";
 import {loadSuggestionsRun, type SuggestionsRunConfig, type SuggestionPersona} from "../fixtures/run";
@@ -118,6 +119,7 @@ test(HOSTED_CASES[5].title, async ({browser, page, run}) => {
     expect(response.status()).toBe(201);
     expect(await response.request().headerValue("authorization")).toBeNull();
     const sessionId = (await response.json()).session_id;
+    await recordResource(run, {event: "suggestion-session", projectId: project.id, sessionId, anonymous: true});
     const label = `OW-2 anonymous ${run.id}`;
     const saved = await saveExistingLabel(anonymous, run.api, project.id, label, true);
     expect(saved.sessionId === sessionId).toBe(true);
@@ -128,6 +130,7 @@ test(HOSTED_CASES[5].title, async ({browser, page, run}) => {
     expect(result.status()).toBe(200);
     expect(await result.request().headerValue("authorization")).toBeNull();
     const submission = await result.json();
+    await recordResource(run, {event: "suggestion-pr", projectId: project.id, sessionId, prNumber: submission.pr_number, anonymous: true});
     expect(submission.status).toBe("submitted");
     expect(submission.pr_number).toBeGreaterThan(0);
     await expect(anonymous.getByRole("dialog", {name: "Thank you — your proposal is in", exact: true})).toBeVisible();

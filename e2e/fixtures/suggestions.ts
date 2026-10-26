@@ -3,6 +3,7 @@
 import { test as base, expect, type APIRequestContext, type Page, type PlaywrightWorkerArgs } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import {recordResource} from "../../scripts/e2e/hosted-resources.mjs";
 import { SUGGESTION_CASES } from "../../scripts/e2e/evidence.mjs";
 import { finishSuggestionResources } from "./suggestion-resources";
 import { loadSession, saveAuthenticatedPersona, type Session } from "./auth";
@@ -66,7 +67,8 @@ export async function addSuggestionMembers(ownerApi: APIRequestContext, run: Sug
   for (const role of ["suggester", "editor"] as const) {
     const response = await ownerApi.post(`/api/v1/projects/${projectId}/members`, {data: {user_id: run.users[role].id, role}});
     expect(response.status(), `add ${role} membership`).toBe(201);
-    const member = await response.json() as {user_id: string; role: string};
+    const member = await response.json() as {id: string; user_id: string; role: string};
+    await recordResource(run, {event: "project-membership", projectId, id: member.id, role});
     expect(member.user_id).toBe(run.users[role].id);
     expect(member.role).toBe(role);
   }

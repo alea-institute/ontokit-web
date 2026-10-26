@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {validateTarget, validateRuntimeAfter, validateHostedReport, HOSTED_CASES} from './hosted-suggestions-contract.mjs';
 import {SUGGESTION_CASES} from './evidence.mjs';
-import {mkdtemp, writeFile, readFile, stat} from 'node:fs/promises';
+import {mkdtemp, writeFile, readFile, stat, symlink, chmod} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import {runHosted} from './hosted-suggestions.mjs';
+import {runHosted, readPrivateJson} from './hosted-suggestions.mjs';
 import {recordResource} from './hosted-resources.mjs';
 import {spawnSync} from 'node:child_process';
 
@@ -149,4 +149,27 @@ test('real Playwright discovers exactly the hosted inventory without contacting 
     }});
   assert.equal(result.status, 0, 'Playwright discovery must load both specs');
   assert.match(result.stdout, /Total: 14 tests in 2 files/);
+});
+test('private target symlinks and permissive files are refused before launch', async () => {
+  const original = await targetFile(syntheticTarget()), linked = path.join(path.dirname(original), 'linked.json');
+  await symlink(original, linked);
+  const permissive = await targetFile(syntheticTarget()); await chmod(permissive, 0o644);
+  for (const file of [linked, permissive]) {
+    await assert.rejects(() => readPrivateJson(file), /HOSTED_PRIVATE_INPUT/);
+    let launched = false;
+    const {receipt} = await runHosted({targetFile: file, fetchImpl: async () => {launched = true;}, runPlaywright: async () => {launched = true;}});
+    assert.equal(launched, false); assert.equal(receipt.status, 'preflight-incomplete');
+  }
+});
+test('ledger refuses symlinks and permissive files without modifying their target', async () => {
+  for (const linked of [true, false]) {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'ow2-ledger-'));
+    const ledger = path.join(dir, 'owned-resources.jsonl'), target = path.join(dir, 'protected-data');
+    await writeFile(target, 'retained', {mode: 0o600});
+    if (linked) await symlink(target, ledger);
+    else await writeFile(ledger, 'retained', {mode: 0o644});
+    await assert.rejects(() => recordResource({id: 'a'.repeat(32), dir, hosted: true}, {event: 'project-created', id: 'new-id'}));
+    assert.equal(await readFile(target, 'utf8'), 'retained');
+    assert.equal(await readFile(ledger, 'utf8'), 'retained');
+  }
 });
