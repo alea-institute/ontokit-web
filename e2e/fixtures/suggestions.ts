@@ -116,7 +116,8 @@ export { expect };
  * Shared UI path for authenticated suggestions and optional-mode proposals. `timeout`
  * bounds the save round trip; real ontologies need minutes, not the action default.
  */
-export async function saveExistingLabel(page: Page, apiOrigin: string, projectId: string, label: string, anonymous = false, timeout?: number) {
+export async function saveExistingLabel(page: Page, apiOrigin: string, projectId: string, label: string, anonymous = false, timeout?: number,
+  observeSession?: (sessionId: string) => Promise<void>) {
   const prefix = `/api/v1/projects/${projectId}/suggestions/${anonymous ? "anonymous/" : ""}sessions/`;
   const input = page.getByPlaceholder("Label text", {exact: true});
   await expect(input).toHaveCount(1);
@@ -129,11 +130,13 @@ export async function saveExistingLabel(page: Page, apiOrigin: string, projectId
       && new URL(r.url()).pathname.endsWith("/save") && r.request().method() === "PUT", {timeout}),
     save.click(),
   ]);
+  const sessionId = new URL(response.url()).pathname.slice(prefix.length, -"/save".length);
+  await observeSession?.(sessionId);
   expect(response.status()).toBe(200);
   const result = await response.json() as {branch: string; changes_count: number};
   expect(result.changes_count).toBeGreaterThan(0);
   await expect(page.getByRole("status").filter({hasText: /^Saved/})).toBeVisible({timeout});
-  return {sessionId: new URL(response.url()).pathname.slice(prefix.length, -"/save".length), branch: result.branch};
+  return {sessionId, branch: result.branch};
 }
 
 /** Each project has one submission, identified by its unique edited label. */

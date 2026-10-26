@@ -76,7 +76,8 @@ async function selectPerson(page: Page) {
 async function edit(page: Page, run: SuggestionsRunConfig, id: string, label: string) {
   await page.goto(`${run.web}/projects/${id}/editor`);
   await selectPerson(page);
-  const saved = await saveExistingLabel(page, run.api, id, label);
+  const saved = await saveExistingLabel(page, run.api, id, label, false, undefined,
+    sessionId => recordResource(run, {event: "suggestion-session", projectId: id, sessionId}));
   await recordResource(run, {event: "suggestion-session", projectId: id, sessionId: saved.sessionId, branch: saved.branch});
   return saved;
 }
@@ -306,9 +307,11 @@ test("public non-member capabilities agree with session create and submission su
   await selectPerson(people.unrelated);
   const [created, saved] = await Promise.all([
     responseFor(people.unrelated, run.api, sessionsPath(project.id)),
-    saveExistingLabel(people.unrelated, run.api, project.id, "D10 public visitor Person"),
+    saveExistingLabel(people.unrelated, run.api, project.id, "D10 public visitor Person", false, undefined,
+      sessionId => recordResource(run, {event: "suggestion-session", projectId: project.id, sessionId})),
   ]);
   expect(created.status()).toBe(201);
+  await recordResource(run, {event: "suggestion-session", projectId: project.id, sessionId: saved.sessionId, branch: saved.branch});
   const pr = await submit(people.unrelated, run, project.id, saved, "D10 public visitor Person");
   expect(await session(unrelatedApi, project.id, saved.sessionId)).toMatchObject({status: "submitted", pr_number: pr});
   await openTriage(people.owner, run.web, project.id, "D10 public visitor Person");
