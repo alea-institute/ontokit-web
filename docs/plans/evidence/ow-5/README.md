@@ -28,6 +28,22 @@ This proves local UI behavior only. It does not establish DEV, OIDC, hosted pers
 
 No existing tests were deleted, weakened or skipped. Browser development iterations corrected the local hostname and two test locators to match the real controls; no application permission or security configuration was changed to make the suite pass.
 
+## Local review and final browser pass
+
+The five-lens simplification pass removed an unnecessary sample-population rescan on each review save (`d2771716`). Membership still depends only on the bundle and branch/component/partition filters. After that change, all 48 hydration tests, type-check and lint passed. The full 5,558-test regression and production build above preceded this behavior-preserving optimization.
+
+Code review run `20261027-135907-298ee9de` examined all 27 changed files against `aafc6c78`, including the optimization. Correctness, project standards, testing, maintainability, performance, reliability, frontend races and adversarial reviewers returned no findings. The requirements check marked R1–R8 and U1–U4 met for this lane's local delivery. There are no unapplied findings or settled-decision conflicts. Cross-model review was disabled by checkout configuration; this result does not replace the controller's Astra/Fable reviews.
+
+The final browser run against the reviewed code passed all four tests in 7.6 seconds and refreshed the six captures. The changed loading capture was inspected again; the other five were byte-identical to the previously inspected captures.
+
+| Route | Result | Proof |
+|---|---|---|
+| `/` | Pass | Pending state, empty search, keyboard reset/focus, narrow layout |
+| `/projects/demo-polish/editor` | Pass | Help trigger, physical Shift+Slash, Escape/close focus return, editable question mark, narrow dialog |
+| `/hydration-review` | Pass | File entry focus, draft retention, IndexedDB restore, export schema/hash, RTL and narrow dark layout |
+
+No route was skipped. Hosted OIDC and live backend flows are outside this suite. Browser console logs are not collected by the suite; assertions check the rendered behavior and fail unexpected API requests. The final server log showed no application exceptions.
+
 ## Reproduce the browser evidence
 
 Install the lockfile dependencies and Playwright Chromium. Select an unused local port before starting the repository's server script: its noninteractive mode may terminate a process on an occupied port. Use a credential-free process with no environment files, no configured OIDC provider, and matching optional auth settings:
