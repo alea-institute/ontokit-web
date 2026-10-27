@@ -1132,7 +1132,7 @@ export default function EditorPage() {
       id: "save",
       key: "s",
       modifiers: { ctrl: true },
-      description: "Save / flush draft",
+      description: "Finish editing the focused field",
       category: "Editing",
       action: () => {
         // Trigger a blur on active element to flush auto-save drafts
@@ -1233,8 +1233,11 @@ export default function EditorPage() {
       <>
         <Header />
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
-          <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+          <div role="status" className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3">
+            <div aria-hidden="true" className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600 motion-reduce:animate-none" />
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {isRetiredRedirecting ? "Opening the current project…" : status === "loading" && authMode === "required" ? "Checking your session…" : "Loading editor…"}
+            </p>
           </div>
         </main>
       </>
@@ -1293,8 +1296,9 @@ export default function EditorPage() {
       <>
         <Header />
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
-          <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+          <div role="status" className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3">
+            <div aria-hidden="true" className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600 motion-reduce:animate-none" />
+            <p className="text-sm text-slate-600 dark:text-slate-400">Opening project viewer…</p>
           </div>
         </main>
       </>
@@ -1538,8 +1542,10 @@ export default function EditorPage() {
                 size="sm"
                 onClick={() => setShortcutDialogOpen(true)}
                 aria-label="Keyboard shortcuts"
+                className="gap-2"
               >
-                <Keyboard className="h-4 w-4" />
+                <Keyboard aria-hidden="true" className="h-4 w-4" />
+                <span className="hidden lg:inline">Shortcuts</span>
               </Button>
 
               {canManage && !settingsUnavailable && (

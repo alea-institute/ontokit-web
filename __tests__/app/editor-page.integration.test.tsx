@@ -177,6 +177,7 @@ describe("Editor page real access and empty-state chains", () => {
     mount();
     await waitFor(() => expect(boundary.replace).toHaveBeenCalledWith("/projects/route-project"));
     expect(screen.queryByText("No Ontology File")).toBeNull();
+    expect(screen.getByRole("status").textContent).toContain("Opening project viewer");
   });
   it("redirects an authenticated explicit viewer before exposing editing controls", async () => {
     authenticate();
@@ -201,6 +202,47 @@ describe("Editor page real access and empty-state chains", () => {
     await waitFor(() => expect(client.getQueryData(["project", "route-project", false])).toEqual(projectResponse));
     expect(screen.queryByText("No Ontology File")).toBeNull();
     expect(boundary.replace).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toContain("Checking your session");
+  });
+  it("names the wait for a retired demo project's replacement", async () => {
+    projectStatus = 410;
+    projectResponse = { detail: { code: "demo_generation_retired", current_project_id: "12345678-1234-4234-8234-123456789abc", retired_at: null } };
+    mount();
+    expect(await screen.findByText("Opening the current project…")).toBeTruthy();
+    expect(screen.queryByText("Project not found")).toBeNull();
+    expect(screen.queryByText("No Ontology File")).toBeNull();
+  });
+  it("names project loading and exposes help with only the anonymous viewer's active shortcuts", async () => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
+    projectResponse = { ...projectResponse, user_role: null, is_public: true, source_file_path: "ontology.ttl" };
+    mount();
+    expect(screen.getByRole("status").textContent).toContain("Loading editor");
+    const opener = await screen.findByRole("button", { name: "Keyboard shortcuts" });
+    expect(opener.textContent).toContain("Shortcuts");
+    opener.focus();
+    fireEvent.click(opener);
+    let dialog = screen.getByRole("dialog", { name: "Keyboard Shortcuts" });
+    expect(within(dialog).queryByText("Add new entity")).toBeNull();
+    expect(within(dialog).queryByText("Accept focused suggestion")).toBeNull();
+    expect(within(dialog).getByText("Show keyboard shortcuts")).toBeTruthy();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+    for (const shiftKey of [true, false]) {
+      fireEvent.keyDown(opener, { key: "?", shiftKey });
+      dialog = screen.getByRole("dialog", { name: "Keyboard Shortcuts" });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+      await waitFor(() => expect(document.activeElement).toBe(opener));
+    }
+  });
+
+  it("lists the add-entity shortcut for an authorized editor", async () => {
+    authenticate();
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl" };
+    mount();
+    fireEvent.click(await screen.findByRole("button", { name: "Keyboard shortcuts" }));
+    const dialog = screen.getByRole("dialog", { name: "Keyboard Shortcuts" });
+    expect(within(dialog).getByText("Add new entity")).toBeTruthy();
+    expect(within(dialog).getByText("Ctrl+N")).toBeTruthy();
   });
   it("allows an anonymous public project into the proposal route when authentication is optional", async () => {
     vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
