@@ -34,7 +34,7 @@ function browserDownload(filename: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
-const select = "rounded border border-slate-300 bg-white p-1 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white";
+const select = "max-w-full rounded border border-slate-300 bg-white p-1 text-sm dark:border-slate-600 dark:bg-slate-900 dark:text-white";
 
 /**
  * Review surface for a generative-folio write-back digest (requirements:
@@ -63,6 +63,11 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
   const filtered = useMemo(
     () => (bundle ? filterRows(bundle.rows, deferredFilter, reviews, searchIndex, selectedId) : []),
     [bundle, deferredFilter, reviews, searchIndex, selectedId],
+  );
+  const { branch, component, partition } = filter;
+  const samplingPopulation = useMemo(
+    () => bundle ? filterRows(bundle.rows, { branch, component, partition, status: "", q: "" }, reviews) : [],
+    [bundle, branch, component, partition, reviews],
   );
 
   const store = () => (storeRef.current ??= createStore());
@@ -142,15 +147,14 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
   }
 
   function drawNewSample() {
-    if (!bundle) return;
-    const population = filterRows(bundle.rows, { ...filter, status: "", q: "" }, reviews);
-    const members = drawSample(population, sampleSize, seed);
+    if (!bundle || samplingPopulation.length === 0) return;
+    const members = drawSample(samplingPopulation, sampleSize, seed);
     const dims = Object.fromEntries(Object.entries({ branch: filter.branch, component: filter.component, partition: filter.partition }).filter(([, v]) => v));
     const sample: Sample = {
       sample_id: `s-${seed.toString(16)}-${members.length}-${Date.now().toString(36)}`,
       seed,
       size: members.length,
-      population: population.length,
+      population: samplingPopulation.length,
       filter: dims,
       members,
       created_at: new Date().toISOString(),
@@ -165,16 +169,26 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
     return (
       <div className="space-y-4">
         <Safety />
-        <label className="flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed border-slate-300 p-10 text-center dark:border-slate-600">
+        <label aria-busy={!!loading} className={cn(
+          "flex flex-col items-center gap-3 rounded-lg border-2 border-dashed border-slate-300 bg-white px-6 py-10 text-center focus-within:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2 dark:border-slate-600 dark:bg-slate-800 dark:focus-within:ring-offset-slate-900",
+          loading ? "cursor-wait opacity-70" : "cursor-pointer hover:border-primary-400",
+        )}>
           <FileUp className="h-8 w-8 text-slate-400" aria-hidden />
-          <span className="font-medium text-slate-900 dark:text-white">Open a review bundle</span>
-          <span className="text-sm text-slate-500">
-            A <span className="font-mono">bundle.jsonl</span> built by generative-folio&apos;s{" "}
-            <span className="font-mono">scripts/writeback_review_bundle.py</span>. It stays on this computer.
+          <span className="text-lg font-semibold text-slate-900 dark:text-white">Open a review bundle</span>
+          <span className="max-w-md text-sm text-slate-600 dark:text-slate-300">
+            Choose a <span className="font-mono">.jsonl</span> review bundle from your computer to inspect proposed additions and record your decisions.
           </span>
-          <input type="file" accept=".jsonl,application/x-ndjson,application/json" className="sr-only" aria-label="Review bundle file" onChange={onBundleFile} />
+          <span className="rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white">{loading ? "Opening bundle…" : "Choose bundle file"}</span>
+          <input type="file" accept=".jsonl,application/x-ndjson,application/json" className="sr-only" aria-label="Review bundle file" disabled={!!loading} onChange={onBundleFile} />
         </label>
-        {loading && <p role="status" className="text-sm text-slate-600">{loading}</p>}
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          Your file stays on this computer. Reviews are saved in this browser for the same bundle; export them to keep a portable copy.
+        </p>
+        <details className="text-sm text-slate-500 dark:text-slate-400">
+          <summary className="cursor-pointer">Where do review bundles come from?</summary>
+          <p className="mt-2 break-words">Use a <span className="font-mono">bundle.jsonl</span> produced by generative-folio&apos;s <span className="font-mono">scripts/writeback_review_bundle.py</span>.</p>
+        </details>
+        {loading && <p role="status" className="text-sm text-slate-600 dark:text-slate-300">{loading}</p>}
         {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
       </div>
     );
@@ -189,9 +203,11 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
   const view = pageOf(filtered, page, PAGE_SIZE);
   const reviewedCount = [...reviews.values()].filter((r) => r.disposition !== null).length;
   const setF = (patch: Partial<RowFilter>) => { setFilter((f) => ({ ...f, ...patch })); setPage(0); };
+  const hasFilters = Object.values(filter).some(Boolean);
+  const clearFilters = () => { setFilter(EMPTY_FILTER); setPage(0); };
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-4 [overflow-wrap:anywhere]">
       <Safety />
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-700 dark:text-slate-200">
         <div>
@@ -199,8 +215,8 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
           {reviewedCount.toLocaleString()} reviewed · {(header.counts.rows - reviewedCount).toLocaleString()} unreviewed ·{" "}
           <span className="font-mono text-xs" title={bundle.sha256}>bundle {bundle.sha256.slice(0, 12)}</span>
         </div>
-        <div className="flex gap-2">
-          <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-800">
+        <div className="flex flex-wrap gap-2">
+          <label className="inline-flex h-8 cursor-pointer items-center rounded-md border border-slate-300 px-3 text-sm hover:bg-slate-100 focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-2 dark:border-slate-600 dark:hover:bg-slate-800 dark:focus-within:ring-offset-slate-900">
             Import reviews
             <input type="file" accept=".jsonl" className="sr-only" aria-label="Review export file" onChange={onImport} />
           </label>
@@ -210,7 +226,7 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
       {notice && <p role="status" className="text-sm text-slate-600 dark:text-slate-300">{notice}</p>}
       {error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{error}</p>}
 
-      <div role="tablist" className="flex gap-1 border-b border-slate-200 dark:border-slate-700">
+      <div role="tablist" aria-label="Review views" className="flex flex-wrap gap-1 border-b border-slate-200 dark:border-slate-700">
         {TABS.map((t) => (
           <button
             key={t}
@@ -227,19 +243,19 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
 
       {(tab === "Rows" || tab === "Samples") && (
         <div className="flex flex-wrap items-end gap-2" aria-label="Filters">
-          <label className="text-sm">Branch<br />
+          <label className="min-w-0 max-w-full text-sm">Branch<br />
             <select aria-label="Branch" value={filter.branch} onChange={(e) => setF({ branch: e.target.value })} className={select}>
               <option value="">All branches</option>
               {Object.entries(header.counts.by_branch).map(([b, n]) => <option key={b} value={b}>{b} ({n.toLocaleString()})</option>)}
             </select>
           </label>
-          <label className="text-sm">Component<br />
+          <label className="min-w-0 max-w-full text-sm">Component<br />
             <select aria-label="Component" value={filter.component} onChange={(e) => setF({ component: e.target.value })} className={select}>
               <option value="">All components</option>
               {Object.entries(header.counts.by_component).map(([c, n]) => <option key={c} value={c}>{c} ({n.toLocaleString()})</option>)}
             </select>
           </label>
-          <label className="text-sm">Partition<br />
+          <label className="min-w-0 max-w-full text-sm">Partition<br />
             <select aria-label="Partition" value={filter.partition} onChange={(e) => setF({ partition: e.target.value })} className={select}>
               <option value="">Keep and regenerate</option>
               {Object.entries(header.counts.by_partition).map(([p, n]) => <option key={p} value={p}>{p} ({n.toLocaleString()})</option>)}
@@ -247,7 +263,7 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
           </label>
           {tab === "Rows" && (
             <>
-              <label className="text-sm">Review state<br />
+              <label className="min-w-0 max-w-full text-sm">Review state<br />
                 <select aria-label="Review state" value={filter.status} onChange={(e) => setF({ status: e.target.value as RowFilter["status"] })} className={select}>
                   <option value="">Any</option>
                   <option value="unreviewed">Unreviewed</option>
@@ -259,11 +275,12 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
                   <option value="rejected">Rejected</option>
                 </select>
               </label>
-              <label className="grow text-sm">Search label, IRI, value or row id<br />
+              <label className="min-w-0 grow text-sm">Search label, IRI, value or row id<br />
                 <input aria-label="Search" type="search" value={filter.q} onChange={(e) => setF({ q: e.target.value })} className={cn(select, "w-full")} />
               </label>
             </>
           )}
+          {hasFilters && <Button size="sm" variant="outline" onClick={clearFilters}>Clear filters</Button>}
         </div>
       )}
 
@@ -271,18 +288,31 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
       <div className="min-w-0 space-y-4">
       {tab === "Rows" && (
         <div className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-          <div className="flex items-center justify-between px-3 py-2 text-sm text-slate-600 dark:text-slate-300">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm text-slate-600 dark:text-slate-300">
             <span role="status">
               {filtered.length ? `${(view.start + 1).toLocaleString()}–${view.end.toLocaleString()} of ${filtered.length.toLocaleString()} matching rows` : "0 matching rows"}
               {" "}({header.counts.rows.toLocaleString()} in bundle)
             </span>
-            <span className="flex items-center gap-2">
+            <span className="flex flex-wrap items-center gap-2">
               <Button size="sm" variant="outline" disabled={view.page === 0} onClick={() => setPage(view.page - 1)}>Previous</Button>
               page {view.page + 1} of {view.pages.toLocaleString()}
               <Button size="sm" variant="outline" disabled={view.page >= view.pages - 1} onClick={() => setPage(view.page + 1)}>Next</Button>
             </span>
           </div>
-          <RowTable rows={view.items} reviews={reviews} selectedId={selectedId} onSelect={setSelectedId} />
+          {filtered.length > 0 ? (
+            <RowTable rows={view.items} reviews={reviews} selectedId={selectedId} onSelect={setSelectedId} />
+          ) : (
+            <div className="space-y-2 p-6 text-center">
+              <h2 className="font-medium text-slate-900 dark:text-white">
+                {bundle.rows.length === 0 ? "No proposed rows in this bundle" : "No rows match these filters"}
+              </h2>
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {bundle.rows.length === 0
+                  ? "There is nothing to review. Check Exclusions for any rows held out of this bundle."
+                  : "Try a different search or clear the filters to return to the full row list."}
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -298,8 +328,17 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
             <label className="text-sm">Seed<br />
               <input aria-label="Seed" type="number" min={0} value={seed} onChange={(e) => setSeed(Number(e.target.value) >>> 0)} className={cn(select, "w-36")} />
             </label>
-            <Button size="sm" onClick={drawNewSample}><Shuffle className="mr-1 h-4 w-4" aria-hidden />Draw sample</Button>
+            <Button size="sm" disabled={samplingPopulation.length === 0} onClick={drawNewSample}><Shuffle className="mr-1 h-4 w-4" aria-hidden />Draw sample</Button>
           </div>
+          {samplingPopulation.length === 0 ? (
+            <p role="status" className="text-sm text-slate-600 dark:text-slate-300">
+              {bundle.rows.length === 0
+                ? "There are no proposed rows to sample in this bundle."
+                : "No rows match the branch, component and partition. Clear filters to sample the full bundle."}
+            </p>
+          ) : samples.length === 0 && (
+            <p className="text-sm text-slate-600 dark:text-slate-300">No samples saved yet. Draw a sample to review a repeatable selection from {samplingPopulation.length.toLocaleString()} eligible rows.</p>
+          )}
           {samples.length > 0 && (
             <ul className="space-y-1 text-sm">
               {samples.map((s) => {
@@ -330,7 +369,12 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
 
       </div>
       {showDetail && selectedRow && (
-        <div className="mt-4 lg:sticky lg:top-4 lg:mt-0 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+        <div className="mt-4 min-w-0 space-y-2 lg:sticky lg:top-4 lg:mt-0 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+          {tab === "Rows" && navIndex < 0 && (
+            <p role="status" className="rounded-md border border-primary-200 bg-primary-50 p-3 text-sm text-primary-800 dark:border-primary-800 dark:bg-primary-950 dark:text-primary-200">
+              This row is outside the current filters. Your correction and note remain here; clear filters to return it to the list.
+            </p>
+          )}
           <RowDetail
             key={selectedRow.row_id}
             row={selectedRow}
@@ -350,6 +394,14 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
 
       {tab === "Rates" && (
         <div className="space-y-6 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-800">
+          {reviewedCount === 0 && (
+            <div className="space-y-2">
+              <p className="text-sm text-slate-600 dark:text-slate-300">
+                {bundle.rows.length === 0 ? "This bundle has no proposed rows to review." : "No completed reviews yet. Open a row and accept, correct or reject it to start reviewing."}
+              </p>
+              {bundle.rows.length > 0 && <Button size="sm" variant="outline" onClick={() => setTab("Rows")}>Review rows</Button>}
+            </div>
+          )}
           <p className="text-sm text-slate-600 dark:text-slate-300">
             Rates count reviewed rows only. Reviewed rows include any sample draws, so these are review-population figures,
             not corpus-wide estimates.
