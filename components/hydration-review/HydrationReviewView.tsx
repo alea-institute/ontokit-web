@@ -66,8 +66,8 @@ export function HydrationReviewView({ createStore = createDefaultStore, download
   );
   const { branch, component, partition } = filter;
   const samplingPopulation = useMemo(
-    () => bundle ? filterRows(bundle.rows, { branch, component, partition, status: "", q: "" }, reviews) : [],
-    [bundle, branch, component, partition, reviews],
+    () => bundle ? filterRows(bundle.rows, { branch, component, partition, status: "", q: "" }, new Map<string, Review>()) : [],
+    [bundle, branch, component, partition],
   );
 
   const store = () => (storeRef.current ??= createStore());
