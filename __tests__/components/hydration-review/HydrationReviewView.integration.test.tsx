@@ -114,11 +114,11 @@ describe("HydrationReviewView", () => {
     const rows = Array.from({ length: 60 }, (_, i) => ({ ...makeRows()[0], row_id: `many-${i}`, label: `Concept ${i}` }));
     await load(createMemoryStore(), vi.fn(), bundleText({ rows }));
     fireEvent.change(screen.getByLabelText("Search"), { target: { value: "Concept" } });
-    fireEvent.click(screen.getByRole("button", { name: "Next", exact: true }));
+    fireEvent.click(screen.getByRole("button", { name: /^Next$/ }));
     expect(await screen.findByText(/51–60 of 60 matching rows/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(await screen.findByText(/1–50 of 60 matching rows/)).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Previous", exact: true }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /^Previous$/ }) as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("explains unsampled and unreviewed states, and samples despite an empty text search", async () => {
