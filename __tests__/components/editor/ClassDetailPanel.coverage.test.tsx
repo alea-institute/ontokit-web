@@ -182,7 +182,7 @@ describe("class detail real editing and suggestion chains", () => {
     Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: vi.fn() });
     mount();
     const field = await screen.findByDisplayValue("Existing definition");
-    fireEvent.click(within(field.parentElement!).getByRole("button", { name: "Language tag" }));
+    fireEvent.click(within(field.parentElement!).getByRole("button", { name: "Language tag: en" }));
     fireEvent.click(screen.getByRole("option", { name: /French\s*Français\s*fr$/ }));
     fireEvent.blur(field);
     const comment = screen.getByPlaceholderText("Add another Comment — or translation.");

@@ -116,14 +116,14 @@ export function LanguagePicker({ value, onChange, disabled, ariaLabel = "Languag
         type="button"
         onClick={() => !disabled && setOpen((prev) => !prev)}
         disabled={disabled}
-        aria-label={ariaLabel}
+        aria-label={`${ariaLabel}: ${displayLabel}`}
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls={open ? listboxId : undefined}
         title={langInfo ? `${langInfo.name} (${langInfo.nativeName})` : value || "Select language"}
         className="flex w-14 items-center justify-center gap-0.5 rounded-md border border-slate-300 bg-white px-1 py-1.5 text-xs text-slate-700 hover:border-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-300 dark:hover:border-slate-500"
       >
-        {flag && <span className="font-emoji text-sm leading-none">{flag}</span>}
+        {flag && <span aria-hidden="true" className="font-emoji text-sm leading-none">{flag}</span>}
         <span className="truncate">{displayLabel}</span>
         <ChevronDown className="h-2.5 w-2.5 shrink-0 text-slate-400" />
       </button>

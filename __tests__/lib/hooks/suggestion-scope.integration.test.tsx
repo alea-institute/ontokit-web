@@ -101,7 +101,7 @@ it.each(['submit', 'resubmit', 'discard'])('completes authenticated %s across sa
   const gate = deferred(); vi.stubGlobal('fetch', vi.fn(() => gate.promise)); const onSubmitted = vi.fn();
   const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken, onSubmitted }), { initialProps: { accessToken: 'old' } });
   act(() => result.current.resumeSession({ sessionId: 'session', branch: 'branch', beaconToken: null }));
-  let pending!: Promise<void>;
+  let pending!: ReturnType<typeof result.current.submitSession> | ReturnType<typeof result.current.discardSession>;
   act(() => { pending = operation === 'submit' ? result.current.submitSession() : operation === 'resubmit' ? result.current.resubmitSession() : result.current.discardSession(); });
   rerender({ accessToken: 'renewed' });
   if (operation !== 'discard') expect(result.current.status).toBe('submitting');
@@ -116,7 +116,7 @@ it.each(['submit', 'resubmit'])('unlocks a renewed credential retry after an old
   const fetcher = vi.fn().mockReturnValueOnce(gate.promise).mockResolvedValueOnce(json({ pr_number: 10, pr_url: null })); vi.stubGlobal('fetch', fetcher);
   const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken, onError, onSubmitted }), { initialProps: { accessToken: 'old' } });
   act(() => result.current.resumeSession({ sessionId: 'session', branch: 'branch', beaconToken: null }));
-  let pending!: Promise<void>;
+  let pending!: ReturnType<typeof result.current.submitSession> | ReturnType<typeof result.current.discardSession>;
   act(() => { pending = operation === 'submit' ? result.current.submitSession() : result.current.resubmitSession(); });
   rerender({ accessToken: 'renewed' });
   await act(async () => { gate.resolve(json({ detail: 'Expired' }, 401)); await pending; });
@@ -132,7 +132,7 @@ it.each(['submit', 'resubmit', 'discard'])('blocks duplicate terminal actions an
   const gate = deferred(); const fetcher = vi.fn(() => gate.promise); vi.stubGlobal('fetch', fetcher);
   const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken }), { initialProps: { accessToken: 'old' } });
   act(() => result.current.resumeSession({ sessionId: 'session', branch: 'branch', beaconToken: null }));
-  let pending!: Promise<void>;
+  let pending!: ReturnType<typeof result.current.submitSession> | ReturnType<typeof result.current.discardSession>;
   act(() => { pending = operation === 'submit' ? result.current.submitSession() : operation === 'resubmit' ? result.current.resubmitSession() : result.current.discardSession(); });
   rerender({ accessToken: 'renewed' });
   await act(async () => {
@@ -150,7 +150,7 @@ it.each(['viewer', 'project', 'session', 'unmount'])('rejects terminal completio
   const initial = { projectId: 'a', viewerId: 'viewer' };
   const { result, rerender, unmount } = renderHook(props => useSuggestionSession({ ...props, accessToken: 'token', onSubmitted }), { initialProps: initial });
   act(() => result.current.resumeSession({ sessionId: 'session', branch: 'branch', beaconToken: null }));
-  let pending!: Promise<void>; act(() => { pending = result.current.submitSession(); });
+  let pending!: ReturnType<typeof result.current.submitSession> | ReturnType<typeof result.current.discardSession>; act(() => { pending = result.current.submitSession(); });
   if (transition === 'unmount') unmount();
   else {
     if (transition === 'session') act(() => result.current.resumeSession({ sessionId: 'other', branch: 'other-branch', beaconToken: null }));
@@ -167,7 +167,7 @@ it('does not reverify and reopen a resumed session during credential renewal and
   const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken, resumeSessionId: 'session', resumeBranch: 'branch', onError: () => {} }), { initialProps: { accessToken: 'old' } });
   await act(async () => {});
   expect(result.current.sessionId).toBe('session');
-  let pending!: Promise<void>; act(() => { pending = result.current.resubmitSession(); });
+  let pending!: ReturnType<typeof result.current.submitSession> | ReturnType<typeof result.current.discardSession>; act(() => { pending = result.current.resubmitSession(); });
   rerender({ accessToken: 'renewed' });
   expect(result.current.status).toBe('submitting');
   await act(async () => { gate.resolve(json({ pr_number: 9, pr_url: null })); await pending; });
@@ -180,7 +180,7 @@ it('ignores verification that began before the same session was submitted', asyn
   vi.stubGlobal('fetch', vi.fn().mockReturnValueOnce(verification.promise).mockReturnValueOnce(submission.promise));
   const { result } = renderHook(() => useSuggestionSession({ projectId: 'a', accessToken: 'token', resumeSessionId: 'session', resumeBranch: 'branch' }));
   act(() => result.current.resumeSession({ sessionId: 'session', branch: 'branch', beaconToken: null }));
-  let pending!: Promise<void>; act(() => { pending = result.current.submitSession(); });
+  let pending!: ReturnType<typeof result.current.submitSession> | ReturnType<typeof result.current.discardSession>; act(() => { pending = result.current.submitSession(); });
   await act(async () => { submission.resolve(json({ pr_number: 9, pr_url: null })); await pending; });
   await act(async () => { verification.resolve(json({ items: [{ session_id: 'session', status: 'changes-requested' }] })); });
   expect(result.current).toMatchObject({ sessionId: null, status: 'submitted' });
@@ -200,7 +200,7 @@ it('retains discard recovery after an obsolete credential is rejected', async ()
   const gate = deferred(); const fetcher = vi.fn().mockReturnValueOnce(gate.promise).mockResolvedValueOnce(json({})); vi.stubGlobal('fetch', fetcher);
   const { result, rerender } = renderHook(({ accessToken }) => useSuggestionSession({ projectId: 'a', viewerId: 'viewer', accessToken }), { initialProps: { accessToken: 'old' } });
   act(() => result.current.resumeSession({ sessionId: 'session', branch: 'branch', beaconToken: null }));
-  let pending!: Promise<void>; act(() => { pending = result.current.discardSession(); });
+  let pending!: ReturnType<typeof result.current.submitSession> | ReturnType<typeof result.current.discardSession>; act(() => { pending = result.current.discardSession(); });
   rerender({ accessToken: 'renewed' });
   await act(async () => { gate.resolve(json({ detail: 'Expired' }, 401)); await pending; });
   expect(result.current).toMatchObject({ sessionId: 'session', status: 'active', error: null });

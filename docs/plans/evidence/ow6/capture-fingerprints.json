@@ -1,0 +1,15 @@
+{
+  "scope": "isolated-ui-fixtures-not-full-stack",
+  "captured_at_utc": "2026-10-28T02:20:16.594900+00:00",
+  "source_sha256": {
+    "lib/hooks/useSuggestionSession.ts": "108199b3b70430580eca9cf1a0e51f8695de94029963f10d47f13be5ed78d7b8"
+  },
+  "screenshots_sha256": {
+    "docs/plans/evidence/ow6/editor-search-label.png": "27f4da8d15520e1f1f5293b8a8a89f5497624f63bc5eb47a7ffd4286330711ad",
+    "docs/plans/evidence/ow6/review-files-mobile.png": "d5ff9cdc695af45a618530baad92678987889e636b9f274cd64e58d0a425b452",
+    "docs/plans/evidence/ow6/review-files.png": "624ebcd0d16876d411bfe860f28a3a978ba03ae873f00669999247aefbd7f92d",
+    "docs/plans/evidence/ow6/submit-dialog-error.png": "84362e35de27e248c516802cb7967e110bbb34f4d64942466c947795bfbc483f",
+    "docs/plans/evidence/ow6/submit-dialog-mobile.png": "a31dc9f8a06a212211e864c5127563cbe150367b684c66854b018b1d391caa57",
+    "docs/plans/evidence/ow6/submit-dialog.png": "2a4a3266595342c7bdf1d74d5c9c39291caab35658086f0fb17ff33f551cc1a8"
+  }
+}

@@ -254,7 +254,7 @@ export function TrustExplainer({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        className="inline-flex items-center gap-1 rounded-sm text-xs font-medium text-primary-600 hover:text-primary-700 focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
+        className="inline-flex items-center gap-1 rounded-sm text-xs font-medium text-primary-700 hover:text-primary-700 focus:outline-hidden focus:ring-2 focus:ring-primary-500 dark:text-primary-400 dark:hover:text-primary-300"
       >
         <HelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
         {triggerLabel}

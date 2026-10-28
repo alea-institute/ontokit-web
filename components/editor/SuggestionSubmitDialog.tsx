@@ -30,14 +30,13 @@ export function SuggestionSubmitDialog({
   const [summary, setSummary] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (open) {
       setSummary("");
       setError(null);
       setIsSubmitting(false);
-      setTimeout(() => textareaRef.current?.focus(), 50);
     }
   }, [open]);
 
@@ -58,7 +57,21 @@ export function SuggestionSubmitDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent
+        className="sm:max-w-md"
+        onOpenAutoFocus={() => {
+          // The editor opens this controlled dialog without a Radix DialogTrigger.
+          returnFocusRef.current = document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          if (returnFocusRef.current?.isConnected) {
+            event.preventDefault();
+            returnFocusRef.current.focus();
+          }
+        }}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -99,7 +112,6 @@ export function SuggestionSubmitDialog({
                 Describe your changes (optional)
               </label>
               <textarea
-                ref={textareaRef}
                 id="suggestion-summary"
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
@@ -115,7 +127,7 @@ export function SuggestionSubmitDialog({
             </div>
 
             {error && (
-              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+              <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>
             )}
           </div>
 
@@ -128,7 +140,7 @@ export function SuggestionSubmitDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} className="bg-primary-700 hover:bg-primary-800 dark:bg-primary-700 dark:hover:bg-primary-800">
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

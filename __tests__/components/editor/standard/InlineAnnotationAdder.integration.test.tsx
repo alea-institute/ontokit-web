@@ -45,7 +45,7 @@ describe("inline annotation entry with real language selection and Turtle persis
   it("writes the chosen French language and resets the form after Enter", async () => {
     const lang = "fr";
     render(<Editor />); await selectDefinition();
-    fireEvent.click(screen.getByRole("button", { name: "Language tag" }));
+    fireEvent.click(screen.getByRole("button", { name: "Language tag: en" }));
     fireEvent.change(screen.getByPlaceholderText("Search languages..."), { target: { value: lang } });
     fireEvent.click(await screen.findByRole("option", { name: /French\s*Français\s*fr$/ }));
     const input = screen.getByLabelText("Annotation value");
@@ -54,7 +54,7 @@ describe("inline annotation entry with real language selection and Turtle persis
     expect(triples()).toContainEqual({ predicate: definitionIri, object: { type: "literal", value: 'A quoted "definition"', lang } });
     expect(screen.getByText("1 saves")).toBeDefined();
     expect((screen.getByLabelText("Annotation value") as HTMLInputElement).disabled).toBe(true);
-    expect(screen.getByRole("button", { name: "Language tag" }).textContent).toContain("en");
+    expect(screen.getByRole("button", { name: "Language tag: en" }).textContent).toContain("en");
     fireEvent.focus(screen.getByLabelText("Select annotation property"));
     expect(screen.queryByRole("button", { name: /Definition\s*skos:definition/ })).toBeNull();
   });

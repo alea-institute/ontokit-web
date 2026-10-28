@@ -1433,7 +1433,7 @@ export default function EditorPage() {
               {/* Suggestions link */}
               {isSuggestionMode && (
                 <Link href={`/projects/${projectId}/suggestions`}>
-                  <Button variant="ghost" size="sm" className="gap-2 text-amber-600 dark:text-amber-400">
+                  <Button variant="ghost" size="sm" className="gap-2 text-amber-700 dark:text-amber-400">
                     <Lightbulb className="h-4 w-4" />
                     <span className="hidden sm:inline">My Suggestions</span>
                   </Button>
@@ -1791,7 +1791,11 @@ export default function EditorPage() {
         <SuggestionSubmitDialog
           open={submitDialogOpen}
           onOpenChange={setSubmitDialogOpen}
-          onConfirm={suggestionSession.isResumed ? suggestionSession.resubmitSession : suggestionSession.submitSession}
+          onConfirm={async (summary) => {
+            const submit = suggestionSession.isResumed ? suggestionSession.resubmitSession : suggestionSession.submitSession;
+            const result = await submit(summary);
+            if (!result.success) throw new Error(result.error);
+          }}
           entitiesModified={suggestionSession.entitiesModified}
           changesCount={suggestionSession.changesCount}
         />

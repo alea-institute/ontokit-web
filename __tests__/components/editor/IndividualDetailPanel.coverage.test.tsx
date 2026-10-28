@@ -109,7 +109,7 @@ describe("individual panel real editing chain", () => {
       let output = source;
       mount(vi.fn(async (entity, data) => { output = updateIndividualInTurtle(output, entity, data); }));
       const definition = screen.getByDisplayValue("Original definition");
-      fireEvent.click(within(definition.parentElement!).getByRole("button", { name: "Language tag" }));
+      fireEvent.click(within(definition.parentElement!).getByRole("button", { name: "Language tag: en" }));
       fireEvent.click(screen.getByRole("option", { name: /French\s*Français\s*fr$/ }));
       fireEvent.blur(definition);
       await waitFor(() => expect(useDraftStore.getState().getDraft(key)).toMatchObject({ definitions: [{ value: "Original definition", lang: "fr" }, { value: "", lang: "en" }] }));

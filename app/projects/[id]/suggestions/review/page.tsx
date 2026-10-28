@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
+import * as Tabs from "@radix-ui/react-tabs";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -56,7 +57,7 @@ function DiffView({ diff }: { diff: PRDiffResponse }) {
   };
 
   const changeTypeConfig: Record<PRFileChange["change_type"], { icon: typeof FileCode; color: string; label: string }> = {
-    added: { icon: FilePlus, color: "text-green-600 dark:text-green-400", label: "Added" },
+    added: { icon: FilePlus, color: "text-green-700 dark:text-green-400", label: "Added" },
     deleted: { icon: FileMinus, color: "text-red-600 dark:text-red-400", label: "Deleted" },
     modified: { icon: FileEdit, color: "text-amber-600 dark:text-amber-400", label: "Modified" },
     renamed: { icon: FileCode, color: "text-blue-600 dark:text-blue-400", label: "Renamed" },
@@ -68,7 +69,7 @@ function DiffView({ diff }: { diff: PRDiffResponse }) {
       <div className="flex items-center gap-4 text-sm text-slate-600 dark:text-slate-400">
         <span>{diff.files_changed} {diff.files_changed === 1 ? "file" : "files"} changed</span>
         {diff.total_additions > 0 && (
-          <span className="text-green-600 dark:text-green-400">+{diff.total_additions}</span>
+          <span className="text-green-700 dark:text-green-400">+{diff.total_additions}</span>
         )}
         {diff.total_deletions > 0 && (
           <span className="text-red-600 dark:text-red-400">-{diff.total_deletions}</span>
@@ -101,7 +102,7 @@ function DiffView({ diff }: { diff: PRDiffResponse }) {
               </span>
               <span className="text-xs text-slate-500 dark:text-slate-400">
                 {file.additions > 0 && (
-                  <span className="text-green-600 dark:text-green-400">+{file.additions}</span>
+                  <span className="text-green-700 dark:text-green-400">+{file.additions}</span>
                 )}
                 {file.additions > 0 && file.deletions > 0 && " / "}
                 {file.deletions > 0 && (
@@ -595,7 +596,7 @@ export default function SuggestionReviewPage() {
                               ? "bulk-selection-limit"
                               : undefined
                           }
-                          className="h-4 w-4 rounded-sm border-slate-300 text-primary-600 focus:ring-primary-500 dark:border-slate-600"
+                          className="h-4 w-4 rounded-sm border-slate-300 text-primary-700 focus:ring-primary-500 dark:border-slate-600"
                         />
                       </label>
                       <button
@@ -683,163 +684,162 @@ export default function SuggestionReviewPage() {
 
                     {/* Detail panel */}
                     {isSelected && (
-                      <div className="mt-2 rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+                      <Tabs.Root
+                        value={activeTab}
+                        onValueChange={(value) => setActiveTab(value as DetailTab)}
+                        activationMode="manual"
+                        className="mt-2 rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
+                      >
                         {/* Tabs */}
-                        <div className="flex border-b border-slate-200 dark:border-slate-700" role="tablist">
-                          <button
+                        <Tabs.List aria-label="Suggestion details" className="flex border-b border-slate-200 dark:border-slate-700">
+                          <Tabs.Trigger
+                            value="summary"
                             onClick={() => setActiveTab("summary")}
-                            role="tab"
-                            id="tab-summary"
-                            aria-selected={activeTab === "summary"}
                             className={cn(
                               "px-4 py-2.5 text-sm font-medium transition-colors",
                               activeTab === "summary"
-                                ? "border-b-2 border-primary-500 text-primary-600 dark:text-primary-400"
+                                ? "border-b-2 border-primary-500 text-primary-700 dark:text-primary-400"
                                 : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
                             )}
                           >
                             Summary
-                          </button>
-                          <button
+                          </Tabs.Trigger>
+                          <Tabs.Trigger
+                            value="files"
                             onClick={() => setActiveTab("files")}
-                            role="tab"
-                            id="tab-files"
-                            aria-selected={activeTab === "files"}
                             className={cn(
                               "px-4 py-2.5 text-sm font-medium transition-colors",
                               activeTab === "files"
-                                ? "border-b-2 border-primary-500 text-primary-600 dark:text-primary-400"
+                                ? "border-b-2 border-primary-500 text-primary-700 dark:text-primary-400"
                                 : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200",
                             )}
                           >
                             Files
-                          </button>
-                        </div>
+                          </Tabs.Trigger>
+                        </Tabs.List>
 
                         {/* Tab content */}
-                        <div className="p-4" role="tabpanel" aria-labelledby={`tab-${activeTab}`}>
-                          {activeTab === "summary" ? (
-                            <div className="space-y-4">
-                              {/* Submitter info */}
+                        <Tabs.Content value="summary" className="p-4">
+                          <div className="space-y-4">
+                            {/* Submitter info */}
+                            <div>
+                              <h4 className="text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                Submitted by
+                              </h4>
+                              <div className="mt-1 flex items-center gap-2">
+                                <p className="text-sm text-slate-900 dark:text-white">
+                                  {s.submitter?.name || s.submitter?.email || (s.is_anonymous ? "Anonymous" : "Unknown user")}
+                                </p>
+                                <TierBadge tier={s.submitter_tier} />
+                                {s.is_anonymous && !s.submitter_tier && (
+                                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                                    Anonymous
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                <Clock className="mr-1 inline h-3 w-3" />
+                                {lastActivity.toLocaleString()}
+                              </p>
+                            </div>
+
+                            {/* Summary text */}
+                            {s.summary && (
                               <div>
-                                <h4 className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                  Submitted by
+                                <h4 className="text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                  Summary
                                 </h4>
-                                <div className="mt-1 flex items-center gap-2">
-                                  <p className="text-sm text-slate-900 dark:text-white">
-                                    {s.submitter?.name || s.submitter?.email || (s.is_anonymous ? "Anonymous" : "Unknown user")}
-                                  </p>
-                                  <TierBadge tier={s.submitter_tier} />
-                                  {s.is_anonymous && !s.submitter_tier && (
-                                    <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                                      Anonymous
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">
-                                  <Clock className="mr-1 inline h-3 w-3" />
-                                  {lastActivity.toLocaleString()}
+                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                                  {s.summary}
                                 </p>
                               </div>
+                            )}
 
-                              {/* Summary text */}
-                              {s.summary && (
-                                <div>
-                                  <h4 className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    Summary
-                                  </h4>
-                                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-                                    {s.summary}
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Entities */}
-                              {s.entities_modified.length > 0 && (
-                                <div>
-                                  <h4 className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    Entities Modified
-                                  </h4>
-                                  <div className="mt-1 flex flex-wrap gap-1.5">
-                                    {s.entities_modified.map((label) => (
-                                      <span
-                                        key={label}
-                                        className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                                      >
-                                        {label}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Revision history */}
-                              {(s.revision ?? 1) > 1 && (
-                                <div>
-                                  <h4 className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    Revision
-                                  </h4>
-                                  <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
-                                    Revision {s.revision} (resubmitted after changes were requested)
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* PR link */}
-                              {s.pr_number && (
-                                <div>
-                                  <h4 className="text-xs font-medium uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                                    Pull Request
-                                  </h4>
-                                  <div className="mt-1 flex items-center gap-2">
-                                    <Link
-                                      href={`/projects/${projectId}/pull-requests/${s.pr_number}`}
-                                      className="text-sm text-primary-600 hover:underline dark:text-primary-400"
+                            {/* Entities */}
+                            {s.entities_modified.length > 0 && (
+                              <div>
+                                <h4 className="text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                  Entities Modified
+                                </h4>
+                                <div className="mt-1 flex flex-wrap gap-1.5">
+                                  {s.entities_modified.map((label) => (
+                                    <span
+                                      key={label}
+                                      className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
                                     >
-                                      PR #{s.pr_number}
-                                    </Link>
-                                    {s.github_pr_url && (
-                                      <a
-                                        href={s.github_pr_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-                                      >
-                                        <ExternalLink className="h-3 w-3" />
-                                        GitHub
-                                      </a>
-                                    )}
-                                  </div>
+                                      {label}
+                                    </span>
+                                  ))}
                                 </div>
-                              )}
-                            </div>
-                          ) : (
-                            // Files tab
-                            <div>
-                              {isDiffLoading ? (
-                                <div className="flex items-center justify-center py-8">
-                                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
-                                </div>
-                              ) : diffError ? (
-                                <div role="alert" className="py-8 text-center text-sm">
-                                  <p>{diffError}</p>
-                                  <Button variant="outline" onClick={() => setDiffAttempt((attempt) => attempt + 1)}>Retry diff</Button>
-                                </div>
-                              ) : diff ? (
-                                <DiffView diff={diff} />
-                              ) : (
-                                <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
-                                  {s.pr_number
-                                    ? "Diff not available for this suggestion."
-                                    : "No PR associated with this suggestion yet."}
+                              </div>
+                            )}
+
+                            {/* Revision history */}
+                            {(s.revision ?? 1) > 1 && (
+                              <div>
+                                <h4 className="text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                  Revision
+                                </h4>
+                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
+                                  Revision {s.revision} (resubmitted after changes were requested)
                                 </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
+                              </div>
+                            )}
+
+                            {/* PR link */}
+                            {s.pr_number && (
+                              <div>
+                                <h4 className="text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                                  Pull Request
+                                </h4>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <Link
+                                    href={`/projects/${projectId}/pull-requests/${s.pr_number}`}
+                                    className="text-sm text-primary-700 hover:underline dark:text-primary-400"
+                                  >
+                                    PR #{s.pr_number}
+                                  </Link>
+                                  {s.github_pr_url && (
+                                    <a
+                                      href={s.github_pr_url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                                    >
+                                      <ExternalLink className="h-3 w-3" />
+                                      GitHub
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </Tabs.Content>
+                        <Tabs.Content value="files" className="p-4">
+                          <div>
+                            {isDiffLoading ? (
+                              <div className="flex items-center justify-center py-8">
+                                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
+                              </div>
+                            ) : diffError ? (
+                              <div role="alert" className="py-8 text-center text-sm">
+                                <p>{diffError}</p>
+                                <Button variant="outline" onClick={() => setDiffAttempt((attempt) => attempt + 1)}>Retry diff</Button>
+                              </div>
+                            ) : diff ? (
+                              <DiffView diff={diff} />
+                            ) : (
+                              <p className="py-8 text-center text-sm text-slate-500 dark:text-slate-400">
+                                {s.pr_number
+                                  ? "Diff not available for this suggestion."
+                                  : "No PR associated with this suggestion yet."}
+                              </p>
+                            )}
+                          </div>
+                        </Tabs.Content>
 
                         {/* Action bar */}
-                        <div className="flex items-center justify-end gap-2 border-t border-slate-200 px-4 py-3 dark:border-slate-700">
+                        <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-4 py-3 dark:border-slate-700">
                           <Button
                             variant="outline"
                             size="sm"
@@ -864,7 +864,7 @@ export default function SuggestionReviewPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            className="gap-1.5 border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                            className="gap-1.5 border-amber-300 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
                             onClick={() => setRequestChangesDialogOpen(true)}
                             disabled={actionInProgress}
                           >
@@ -873,7 +873,7 @@ export default function SuggestionReviewPage() {
                           </Button>
                           <Button
                             size="sm"
-                            className="gap-1.5 bg-green-600 text-white hover:bg-green-700"
+                            className="gap-1.5 bg-green-700 text-white hover:bg-green-800 dark:bg-green-700 dark:hover:bg-green-800"
                             onClick={handleApprove}
                             disabled={actionInProgress}
                           >
@@ -881,7 +881,7 @@ export default function SuggestionReviewPage() {
                             Approve
                           </Button>
                         </div>
-                      </div>
+                      </Tabs.Root>
                     )}
                   </div>
                 );

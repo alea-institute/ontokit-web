@@ -83,10 +83,10 @@ vi.mock("@/components/ui/ScreenReaderAnnouncer", () => ({
   useAnnounce: () => ({ announce: mockAnnounce }),
 }));
 vi.mock("@/components/editor/LanguagePicker", () => ({
-  LanguagePicker: ({ value, onChange }: { value: string; onChange: (code: string) => void }) => (
+  LanguagePicker: ({ value, onChange, ariaLabel = "Language tag" }: { value: string; onChange: (code: string) => void; ariaLabel?: string }) => (
     <select
       data-testid="lang-picker"
-      aria-label="Language tag"
+      aria-label={ariaLabel}
       value={value}
       onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onChange(e.target.value)}
     >
@@ -236,6 +236,38 @@ describe("ClassDetailPanel", () => {
     const button = await screen.findByRole("button", { name: "Starting…" });
     expect((button as HTMLButtonElement).disabled).toBe(true);
     expect(button.getAttribute("aria-busy")).toBe("true");
+  });
+
+  it("names primary label rows by language and preserves the other language when editing", async () => {
+    mockGetClassDetail.mockResolvedValue(makeClassDetail({ labels: [
+      { value: "Person", lang: "en" }, { value: "Personne", lang: "fr" },
+    ] }));
+    const user = userEvent.setup();
+    render(<ClassDetailPanel {...DEFAULT_PROPS} canEdit onUpdateClass={vi.fn()} />);
+    const english = await screen.findByRole("textbox", { name: "Primary label (en)" });
+    const french = screen.getByRole("textbox", { name: "Primary label (fr)" });
+    expect(screen.getByRole("combobox", { name: "Primary label language (en)" })).toHaveProperty("value", "en");
+    expect(screen.getByRole("combobox", { name: "Primary label language (fr)" })).toHaveProperty("value", "fr");
+    expect((english as HTMLInputElement).labels?.length).toBe(1);
+    expect((french as HTMLInputElement).labels?.length).toBe(1);
+    await user.clear(english);
+    await user.type(english, "Human");
+    await user.tab();
+    expect((french as HTMLInputElement).value).toBe("Personne");
+    expect(mockEditStateRef.current?.labels).toEqual([
+      { value: "Human", lang: "en" }, { value: "Personne", lang: "fr" },
+    ]);
+    expect(mockTriggerSave).toHaveBeenCalled();
+  });
+
+  it("distinguishes primary labels with repeated or missing language tags", async () => {
+    mockGetClassDetail.mockResolvedValue(makeClassDetail({ labels: [
+      { value: "Person", lang: "en" }, { value: "Human", lang: "en" }, { value: "Untagged", lang: "" },
+    ] }));
+    render(<ClassDetailPanel {...DEFAULT_PROPS} canEdit onUpdateClass={vi.fn()} />);
+    expect(await screen.findByRole("textbox", { name: "Primary label (en), row 1" })).toHaveProperty("value", "Person");
+    expect(screen.getByRole("textbox", { name: "Primary label (en), row 2" })).toHaveProperty("value", "Human");
+    expect(screen.getByRole("textbox", { name: "Primary label (no language)" })).toHaveProperty("value", "Untagged");
   });
 
   it("shows language flags and calm provisional values without committing them", async () => {
@@ -872,17 +904,23 @@ describe("ClassDetailPanel", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getAllByLabelText("Language tag").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByLabelText(/^(Language tag|Primary label language \(.+\))$/).length).toBeGreaterThanOrEqual(1);
     });
 
     // Find the language picker (mocked as <select>)
-    const langPickers = screen.getAllByLabelText("Language tag");
+    const langPickers = screen.getAllByLabelText(/^(Language tag|Primary label language \(.+\))$/);
     await user.selectOptions(langPickers[0], "de");
 
     expect((langPickers[0] as HTMLSelectElement).value).toBe("de");
   });
 
   // ── Comment editing ──
+
+  it("names populated and empty comment fields by language and row", async () => {
+    render(<ClassDetailPanel {...DEFAULT_PROPS} canEdit onUpdateClass={vi.fn()} />);
+    expect(await screen.findByRole("textbox", { name: "Comment (en), row 1" })).toHaveProperty("value", "A human being");
+    expect(screen.getByRole("textbox", { name: /^Comment \(.+\), row 2$/ })).toHaveProperty("value", "");
+  });
 
   it("renders comment textareas in edit mode", async () => {
     const onUpdateClass = vi.fn();
@@ -1797,7 +1835,7 @@ describe("ClassDetailPanel", () => {
     });
 
     // Find language pickers (mocked as <select>) — labels come first, then comments
-    const langPickers = screen.getAllByLabelText("Language tag");
+    const langPickers = screen.getAllByLabelText(/^(Language tag|Primary label language \(.+\))$/);
     expect(langPickers.length).toBeGreaterThanOrEqual(2);
 
     // The comment lang picker is after the label ones

@@ -134,6 +134,22 @@ Catholic OS browsing with CTT terms marked uncalibrated, and a Catholic OS edit 
 merged. The receipt adds a `rehearsal` block: upstream commits and hashes, the merged-file
 hash, and the CTT build and counts. A run is never accepted without that block.
 
+The four rehearsal cases also check keyboard search dismissal/reopening, named label
+fields, and manual keyboard activation of the review Files tab before approval.
+`fixtures/accessibility.ts` scans settled `main` content and the open proposal dialog
+with WCAG 2/2.1 A/AA tags. It fails on violations and logs rule IDs, impact and node
+counts only; incomplete checks still need manual review. No axe rules are excluded.
+These checks do not establish whole-product accessibility conformance.
+
+Explicit screenshots use fixed desktop viewports and disabled animations. Private
+test output contains `folio-editor-search-label.png`, `catholic-editor-label.png`,
+`submit-dialog.png` and `review-files.png` in each case's output directory. Preserve
+needed captures while the run is active, before successful runtime cleanup removes
+them; do not disable cleanup to retain evidence. Inspect for identity/account data
+before copying approved PNGs under `docs/plans/evidence/`. Global automatic traces,
+screenshots and video remain off. The [ow-6 receipt](../docs/plans/evidence/2026-10-27-ow6-rehearsal-hygiene.md)
+separates local fixture UI captures from genuine rehearsal and hosted acceptance.
+
 The same spec runs against a serving host:
 
 ```sh

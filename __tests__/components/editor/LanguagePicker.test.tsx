@@ -33,23 +33,37 @@ vi.mock("@/lib/utils", async (importOriginal) => {
 import { LanguagePicker } from "@/components/editor/LanguagePicker";
 
 describe("LanguagePicker", () => {
+  it.each([
+    ["en", "en"],
+    ["EN", "en"],
+    ["", "lang"],
+    ["x-custom", "x-custom"],
+  ])("includes the visible code in the contextual name for %s", (value, visibleCode) => {
+    render(<LanguagePicker value={value} onChange={vi.fn()} ariaLabel="Primary label language" />);
+    const trigger = screen.getByRole("button", { name: `Primary label language: ${visibleCode}` });
+    expect(trigger.textContent).toContain(visibleCode);
+    if (value === "en") {
+      expect(screen.getByText("\u{1F1FA}\u{1F1F8}").getAttribute("aria-hidden")).toBe("true");
+    }
+  });
+
   it("renders a trigger button with the current language code", () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     expect(btn).toBeDefined();
     expect(btn.textContent).toContain("en");
   });
 
   it("shows aria-expanded=false when closed", () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     expect(btn.getAttribute("aria-expanded")).toBe("false");
     expect(btn.getAttribute("aria-haspopup")).toBe("listbox");
   });
 
   it("opens the dropdown and sets aria-expanded=true on click", async () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     fireEvent.click(btn);
     await waitFor(() => {
       expect(btn.getAttribute("aria-expanded")).toBe("true");
@@ -60,7 +74,7 @@ describe("LanguagePicker", () => {
 
   it("shows 'Frequently used' and 'All languages' groups when open", async () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    fireEvent.click(screen.getByLabelText("Language tag"));
+    fireEvent.click(screen.getByRole("button", { name: "Language tag: en" }));
     await waitFor(() => {
       expect(screen.getByText("Frequently used")).toBeDefined();
       expect(screen.getByText("All languages")).toBeDefined();
@@ -70,7 +84,7 @@ describe("LanguagePicker", () => {
   it("calls onChange and closes when a language is selected", async () => {
     const onChange = vi.fn();
     render(<LanguagePicker value="en" onChange={onChange} />);
-    fireEvent.click(screen.getByLabelText("Language tag"));
+    fireEvent.click(screen.getByRole("button", { name: "Language tag: en" }));
 
     await waitFor(() => {
       expect(screen.getByText("French")).toBeDefined();
@@ -84,7 +98,7 @@ describe("LanguagePicker", () => {
 
     expect(onChange).toHaveBeenCalledWith("fr");
     // Verify the menu closed
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     await waitFor(() => {
       expect(btn.getAttribute("aria-expanded")).toBe("false");
     });
@@ -92,14 +106,14 @@ describe("LanguagePicker", () => {
 
   it("does not open when disabled", () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} disabled />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     fireEvent.click(btn);
     expect(screen.queryByPlaceholderText("Search languages...")).toBeNull();
   });
 
   it("closes on Escape key", async () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     fireEvent.click(btn);
     await waitFor(() => {
       expect(btn.getAttribute("aria-expanded")).toBe("true");
@@ -118,7 +132,7 @@ describe("LanguagePicker", () => {
         <LanguagePicker value="en" onChange={vi.fn()} />
       </div>
     );
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     fireEvent.click(btn);
     await waitFor(() => {
       expect(btn.getAttribute("aria-expanded")).toBe("true");
@@ -132,19 +146,19 @@ describe("LanguagePicker", () => {
 
   it("displays flag emoji for known language codes", () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     expect(btn.textContent).toContain("\u{1F1FA}\u{1F1F8}");
   });
 
   it("shows 'lang' placeholder when value is empty", () => {
     render(<LanguagePicker value="" onChange={vi.fn()} />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: lang" });
     expect(btn.textContent).toContain("lang");
   });
 
   it("sets aria-controls to the list id when open", async () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     fireEvent.click(btn);
     await waitFor(() => {
       expect(btn.getAttribute("aria-expanded")).toBe("true");
@@ -159,7 +173,7 @@ describe("LanguagePicker", () => {
   it("restores focus to trigger button after selecting a language", async () => {
     const onChange = vi.fn();
     render(<LanguagePicker value="en" onChange={onChange} />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     fireEvent.click(btn);
 
     await waitFor(() => {
@@ -177,7 +191,7 @@ describe("LanguagePicker", () => {
 
   it("restores focus to trigger button after Escape", async () => {
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    const btn = screen.getByLabelText("Language tag");
+    const btn = screen.getByRole("button", { name: "Language tag: en" });
     fireEvent.click(btn);
     await waitFor(() => {
       expect(btn.getAttribute("aria-expanded")).toBe("true");
@@ -193,7 +207,7 @@ describe("LanguagePicker", () => {
   it("shows 'Use custom code' option when search doesn't match a known language", async () => {
     const user = userEvent.setup();
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    fireEvent.click(screen.getByLabelText("Language tag"));
+    fireEvent.click(screen.getByRole("button", { name: "Language tag: en" }));
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText("Search languages...")).toBeDefined();
@@ -212,7 +226,7 @@ describe("LanguagePicker", () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     render(<LanguagePicker value="en" onChange={onChange} />);
-    fireEvent.click(screen.getByLabelText("Language tag"));
+    fireEvent.click(screen.getByRole("button", { name: "Language tag: en" }));
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText("Search languages...")).toBeDefined();
@@ -234,7 +248,7 @@ describe("LanguagePicker", () => {
   it("does not show custom code option when search matches a known language", async () => {
     const user = userEvent.setup();
     render(<LanguagePicker value="en" onChange={vi.fn()} />);
-    fireEvent.click(screen.getByLabelText("Language tag"));
+    fireEvent.click(screen.getByRole("button", { name: "Language tag: en" }));
 
     await waitFor(() => {
       expect(screen.getByPlaceholderText("Search languages...")).toBeDefined();

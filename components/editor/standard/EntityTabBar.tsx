@@ -26,7 +26,7 @@ export function EntityTabBar({ activeTab, onTabChange }: EntityTabBarProps) {
           className={cn(
             "flex-1 px-3 py-2 text-xs font-medium transition-colors",
             activeTab === tab.id
-              ? "border-b-2 border-primary-600 text-primary-600 dark:border-primary-400 dark:text-primary-400"
+              ? "border-b-2 border-primary-600 text-primary-700 dark:border-primary-400 dark:text-primary-400"
               : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
           )}
         >

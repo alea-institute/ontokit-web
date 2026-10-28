@@ -30,9 +30,14 @@ describe("ShareButton", () => {
 
   // ── Simple button (no selectedIri) ──────────────────────────────
   describe("simple button (no class selected)", () => {
+    it("includes the visible Share label and clipboard intent in its name", () => {
+      render(<ShareButton projectId="proj-1" />);
+      expect(screen.getByRole("button", { name: "Share: copy project link" }).textContent).toContain("Share");
+    });
+
     it("renders a Share button", () => {
       render(<ShareButton projectId="proj-1" />);
-      expect(screen.getByLabelText("Copy project link")).toBeDefined();
+      expect(screen.getByLabelText("Share: copy project link")).toBeDefined();
     });
 
     it("renders the text 'Share'", () => {
@@ -43,7 +48,7 @@ describe("ShareButton", () => {
     it("copies the project URL on click", async () => {
       render(<ShareButton projectId="proj-1" />);
       await act(async () => {
-        screen.getByLabelText("Copy project link").click();
+        screen.getByLabelText("Share: copy project link").click();
       });
       expect(writeTextMock).toHaveBeenCalledWith(
         expect.stringContaining("/projects/proj-1")
@@ -55,7 +60,7 @@ describe("ShareButton", () => {
       writeTextMock.mockRejectedValueOnce(new Error("fail"));
       render(<ShareButton projectId="proj-1" />);
       await act(async () => {
-        screen.getByLabelText("Copy project link").click();
+        screen.getByLabelText("Share: copy project link").click();
       });
       expect(mockError).toHaveBeenCalledWith("Failed to copy link");
     });
@@ -66,11 +71,18 @@ describe("ShareButton", () => {
     const iri = "http://example.org/ontology#Person";
     const label = "Person";
 
+    it("includes the visible truncated label and full clipboard target in its name", () => {
+      const fullLabel = "A concept label longer than twenty-four characters";
+      render(<ShareButton projectId="proj-1" selectedIri={iri} selectedLabel={fullLabel} />);
+      const primary = screen.getByRole("button", { name: "Share “A concept label longer …”: copy link to A concept label longer than twenty-four characters" });
+      expect(primary.textContent).toBe("Share “A concept label longer …”");
+    });
+
     it("renders the label in the primary button", () => {
       render(
         <ShareButton projectId="proj-1" selectedIri={iri} selectedLabel={label} />
       );
-      expect(screen.getByLabelText(`Copy link to ${label}`)).toBeDefined();
+      expect(screen.getByLabelText(`Share “${label}”: copy link to ${label}`)).toBeDefined();
     });
 
     it("copies the class URL on primary button click", async () => {
@@ -78,7 +90,7 @@ describe("ShareButton", () => {
         <ShareButton projectId="proj-1" selectedIri={iri} selectedLabel={label} />
       );
       await act(async () => {
-        screen.getByLabelText(`Copy link to ${label}`).click();
+        screen.getByLabelText(`Share “${label}”: copy link to ${label}`).click();
       });
       expect(writeTextMock).toHaveBeenCalledWith(
         expect.stringContaining(`classIri=${encodeURIComponent(iri)}`)
@@ -149,7 +161,7 @@ describe("ShareButton", () => {
       fireEvent.click(screen.getByLabelText("More share options"));
       expect(screen.getByRole("menu")).toBeDefined();
       await act(async () => {
-        screen.getByLabelText(`Copy link to ${label}`).click();
+        screen.getByLabelText(`Share “${label}”: copy link to ${label}`).click();
       });
       expect(screen.queryByRole("menu")).toBeNull();
     });
@@ -177,7 +189,7 @@ describe("ShareButton", () => {
         />
       );
       // The label should appear without ellipsis
-      const primaryBtn = screen.getByLabelText(`Copy link to ${shortLabel}`);
+      const primaryBtn = screen.getByLabelText(`Share “${shortLabel}”: copy link to ${shortLabel}`);
       expect(primaryBtn.textContent).toContain(shortLabel);
       expect(primaryBtn.textContent).not.toContain("\u2026");
     });
@@ -193,7 +205,7 @@ describe("ShareButton", () => {
           selectedLabel={longLabel}
         />
       );
-      const primaryBtn = screen.getByLabelText(`Copy link to ${longLabel}`);
+      const primaryBtn = screen.getByLabelText(`Share “${expectedTruncated}”: copy link to ${longLabel}`);
       expect(primaryBtn.textContent).toContain(expectedTruncated);
     });
 
@@ -205,7 +217,7 @@ describe("ShareButton", () => {
         />
       );
       // getLocalName extracts "MyClass"
-      expect(screen.getByLabelText("Copy link to MyClass")).toBeDefined();
+      expect(screen.getByLabelText("Share “MyClass”: copy link to MyClass")).toBeDefined();
     });
   });
 });

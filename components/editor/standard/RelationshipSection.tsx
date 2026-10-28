@@ -91,7 +91,7 @@ export function RelationshipSection({
                   className={cn(
                     "min-w-0 truncate text-sm",
                     onNavigateToClass
-                      ? "text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
+                      ? "text-primary-700 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
                       : "text-slate-700 dark:text-slate-300"
                   )}
                   title={target.iri}
@@ -130,7 +130,7 @@ export function RelationshipSection({
               <div key={target.iri} className="flex items-center gap-2">
                 <button
                   onClick={() => onNavigateToClass?.(target.iri)}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-sm text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
+                  className="flex min-w-0 flex-1 items-center gap-2 text-sm text-primary-700 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300"
                   title={target.iri}
                 >
                   <span className="truncate">{target.label || getLocalName(target.iri)}</span>
@@ -166,7 +166,7 @@ export function RelationshipSection({
       {/* Add relationship group button */}
       <button
         onClick={onAddGroup}
-        className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+        className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary-700 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
       >
         <span className="text-sm">+</span>
         Add relationship

@@ -1,5 +1,13 @@
 # Disposable lifecycle (U1)
 
+The BAIF rehearsal's keyboard, accessibility and private screenshot checks are
+documented in [the browser guide](../../e2e/README.md#baif-rehearsal-profile-folio-catholic-os-and-ctt).
+They extend the existing four-case inventory; no skipped, retried or fixture-only
+browser run can satisfy its accepted-run gate. Capture exports must be inspected
+before publication and preserved during the active run, without changing cleanup.
+See [the ow-6 receipt](../../docs/plans/evidence/2026-10-27-ow6-rehearsal-hygiene.md)
+for current local verification and the remaining controller-run acceptance work.
+
 Linux and a local Unix Docker endpoint with Compose v2 are required, plus 8 GiB free under `/tmp`.
 The API checkout is mandatory:
 

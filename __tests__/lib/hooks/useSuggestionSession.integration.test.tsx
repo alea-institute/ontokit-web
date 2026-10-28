@@ -112,7 +112,7 @@ describe('authenticated suggestion session persistence chain', () => {
   it('keeps a resumed draft active for retry after resubmission is rejected', async () => {
     const { result, fail, onSubmitted } = setup('changes-requested');
     await waitFor(() => expect(result.current.isResumed).toBe(true)); fail('/resubmit');
-    await act(() => result.current.resubmitSession());
+    await act(async () => { expect(await result.current.resubmitSession()).toEqual({ success: false, error: 'Session unavailable' }); });
     expect(result.current.status).toBe('error'); expect(result.current.sessionId).toBe('session');
     expect(onSubmitted).not.toHaveBeenCalled();
     fail(''); await act(() => result.current.resubmitSession());
@@ -122,7 +122,7 @@ describe('authenticated suggestion session persistence chain', () => {
   it('does not write or submit after credentials disappear', async () => {
     const { result, rerender, fetcher } = setup();
     await act(() => result.current.startSession()); rerender({ token: undefined });
-    await act(async () => { expect(await result.current.saveToSession('draft', 'iri', 'Label')).toBe(false); await result.current.submitSession(); await result.current.resubmitSession(); await result.current.discardSession(); });
+    await act(async () => { expect(await result.current.saveToSession('draft', 'iri', 'Label')).toBe(false); expect(await result.current.submitSession()).toMatchObject({ success: false }); expect(await result.current.resubmitSession()).toMatchObject({ success: false }); await result.current.discardSession(); });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
 

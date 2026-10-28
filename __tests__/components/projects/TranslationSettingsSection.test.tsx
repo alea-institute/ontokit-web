@@ -100,7 +100,7 @@ describe("TranslationSettingsSection", () => {
     await user.click(screen.getByRole("button", { name: /add selected language/i }));
 
     await user.click(screen.getByRole("button", { name: /add language/i }));
-    await user.click(screen.getByLabelText("Language tag"));
+    await user.click(screen.getByRole("button", { name: "Language tag: lang" }));
     await user.type(screen.getByPlaceholderText("Search languages..."), "grc");
     await user.click(await screen.findByText(/Use custom code/));
     await user.click(screen.getByRole("button", { name: /add selected language/i }));
@@ -168,7 +168,7 @@ describe("TranslationSettingsSection", () => {
     expect(await screen.findByText("Ada Reviewer")).toBeDefined();
     await user.click(screen.getByRole("button", { name: /remove fr from ada reviewer/i }));
     const reviewer = screen.getByText("Ada Reviewer").parentElement!;
-    await user.click(within(reviewer).getByLabelText("Language tag for Ada Reviewer"));
+    await user.click(within(reviewer).getByRole("button", { name: "Language tag for Ada Reviewer: lang" }));
     await user.type(within(reviewer).getByPlaceholderText("Search languages..."), "es");
     await user.click(await screen.findByText("Spanish"));
     await user.click(within(reviewer).getByRole("button", { name: "Add" }));
