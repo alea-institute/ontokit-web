@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, useId, type ReactNode } from "react";
 import {
   ExternalLink,
   AlertTriangle,
@@ -135,6 +135,7 @@ export function ClassDetailPanel({
   onAddSuggestedChild,
   autoSuggestAnnotationsOnMount,
 }: ClassDetailPanelProps) {
+  const labelId = useId();
   const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
   const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -968,7 +969,7 @@ export function ClassDetailPanel({
                 {!canEdit && !canPropose && !isEditing && showSignInToEdit && onSignInToEdit && (
                   <button
                     onClick={onSignInToEdit}
-                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-primary-700 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                     title="Sign in to edit this class"
                   >
                     <LogIn className="h-3.5 w-3.5" />
@@ -993,7 +994,7 @@ export function ClassDetailPanel({
               {onNavigateToSource && (
                 <button
                   onClick={() => onNavigateToSource(classDetail.iri)}
-                  className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-primary-600 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
+                  className="flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-xs text-primary-700 hover:bg-primary-50 hover:text-primary-700 dark:text-primary-400 dark:hover:bg-primary-900/20 dark:hover:text-primary-300"
                   title="View in Source"
                 >
                   <Code className="h-3 w-3" />
@@ -1056,38 +1057,47 @@ export function ClassDetailPanel({
           {isEditing ? (
             <Section title="Primary Label" tooltip="rdfs:label" icon={<Tag className="h-4 w-4" />}>
               <div className="space-y-2">
-                {editLabels.map((label, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={label.value}
-                      onChange={(e) => updateLabel(index, "value", e.target.value)}
-                      onBlur={() => triggerSave()}
-                      placeholder="Label text"
-                      className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
-                    />
-                    <LanguagePicker
-                      value={label.lang}
-                      onChange={(code) => {
-                        updateLabel(index, "lang", code);
-                        triggerSave();
-                      }}
-                    />
-                    {editLabels.length > 1 ? (
-                      <button
-                        onClick={() => removeLabel(index)}
-                        className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                        title="Remove label"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    ) : (
-                      <div className="rounded-sm p-1">
-                        <div className="h-3.5 w-3.5" />
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {editLabels.map((label, index) => {
+                  const language = label.lang || "no language";
+                  const repeated = editLabels.some((other, otherIndex) => otherIndex !== index && (other.lang || "no language") === language);
+                  const rowName = `(${language})${repeated ? `, row ${index + 1}` : ""}`;
+                  return (
+                    <div key={index} className="flex items-center gap-2">
+                      <label htmlFor={`${labelId}-${index}`} className="sr-only">Primary label {rowName}</label>
+                      <input
+                        id={`${labelId}-${index}`}
+                        type="text"
+                        value={label.value}
+                        onChange={(e) => updateLabel(index, "value", e.target.value)}
+                        onBlur={() => triggerSave()}
+                        placeholder="Label text"
+                        className="flex-1 rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+                      />
+                      <LanguagePicker
+                        ariaLabel={`Primary label language ${rowName}`}
+                        value={label.lang}
+                        onChange={(code) => {
+                          updateLabel(index, "lang", code);
+                          triggerSave();
+                        }}
+                      />
+                      {editLabels.length > 1 ? (
+                        <button
+                          onClick={() => removeLabel(index)}
+                          className="rounded-sm p-1 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20 dark:hover:text-red-400"
+                          title="Remove label"
+                          aria-label={`Remove primary label ${rowName}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      ) : (
+                        <div className="rounded-sm p-1">
+                          <div className="h-3.5 w-3.5" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </Section>
           ) : classDetail.labels.length > 0 ? (
@@ -1193,6 +1203,7 @@ export function ClassDetailPanel({
                   return (
                     <div key={index} className="flex items-start gap-2">
                       <textarea
+                        aria-label={`Comment (${comment.lang || "no language"}), row ${index + 1}`}
                         value={comment.value}
                         onChange={(e) => updateComment(index, "value", e.target.value)}
                         onBlur={() => triggerSave()}
@@ -1392,7 +1403,7 @@ export function ClassDetailPanel({
                 ) : (
                   <button
                     onClick={() => setShowParentPicker(true)}
-                    className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-primary-700 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
                   >
                     <Plus className="h-3 w-3" />
                     Add parent
@@ -1641,7 +1652,7 @@ function IriLink({ iri, label, onClick }: IriLinkProps) {
     <button
       onClick={() => onClick?.(iri)}
       className={cn(
-        "flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300",
+        "flex items-center gap-2 text-sm text-primary-700 hover:text-primary-700 hover:underline dark:text-primary-400 dark:hover:text-primary-300",
         !onClick && "cursor-default hover:no-underline"
       )}
       title={iri}

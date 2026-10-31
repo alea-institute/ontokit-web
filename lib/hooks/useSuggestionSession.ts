@@ -24,6 +24,8 @@ export interface SuggestionSessionSnapshot {
   entitiesModified?: string[];
 }
 
+type SuggestionSubmitResult = { success: true } | { success: false; error: string };
+
 export interface UseSuggestionSessionReturn {
   sessionId: string | null;
   branch: string | null;
@@ -38,10 +40,10 @@ export interface UseSuggestionSessionReturn {
   startSession: () => Promise<string | null>;
   /** Resolves true only when the source reached the suggestion branch. */
   saveToSession: (content: string, entityIri: string, entityLabel: string) => Promise<boolean>;
-  submitSession: (summary?: string) => Promise<void>;
+  submitSession: (summary?: string) => Promise<SuggestionSubmitResult>;
   discardSession: () => Promise<void>;
   resumeSession: (session: SuggestionSessionSnapshot) => void;
-  resubmitSession: (summary?: string) => Promise<void>;
+  resubmitSession: (summary?: string) => Promise<SuggestionSubmitResult>;
 }
 
 interface UseSuggestionSessionOptions {
@@ -220,9 +222,11 @@ export function useSuggestionSession({
     terminalRef.current === operation && ownerRef.current === operation.owner
       && operation.owner.live && sessionIdRef.current === operation.sessionId, []);
 
-  const submitSession = useCallback(async (summary?: string) => {
+  const submitSession = useCallback(async (summary?: string): Promise<SuggestionSubmitResult> => {
     const operation = beginTerminal();
-    if (!operation || !sessionId || !accessToken) return;
+    if (!operation || !sessionId || !accessToken) {
+      return { success: false, error: "Suggestions are not ready to submit. Wait for saving to finish and try again." };
+    }
 
     setStatus("submitting");
     setError(null);
@@ -234,7 +238,7 @@ export function useSuggestionSession({
         { summary },
         accessToken,
       );
-      if (!ownsTerminal(operation)) return;
+      if (!ownsTerminal(operation)) return { success: false, error: "The suggestion session changed. Please try again." };
       terminalRef.current = null;
       setStatus("submitted");
 
@@ -248,14 +252,19 @@ export function useSuggestionSession({
       setEntitiesModified([]);
       setIsResumed(false);
       onSubmitted?.(result.pr_number, result.pr_url);
+      return { success: true };
     } catch (err) {
-      if (!ownsTerminal(operation)) return;
+      if (!ownsTerminal(operation)) return { success: false, error: "The suggestion session changed. Please try again." };
       terminalRef.current = null;
-      if (!isCurrent()) { setStatus("active"); return; }
-      const msg = err instanceof Error ? err.message : "Failed to submit suggestions";
+      if (!isCurrent()) {
+        setStatus("active");
+        return { success: false, error: "The suggestion session changed. Please try again." };
+      }
+      const msg = getApiErrorMessage(err, "Failed to submit suggestions");
       setStatus("error");
       setError(msg);
       onError?.(msg);
+      return { success: false, error: msg };
     }
   }, [sessionId, accessToken, projectId, onSubmitted, onError, isCurrent, beginTerminal, ownsTerminal]);
 
@@ -310,9 +319,11 @@ export function useSuggestionSession({
   }, [owner]);
 
   /** Resubmit a resumed session after addressing requested changes. */
-  const resubmitSession = useCallback(async (summary?: string) => {
+  const resubmitSession = useCallback(async (summary?: string): Promise<SuggestionSubmitResult> => {
     const operation = beginTerminal();
-    if (!operation || !sessionId || !accessToken) return;
+    if (!operation || !sessionId || !accessToken) {
+      return { success: false, error: "Suggestions are not ready to submit. Wait for saving to finish and try again." };
+    }
 
     setStatus("submitting");
     setError(null);
@@ -324,7 +335,7 @@ export function useSuggestionSession({
         { summary },
         accessToken,
       );
-      if (!ownsTerminal(operation)) return;
+      if (!ownsTerminal(operation)) return { success: false, error: "The suggestion session changed. Please try again." };
       terminalRef.current = null;
       setStatus("submitted");
 
@@ -338,14 +349,19 @@ export function useSuggestionSession({
       setEntitiesModified([]);
       setIsResumed(false);
       onSubmitted?.(result.pr_number, result.pr_url);
+      return { success: true };
     } catch (err) {
-      if (!ownsTerminal(operation)) return;
+      if (!ownsTerminal(operation)) return { success: false, error: "The suggestion session changed. Please try again." };
       terminalRef.current = null;
-      if (!isCurrent()) { setStatus("active"); return; }
-      const msg = err instanceof Error ? err.message : "Failed to resubmit suggestions";
+      if (!isCurrent()) {
+        setStatus("active");
+        return { success: false, error: "The suggestion session changed. Please try again." };
+      }
+      const msg = getApiErrorMessage(err, "Failed to resubmit suggestions");
       setStatus("error");
       setError(msg);
       onError?.(msg);
+      return { success: false, error: msg };
     }
   }, [sessionId, accessToken, projectId, onSubmitted, onError, isCurrent, beginTerminal, ownsTerminal]);
 

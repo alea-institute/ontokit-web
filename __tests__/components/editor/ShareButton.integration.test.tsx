@@ -40,7 +40,7 @@ describe("share links through the real toast provider and clipboard boundary", (
     const iri = "https://example.test/ontology#";
     mount(iri);
     if (dropdown) fireEvent.click(screen.getByRole("button", { name: "More share options" }));
-    await act(async () => fireEvent.click(screen.getByRole(dropdown ? "menuitem" : "button", { name: /^Copy link to/ })));
+    await act(async () => fireEvent.click(screen.getByRole(dropdown ? "menuitem" : "button", { name: dropdown ? /^Copy link to/ : /^Share .*: copy link to/ })));
     expect(writeText).toHaveBeenCalledExactlyOnceWith(`${window.location.origin}/projects/sharing?classIri=${encodeURIComponent(iri)}`);
     expect(screen.getByRole("alert")).toBeDefined();
     expect(screen.queryByRole("menu")).toBeNull();
@@ -76,7 +76,7 @@ describe("share links through the real toast provider and clipboard boundary", (
 
   it("copies the project URL directly when no entity is selected", async () => {
     mount(null);
-    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Copy project link" })));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Share: copy project link" })));
     expect(writeText).toHaveBeenCalledExactlyOnceWith(`${window.location.origin}/projects/sharing`);
     expect(screen.getByRole("alert").textContent).toContain("Copied project link");
     expect(screen.queryByRole("button", { name: "More share options" })).toBeNull();

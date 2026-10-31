@@ -28,6 +28,10 @@ import { AutoSaveAffordanceBar } from "@/components/editor/AutoSaveAffordanceBar
 import { useEditorModeStore } from "@/lib/stores/editorModeStore";
 
 describe("AutoSaveAffordanceBar", () => {
+  it("names the save-settings help button", () => {
+    render(<AutoSaveAffordanceBar status="idle" onManualSave={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "About the Save button" })).toBeDefined();
+  });
   beforeEach(() => {
     useEditorModeStore.setState({ showManualSaveButton: true });
   });

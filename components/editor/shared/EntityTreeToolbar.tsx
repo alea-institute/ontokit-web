@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useCallback, useState, useEffect } from "react";
+import { useRef, useCallback, useState, useEffect, useId } from "react";
 import { Search, X, Plus, ChevronDown, ChevronsDown, ChevronRight, ChevronsRight, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +49,8 @@ export function EntityTreeToolbar({
 }: EntityTreeToolbarProps) {
   const internalRef = useRef<HTMLInputElement>(null);
   const inputRef = searchInputRef || internalRef;
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  const searchId = useId();
 
   // Dismissible tip
   const [showTip, setShowTip] = useState(false);
@@ -75,8 +77,15 @@ export function EntityTreeToolbar({
     onToggleSearch();
     if (!showSearch) {
       setTimeout(() => inputRef.current?.focus(), 0);
+    } else {
+      searchToggleRef.current?.focus();
     }
   }, [onToggleSearch, showSearch, inputRef]);
+
+  const handleClose = useCallback(() => {
+    onCloseSearch();
+    searchToggleRef.current?.focus();
+  }, [onCloseSearch]);
 
   const handleExpandOneLevel = useCallback(() => {
     onExpandOneLevel?.();
@@ -163,6 +172,7 @@ export function EntityTreeToolbar({
         )}
 
         <button
+          ref={searchToggleRef}
           onClick={handleToggle}
           className={cn(
             "flex items-center gap-0.5 rounded-sm p-1 hover:bg-slate-100 dark:hover:bg-slate-700",
@@ -170,6 +180,8 @@ export function EntityTreeToolbar({
           )}
           title={showSearch ? "Close search" : "Search (Ctrl+K)"}
           aria-label={showSearch ? "Close search" : "Search entities"}
+          aria-expanded={showSearch}
+          aria-controls={showSearch ? searchId : undefined}
         >
           {showSearch ? (
             <X className="h-4 w-4 text-slate-500" />
@@ -200,11 +212,13 @@ export function EntityTreeToolbar({
         <div className="mt-1.5 pb-0.5">
           <input
             ref={inputRef}
+            id={searchId}
+            aria-label="Search entities"
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape") onCloseSearch();
+              if (e.key === "Escape") handleClose();
             }}
             placeholder="Search classes, properties, individuals..."
             className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm placeholder:text-slate-400 focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder:text-slate-500"

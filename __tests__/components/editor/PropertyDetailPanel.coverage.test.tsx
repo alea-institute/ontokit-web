@@ -125,7 +125,7 @@ describe("property panel real editing chain", () => {
     let output = source;
     mount(vi.fn(async (entity, data) => { output = updatePropertyInTurtle(output, entity, data); }));
     const definition = screen.getByDisplayValue("Original definition");
-    fireEvent.click(within(definition.parentElement!).getByRole("button", { name: "Language tag" }));
+    fireEvent.click(within(definition.parentElement!).getByRole("button", { name: "Language tag: en" }));
     fireEvent.click(screen.getByRole("option", { name: /French\s*Français\s*fr$/ }));
     fireEvent.blur(definition);
     const example = screen.getByDisplayValue("Original example");

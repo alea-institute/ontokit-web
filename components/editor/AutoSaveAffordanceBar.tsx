@@ -80,14 +80,14 @@ export function AutoSaveAffordanceBar({
           {effectiveStatus === "saved" && (
             <>
               <Check className="h-3.5 w-3.5 text-green-500" />
-              <span className="text-xs text-green-600 dark:text-green-400">Saved</span>
+              <span className="text-xs text-green-700 dark:text-green-400">Saved</span>
             </>
           )}
 
           {effectiveStatus === "draft" && (
             <>
               <span className="h-2 w-2 shrink-0 rounded-full bg-amber-400" />
-              <span className="text-xs text-amber-600 dark:text-amber-400">Draft saved</span>
+              <span className="text-xs text-amber-700 dark:text-amber-400">Draft saved</span>
             </>
           )}
 
@@ -95,7 +95,7 @@ export function AutoSaveAffordanceBar({
             <>
               <Cloud className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
               <span
-                className="text-xs text-slate-400 dark:text-slate-500"
+                className="text-xs text-slate-600 dark:text-slate-400"
                 title="Changes save as a local draft on blur, and commit to git when you navigate away"
               >
                 Auto-save on
@@ -114,7 +114,7 @@ export function AutoSaveAffordanceBar({
                 className={cn(
                   "flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
                   saveEnabled
-                    ? "bg-primary-600 text-white hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
+                    ? "bg-primary-700 text-white hover:bg-primary-800 dark:bg-primary-700 dark:hover:bg-primary-800"
                     : "cursor-not-allowed bg-slate-200 text-slate-400 dark:bg-slate-700 dark:text-slate-500",
                 )}
               >
@@ -139,6 +139,7 @@ export function AutoSaveAffordanceBar({
               >
                 <button
                   type="button"
+                  aria-label="About the Save button"
                   className="text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
                 >
                   <Info className="h-3.5 w-3.5" />

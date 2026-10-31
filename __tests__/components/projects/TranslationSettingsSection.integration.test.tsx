@@ -137,7 +137,7 @@ describe("translation settings through query and HTTP clients", () => {
     mount(); const user = userEvent.setup(); await screen.findByText("reviewer@example.test");
     expect(screen.getByText("fallback-id")).toBeDefined();
     const row = within(screen.getByText("reviewer@example.test").parentElement!);
-    await user.click(row.getByLabelText("Language tag for reviewer@example.test"));
+    await user.click(row.getByRole("button", { name: "Language tag for reviewer@example.test: lang" }));
     await user.type(screen.getByPlaceholderText("Search languages..."), "es");
     await user.click(await screen.findByText("Spanish"));
     await user.click(row.getByRole("button", { name: "Add" }));

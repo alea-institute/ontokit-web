@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useRef, useState } from "react";
 
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
 
@@ -102,6 +103,49 @@ describe("EntityTreeToolbar", () => {
     const input = screen.getByPlaceholderText("Search classes, properties, individuals...");
     fireEvent.keyDown(input, { key: "Escape" });
     expect(onCloseSearch).toHaveBeenCalledOnce();
+  });
+
+  it("names search and restores its trigger after keyboard dismissal and reopening", async () => {
+    function SearchToolbar() {
+      const [open, setOpen] = useState(false);
+      return <EntityTreeToolbar {...baseProps} showSearch={open}
+        onToggleSearch={() => setOpen(!open)} onCloseSearch={() => setOpen(false)} />;
+    }
+    const user = userEvent.setup();
+    render(<SearchToolbar />);
+    const trigger = screen.getByRole("button", { name: "Search entities" });
+    await user.tab();
+    expect(document.activeElement).toBe(trigger);
+    await user.keyboard("{Enter}");
+    const input = screen.getByRole("textbox", { name: "Search entities" });
+    expect(document.activeElement).toBe(input);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+    await user.keyboard("{Enter}");
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Search entities" }));
+    await user.tab({ shift: true });
+    await user.keyboard("{Enter}");
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("does not steal navigation focus when selection closes search", async () => {
+    function SearchToolbar() {
+      const [open, setOpen] = useState(true);
+      const detail = useRef<HTMLButtonElement>(null);
+      return <>
+        <EntityTreeToolbar {...baseProps} showSearch={open}
+          onToggleSearch={() => setOpen(!open)} onCloseSearch={() => setOpen(false)} />
+        <button onClick={() => { setOpen(false); detail.current?.focus(); }}>Select Person</button>
+        <button ref={detail}>Edit Person</button>
+      </>;
+    }
+    const user = userEvent.setup();
+    render(<SearchToolbar />);
+    await user.click(screen.getByRole("button", { name: "Select Person" }));
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Edit Person" }));
   });
 
   it("renders expand/collapse buttons when callbacks provided", () => {

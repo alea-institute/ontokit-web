@@ -2,6 +2,7 @@ import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import userEvent from "@testing-library/user-event";
 import SuggestionReviewPage from "@/app/projects/[id]/suggestions/review/page";
 import type { SuggestionSessionSummary } from "@/lib/api/suggestions";
 import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/hooks/useNotifications";
@@ -286,6 +287,45 @@ describe("Suggestion review page through real project hook, API client and revie
     expect(posted()).toHaveLength(1);
   });
 
+});
+
+it("uses one tab stop and manual keyboard activation before loading Files", async () => {
+  items[0].pr_number = 19;
+  let release!: (response: Response) => void;
+  diffResponse = () => new Promise<Response>(resolve => { release = resolve; });
+  const user = userEvent.setup();
+  mount(); await ready();
+  await user.click(screen.getByRole("button", { name: /Ada.*Update Ada/ }));
+  const summary = screen.getByRole("tab", { name: "Summary" });
+  const files = screen.getByRole("tab", { name: "Files" });
+  await user.tab();
+  expect(document.activeElement).toBe(summary);
+  expect(summary.tabIndex).toBe(0);
+  expect(files.tabIndex).toBe(-1);
+  const summaryPanel = screen.getByRole("tabpanel", { name: "Summary" });
+  expect(summary.getAttribute("aria-controls")).toBe(summaryPanel.id);
+  expect(summaryPanel.getAttribute("aria-labelledby")).toBe(summary.id);
+  await user.keyboard("{ArrowRight}");
+  await waitFor(() => expect(document.activeElement).toBe(files));
+  expect(summary.getAttribute("aria-selected")).toBe("true");
+  expect(fetchMock.mock.calls.filter(([url]) => url.includes("/diff"))).toHaveLength(0);
+  await user.keyboard("{Enter}");
+  await waitFor(() => expect(fetchMock.mock.calls.filter(([url]) => url.includes("/diff"))).toHaveLength(1));
+  const filesPanel = screen.getByRole("tabpanel", { name: "Files" });
+  expect(files.getAttribute("aria-controls")).toBe(filesPanel.id);
+  expect(filesPanel.getAttribute("aria-labelledby")).toBe(files.id);
+  expect(files.getAttribute("aria-selected")).toBe("true");
+  await act(async () => release(json({ files_changed: 1, total_additions: 1, total_deletions: 0, files: [{ path: "ontology.ttl", change_type: "modified", additions: 1, deletions: 0, patch: "+:Person a owl:Class ." }] })));
+  expect(await within(filesPanel).findByText("+:Person a owl:Class .")).toBeDefined();
+  await user.keyboard("{Home}");
+  await waitFor(() => expect(document.activeElement).toBe(summary));
+  expect(files.getAttribute("aria-selected")).toBe("true");
+  await user.keyboard(" ");
+  expect(summary.getAttribute("aria-selected")).toBe("true");
+  expect(fetchMock.mock.calls.filter(([url]) => url.includes("/diff"))).toHaveLength(1);
+  await user.keyboard("{End}");
+  await waitFor(() => expect(document.activeElement).toBe(files));
+  expect(summary.getAttribute("aria-selected")).toBe("true");
 });
 
 it("renders a linked PR diff and retries its visible HTTP failure", async () => {

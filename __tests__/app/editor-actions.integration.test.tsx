@@ -1019,13 +1019,12 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     if (retry) suggestionSubmitStatus = 403;
     fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
     if (retry) {
-      await screen.findByText(/Submission refused/);
+      expect((await within(dialog).findByRole("alert")).textContent).toBe("Submission refused");
+      expect(screen.getByRole("dialog", { name: "Submit Suggestions" })).toBe(dialog);
+      expect(within(dialog).getByLabelText("Describe your changes (optional)")).toHaveProperty("value", summary);
       expect(screen.queryByText("Suggestions submitted as PR #23")).toBeNull();
       suggestionSubmitStatus = 200;
-      fireEvent.click(screen.getByRole("button", { name: /Submit Suggestions/ }));
-      const retryDialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
-      fireEvent.change(within(retryDialog).getByLabelText("Describe your changes (optional)"), { target: { value: summary } });
-      fireEvent.click(within(retryDialog).getByRole("button", { name: "Submit for Review" }));
+      fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
     }
     await screen.findByText("Suggestions submitted as PR #23");
     expect(suggestionSubmissions).toEqual(Array.from({ length: retry ? 2 : 1 }, () => summary.trim() ? { summary: summary.trim() } : {}));
@@ -1347,13 +1346,12 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     suggestionSubmitStatus = status;
     fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
     if (status === 403) {
-      await screen.findByText(/Submission refused/);
+      expect((await within(dialog).findByRole("alert")).textContent).toBe("Submission refused");
+      expect(screen.getByRole("dialog", { name: "Submit Suggestions" })).toBe(dialog);
+      expect(within(dialog).getByLabelText("Describe your changes (optional)")).toHaveProperty("value", "Address feedback");
       expect(screen.queryByText("Suggestions submitted as PR #23")).toBeNull();
       suggestionSubmitStatus = 200;
-      fireEvent.click(screen.getByRole("button", { name: /Resubmit Suggestions/ }));
-      const retryDialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
-      fireEvent.change(within(retryDialog).getByLabelText("Describe your changes (optional)"), { target: { value: "Address feedback" } });
-      fireEvent.click(within(retryDialog).getByRole("button", { name: "Submit for Review" }));
+      fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
     }
     await screen.findByText("Suggestions submitted as PR #23");
     expect(screen.queryByRole("button", { name: /Resubmit Suggestions/ })).toBeNull();
@@ -1385,13 +1383,12 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     suggestionSubmitStatus = status;
     fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
     if (status === 403) {
-      await screen.findByText(/Submission refused/);
+      expect((await within(dialog).findByRole("alert")).textContent).toBe("Submission refused");
+      expect(screen.getByRole("dialog", { name: "Submit Suggestions" })).toBe(dialog);
+      expect(within(dialog).getByLabelText("Describe your changes (optional)")).toHaveProperty("value", "Address feedback");
       expect(screen.queryByText("Suggestions submitted as PR #23")).toBeNull();
       suggestionSubmitStatus = 200;
-      fireEvent.click(screen.getByRole("button", { name: /Resubmit Suggestions/ }));
-      const retryDialog = await screen.findByRole("dialog", { name: "Submit Suggestions" });
-      fireEvent.change(within(retryDialog).getByLabelText("Describe your changes (optional)"), { target: { value: "Address feedback" } });
-      fireEvent.click(within(retryDialog).getByRole("button", { name: "Submit for Review" }));
+      fireEvent.click(within(dialog).getByRole("button", { name: "Submit for Review" }));
     }
     await screen.findByText("Suggestions submitted as PR #23");
     expect(screen.queryByRole("button", { name: /Resubmit Suggestions/ })).toBeNull();

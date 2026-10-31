@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { SuggestionSubmitDialog } from "@/components/editor/SuggestionSubmitDialog";
 
 describe("SuggestionSubmitDialog", () => {
@@ -142,6 +143,40 @@ describe("SuggestionSubmitDialog", () => {
     await waitFor(() => {
       expect(screen.getByText("Failed to submit")).toBeDefined();
     });
+  });
+
+  it("announces a failed submission, keeps the draft, and allows a successful retry", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const onConfirm = vi.fn().mockRejectedValueOnce(new Error("Network error")).mockResolvedValueOnce(undefined);
+    render(<SuggestionSubmitDialog {...defaultProps} onConfirm={onConfirm} />);
+    const summary = screen.getByRole("textbox", { name: "Describe your changes (optional)" });
+    await user.type(summary, "Clarify the label");
+    await user.click(screen.getByRole("button", { name: "Submit for Review" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("Network error");
+    expect((summary as HTMLTextAreaElement).value).toBe("Clarify the label");
+    expect(screen.getByRole("dialog")).toBeDefined();
+    expect(defaultProps.onOpenChange).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "Submit for Review" }));
+    await waitFor(() => expect(defaultProps.onOpenChange).toHaveBeenCalledWith(false));
+    expect(onConfirm).toHaveBeenNthCalledWith(2, "Clarify the label");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("returns focus to the invoking button when cancelled", async () => {
+    function Proposal() {
+      const [open, setOpen] = useState(false);
+      return <>
+        <button onClick={() => setOpen(true)}>Propose changes</button>
+        <SuggestionSubmitDialog {...defaultProps} open={open} onOpenChange={setOpen} />
+      </>;
+    }
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<Proposal />);
+    const trigger = screen.getByRole("button", { name: "Propose changes" });
+    await user.click(trigger);
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.activeElement).toBe(trigger);
   });
 
   it("shows Submitting state during async submit", async () => {

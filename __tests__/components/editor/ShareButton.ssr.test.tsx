@@ -8,7 +8,7 @@ describe("share controls rendered without a browser", () => {
   it.each([null, "https://example.test#Person"])("renders accessible sharing controls for selected IRI %s", selectedIri => {
     expect(typeof window).toBe("undefined");
     const html = renderToStaticMarkup(<ToastProvider><ShareButton projectId="project" selectedIri={selectedIri} /></ToastProvider>);
-    expect(html).toContain(selectedIri ? 'aria-label="Copy link to Person"' : 'aria-label="Copy project link"');
+    expect(html).toContain(selectedIri ? 'aria-label="Share “Person”: copy link to Person"' : 'aria-label="Share: copy project link"');
     if (selectedIri) expect(html).toContain('aria-label="More share options"');
     else expect(html).not.toContain('aria-label="More share options"');
     expect(html).not.toContain('role="menu"');

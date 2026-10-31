@@ -72,7 +72,7 @@ export function ShareButton({ projectId, selectedIri, selectedLabel }: ShareButt
         className="gap-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         onClick={() => copyToClipboard(projectUrl)}
         title="Share project permalink"
-        aria-label="Copy project link"
+        aria-label="Share: copy project link"
       >
         <Share2 className="h-4 w-4" />
         <span className="hidden sm:inline text-xs">Share</span>
@@ -90,7 +90,7 @@ export function ShareButton({ projectId, selectedIri, selectedLabel }: ShareButt
         className="gap-1.5 rounded-r-none pr-1.5 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         onClick={() => copyToClipboard(classUrl, displayLabel || undefined)}
         title={`Share link to "${displayLabel}"`}
-        aria-label={`Copy link to ${displayLabel}`}
+        aria-label={`Share “${truncatedLabel}”: copy link to ${displayLabel}`}
       >
         <Share2 className="h-4 w-4" />
         <span className="hidden sm:inline text-xs max-w-[10rem] truncate">
