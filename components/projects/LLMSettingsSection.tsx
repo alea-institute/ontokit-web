@@ -105,6 +105,7 @@ export function LLMSettingsSection({
   >("idle");
   const [validationError, setValidationError] = useState<string | null>(null);
   const validationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // UI state
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -162,10 +163,11 @@ export function LLMSettingsSection({
     return () => document.removeEventListener("mousedown", handleOutside);
   }, []);
 
-  // Clear validation timer on unmount
+  // Clear message timers on unmount
   useEffect(() => {
     return () => {
       if (validationTimerRef.current) clearTimeout(validationTimerRef.current);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
     };
   }, []);
 
@@ -305,7 +307,8 @@ export function LLMSettingsSection({
 
       setApiKey("");
       setSuccess("AI settings saved.");
-      setTimeout(() => setSuccess(null), 3000);
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       setError(
         err instanceof Error
