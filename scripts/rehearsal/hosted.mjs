@@ -224,7 +224,11 @@ export async function runHosted({targetFile, fetchImpl = fetch, runPlaywright = 
     try { file = await writeReceipt(receipt); }
     catch { throw new Error('Hosted receipt could not be saved'); }
     const failure = failureCode && new Error(preflightMessage ?? messages[failureCode]);
-    if (!run && failure) throw Object.assign(failure, {receipt, file});
+    if (!run && failure) {
+      failure.receipt = receipt;
+      failure.file = file;
+      throw failure;
+    }
     return {receipt, file, failure};
   } finally {
     for (const [signal, handler] of Object.entries(handlers)) process.off(signal, handler);
