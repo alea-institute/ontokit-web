@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProjectListResponse } from "@/lib/api/projects";
@@ -64,25 +65,30 @@ function renderPage() {
     defaultOptions: { queries: { retry: false } },
   });
 
-  return render(
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <HomePage />
     </QueryClientProvider>,
   );
+  return { ...view, queryClient };
 }
 
 describe("HomePage public projects", () => {
   const originalAuthMode = process.env.NEXT_PUBLIC_AUTH_MODE;
+  const originalConfigured = process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED;
 
   beforeEach(() => {
     listProjects.mockReset();
     sessionState.data = null;
     sessionState.status = "unauthenticated";
     process.env.NEXT_PUBLIC_AUTH_MODE = "disabled";
+    process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED = "false";
   });
 
   afterEach(() => {
     process.env.NEXT_PUBLIC_AUTH_MODE = originalAuthMode;
+    if (originalConfigured === undefined) delete process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED;
+    else process.env.NEXT_PUBLIC_ZITADEL_CONFIGURED = originalConfigured;
   });
 
   it("shows public projects to an anonymous visitor", async () => {
@@ -114,6 +120,121 @@ describe("HomePage public projects", () => {
 
     expect(await screen.findByText("Demo entry")).toBeDefined();
     expect(listProjects).not.toHaveBeenCalled();
+    expect(screen.getByRole("status").textContent).toBe("Checking your session…");
+    expect(screen.queryByText("No projects available")).toBeNull();
+  });
+
+  it("announces the initial request until projects arrive", async () => {
+    let resolve!: (response: ProjectListResponse) => void;
+    listProjects.mockReturnValue(new Promise<ProjectListResponse>((done) => { resolve = done; }));
+
+    renderPage();
+
+    expect(screen.getByRole("status").textContent).toBe("Loading projects…");
+    expect(screen.queryByText("No projects available")).toBeNull();
+    await act(async () => resolve(seededResponse));
+    expect(await screen.findByText("FOLIO DEV")).toBeDefined();
+    expect(screen.queryByText("Loading projects…")).toBeNull();
+  });
+
+  it("starts providerless optional browsing while the session is pending", async () => {
+    process.env.NEXT_PUBLIC_AUTH_MODE = "optional";
+    sessionState.status = "loading";
+    listProjects.mockResolvedValue(seededResponse);
+
+    renderPage();
+
+    expect(await screen.findByText("FOLIO DEV")).toBeDefined();
+    expect(screen.queryByText("Checking your session…")).toBeNull();
+  });
+
+  it("clears search by keyboard, cancels a pending term and returns to page one of the same tab", async () => {
+    const user = userEvent.setup();
+    sessionState.status = "authenticated";
+    sessionState.data = { accessToken: "fixture-token" };
+    const firstPage = { ...seededResponse, total: 51, unfiltered_total: 51 };
+    const lastPage = {
+      ...firstPage,
+      skip: 50,
+      items: [{ ...seededResponse.items[0], id: "second", name: "Second page project" }],
+    };
+    listProjects.mockImplementation(async (skip, _limit, _filter, _token, search) =>
+      search ? { ...firstPage, items: [], total: 0, skip: 0 } : skip === 50 ? lastPage : firstPage,
+    );
+
+    renderPage();
+    await screen.findByText("FOLIO DEV");
+    await user.click(screen.getByRole("button", { name: "Load More" }));
+    await screen.findByText("Second page project");
+    const input = screen.getByRole("textbox", { name: "Search projects" }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "missing" } });
+    await screen.findByText("No projects found");
+    fireEvent.change(input, { target: { value: "pending term" } });
+    screen.getByRole("button", { name: "Clear search" }).focus();
+    await user.keyboard("{Enter}");
+
+    expect(input.value).toBe("");
+    expect(document.activeElement).toBe(input);
+    await screen.findByText("FOLIO DEV");
+    expect(screen.queryByText("Second page project")).toBeNull();
+    expect(listProjects).toHaveBeenLastCalledWith(0, 50, "mine", "fixture-token", undefined);
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 350)); });
+    expect(listProjects.mock.calls.some((call) => call[4] === "pending term")).toBe(false);
+    expect(screen.queryByText("No projects found")).toBeNull();
+  });
+
+  it("offers public browsing alongside creation for an authenticated empty My Projects", async () => {
+    sessionState.status = "authenticated";
+    sessionState.data = { accessToken: "fixture-token" };
+    listProjects.mockImplementation(async (_skip, _limit, filter) =>
+      filter === "mine" ? { ...seededResponse, items: [], total: 0, unfiltered_total: 0 } : seededResponse,
+    );
+
+    renderPage();
+    await screen.findByText("No projects yet");
+    expect(screen.getByRole("link", { name: "Create Project" }).getAttribute("href")).toBe("/projects/new");
+    fireEvent.click(screen.getByRole("button", { name: "Browse public projects" }));
+    expect(await screen.findByText("FOLIO DEV")).toBeDefined();
+    expect(listProjects).toHaveBeenLastCalledWith(0, 50, "public", "fixture-token", undefined);
+  });
+
+  it("keeps cards visible during background refresh and offers retry if refresh fails", async () => {
+    listProjects.mockResolvedValue(seededResponse);
+    const { queryClient } = renderPage();
+    await screen.findByText("FOLIO DEV");
+    let reject!: (error: Error) => void;
+    listProjects.mockReturnValueOnce(new Promise<ProjectListResponse>((_resolve, fail) => { reject = fail; }));
+
+    act(() => { void queryClient.invalidateQueries({ queryKey: ["projects"] }); });
+    expect(await screen.findByText("Refreshing projects…")).toBeDefined();
+    expect(screen.getByText("FOLIO DEV")).toBeDefined();
+    await act(async () => reject(new Error("Refresh unavailable")));
+    expect(await screen.findByText(/Refresh unavailable/)).toBeDefined();
+    expect(screen.getByText("FOLIO DEV")).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Try Again" }));
+    await waitFor(() => expect(screen.queryByText(/Refresh unavailable/)).toBeNull());
+    expect(screen.getByText("FOLIO DEV")).toBeDefined();
+  });
+
+  it("announces load-more without hiding existing cards", async () => {
+    const firstPage = { ...seededResponse, total: 51, unfiltered_total: 51 };
+    listProjects.mockResolvedValueOnce(firstPage);
+    let resolve!: (response: ProjectListResponse) => void;
+    listProjects.mockReturnValueOnce(new Promise<ProjectListResponse>((done) => { resolve = done; }));
+    renderPage();
+    await screen.findByText("FOLIO DEV");
+
+    fireEvent.click(screen.getByRole("button", { name: "Load More" }));
+    expect(await screen.findByText("Loading more projects…")).toBeDefined();
+    expect(screen.getByText("FOLIO DEV")).toBeDefined();
+    expect((screen.getByRole("button", { name: "Loading..." }) as HTMLButtonElement).disabled).toBe(true);
+    await act(async () => resolve({
+      ...firstPage, skip: 50,
+      items: [{ ...seededResponse.items[0], id: "second", name: "Second page project" }],
+    }));
+    expect(await screen.findByText("Second page project")).toBeDefined();
+    expect(screen.getByText("FOLIO DEV")).toBeDefined();
+    expect(screen.queryByText("Loading more projects…")).toBeNull();
   });
 
   it("shows the empty state only after a genuinely empty successful response", async () => {

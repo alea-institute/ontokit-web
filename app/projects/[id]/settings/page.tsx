@@ -2241,11 +2241,22 @@ function WebhookConfigPanel({
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-  // On mount: determine initial webhook status
+  // Tracks whether the current "configured" status came from a stored hook id
+  // (rather than from an auto-setup response), so only that derived status is
+  // cleared when the hook id disappears.
+  const statusFromHookIdRef = useRef(false);
+
+  // Derive webhook status from the stored integration. This effect can run after
+  // an auto-setup response has already landed (the enable PATCH and the delayed
+  // setup race under load), so it must never discard a setup result such as an
+  // error (which would hide "Retry auto-setup") or a "created" response that
+  // carried no hook id.
   useEffect(() => {
     if (githubIntegration.webhooks_enabled && githubIntegration.github_hook_id) {
+      statusFromHookIdRef.current = true;
       setWebhookStatus("configured");
-    } else if (githubIntegration.webhooks_enabled && !githubIntegration.github_hook_id) {
+    } else if (statusFromHookIdRef.current) {
+      statusFromHookIdRef.current = false;
       setWebhookStatus("unknown");
     }
   }, [githubIntegration.webhooks_enabled, githubIntegration.github_hook_id]);

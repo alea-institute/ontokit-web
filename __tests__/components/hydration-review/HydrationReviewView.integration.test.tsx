@@ -25,6 +25,131 @@ function rowButton(label: string, nth = 0) {
 }
 
 describe("HydrationReviewView", () => {
+  it("announces file loading and disables the picker until saved reviews finish restoring", async () => {
+    let finishLoad!: (value: Awaited<ReturnType<ReviewStore["load"]>>) => void;
+    const store = { ...createMemoryStore(), load: () => new Promise<Awaited<ReturnType<ReviewStore["load"]>>>((resolve) => { finishLoad = resolve; }) };
+    render(<HydrationReviewView createStore={() => store} />);
+    const picker = screen.getByLabelText("Review bundle file") as HTMLInputElement;
+    fireEvent.change(picker, { target: { files: [new File([bundleText()], "review.jsonl")] } });
+    expect((await screen.findByRole("status")).textContent).toContain("Reading review.jsonl");
+    expect(picker.disabled).toBe(true);
+    await waitFor(() => expect(finishLoad).toBeTypeOf("function"));
+    finishLoad({ reviews: [], samples: [] });
+    await screen.findByRole("tablist");
+  });
+
+  it("restores a usable picker after invalid data and accepts a valid retry", async () => {
+    render(<HydrationReviewView createStore={createMemoryStore} />);
+    const picker = screen.getByLabelText("Review bundle file") as HTMLInputElement;
+    fireEvent.change(picker, { target: { files: [new File(["{}"], "invalid.jsonl")] } });
+    await screen.findByRole("alert");
+    expect(picker.disabled).toBe(false);
+    expect(screen.queryByRole("status")).toBeNull();
+    fireEvent.change(picker, { target: { files: [new File([bundleText()], "valid.jsonl")] } });
+    await screen.findByRole("tablist");
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("explains an empty bundle and cannot draw a sample from it", async () => {
+    const store = createMemoryStore();
+    const saveSample = vi.spyOn(store, "putSample");
+    await load(store, vi.fn(), bundleText({ rows: [], includeExclusions: false }));
+    expect(screen.getByRole("heading", { name: "No proposed rows in this bundle" })).toBeTruthy();
+    expect(screen.queryByText("No rows match these filters")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Samples" }));
+    const draw = screen.getByRole("button", { name: /Draw sample/ }) as HTMLButtonElement;
+    expect(draw.disabled).toBe(true);
+    fireEvent.click(draw);
+    expect(saveSample).not.toHaveBeenCalled();
+    expect(screen.getByText(/There are no proposed rows to sample/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("tab", { name: "Rates" }));
+    expect(screen.getByText(/This bundle has no proposed rows to review/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Review rows" })).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: /Exclusions/ }));
+    expect(screen.getByRole("heading", { name: "No excluded rows" })).toBeTruthy();
+    expect(screen.queryByRole("combobox")).toBeNull();
+  });
+
+  it("retains separately recorded prescreen counts when no excluded rows are bundled", async () => {
+    const text = bundleText({ includeExclusions: false }).replace('"prescreen_rejected_items":0', '"prescreen_rejected_items":2');
+    await load(createMemoryStore(), vi.fn(), text);
+    fireEvent.click(screen.getByRole("tab", { name: /Exclusions/ }));
+    expect(screen.getByRole("heading", { name: "No excluded rows" })).toBeTruthy();
+    expect(screen.getByText(/separately records 2 items/)).toBeTruthy();
+  });
+
+  it("clears filters without losing a selected correction draft, note, saved reviews or samples", async () => {
+    const store = createMemoryStore();
+    await load(store);
+    fireEvent.click(rowButton("Alpha"));
+    fireEvent.click(within(screen.getByRole("region", { name: "Row detail" })).getByRole("button", { name: "Accept as proposed" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Samples" }));
+    fireEvent.change(screen.getByLabelText("Seed"), { target: { value: "7" } });
+    fireEvent.click(screen.getByRole("button", { name: /Draw sample/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "Rows" }));
+    fireEvent.click(rowButton("Alpha", 1));
+    const detail = screen.getByRole("region", { name: "Row detail" });
+    fireEvent.change(within(detail).getByLabelText("Corrected value"), { target: { value: "טיוטה" } });
+    fireEvent.change(within(detail).getByLabelText("Note (optional)"), { target: { value: "Keep my note" } });
+    fireEvent.change(screen.getByLabelText("Branch"), { target: { value: "Location" } });
+    fireEvent.change(screen.getByLabelText("Search"), { target: { value: "no-matching-value" } });
+    expect(await screen.findByRole("heading", { name: "No rows match these filters" })).toBeTruthy();
+    expect(screen.getByText(/This row is outside the current filters/)).toBeTruthy();
+    expect(within(detail).queryByRole("button", { name: "Next row" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    await screen.findByText(/1–6 of 6 matching rows/);
+    expect(screen.getByRole("region", { name: "Row detail" })).toBe(detail);
+    expect((within(detail).getByLabelText("Corrected value") as HTMLTextAreaElement).value).toBe("טיוטה");
+    expect((within(detail).getByLabelText("Note (optional)") as HTMLInputElement).value).toBe("Keep my note");
+    expect(within(detail).getByRole("button", { name: "Next row" })).toBeTruthy();
+    expect(screen.queryByText(/This row is outside the current filters/)).toBeNull();
+    expect((screen.getByLabelText("Search") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Branch") as HTMLSelectElement).value).toBe("");
+    expect(screen.getByText("unclassified · accepted")).toBeTruthy();
+    expect((await store.load(await currentSha())).samples).toHaveLength(1);
+  });
+
+  it("returns to the first page when filters are cleared", async () => {
+    const rows = Array.from({ length: 60 }, (_, i) => ({ ...makeRows()[0], row_id: `many-${i}`, label: `Concept ${i}` }));
+    await load(createMemoryStore(), vi.fn(), bundleText({ rows }));
+    fireEvent.change(screen.getByLabelText("Search"), { target: { value: "Concept" } });
+    fireEvent.click(screen.getByRole("button", { name: /^Next$/ }));
+    expect(await screen.findByText(/51–60 of 60 matching rows/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(await screen.findByText(/1–50 of 60 matching rows/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: /^Previous$/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("explains unsampled and unreviewed states, and samples despite an empty text search", async () => {
+    await load(createMemoryStore());
+    fireEvent.change(screen.getByLabelText("Search"), { target: { value: "no-matching-value" } });
+    await screen.findByRole("heading", { name: "No rows match these filters" });
+    fireEvent.click(screen.getByRole("tab", { name: "Samples" }));
+    expect(screen.getByText(/No samples saved yet/)).toBeTruthy();
+    const draw = screen.getByRole("button", { name: /Draw sample/ }) as HTMLButtonElement;
+    expect(draw.disabled).toBe(false);
+    fireEvent.change(screen.getByLabelText("Seed"), { target: { value: "7" } });
+    fireEvent.click(draw);
+    expect(await screen.findByText(/6 of 6 · seed 7 · whole bundle/)).toBeTruthy();
+    expect(screen.queryByText(/No samples saved yet/)).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Rates" }));
+    expect(screen.getByText(/No completed reviews yet/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Review rows" }));
+    expect(screen.getByRole("tab", { name: "Rows" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("disables sampling for an empty dimension intersection and recovers when filters clear", async () => {
+    await load(createMemoryStore());
+    fireEvent.change(screen.getByLabelText("Branch"), { target: { value: "Location" } });
+    fireEvent.change(screen.getByLabelText("Component"), { target: { value: "translation:he-il" } });
+    fireEvent.click(screen.getByRole("tab", { name: "Samples" }));
+    expect((screen.getByRole("button", { name: /Draw sample/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/No rows match the branch, component and partition/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect((screen.getByRole("button", { name: /Draw sample/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
   it("states that nothing writes to FOLIO before and after loading", async () => {
     render(<HydrationReviewView createStore={createMemoryStore} />);
     expect(screen.getByText(/Nothing on this page writes to FOLIO/)).toBeTruthy();

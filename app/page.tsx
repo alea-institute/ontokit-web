@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useSession, signIn } from "next-auth/react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Plus, Search, Globe, Lock, FolderOpen, LogIn, User } from "lucide-react";
 import { Header } from "@/components/layout/header";
@@ -19,12 +19,15 @@ type FilterType = "public" | "private" | "mine" | "all";
 
 export default function HomePage() {
   const { data: session, status } = useSession();
+  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>("public");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const isAuthenticated = status === "authenticated";
   const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+  const waitingForSession = status === "loading" && (filter !== "public" || authMode === "required");
   // Sign-in is offered only when a provider can actually complete it; otherwise
   // the private tabs explain why they are empty instead of showing a dead end.
   const showAuthUI = shouldShowAuthUI();
@@ -51,6 +54,7 @@ export default function HomePage() {
     data,
     isLoading,
     isFetching,
+    isRefetchError,
     error,
     refetch,
     fetchNextPage,
@@ -94,6 +98,15 @@ export default function HomePage() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
+  function clearSearch() {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    // A prior visit to this tab may have cached several pages. Start at page one.
+    void queryClient.resetQueries({ queryKey: ["projects", filter, isAuthenticated, ""], exact: true });
+    setSearchQuery("");
+    setDebouncedSearch("");
+    searchRef.current?.focus();
+  }
+
   return (
     <>
       <Header />
@@ -126,7 +139,7 @@ export default function HomePage() {
           {/* Filters and Search */}
           <div className="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             {/* Filter Tabs */}
-            <div className="flex rounded-lg border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-800">
+            <div className="grid grid-cols-2 rounded-lg border border-slate-200 bg-white p-1 sm:flex dark:border-slate-700 dark:bg-slate-800">
               {([
                 { value: "mine" as const, label: "My Projects", icon: User },
                 { value: "public" as const, label: "Public", icon: Globe },
@@ -136,6 +149,7 @@ export default function HomePage() {
                 <button
                   key={value}
                   onClick={() => setFilter(value)}
+                  aria-pressed={filter === value}
                   className={cn(
                     "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
                     filter === value
@@ -143,7 +157,7 @@ export default function HomePage() {
                       : "text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" aria-hidden />
                   {label}
                 </button>
               ))}
@@ -151,9 +165,11 @@ export default function HomePage() {
 
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
               <input
+                ref={searchRef}
                 type="text"
+                aria-label="Search projects"
                 placeholder="Search projects..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -169,132 +185,159 @@ export default function HomePage() {
 
           {/* Content */}
           <div className="mt-8">
-            {/* Private tab login prompt for unauthenticated users */}
-            {(filter === "mine" || filter === "private") && !isAuthenticated ? (
-              <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
-                {filter === "private" ? (
-                  <Lock className="mx-auto h-12 w-12 text-slate-400" />
-                ) : (
-                  <User className="mx-auto h-12 w-12 text-slate-400" />
-                )}
-                {showAuthUI ? (
-                  <>
-                    <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
-                      {filter === "private"
-                        ? "Sign in to see private projects"
-                        : "Sign in to see your projects"}
-                    </h3>
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      {filter === "private"
-                        ? "View all private projects you own or are a member of"
-                        : "View all projects you own or are a member of"}
-                    </p>
-                    <Button className="mt-6" onClick={() => signIn()}>
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Sign In
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
-                      {filter === "private"
-                        ? "Private projects aren't available here"
-                        : "Your projects aren't available here"}
-                    </h3>
-                    <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                      Sign-in is unavailable in this configuration, so only public projects can be browsed.
-                    </p>
-                    <Button variant="outline" className="mt-6" onClick={() => setFilter("public")}>
-                      <Globe className="mr-2 h-4 w-4" />
-                      Browse public projects
-                    </Button>
-                  </>
-                )}
-              </div>
-            ) : isLoading ? (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div
-                    key={i}
-                    className="h-40 animate-pulse rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800"
-                  />
-                ))}
-              </div>
-            ) : error && !data ? (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/50 dark:bg-red-900/20">
-                <p className="text-red-700 dark:text-red-400">{error instanceof Error ? error.message : "Failed to load projects"}</p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => refetch()}
-                  disabled={isFetching}
-                >
+            {(waitingForSession || isFetching) && (
+              <p role="status" className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                {waitingForSession ? "Checking your session…" : !data ? "Loading projects…" : isFetchingNextPage ? "Loading more projects…" : "Refreshing projects…"}
+              </p>
+            )}
+            {isRefetchError && !waitingForSession && (
+              <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-900/20 dark:text-red-400">
+                <p>Could not refresh projects. {error instanceof Error ? error.message : "Please try again."}</p>
+                <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
                   {isFetching ? "Retrying..." : "Try Again"}
                 </Button>
               </div>
-            ) : projects.length === 0 ? (
-              <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
-                <FolderOpen className="mx-auto h-12 w-12 text-slate-400" />
-                <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
-                  {debouncedSearch
-                    ? "No projects found"
-                    : filter === "private"
-                    ? "No private projects yet"
-                    : filter === "mine"
-                    ? "No projects yet"
-                    : "No projects available"}
-                </h3>
-                <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                  {debouncedSearch
-                    ? "Try a different search term"
-                    : filter === "private" && isAuthenticated
-                    ? "You are not a member of any private projects, and do not own any private projects. Create your first private project to get started."
-                    : filter === "mine" && isAuthenticated
-                    ? "Create your first project to get started"
-                    : "Check back later for public projects"}
-                </p>
-                {(filter === "mine" || filter === "private") && isAuthenticated && !debouncedSearch && (
-                  <Link href="/projects/new" className="mt-4 inline-block">
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      {filter === "private" ? "Create Private Project" : "Create Project"}
-                    </Button>
-                  </Link>
-                )}
-              </div>
-            ) : (
-              <>
-                <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
-                  {debouncedSearch
-                    ? `${total} ${total === 1 ? "result" : "results"} for "${debouncedSearch}"`
-                    : `${total} ${total === 1 ? "project" : "projects"}`}
-                  {isFiltered && (
-                    <span className="text-slate-400 dark:text-slate-500">
-                      {` (of ${unfilteredTotal})`}
-                    </span>
-                  )}
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {projects.map((project) => (
-                    <ProjectCard key={project.id} project={project} />
+            )}
+            <div aria-busy={waitingForSession || isFetching}>
+              {waitingForSession || isLoading ? (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-hidden>
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div
+                      key={i}
+                      className="h-40 animate-pulse rounded-lg border border-slate-200 bg-white motion-reduce:animate-none dark:border-slate-700 dark:bg-slate-800"
+                    />
                   ))}
                 </div>
-                {hasNextPage && (
-                  <div className="mt-6 flex flex-col items-center gap-2">
-                    {nextPageError && (
-                      <p className="text-sm text-red-600 dark:text-red-400">{nextPageError}</p>
-                    )}
-                    <Button
-                      variant="outline"
-                      onClick={handleLoadMore}
-                      disabled={isFetchingNextPage}
-                    >
-                      {isFetchingNextPage ? "Loading..." : nextPageError ? "Retry" : "Load More"}
+              ) : (filter === "mine" || filter === "private") && !isAuthenticated ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
+                  {filter === "private" ? (
+                    <Lock className="mx-auto h-12 w-12 text-slate-400" />
+                  ) : (
+                    <User className="mx-auto h-12 w-12 text-slate-400" />
+                  )}
+                  {showAuthUI ? (
+                    <>
+                      <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
+                        {filter === "private"
+                          ? "Sign in to see private projects"
+                          : "Sign in to see your projects"}
+                      </h3>
+                      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                        {filter === "private"
+                          ? "View all private projects you own or are a member of"
+                          : "View all projects you own or are a member of"}
+                      </p>
+                      <Button className="mt-6" onClick={() => signIn()}>
+                        <LogIn className="mr-2 h-4 w-4" />
+                        Sign In
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
+                        {filter === "private"
+                          ? "Private projects aren't available here"
+                          : "Your projects aren't available here"}
+                      </h3>
+                      <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                        Sign-in is unavailable in this configuration, so only public projects can be browsed.
+                      </p>
+                      <Button variant="outline" className="mt-6" onClick={() => setFilter("public")}>
+                        <Globe className="mr-2 h-4 w-4" />
+                        Browse public projects
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ) : error && !data ? (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-6 text-center dark:border-red-900/50 dark:bg-red-900/20">
+                  <p className="text-red-700 dark:text-red-400">{error instanceof Error ? error.message : "Failed to load projects"}</p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => refetch()}
+                    disabled={isFetching}
+                  >
+                    {isFetching ? "Retrying..." : "Try Again"}
+                  </Button>
+                </div>
+              ) : projects.length === 0 ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-12 text-center dark:border-slate-700 dark:bg-slate-800">
+                  <FolderOpen className="mx-auto h-12 w-12 text-slate-400" />
+                  <h3 className="mt-4 text-lg font-medium text-slate-900 dark:text-slate-100">
+                    {debouncedSearch
+                      ? "No projects found"
+                      : filter === "private"
+                      ? "No private projects yet"
+                      : filter === "mine"
+                      ? "No projects yet"
+                      : "No projects available"}
+                  </h3>
+                  <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                    {debouncedSearch
+                      ? "Try a different search term"
+                      : filter === "private" && isAuthenticated
+                      ? "You are not a member of any private projects, and do not own any private projects. Create your first private project to get started."
+                      : filter === "mine" && isAuthenticated
+                      ? "Create your first project to get started"
+                      : "Check back later for public projects"}
+                  </p>
+                  {debouncedSearch && (
+                    <Button variant="outline" className="mt-4" onClick={clearSearch}>
+                      Clear search
                     </Button>
+                  )}
+                  {(filter === "mine" || filter === "private") && isAuthenticated && !debouncedSearch && (
+                    <Link href="/projects/new" className="mt-4 inline-block">
+                      <Button>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {filter === "private" ? "Create Private Project" : "Create Project"}
+                      </Button>
+                    </Link>
+                  )}
+                  {filter === "mine" && isAuthenticated && !debouncedSearch && (
+                    <div className="mt-3">
+                      <Button variant="outline" onClick={() => setFilter("public")}>
+                        <Globe className="mr-2 h-4 w-4" aria-hidden />
+                        Browse public projects
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                    {debouncedSearch
+                      ? `${total} ${total === 1 ? "result" : "results"} for "${debouncedSearch}"`
+                      : `${total} ${total === 1 ? "project" : "projects"}`}
+                    {isFiltered && (
+                      <span className="text-slate-400 dark:text-slate-500">
+                        {` (of ${unfilteredTotal})`}
+                      </span>
+                    )}
                   </div>
-                )}
-              </>
-            )}
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {projects.map((project) => (
+                      <ProjectCard key={project.id} project={project} />
+                    ))}
+                  </div>
+                  {hasNextPage && (
+                    <div className="mt-6 flex flex-col items-center gap-2">
+                      {nextPageError && (
+                        <p role="alert" className="text-sm text-red-600 dark:text-red-400">{nextPageError}</p>
+                      )}
+                      <Button
+                        variant="outline"
+                        onClick={handleLoadMore}
+                        disabled={isFetchingNextPage}
+                      >
+                        {isFetchingNextPage ? "Loading..." : nextPageError ? "Retry" : "Load More"}
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </main>

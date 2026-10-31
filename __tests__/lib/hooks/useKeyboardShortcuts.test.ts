@@ -26,6 +26,54 @@ function fireKeydown(opts: Partial<KeyboardEventInit> = {}) {
 }
 
 describe("useKeyboardShortcuts", () => {
+  it.each([false, true])("opens help for a produced question mark with Shift=%s", (shiftKey) => {
+    const action = vi.fn();
+    renderHook(() => useKeyboardShortcuts([{
+      id: "help", key: "?", description: "Help", category: "General", action,
+    }]));
+    const event = fireKeydown({ key: "?", shiftKey });
+    expect(action).toHaveBeenCalledOnce();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it.each([
+    { key: "/", shiftKey: true },
+    { key: "?", ctrlKey: true },
+    { key: "?", metaKey: true },
+    { key: "?", altKey: true, shiftKey: true },
+  ])("leaves non-help key combinations unconsumed: %j", (keys) => {
+    const action = vi.fn();
+    renderHook(() => useKeyboardShortcuts([{
+      id: "help", key: "?", description: "Help", category: "General", action,
+    }]));
+    expect(fireKeydown(keys).defaultPrevented).toBe(false);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { id: "other-question", key: "?" },
+    { id: "help", key: "h" },
+    { id: "help", key: "?", modifiers: { shift: false } },
+  ])("keeps Shift matching strict outside the unspecified help binding: %j", (definition) => {
+    const action = vi.fn();
+    renderHook(() => useKeyboardShortcuts([{
+      ...definition, description: "Test", category: "General", action,
+    }]));
+    expect(fireKeydown({ key: definition.key, shiftKey: true }).defaultPrevented).toBe(false);
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("preserves an explicit Shift requirement on the help binding", () => {
+    const action = vi.fn();
+    renderHook(() => useKeyboardShortcuts([{
+      id: "help", key: "?", modifiers: { shift: true }, description: "Help", category: "General", action,
+    }]));
+    expect(fireKeydown({ key: "?" }).defaultPrevented).toBe(false);
+    expect(action).not.toHaveBeenCalled();
+    expect(fireKeydown({ key: "?", shiftKey: true }).defaultPrevented).toBe(true);
+    expect(action).toHaveBeenCalledOnce();
+  });
+
   it("registers keydown event listener", () => {
     const addSpy = vi.spyOn(document, "addEventListener");
     const action = vi.fn();
