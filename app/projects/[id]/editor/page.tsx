@@ -130,12 +130,30 @@ export default function EditorPage() {
   const [activeBranch, setActiveBranch] = useState<string | undefined>(undefined);
   const generatedEntityPersistenceQueue = useRef(createGeneratedEntityPersistenceQueue());
 
+  const toast = useToast();
+
+  // Post-submit success state for anonymous proposals (R7, KTD12). A dialog
+  // rather than a toast, because this is the one moment the account nudge has
+  // the contributor's attention — and a toast that vanishes cannot carry a CTA.
+  const [submittedProposal, setSubmittedProposal] = useState<
+    { prNumber: number; prUrl: string | null } | null
+  >(null);
+
+  const anonymousSuggestion = useAnonymousSuggestion({
+    projectId,
+    onSubmitted: (prNumber, prUrl) => {
+      setSubmittedProposal({ prNumber, prUrl });
+    },
+    onError: (msg) => toast.error("Proposal error", msg),
+  });
+
   // Shared project/tree/source state from hook
   const viewer = useProjectViewer({
     projectId,
     accessToken: session?.accessToken,
     sessionStatus: status,
     activeBranch,
+    proposalBranch: authMode !== "required" && anonymousSuggestion.isActive ? anonymousSuggestion.branch ?? undefined : undefined,
     enableWebSocket: true,
   });
 
@@ -277,7 +295,6 @@ export default function EditorPage() {
   const [deleteImpactAcknowledged, setDeleteImpactAcknowledged] = useState(true);
 
   // Toast
-  const toast = useToast();
 
   // Pending scroll IRI for source navigation
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
@@ -328,21 +345,6 @@ export default function EditorPage() {
   const canPropose = authMode !== "required" && !canEdit && !canSuggest && !!project?.is_public;
   const [creditModalOpen, setCreditModalOpen] = useState(false);
   const [discardProposalConfirmOpen, setDiscardProposalConfirmOpen] = useState(false);
-
-  // Post-submit success state for anonymous proposals (R7, KTD12). A dialog
-  // rather than a toast, because this is the one moment the account nudge has
-  // the contributor's attention — and a toast that vanishes cannot carry a CTA.
-  const [submittedProposal, setSubmittedProposal] = useState<
-    { prNumber: number; prUrl: string | null } | null
-  >(null);
-
-  const anonymousSuggestion = useAnonymousSuggestion({
-    projectId,
-    onSubmitted: (prNumber, prUrl) => {
-      setSubmittedProposal({ prNumber, prUrl });
-    },
-    onError: (msg) => toast.error("Proposal error", msg),
-  });
 
   const isAnonymousProposalMode = canPropose && anonymousSuggestion.isActive;
 
@@ -1132,7 +1134,7 @@ export default function EditorPage() {
       id: "save",
       key: "s",
       modifiers: { ctrl: true },
-      description: "Save / flush draft",
+      description: "Finish editing the focused field",
       category: "Editing",
       action: () => {
         // Trigger a blur on active element to flush auto-save drafts
@@ -1233,8 +1235,11 @@ export default function EditorPage() {
       <>
         <Header />
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
-          <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+          <div role="status" className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3">
+            <div aria-hidden="true" className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600 motion-reduce:animate-none" />
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {isRetiredRedirecting ? "Opening the current project…" : status === "loading" && authMode === "required" ? "Checking your session…" : "Loading editor…"}
+            </p>
           </div>
         </main>
       </>
@@ -1293,8 +1298,9 @@ export default function EditorPage() {
       <>
         <Header />
         <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-50 dark:bg-slate-900">
-          <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+          <div role="status" className="flex h-[calc(100vh-4rem)] flex-col items-center justify-center gap-3">
+            <div aria-hidden="true" className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600 motion-reduce:animate-none" />
+            <p className="text-sm text-slate-600 dark:text-slate-400">Opening project viewer…</p>
           </div>
         </main>
       </>
@@ -1538,8 +1544,10 @@ export default function EditorPage() {
                 size="sm"
                 onClick={() => setShortcutDialogOpen(true)}
                 aria-label="Keyboard shortcuts"
+                className="gap-2"
               >
-                <Keyboard className="h-4 w-4" />
+                <Keyboard aria-hidden="true" className="h-4 w-4" />
+                <span className="hidden lg:inline">Shortcuts</span>
               </Button>
 
               {canManage && !settingsUnavailable && (
@@ -1590,6 +1598,9 @@ export default function EditorPage() {
                   isExpandingAll={isExpandingAll}
                   navigateToNode={navigateToNode}
                   sourceContent={sourceContent}
+                  isSourceReady={viewer.isSourceReady}
+                  sourceScope={viewer.sourceScope}
+                  sourceFilePath={project?.git_ontology_path}
                   setSourceContent={setSourceContent as (content: string | ((prev: string) => string)) => void}
                   isLoadingSource={isLoadingSource}
                   sourceError={sourceError}

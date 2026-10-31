@@ -27,18 +27,27 @@ export function makeRows(): BundleRow[] {
   ];
 }
 
-export function bundleText({ excludedRowId = "x-ja" }: { excludedRowId?: string } = {}): string {
-  const rows = makeRows();
+export function bundleText({ excludedRowId = "x-ja", rows = makeRows(), includeExclusions = true }: {
+  excludedRowId?: string;
+  rows?: BundleRow[];
+  includeExclusions?: boolean;
+} = {}): string {
+  const countBy = (key: "partition" | "component" | "branch") => {
+    const values = [...new Set(rows.map((r) => r[key]))];
+    if (key === "branch") values.sort();
+    return Object.fromEntries(values.map((value) => [value, rows.filter((r) => r[key] === value).length]));
+  };
   const header = {
     kind: "header", schema: "folio-review-bundle/1", digest_id: "digest-test", writes_to_folio: false,
     counts: {
       rows: rows.length,
-      by_partition: { keep: 4, regenerate: 2 },
-      by_component: Object.fromEntries(rows.map((r) => [r.component, 1])),
-      by_branch: { Location: 3, Status: 3 },
-      concepts: 2, exclusions: 1, exclusions_by_reason: { locale_prescreen_rejected: 1 },
+      by_partition: countBy("partition"),
+      by_component: countBy("component"),
+      by_branch: countBy("branch"),
+      concepts: 2, exclusions: includeExclusions ? 1 : 0,
+      exclusions_by_reason: includeExclusions ? { locale_prescreen_rejected: 1 } : {},
     },
-    digest_manifest: { accepted_total: 6, prescreen_rejected_items: 2 },
+    digest_manifest: { accepted_total: rows.length, prescreen_rejected_items: includeExclusions ? 2 : 0 },
   };
   const concepts = [
     { kind: "concept", iri: A, label: "Alpha", branch: "Status", existing_definition: "An alpha." },
@@ -48,6 +57,6 @@ export function bundleText({ excludedRowId = "x-ja" }: { excludedRowId?: string 
     kind: "exclusion", row_id: excludedRowId, iri: B, label: "Beta", branch: "Location",
     component: "translation:ja-jp", lang: "ja-jp", reason: "locale_prescreen_rejected", value: "ベータtest",
   };
-  return [header, ...concepts, ...rows.map((r) => ({ kind: "row", ...r })), exclusion]
+  return [header, ...concepts, ...rows.map((r) => ({ kind: "row", ...r })), ...(includeExclusions ? [exclusion] : [])]
     .map((r) => JSON.stringify(r)).join("\n") + "\n";
 }

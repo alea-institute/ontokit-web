@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "item": "ow-4",
+  "kind": "planned",
+  "stage": "plan",
+  "reviewed_at": "2026-10-26",
+  "plan": "docs/plans/2026-10-26-1247-feat-ow4-entity-source-preview-plan.md",
+  "plan_sha256": "cfe1f586d399de6c281160ce5d1aa63416c454a1a69aacba30eedb0efd66a62a",
+  "inspected_source_revision": "43783d39e37f43b222516f737c4cff6837e5c547",
+  "workflow": [
+    "ce-plan",
+    "ce-explain behavior trace",
+    "ce-noslop author pass",
+    "ce-doc-review mode:non-interactive",
+    "ce-commit"
+  ],
+  "confidence_check": {
+    "result": "passed",
+    "deepening_needed": false,
+    "basis": "Existing Developer layout, source ownership, exact statement utilities and source-navigation paths were inspected. Independent repository and source-flow research informed the plan before document review.",
+    "research_changes": [
+      "Bound the delivery to B27 excerpts, copy and line context; retain all eleven Phase17 requirements and deferred portions.",
+      "Keep detail forms mounted while previewing to preserve pending edits and avoid unmount-triggered saves.",
+      "Use exact statement offsets, preserve writer semantics and report unsupported attribution honestly.",
+      "Require source-readiness and effective branch/file scope so empty, loading and stale snapshots cannot be confused."
+    ]
+  },
+  "document_review": {
+    "status": "complete",
+    "mode": "non-interactive",
+    "model": "gpt-6-astra",
+    "coverage": [
+      "coherence",
+      "feasibility",
+      "design-lens",
+      "product-lens",
+      "scope-guardian"
+    ],
+    "cross_model_review": {
+      "status": "disabled_by_checkout_config",
+      "external_provider_invoked": false,
+      "whole_document_peer_sweep": "not_run"
+    },
+    "original_evidence": [
+      {
+        "reviewer": "coherence",
+        "findings": [],
+        "residual_risks": [],
+        "deferred_questions": []
+      },
+      {
+        "reviewer": "feasibility",
+        "findings": [],
+        "residual_risks": [],
+        "deferred_questions": []
+      },
+      {
+        "reviewer": "design-lens",
+        "findings": [],
+        "residual_risks": [],
+        "deferred_questions": []
+      },
+      {
+        "reviewer": "product-lens",
+        "findings": [],
+        "residual_risks": [],
+        "deferred_questions": []
+      },
+      {
+        "reviewer": "scope-guardian",
+        "findings": [],
+        "residual_risks": [],
+        "deferred_questions": []
+      }
+    ],
+    "resolved_result": {
+      "fixes_applied": 0,
+      "proposed_fixes_count": 0,
+      "decisions_count": 0,
+      "fyi_count": 0,
+      "retained_findings": [],
+      "dismissed_findings": [],
+      "actual_edits": [],
+      "disposition": "All five reviews completed without findings; no review correction was required."
+    }
+  },
+  "document_integrity": {
+    "ledger_ids": "B01-B75 retained exactly once in order",
+    "area_dispositions": 12,
+    "historical_phase17_requirements": 11,
+    "plan_local_links": "resolved",
+    "machine_local_paths": "none in plan or roadmap"
+  },
+  "verification_limits": {
+    "application_tests": "not_run_plan_stage",
+    "build": "not_run_plan_stage",
+    "browser_screenshots": "not_run_plan_stage_no_frontend_change",
+    "hosted_acceptance": "not_claimed",
+    "remote_branch_state": "not_available_isolated_clone",
+    "chief_campaign_source": "not_mounted; controller compares the Goal Capsule and cited R-IDs before build dispatch",
+    "api_contract_state": "not_available; selected source-preview slice requires no new API contract"
+  },
+  "handoff": {
+    "next_action": "Controller dispatches the build stage with lfg on this plan; publication remains controller-owned.",
+    "branch": "drawdown/ow-4",
+    "new_user_decisions": [],
+    "implementation_started": false
+  }
+}
