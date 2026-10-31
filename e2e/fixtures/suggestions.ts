@@ -3,9 +3,11 @@
 import { test as base, expect, type APIRequestContext, type Page, type PlaywrightWorkerArgs } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import {recordResource} from "../../scripts/e2e/hosted-resources.mjs";
 import { SUGGESTION_CASES } from "../../scripts/e2e/evidence.mjs";
-import { loadSession, saveAuthenticatedPersona } from "./auth";
-import { loadSuggestionsRun, type SuggestionPersona, type SuggestionsRunConfig } from "./run";
+import { finishSuggestionResources } from "./suggestion-resources";
+import { loadSession, saveAuthenticatedPersona, type Session } from "./auth";
+import { authPath, sessionPath, loadSuggestionsRun, type SuggestionPersona, type SuggestionsRunConfig } from "./run";
 
 const PERSONAS: SuggestionPersona[] = ["owner", "suggester", "editor", "unrelated"];
 const apiPersonas = new WeakMap<APIRequestContext, SuggestionPersona>();
@@ -18,8 +20,22 @@ interface SuggestionFixtures {
 }
 interface SuggestionWorkers { suggestionsRun: SuggestionsRunConfig }
 function personaApi(persona: SuggestionPersona) {
-  return async ({playwright, run}: {playwright: PlaywrightWorkerArgs["playwright"]; run: SuggestionsRunConfig}, provide: (api: APIRequestContext) => Promise<void>) => {
-    const session = await loadSession(run, persona);
+  return async ({playwright, browser, run}: {playwright: PlaywrightWorkerArgs["playwright"]; browser: PlaywrightWorkerArgs["browser"]; run: SuggestionsRunConfig}, provide: (api: APIRequestContext) => Promise<void>) => {
+    let session = await loadSession(run, persona);
+    if (run.hosted) {
+      // Long observations may outlive the setup bearer. Let Auth.js renew through
+      // the genuine browser session before constructing this test's API client.
+      const context = await browser.newContext({storageState: authPath(run, persona)});
+      try {
+        const page = await context.newPage();
+        const response = page.waitForResponse(r => r.url() === `${run.web}/api/auth/session` && r.request().method() === "GET");
+        await page.goto(`${run.web}/`);
+        session = await (await response).json() as Session;
+        expect(Boolean(session?.accessToken && !session.error && session.user?.id === run.users[persona].id)).toBe(true);
+        await context.storageState({path: authPath(run, persona)});
+        await fs.writeFile(sessionPath(run, persona), JSON.stringify(session), {mode: 0o600});
+      } finally { await context.close(); }
+    }
     const api = await playwright.request.newContext({baseURL: run.api, extraHTTPHeaders: {Authorization: `Bearer ${session.accessToken}`}});
     apiPersonas.set(api, persona);
     try { await provide(api); } finally { apiPersonas.delete(api); await api.dispose(); }
@@ -30,12 +46,12 @@ export const test = base.extend<SuggestionFixtures, SuggestionWorkers>({
   suggestionsRun: [async ({browser}, provide) => {
     const run = loadSuggestionsRun();
     const authDir = path.join(run.dir, "auth");
-    await fs.mkdir(authDir, {mode: 0o700});
+    await fs.mkdir(authDir, {mode: 0o700, recursive: true});
     try {
       for (const persona of PERSONAS) await saveAuthenticatedPersona(browser, run, persona);
       await provide(run);
     } finally {
-      await fs.rm(authDir, {recursive: true, force: true});
+      await finishSuggestionResources(run, () => fs.rm(authDir, {recursive: true, force: true}));
     }
   }, {scope: "worker", timeout: 360_000}],
   run: async ({suggestionsRun}, provide) => { await provide(suggestionsRun); },
@@ -51,9 +67,19 @@ export async function addSuggestionMembers(ownerApi: APIRequestContext, run: Sug
   for (const role of ["suggester", "editor"] as const) {
     const response = await ownerApi.post(`/api/v1/projects/${projectId}/members`, {data: {user_id: run.users[role].id, role}});
     expect(response.status(), `add ${role} membership`).toBe(201);
-    const member = await response.json() as {user_id: string; role: string};
+    const member = await response.json() as {id: string; user_id: string; role: string};
+    await recordResource(run, {event: "project-membership", projectId, id: member.id, role});
     expect(member.user_id).toBe(run.users[role].id);
     expect(member.role).toBe(role);
+  }
+  if (run.hosted) {
+    const response = await ownerApi.get(`/api/v1/projects/${projectId}/members`);
+    expect(response.status()).toBe(200);
+    const members = await response.json() as {items: {user_id: string; role: string}[]};
+    for (const role of ["owner", "suggester", "editor"] as const) {
+      expect(members.items.some(m => m.user_id === run.users[role].id && m.role === role)).toBe(true);
+    }
+    expect(members.items.some(m => m.user_id === run.users.unrelated.id)).toBe(false);
   }
 }
 
@@ -90,7 +116,8 @@ export { expect };
  * Shared UI path for authenticated suggestions and optional-mode proposals. `timeout`
  * bounds the save round trip; real ontologies need minutes, not the action default.
  */
-export async function saveExistingLabel(page: Page, apiOrigin: string, projectId: string, label: string, anonymous = false, timeout?: number) {
+export async function saveExistingLabel(page: Page, apiOrigin: string, projectId: string, label: string, anonymous = false, timeout?: number,
+  observeSession?: (sessionId: string) => Promise<void>) {
   const prefix = `/api/v1/projects/${projectId}/suggestions/${anonymous ? "anonymous/" : ""}sessions/`;
   const input = page.getByPlaceholder("Label text", {exact: true});
   await expect(input).toHaveCount(1);
@@ -103,11 +130,13 @@ export async function saveExistingLabel(page: Page, apiOrigin: string, projectId
       && new URL(r.url()).pathname.endsWith("/save") && r.request().method() === "PUT", {timeout}),
     save.click(),
   ]);
+  const sessionId = new URL(response.url()).pathname.slice(prefix.length, -"/save".length);
+  await observeSession?.(sessionId);
   expect(response.status()).toBe(200);
   const result = await response.json() as {branch: string; changes_count: number};
   expect(result.changes_count).toBeGreaterThan(0);
   await expect(page.getByRole("status").filter({hasText: /^Saved/})).toBeVisible({timeout});
-  return {sessionId: new URL(response.url()).pathname.slice(prefix.length, -"/save".length), branch: result.branch};
+  return {sessionId, branch: result.branch};
 }
 
 /** Each project has one submission, identified by its unique edited label. */
