@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { hostedRunDir } from "../../scripts/rehearsal/disposition.mjs";
 import { randomBytes } from "node:crypto";
 
 export type Persona = "owner" | "unrelated";
@@ -159,7 +160,9 @@ export function loadRunConfig(): AnyRunConfig {
   const stat = fs.lstatSync(file);
   if (!stat.isFile() || stat.isSymbolicLink() || (stat.mode & 0o077) !== 0 || stat.uid !== process.getuid?.()) throw new Error("Unsafe private E2E config");
   const run = JSON.parse(fs.readFileSync(file, "utf8")) as AnyRunConfig;
-  const expected = `/tmp/ontokit-e2e-${process.getuid?.()}/${run.id}`;
+  const expected = run.profile === "rehearsal" && run.rehearsal?.target === "hosted"
+    ? hostedRunDir(run.id)
+    : `/tmp/ontokit-e2e-${process.getuid?.()}/${run.id}`;
   if (!RUN_ID.test(run.id) || run.id !== process.env.ONTOKIT_E2E_RUN || run.dir !== expected || path.dirname(file) !== expected) throw new Error("E2E config does not belong to this invocation");
   if (run.profile === "rehearsal") {
     validateRehearsalRun(run);

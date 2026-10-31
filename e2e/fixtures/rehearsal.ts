@@ -5,6 +5,7 @@
 import { test as base, expect, type APIRequestContext, type Page, type PlaywrightWorkerArgs } from "@playwright/test";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { importWithJournal, teardownRehearsal } from "../../scripts/rehearsal/disposition.mjs";
 import { loadSession, saveAuthenticatedPersona } from "./auth";
 import { projectsPath, readSource } from "./projects";
 import { loadRehearsalRun, authPath, type RehearsalPersona, type RehearsalRunConfig, type RehearsalTarget } from "./run";
@@ -34,7 +35,7 @@ async function personaContext(playwright: PlaywrightWorkerArgs["playwright"], ru
   return playwright.request.newContext({baseURL: run.api, timeout: IMPORT_TIMEOUT, extraHTTPHeaders: {Authorization: `Bearer ${session.accessToken}`}});
 }
 
-async function importProject(api: APIRequestContext, run: RehearsalRunConfig, key: "folio" | "catholicCtt", name: string): Promise<RehearsalProject> {
+async function importProjectRequest(api: APIRequestContext, run: RehearsalRunConfig, key: "folio" | "catholicCtt", name: string): Promise<RehearsalProject> {
   const file = run.rehearsal.sources[key];
   const response = await api.post(`${projectsPath}/import`, {timeout: IMPORT_TIMEOUT, multipart: {
     name, description: `ontokit-e2e-run:${run.id}:rehearsal:${key}`, is_public: "true",
@@ -43,6 +44,11 @@ async function importProject(api: APIRequestContext, run: RehearsalRunConfig, ke
   expect(response.status(), `import ${key}`).toBe(201);
   const {id} = await response.json() as {id: string};
   return {id, name};
+}
+
+async function importProject(api: APIRequestContext, run: RehearsalRunConfig, key: "folio" | "catholicCtt", name: string): Promise<RehearsalProject> {
+  const request = () => importProjectRequest(api, run, key, name);
+  return run.rehearsal.target === "hosted" ? importWithJournal(run, key, request) : request();
 }
 
 async function waitForIndex(api: APIRequestContext, id: string) {
@@ -85,19 +91,8 @@ export const test = base.extend<RehearsalFixtures, RehearsalWorker>({
       }
       await provide({run, folio, catholic});
     } finally {
-      // Exact-ID teardown of what this run created; isolated volume cleanup still follows.
-      // Attempt every delete before asserting, so one failure never strands the other copy.
-      const failures: string[] = [];
-      if (owner) {
-        for (const id of created) {
-          try {
-            const status = (await owner.delete(`${projectsPath}/${id}`)).status();
-            if (![204, 404].includes(status)) failures.push(`${id}: ${status}`);
-          } catch { failures.push(`${id}: request failed`); }
-        }
-        await owner.dispose();
-      }
-      await fs.rm(authDir, {recursive: true, force: true});
+      // Hosted copies and auth artifacts remain recoverable; isolated teardown is unchanged.
+      const failures = await teardownRehearsal({run, owner, created});
       expect(failures, "Exact-ID rehearsal project teardown").toEqual([]);
     }
   }, {scope: "worker", timeout: SETUP_TIMEOUT}],

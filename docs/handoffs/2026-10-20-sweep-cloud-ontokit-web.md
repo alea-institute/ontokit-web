@@ -149,7 +149,24 @@ All three runs used API `dev` `c682a2f2`.
      code changes.
    - Questions 1 (CTT namespace) and 2 (CTT quotations) remain open with Damien.
 
-## Steps that need the home box or credentials
+## Hosted continuation — 2026-10-26
+
+The original hosted command and deletion instructions below are superseded by the
+[ow-1 continuation plan](../plans/2026-10-26-0932-fix-ow-1-dev-rehearsal-plan.md),
+[current controller run protocol](../../e2e/README.md#baif-rehearsal-profile-folio-catholic-os-and-ctt)
+and [outcome note](../plans/evidence/ow-1-dev-rehearsal.md).
+The hosted runner now retains project copies and private artifacts by default, journals
+uncertain imports, and requires controller-issued DEV runtime observations before and
+after the four-case rehearsal. It distinguishes runner checkout identity from deployment
+identity. A real DEV run is still required; synthetic test results are not hosted acceptance.
+
+The controller owns verification of ordinary personas, the current DEV pair and source
+cache, any prerequisite API deployment work, and execution outside the worker sandbox.
+Reconcile the old persona and MinIO findings against current deployment evidence before
+acting on them. No new authorization or decision is requested from Damien by this item.
+The CTT questions above remain outside ow-1.
+
+## Historical execution instructions (superseded)
 
 1. **Provision three verified DEV personas** (steward/owner, contributor/suggester,
    reviewer/editor). This is the same blocker and the same ask as D10
@@ -174,10 +191,10 @@ All three runs used API `dev` `c682a2f2`.
    npm run rehearsal:hosted -- --target /absolute/path/to/that-file.json
    ```
    - The run imports two run-tagged public projects of about 18 MB and 8 MB on DEV, and
-     deletes them at the end.
+     formerly deleted them at the end; the current runner retains them.
    - It writes `.e2e-runs/receipts/hosted-<id>.json` with
-     `acceptance.scope: hosted-rehearsal`. Copy that receipt into `docs/releases/` with a
-     short readiness note.
+     `acceptance.scope: hosted-rehearsal`. Current accepted evidence belongs under
+     `docs/plans/evidence/`, using the protocol linked above.
    - The sign-in step expects the Zitadel Login v2 UI test IDs the isolated stack uses. If
      DEV's login UI differs, the first case fails at sign-in. Adjust
      `e2e/fixtures/auth.ts` `enterProviderCredentials`.
