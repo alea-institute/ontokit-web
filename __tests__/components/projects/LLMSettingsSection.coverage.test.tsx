@@ -236,6 +236,20 @@ describe("LLM settings through the real hook, API client, and BYO store", () => 
     expect(screen.queryByText("Key valid")).toBeNull();
   });
 
+  it("cancels the saved-message timer on unmount", async () => {
+    setup(); await ready();
+    vi.useFakeTimers();
+    const set = vi.spyOn(globalThis, "setTimeout");
+    const clear = vi.spyOn(globalThis, "clearTimeout");
+    change("API Key", "synthetic-unmount");
+    await act(async () => { save(); await vi.advanceTimersByTimeAsync(20); });
+    expect(screen.getByText("AI settings saved.")).toBeTruthy();
+    const messageTimers = set.mock.calls.flatMap((call, i) => (call[1] === 3000 ? [set.mock.results[i].value] : []));
+    expect(messageTimers).toHaveLength(1);
+    cleanup();
+    expect(clear.mock.calls.map(call => call[0])).toContain(messageTimers[0]);
+  });
+
   it("disables duplicate saves while validation and persistence are pending", async () => {
     let resolveConnection!: (response: Response) => void;
     let resolveSave!: (response: Response) => void;
