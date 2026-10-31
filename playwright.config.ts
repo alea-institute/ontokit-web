@@ -10,6 +10,8 @@ const run = loadRunConfig();
 if (run.profile === "suggestions" && run.hosted) throw new Error("Use the hosted Playwright configuration");
 export default defineConfig({
   testDir: "./e2e",
+  // Synthetic page proof runs only through playwright.ui.config.ts.
+  testIgnore: ["**/ui/**"],
   outputDir: path.join(run.dir, "test-results"),
   forbidOnly: true,
   fullyParallel: false,
@@ -27,5 +29,8 @@ export default defineConfig({
     screenshot: "off",
     video: "off",
   },
-  projects: playwrightProjects(run.profile),
+  projects: playwrightProjects(run.profile).map(project => ({
+    ...project,
+    testIgnore: [...("testIgnore" in project ? project.testIgnore ?? [] : []), "**/ui/**"],
+  })),
 });

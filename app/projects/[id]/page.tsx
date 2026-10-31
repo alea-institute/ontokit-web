@@ -353,6 +353,9 @@ function ViewerContent({
                   navigateToNode={navigateToNode}
                   entityNavigationRef={entityNavigationRef}
                   sourceContent={sourceContent}
+                  sourceFilePath={project?.git_ontology_path}
+                  sourceScope={viewer.sourceScope}
+                  isSourceReady={viewer.isSourceReady}
                   setSourceContent={setSourceContent as (content: string | ((prev: string) => string)) => void}
                   isLoadingSource={isLoadingSource}
                   sourceError={sourceError}

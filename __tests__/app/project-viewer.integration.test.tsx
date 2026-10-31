@@ -119,6 +119,34 @@ afterEach(() => {
 });
 
 describe("Project viewer route through real providers and API", () => {
+  it("copies the known ontology path from the read-only entity preview", async () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, "clipboard");
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    try {
+      projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", git_ontology_path: "sources/folio.ttl", user_role: null, is_public: true };
+      mount(); fireEvent.click(await screen.findByText("Person"));
+      fireEvent.mouseDown(screen.getByRole("tab", { name: "Entity source" }), { button: 0, ctrlKey: false });
+      fireEvent.click(await screen.findByRole("button", { name: "Copy snippet" }));
+      await screen.findByText("Snippet copied");
+      expect(writeText).toHaveBeenCalledWith('# File: sources/folio.ttl, line 2\nex:Person a <http://www.w3.org/2002/07/owl#Class> .');
+      expect(requests.every(request => request.method === "GET")).toBe(true);
+    } finally {
+      if (original) Object.defineProperty(navigator, "clipboard", original);
+      else Reflect.deleteProperty(navigator, "clipboard");
+    }
+  });
+
+  it("recognizes a successfully loaded empty source in the read-only preview", async () => {
+    sourceContent = "";
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", git_ontology_path: "ontology.ttl", user_role: null, is_public: true };
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Entity source" }), { button: 0, ctrlKey: false });
+    await screen.findByText("No direct statements available");
+    expect(requests.filter(request => request.path.endsWith("/revisions/file"))).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "Copy snippet" })).toBeNull();
+  });
+
   it("shows a private project sign-in action after an anonymous 403", async () => {
     // Required mode always runs with a provider (lib/env.ts enforces it).
     vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "true");

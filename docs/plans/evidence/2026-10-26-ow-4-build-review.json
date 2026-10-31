@@ -1,0 +1,86 @@
+{
+  "run_id": "ow4-20261026",
+  "reviewed_base": "50b27b3d",
+  "correction_commit": "9815250e",
+  "reviewers": [
+    "correctness",
+    "testing",
+    "project-standards",
+    "maintainability",
+    "performance",
+    "reliability",
+    "adversarial",
+    "julik-frontend-races"
+  ],
+  "original_verdict": "Ready with fixes",
+  "validator_counts": {
+    "confirmed": 5,
+    "rejected": 0,
+    "unresolved": 0
+  },
+  "findings": [
+    {
+      "id": 1,
+      "severity": "P2",
+      "title": "Reject merged statements before attributing an excerpt",
+      "file": "lib/ontology/entitySource.ts",
+      "confidence": 100,
+      "validation": "confirmed",
+      "resolution": "corrected in 9815250e; regression coverage added"
+    },
+    {
+      "id": 2,
+      "severity": "P2",
+      "title": "Reset request markers when revisiting a source scope",
+      "file": "components/editor/developer/DeveloperEditorLayout.tsx",
+      "confidence": 75,
+      "validation": "confirmed",
+      "resolution": "corrected in 9815250e; regression coverage added"
+    },
+    {
+      "id": 3,
+      "severity": "P2",
+      "title": "Read-only viewers copy snippets without the known source filename",
+      "file": "components/editor/developer/DeveloperEditorLayout.tsx",
+      "confidence": 75,
+      "validation": "confirmed",
+      "resolution": "corrected in 9815250e; regression coverage added"
+    },
+    {
+      "id": 4,
+      "severity": "P2",
+      "title": "Entity selection rescans megabytes during React render",
+      "file": "components/editor/EntitySourcePreview.tsx",
+      "confidence": 75,
+      "validation": "confirmed",
+      "resolution": "corrected in 9815250e; regression coverage added"
+    },
+    {
+      "id": 5,
+      "severity": "P2",
+      "title": "Invalidate the IRI index with the source scope",
+      "file": "lib/hooks/useProjectViewer.ts",
+      "confidence": 75,
+      "validation": "confirmed",
+      "resolution": "corrected in 9815250e; regression coverage added"
+    }
+  ],
+  "followup": "Read-only correctness probes confirmed original and compact numeric/boolean attribution cases, ordinary literals, declaration ordering, preview cancellation and source epoch ownership after corrections. No remaining defect identified in the corrected scope.",
+  "cross_model": "Disabled by checkout configuration; local adversarial review ran. Campaign Astra/Fable gate remains with controller.",
+  "open_acceptance_gates": [
+    "Real Playwright page assertions and committed light/dark screenshots: Chrome cannot create required Unix socket in this sandbox.",
+    "Compatible API full-stack workflow regression and hosted acceptance remain unverified."
+  ],
+  "verification_receipt": "docs/plans/evidence/2026-10-26-ow-4-source-preview-readiness.md",
+  "final_checks": {
+    "full_suite": {
+      "command": "npm run test -- --run --maxWorkers=4",
+      "files_passed": 373,
+      "tests_passed": 5589
+    },
+    "type_check": "passed",
+    "lint": "0 errors, 21 existing warnings; final changed-file checks passed",
+    "production_build": "passed with synthetic local configuration",
+    "playwright_screenshots": "not captured; sandbox denies required Unix socket"
+  }
+}
