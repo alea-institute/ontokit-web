@@ -46,7 +46,8 @@ async function searchAndSelect(page: Page, query: string, target: RehearsalTarge
   await expect(hit).toBeVisible({timeout: 60_000});
   await hit.click();
   await expect(hit).toHaveAttribute("aria-selected", "true");
-  await expect(page).toHaveURL(new RegExp(encodeURIComponent(target.iri)));
+  const encodedIri = encodeURIComponent(target.iri);
+  await expect(page).toHaveURL(url => url.toString().includes(encodedIri));
 }
 async function labelInput(page: Page, value: string) {
   const input = page.getByPlaceholder("Label text", {exact: true});
