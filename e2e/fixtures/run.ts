@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { validateTarget } from "../../scripts/e2e/hosted-suggestions-contract.mjs";
 import { hostedRunDir } from "../../scripts/rehearsal/disposition.mjs";
 import { randomBytes } from "node:crypto";
 
@@ -28,6 +29,7 @@ export interface RunConfig extends RunBase {
 }
 export interface SuggestionsRunConfig extends RunBase {
   profile: "suggestions";
+  hosted?: ReturnType<typeof validateTarget>["hosted"];
   users: Record<SuggestionPersona, RunUser>;
 }
 /** One class the rehearsal edits or inspects, as `scripts/rehearsal/sources.mjs` pins it. */
@@ -164,6 +166,13 @@ export function loadRunConfig(): AnyRunConfig {
     ? hostedRunDir(run.id)
     : `/tmp/ontokit-e2e-${process.getuid?.()}/${run.id}`;
   if (!RUN_ID.test(run.id) || run.id !== process.env.ONTOKIT_E2E_RUN || run.dir !== expected || path.dirname(file) !== expected) throw new Error("E2E config does not belong to this invocation");
+  if (run.profile === "suggestions" && run.hosted) {
+    // Preflight freshness is checked by the launcher. Long-running workers still
+    // validate the original attestation shape without inventing a newer timestamp.
+    validateTarget(run, Date.parse(run.hosted.runtime.observedAt));
+    if (process.env.ONTOKIT_E2E_HOSTED !== "suggestions") throw new Error("Hosted suggestions require the dedicated runner");
+    return run;
+  }
   if (run.profile === "rehearsal") {
     validateRehearsalRun(run);
     return run;

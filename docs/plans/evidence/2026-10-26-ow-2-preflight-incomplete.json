@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "kind": "hosted-suggestions",
+  "run": "301ac0d7639bc37526ef0528c2765cc0",
+  "startedAt": "2026-10-26T16:02:46.001Z",
+  "finishedAt": "2026-10-26T16:02:46.012Z",
+  "runner": {
+    "revision": "48442718ae915272780176b08f019df5ea788bba",
+    "dirty": false
+  },
+  "runtimeBefore": null,
+  "runtimeAfter": null,
+  "status": "preflight-incomplete",
+  "failure": "HOSTED_PRIVATE_INPUT",
+  "tests": null,
+  "outcomes": [
+    {
+      "file": "browser/suggestions.spec.ts",
+      "title": "suggester edits an existing class label, saves and submits for owner triage",
+      "project": "suggestions",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/suggestions.spec.ts",
+      "title": "owner approval merges the label, removes the session branch and notifies the suggester",
+      "project": "suggestions",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/suggestions.spec.ts",
+      "title": "requested changes notify the suggester who resumes and resubmits revision two on the same pull request for owner approval and merge",
+      "project": "suggestions",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/suggestions.spec.ts",
+      "title": "editor rejection closes the pull request and notifies the suggester",
+      "project": "suggestions",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/suggestions.spec.ts",
+      "title": "private non-member create and untrusted entity mint are refused by the API",
+      "project": "suggestions",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/suggestions.spec.ts",
+      "title": "editor approval merges a suggestion through the suggestion review path",
+      "project": "suggestions",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/suggestions.spec.ts",
+      "title": "public non-member capabilities agree with session create and submission succeeds",
+      "project": "suggestions",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/hosted-personas.spec.ts",
+      "title": "owner completes interactive sign-in and federated sign-out",
+      "project": "hosted-personas",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/hosted-personas.spec.ts",
+      "title": "suggester completes interactive sign-in and federated sign-out",
+      "project": "hosted-personas",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/hosted-personas.spec.ts",
+      "title": "editor completes interactive sign-in and federated sign-out",
+      "project": "hosted-personas",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/hosted-personas.spec.ts",
+      "title": "unrelated completes interactive sign-in and federated sign-out",
+      "project": "hosted-personas",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/hosted-personas.spec.ts",
+      "title": "optional mode preserves public visibility and private isolation through sign-in",
+      "project": "hosted-personas",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/hosted-personas.spec.ts",
+      "title": "anonymous proposal reaches owner triage",
+      "project": "hosted-personas",
+      "outcome": "not-run"
+    },
+    {
+      "file": "browser/hosted-personas.spec.ts",
+      "title": "real elapsed authentication boundaries are observed or remain explicitly open",
+      "project": "hosted-personas",
+      "outcome": "not-run"
+    }
+  ],
+  "fixtures": {
+    "disposition": "retained",
+    "ledger": "owned-resources.jsonl",
+    "cleanupPerformed": false
+  },
+  "acceptance": {
+    "scope": "hosted-d08-d10",
+    "chainAccepted": false,
+    "hostedAcceptance": false
+  },
+  "expiry": {
+    "case": "expiry",
+    "renewal": "not-observed",
+    "refreshRecovery": "not-observed",
+    "cookieExpiry": "not-observed"
+  }
+}
