@@ -134,16 +134,81 @@ Catholic OS browsing with CTT terms marked uncalibrated, and a Catholic OS edit 
 merged. The receipt adds a `rehearsal` block: upstream commits and hashes, the merged-file
 hash, and the CTT build and counts. A run is never accepted without that block.
 
-The same spec runs against a serving host:
+The same spec runs against DEV through an authorized controller:
 
 ```sh
-npm run rehearsal:hosted -- --target /absolute/path/hosted-target.json
+npm run rehearsal:hosted -- --target "$ONTOKIT_REHEARSAL_TARGET" --runtime-evidence "$ONTOKIT_RUNTIME_EVIDENCE"
 ```
 
-The target file must be mode 0600 and hold HTTPS origins plus three existing persona
-accounts (see `scripts/rehearsal/hosted.mjs`). It writes
-`.e2e-runs/receipts/hosted-<id>.json` with `acceptance.scope: "hosted-rehearsal"`.
-The credentials never leave the private run directory, which is removed afterwards.
+Both arguments name absolute paths supplied by the controller. The target is a private,
+owned, nonsymlink file (mode 0600) containing HTTPS origins and three distinct existing
+ordinary persona accounts. Workers never receive that file. The runtime evidence directory
+contains only nonsecret deployment observations:
+
+- `selected.json`: `{ "run": "<fresh 32 lowercase hex characters>", "revisions": { "web": "<40 hex commit>", "api": "<40 hex commit>", "worker": "<40 hex commit>" } }`.
+- `before.json` and `after.json`: each follows the observation shape below. Obtain actual
+  service revisions from the existing deployment-status facility, independently of the
+  runner checkout. Hash the controller's nonsecret status evidence into `provenance.sha256`.
+
+```json
+{
+  "version": 1,
+  "environment": "dev",
+  "run": "<same run identity as selected.json>",
+  "phase": "before",
+  "host": { "web": "https://<DEV web origin>", "api": "https://<DEV API origin>" },
+  "observedAt": "<UTC timestamp, including milliseconds and Z>",
+  "revisions": { "web": "<40 hex commit>", "api": "<40 hex commit>", "worker": "<40 hex commit>" },
+  "provenance": { "source": "deployment-status", "sha256": "<64 hex digest>" }
+}
+```
+
+Prepare `before.json` within five minutes of execution. Watch the run's
+`.e2e-runs/retained/<id>/runtime-after-request.json`; after it appears, obtain a fresh
+status observation, set `phase` to `after`, and atomically publish `after.json` in the
+external evidence directory within 60 seconds. Its timestamp must be at or after the
+request's `notBefore`. Use a new evidence directory and run ID on each attempt so stale
+files cannot substitute for fresh observations. Both observations must match the selected
+web/API/worker revisions and target origins. They establish identity at those two points;
+proving no intervening deployment requires the controller's deployment record.
+
+Controllers with an existing status adapter can instead import `runHosted` from
+`scripts/rehearsal/hosted.mjs`, pass `runId` and `selectedRuntime`, and implement
+`observeRuntime({run, phase, host, notBefore, signal})` to return the same observation.
+There is no deployment endpoint, arbitrary command hook, or credential provisioning in
+this runner.
+
+The runner writes `.e2e-runs/receipts/hosted-<id>.json` (schema version 2). Its `runner`
+field identifies the checkout; `runtime` identifies the observed deployment. Acceptance
+requires the exact four mandatory cases passing once, no retries/skips/flakiness, pinned
+source evidence, matching runtime observations, and resolved resource disposition.
+Early preflight failures also save a sanitized failed receipt when storage is available.
+A failed receipt write exits unsuccessfully and does not claim a saved artifact. Browser
+console output, reports and credentials stay private; public failures use fixed categories.
+
+**Hosted resource retention:** two run-tagged public project copies remain on DEV. The
+append-only `.e2e-runs/retained/<id>/ownership.jsonl` records each full marker before import
+and returned project ID before membership/index work. A lost response remains uncertain;
+the controller must reconcile that exact marker before rerunning. Never infer that a
+failed HTTP response means no project exists. This runner issues no hosted project DELETE.
+
+Private artifacts remain under the owned mode-0700 `.e2e-runs/retained/<id>/private/`
+directory, outside temporary-run cleanup. Auth files are retained with the final report.
+An immutable, sanitized `outcome-before-disposition.json` lives beside the journal.
+The CLI always retains private artifacts. A controller may supply `verifyBackup` to
+`runHosted` only through its existing backup facility: it receives `{run, dir, sha256}` and
+must verify final artifact coverage before returning `{run, sha256, verified: true}`.
+The runner rechecks the fingerprint before removal. Missing, stale, mismatched, failed or
+changed backup coverage chooses verified retention; unsafe retention blocks acceptance.
+The journal and preliminary outcome survive private removal. A source export alone is
+not a backup of project metadata, memberships or review history. Retention is not complete
+cleanup; the controller owns later backup and disposition.
+
+Copy only the sanitized final receipt into
+`docs/plans/evidence/ow-1-dev-rehearsal-<run-id>.json` and update the
+[ow-1 outcome note](../docs/plans/evidence/ow-1-dev-rehearsal.md). Never commit the retained
+tree, target, raw report, status payload, auth files, or synthetic test receipts. Isolated
+rehearsals retain their existing cleanup contract and remain `local-verification` evidence.
 
 Behind an egress proxy or a TLS-inspecting gateway, the launcher passes only `HTTP(S)_PROXY`,
 `NO_PROXY` and `NODE_EXTRA_CA_CERTS` to owned commands. It never passes application settings.
