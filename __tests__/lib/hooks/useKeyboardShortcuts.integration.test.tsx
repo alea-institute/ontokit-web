@@ -8,6 +8,27 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 const shortcut = (action: () => void, extra: Partial<ShortcutDefinition> = {}): ShortcutDefinition => ({ id: 'save', key: 's', modifiers: { ctrl: true }, description: 'Save', category: 'Editing', action, ...extra });
 
 describe('keyboard shortcuts with real focus and dialog components', () => {
+  it.each(['input', 'textarea', 'select', 'contenteditable', 'monaco', 'dialog'] as const)('leaves a shifted question mark unconsumed in %s', context => {
+    const action = vi.fn();
+    function Consumer() {
+      useKeyboardShortcuts([shortcut(action, { id: 'help', key: '?', modifiers: undefined })]);
+      if (context === 'dialog') return <Dialog open><DialogContent aria-describedby={undefined}><DialogTitle>Settings</DialogTitle><button>Dialog control</button></DialogContent></Dialog>;
+      if (context === 'input') return <input aria-label="Editing" />;
+      if (context === 'textarea') return <textarea aria-label="Editing" />;
+      if (context === 'select') return <select aria-label="Editing"><option>Choose</option></select>;
+      if (context === 'monaco') return <div className="monaco-editor"><button aria-label="Editing">Source control</button></div>;
+      return <div contentEditable suppressContentEditableWarning tabIndex={0} aria-label="Editing">Draft</div>;
+    }
+    render(<Consumer />);
+    const editing = context === 'dialog' ? screen.getByRole('button', { name: 'Dialog control' }) : screen.getByLabelText('Editing');
+    if (context === 'contenteditable') Object.defineProperty(editing, 'isContentEditable', { configurable: true, value: true });
+    editing.focus();
+    const event = new KeyboardEvent('keydown', { key: '?', shiftKey: true, bubbles: true, cancelable: true });
+    fireEvent(editing, event);
+    expect(action).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
   it('suspends a global shortcut inside a real dialog and restores it after closing', () => {
     const action = vi.fn();
     function Consumer() {

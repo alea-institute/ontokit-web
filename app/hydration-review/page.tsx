@@ -17,7 +17,7 @@ export default function HydrationReviewPage() {
           <div className="mb-6">
             <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Hydration review</h1>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              Inspect, sample, classify and correct every proposed addition in a FOLIO write-back digest.
+              Review proposed FOLIO additions from a local bundle, then export your decisions.
             </p>
           </div>
           <HydrationReviewView />

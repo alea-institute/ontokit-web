@@ -18,7 +18,8 @@ export function RowTable({ rows, reviews, selectedId, onSelect }: RowTableProps)
     return <p className="p-4 text-sm text-slate-500">No rows match.</p>;
   }
   return (
-    <table className="w-full table-fixed text-left text-sm">
+    <div className="max-w-full overflow-x-auto">
+    <table className="w-full min-w-[36rem] table-fixed text-left text-sm">
       <thead className="text-xs uppercase text-slate-500">
         <tr>
           <th className="w-1/4 px-2 py-1">Concept</th>
@@ -39,7 +40,7 @@ export function RowTable({ rows, reviews, selectedId, onSelect }: RowTableProps)
             onClick={() => onSelect(row.row_id)}
           >
             <td className="truncate px-2 py-1.5">
-              <button type="button" className="text-left font-medium text-slate-900 hover:underline dark:text-white" onClick={() => onSelect(row.row_id)}>
+              <button type="button" className="max-w-full truncate text-left font-medium text-slate-900 hover:underline dark:text-white" title={row.label} onClick={() => onSelect(row.row_id)}>
                 {row.label}
               </button>
               <div className="truncate text-xs text-slate-500">{row.branch}</div>
@@ -56,5 +57,6 @@ export function RowTable({ rows, reviews, selectedId, onSelect }: RowTableProps)
         ))}
       </tbody>
     </table>
+    </div>
   );
 }

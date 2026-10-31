@@ -73,7 +73,10 @@ export function useKeyboardShortcuts(shortcuts: ShortcutDefinition[]): void {
         const wantsAlt = shortcut.modifiers?.alt ?? false;
 
         const ctrlMatch = wantsCtrl ? (e.ctrlKey || e.metaKey) : !(e.ctrlKey || e.metaKey);
-        const shiftMatch = wantsShift ? e.shiftKey : !e.shiftKey;
+        // '?' needs Shift on many keyboards. Match the produced character for
+        // help only; explicit modifier requirements keep their usual meaning.
+        const helpCharacter = shortcut.id === "help" && shortcut.key === "?" && shortcut.modifiers?.shift === undefined;
+        const shiftMatch = helpCharacter || (wantsShift ? e.shiftKey : !e.shiftKey);
         const altMatch = wantsAlt ? e.altKey : !e.altKey;
 
         // Check key
