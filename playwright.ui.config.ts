@@ -12,14 +12,16 @@ const port = existingURL ? null : Number(process.env.OW4_UI_PORT || execFileSync
 `], { encoding: "utf8" }).trim());
 // Workers reload this configuration; they must use the parent's server port.
 if (port !== null) process.env.OW4_UI_PORT = String(port);
-const baseURL = existingURL || `http://127.0.0.1:${port}`;
+// Next dev serves its chunks only to its default dev origin (localhost); a
+// 127.0.0.1 page origin is treated as cross-origin and never hydrates.
+const baseURL = existingURL || `http://localhost:${port}`;
 if (!["127.0.0.1", "localhost"].includes(new URL(baseURL).hostname)) {
   throw new Error("OW4_UI_BASE_URL must identify a local synthetic-data server");
 }
 
 export default defineConfig({
   testDir: "./e2e/ui",
-  testMatch: "entity-source-preview.spec.ts",
+  testMatch: ["entity-source-preview.spec.ts", "entity-source-preview-evidence.spec.ts"],
   outputDir: "test-results/ow4-ui",
   forbidOnly: true,
   fullyParallel: false,
