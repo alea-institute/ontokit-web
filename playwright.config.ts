@@ -5,8 +5,9 @@ import { playwrightProjects } from "./scripts/e2e/auth-modes.mjs";
 
 // Profiles run on separate fresh stacks (KTD1). Projects come from the profile
 // registry (KTD7): each non-baseline profile discovers only its own spec, and the
-// baseline project ignores every spec another profile owns.
+// baseline project ignores every spec another profile or the hosted config owns.
 const run = loadRunConfig();
+if (run.profile === "suggestions" && run.hosted) throw new Error("Use the hosted Playwright configuration");
 export default defineConfig({
   testDir: "./e2e",
   // Synthetic page proof runs only through playwright.ui.config.ts.

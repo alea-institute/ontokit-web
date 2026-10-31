@@ -1,0 +1,179 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {validateTarget, validateRuntimeAfter, validateHostedReport, HOSTED_CASES} from './hosted-suggestions-contract.mjs';
+import {SUGGESTION_CASES} from './evidence.mjs';
+import {mkdtemp, writeFile, readFile, stat, symlink, chmod} from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {runHosted, readPrivateJson} from './hosted-suggestions.mjs';
+import {recordResource} from './hosted-resources.mjs';
+import {spawnSync} from 'node:child_process';
+
+export function syntheticTarget(now = Date.now()) {
+  return {
+    web: 'https://web.example.test', api: 'https://api.example.test', issuer: 'https://id.example.test', login: 'https://login.example.test',
+    users: Object.fromEntries(['owner', 'suggester', 'editor', 'unrelated'].map((p, i) => [p, {id: `${i + 1}`, email: `${p}@example.test`, password: 'synthetic-password'}])),
+    hosted: {
+      version: 1, retain: true, observationWindowSeconds: 60,
+      runtime: {observedAt: new Date(now).toISOString(), webOrigin: 'https://web.example.test', apiOrigin: 'https://api.example.test', web: 'a'.repeat(40), api: 'b'.repeat(40), worker: 'b'.repeat(40),
+        authModes: {web: {mode: 'optional', providerConfigured: true}, api: {mode: 'optional', providerConfigured: true}}},
+      ordinaryPersonas: Object.fromEntries(['owner', 'suggester', 'editor', 'unrelated'].map((p, i) => [p, {subject: `${i + 1}`, nonAdministrative: true}])),
+      noBilling: {import: true, index: true, save: true, submit: true},
+      refreshIdleSeconds: 86400, refreshAbsoluteSeconds: 172800,
+    },
+  };
+}
+export function syntheticReport() {
+  const specs = SUGGESTION_CASES.filter(c => c.profile === 'suggestions').map(c => ({file: 'browser/suggestions.spec.ts', title: c.title, project: 'suggestions',
+    annotations: c.probes.map(p => ({type: 'mode-evidence', description: JSON.stringify(p)}))}));
+  specs.push(...HOSTED_CASES.map(c => ({file: 'browser/hosted-personas.spec.ts', title: c.title, project: 'hosted-personas',
+    annotations: [{type: 'hosted-evidence', description: JSON.stringify(c.proof)}]})));
+  return {errors: [], stats: {expected: specs.length, unexpected: 0, skipped: 0, flaky: 0}, suites: [{specs: specs.map(({file, title, project, annotations}) => ({file, title, ok: true, tests: [{projectName: project, status: 'expected', expectedStatus: 'passed', annotations, results: [{status: 'passed', retry: 0, errors: []}]}]}))}]};
+}
+test('hosted preflight requires four distinct attested ordinary identities and non-billing optional mode', () => {
+  assert.equal(validateTarget(syntheticTarget()).hosted.runtime.api, 'b'.repeat(40));
+  for (const mutate of [t => delete t.users.editor, t => t.users.editor.id = '1', t => t.hosted.ordinaryPersonas.owner.nonAdministrative = false,
+    t => delete t.hosted.noBilling.index, t => t.hosted.runtime.authModes.api.mode = 'required', t => t.hosted.runtime.worker = 'c'.repeat(40),
+    t => t.hosted.runtime.observedAt = '2020-01-01T00:00:00.000Z', t => t.web = 'https://user:sentinel@web.example.test/path',
+    t => t.api = 'https://127.1', t => t.hosted.retain = false]) {
+    const target = syntheticTarget(); mutate(target);
+    assert.throws(() => validateTarget(target), /^Error: HOSTED_[A-Z_]+$/);
+  }
+});
+test('runtime after must follow execution, match deployed pair and never substitute runner HEAD', () => {
+  const target = validateTarget(syntheticTarget());
+  const after = {...target.hosted.runtime, webOrigin: target.web, apiOrigin: target.api, observedAt: new Date().toISOString()};
+  assert.doesNotThrow(() => validateRuntimeAfter(target, after, Date.parse(after.observedAt)));
+  assert.throws(() => validateRuntimeAfter(target, {...after, web: 'c'.repeat(40)}, 0));
+  assert.throws(() => validateRuntimeAfter(target, after, Date.now() + 1000));
+});
+test('hosted inventory preserves all seven journeys and rejects omissions, retries, skips and wrong profiles', () => {
+  const report = syntheticReport();
+  const result = validateHostedReport(report);
+  assert.equal(result.suggestions.passed, 7);
+  assert.equal(result.personas.length, HOSTED_CASES.length);
+  for (const mutate of [r => r.suites[0].specs.pop(), r => r.suites[0].specs.push(r.suites[0].specs[0]),
+    r => r.suites[0].specs[0].tests[0].results[0].retry = 1, r => r.stats.skipped = 1,
+    r => r.suites[0].specs[0].tests[0].projectName = 'baseline', r => r.suites[0].specs[0].tests[0].annotations = [],
+    r => r.suites[0].specs[7].tests[0].annotations = []]) {
+    const candidate = structuredClone(report); mutate(candidate);
+    assert.throws(() => validateHostedReport(candidate));
+  }
+});
+test('untrusted report details cannot enter public case facts', () => {
+  const report = syntheticReport();
+  report.secret = 'sentinel-private-person';
+  report.suites[0].specs[0].tests[0].results[0].stdout = [{text: 'sentinel-private-person'}];
+  assert.ok(!JSON.stringify(validateHostedReport(report)).includes('sentinel'));
+});
+const healthy = async () => ({ok: true, json: async () => ({zitadel: {}})});
+async function targetFile(target) {
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'ow2-synthetic-'));
+  const file = path.join(dir, 'target.json');
+  await writeFile(file, JSON.stringify(target), {mode: 0o600});
+  return file;
+}
+test('missing prerequisites produce a fixed incomplete receipt before any network or browser call', async () => {
+  let called = false;
+  const {receipt} = await runHosted({fetchImpl: async () => {called = true;}, runPlaywright: async () => {called = true;}});
+  assert.equal(called, false);
+  assert.equal(receipt.status, 'preflight-incomplete');
+  assert.equal(receipt.tests, null);
+  assert.equal(receipt.acceptance.chainAccepted, false);
+});
+test('failed or interrupted child preserves the fsynced ledger without publishing private errors', async () => {
+  for (const interrupted of [false, true]) {
+    const abort = new AbortController();
+    let dir;
+    const {receipt} = await runHosted({targetFile: await targetFile(syntheticTarget()), fetchImpl: healthy, signal: abort.signal,
+      runPlaywright: async (env, options) => {
+        dir = options.dir;
+        const run = JSON.parse(await readFile(env.ONTOKIT_E2E_CONFIG, 'utf8'));
+        await recordResource(run, {event: 'project-created', id: 'synthetic-project', marker: `ontokit-e2e-run:${run.id}`});
+        if (interrupted) abort.abort();
+        throw new Error('sentinel-secret-person');
+      }});
+    assert.equal(receipt.status, interrupted ? 'interrupted' : 'executed-failed');
+    assert.equal(receipt.fixtures.cleanupPerformed, false);
+    assert.match(await readFile(path.join(dir, 'owned-resources.jsonl'), 'utf8'), /synthetic-project/);
+    assert.equal((await stat(path.join(dir, 'owned-resources.jsonl'))).mode & 0o077, 0);
+    assert.ok(!JSON.stringify(receipt).includes('sentinel'));
+  }
+});
+test('passing browser report without a post-run deployment readback stays incomplete', async () => {
+  const {receipt} = await runHosted({targetFile: await targetFile(syntheticTarget()), fetchImpl: healthy,
+    runPlaywright: async (_, {dir}) => {await writeFile(path.join(dir, 'playwright-report.json'), JSON.stringify(syntheticReport())); return 0;}});
+  assert.equal(receipt.status, 'preflight-incomplete');
+  assert.equal(receipt.failure, 'HOSTED_RUNTIME_AFTER');
+  assert.equal(receipt.tests.suggestions.passed, 7);
+  assert.equal(receipt.acceptance.chainAccepted, false);
+  assert.equal(receipt.expiry.cookieExpiry, 'not-observed');
+});
+test('matched post-run readback accepts the chain while cookie-expiry acceptance stays open', async () => {
+  const target = syntheticTarget(), file = await targetFile(target), after = path.join(path.dirname(file), 'after.json');
+  let writing;
+  const {receipt} = await runHosted({targetFile: file, afterFile: after, fetchImpl: healthy,
+    runPlaywright: async (_, {dir}) => {
+      await writeFile(path.join(dir, 'playwright-report.json'), JSON.stringify(syntheticReport()));
+      writing = new Promise(resolve => setTimeout(async () => {
+        await writeFile(after, JSON.stringify({...target.hosted.runtime, observedAt: new Date().toISOString()}), {mode: 0o600}); resolve();
+      }, 20));
+      return 0;
+    }});
+  await writing;
+  assert.equal(receipt.status, 'passed');
+  assert.equal(receipt.acceptance.chainAccepted, true);
+  assert.equal(receipt.acceptance.hostedAcceptance, false);
+  assert.equal(receipt.outcomes.length, 14);
+});
+test('failed reports retain fixed failure outcomes without assertion errors', async () => {
+  const {receipt} = await runHosted({targetFile: await targetFile(syntheticTarget()), fetchImpl: healthy,
+    runPlaywright: async (_, {dir}) => {
+      const report = syntheticReport();
+      const spec = report.suites[0].specs[0]; spec.ok = false; spec.tests[0].status = 'unexpected';
+      spec.tests[0].results[0] = {status: 'failed', retry: 0, errors: [{message: 'sentinel-secret-person'}]};
+      await writeFile(path.join(dir, 'playwright-report.json'), JSON.stringify(report));
+      return 1;
+    }});
+  assert.equal(receipt.status, 'executed-failed');
+  assert.equal(receipt.outcomes[0].outcome, 'failed');
+  assert.equal(receipt.tests, null);
+  assert.ok(!JSON.stringify(receipt).includes('sentinel'));
+});
+test('real Playwright discovers exactly the hosted inventory without contacting a target', async () => {
+  let result;
+  await runHosted({targetFile: await targetFile(syntheticTarget()), fetchImpl: healthy,
+    runPlaywright: async env => {
+      result = spawnSync(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', '--config', 'playwright.hosted.config.ts', '--list'], {env, encoding: 'utf8'});
+      return 1; // Discovery is not an executed browser matrix.
+    }});
+  assert.equal(result.status, 0, 'Playwright discovery must load both specs');
+  assert.match(result.stdout, /Total: 14 tests in 2 files/);
+});
+test('private target symlinks and permissive files are refused before launch', async () => {
+  const original = await targetFile(syntheticTarget()), linked = path.join(path.dirname(original), 'linked.json');
+  await symlink(original, linked);
+  const permissive = await targetFile(syntheticTarget()); await chmod(permissive, 0o644);
+  for (const file of [linked, permissive]) {
+    await assert.rejects(() => readPrivateJson(file), /HOSTED_PRIVATE_INPUT/);
+    let launched = false;
+    const {receipt} = await runHosted({targetFile: file, fetchImpl: async () => {launched = true;}, runPlaywright: async () => {launched = true;}});
+    assert.equal(launched, false); assert.equal(receipt.status, 'preflight-incomplete');
+  }
+});
+test('ledger refuses symlinks and permissive files without modifying their target', async () => {
+  for (const linked of [true, false]) {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'ow2-ledger-'));
+    const ledger = path.join(dir, 'owned-resources.jsonl'), target = path.join(dir, 'protected-data');
+    await writeFile(target, 'retained', {mode: 0o600});
+    if (linked) await symlink(target, ledger);
+    else {
+      await writeFile(ledger, 'retained', {mode: 0o644});
+      await chmod(ledger, 0o644); // The controller's restrictive umask must not repair the negative fixture.
+      assert.equal((await stat(ledger)).mode & 0o777, 0o644);
+    }
+    await assert.rejects(() => recordResource({id: 'a'.repeat(32), dir, hosted: true}, {event: 'project-created', id: 'new-id'}));
+    assert.equal(await readFile(target, 'utf8'), 'retained');
+    assert.equal(await readFile(ledger, 'utf8'), 'retained');
+  }
+});

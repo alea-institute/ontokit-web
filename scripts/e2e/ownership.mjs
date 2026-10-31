@@ -1,7 +1,7 @@
 import { lstat, readFile, realpath, mkdir, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-export const ROOT = fileURLToPath(new URL('../../.e2e-runs', import.meta.url));
+import { ROOT } from './paths.js';
+export { ROOT };
 export const RUNTIME_ROOT = `/tmp/ontokit-e2e-${process.getuid()}`;
 export function validateManifest(m) {
   if (m.version !== 1 || !/^[a-f0-9]{32}$/.test(m.id) || m.project !== `ontokit-e2e-${m.id}` || m.uid !== process.getuid() || !Array.isArray(m.processes)) throw new Error('Invalid recovery identity');
