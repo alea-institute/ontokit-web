@@ -35,6 +35,12 @@ export function profileSpec(profile) {
 export const serviceSet = profile => [...CORE_SERVICES, ...(profileSpec(profile).identity ? IDENTITY_SERVICES : [])];
 /** Every spec file owned by a profile other than `profile`; baseline ignores all of them. */
 export const foreignSpecs = profile => Object.entries(PROFILE_REGISTRY).filter(([name, p]) => name !== profile && p.specs).flatMap(([, p]) => p.specs);
+/**
+ * Specs only the hosted Playwright configuration (`playwright.hosted.config.ts`) runs.
+ * No launcher profile owns them, but baseline must still ignore them: its chromium
+ * project sets its own testIgnore, which replaces any top-level one.
+ */
+export const HOSTED_ONLY_SPECS = Object.freeze([spec('browser/hosted-personas.spec.ts')]);
 /** Which profile owns a spec file (relative to e2e/); unowned specs belong to baseline. */
 export const specOwner = file => Object.entries(PROFILE_REGISTRY).find(([, p]) => p.specs?.includes(file))?.[0] ?? 'baseline';
 
@@ -47,7 +53,7 @@ export function playwrightProjects(profile) {
     return [
       {name: 'stack setup', testMatch: /stack\.setup\.ts/, teardown: 'stack teardown'},
       {name: 'stack teardown', testMatch: /stack\.teardown\.ts/},
-      {name: 'chromium', testMatch: /.*\.spec\.ts/, testIgnore: foreignSpecs('baseline').map(specPattern), dependencies: ['stack setup']},
+      {name: 'chromium', testMatch: /.*\.spec\.ts/, testIgnore: [...foreignSpecs('baseline'), ...HOSTED_ONLY_SPECS].map(specPattern), dependencies: ['stack setup']},
     ];
   }
   if (p.projects.length !== 1 || p.specs.length !== 1) throw new Error('Unknown E2E profile');

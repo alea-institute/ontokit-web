@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
-  PROFILE_REGISTRY, MODE_PROFILES, profileSpec, serviceSet, foreignSpecs, specOwner, playwrightProjects,
+  PROFILE_REGISTRY, MODE_PROFILES, profileSpec, serviceSet, foreignSpecs, HOSTED_ONLY_SPECS, specOwner, playwrightProjects,
   assertLaunch, apiModeFor, webAuthEnv, parseCompiledMode, readCompiledMode, parseApiMode, assertModeAgreement, API_MODE_PROBE,
 } from './auth-modes.mjs';
 import { PROFILES, assertProfile } from './bootstrap-identity.mjs';
@@ -163,9 +164,35 @@ test('baseline discovery ignores every spec owned by another profile', () => {
   assert.deepEqual([setup.name, teardown.name, chromium.name], ['stack setup', 'stack teardown', 'chromium']);
   assert.deepEqual(chromium.dependencies, ['stack setup']);
   const ignored = file => chromium.testIgnore.some(pattern => path.matchesGlob(`/tmp/run/web/e2e/${file}`, pattern));
-  for (const file of foreignSpecs('baseline')) assert.equal(ignored(file), true, file);
+  for (const file of [...foreignSpecs('baseline'), ...HOSTED_ONLY_SPECS]) assert.equal(ignored(file), true, file);
   for (const file of ['api/projects.spec.ts', 'browser/ontology-workflow.spec.ts', 'auth-foundation.spec.ts', 'browser/x-auth-mode-disabled.spec.ts.bak']) assert.equal(ignored(file), false, file);
   assert.equal(foreignSpecs('baseline').length, 6);
+});
+// A project-level testIgnore replaces the top-level one, so the effective ignore list is
+// only observable through Playwright itself. Discovery loads every spec but runs no test.
+test('real Playwright baseline discovery excludes hosted-only and other profiles\' specs', async () => {
+  const id = randomBytes(16).toString('hex');
+  const dir = path.join(`/tmp/ontokit-e2e-${process.getuid()}`, id);
+  await mkdir(dir, {recursive: true, mode: 0o700});
+  try {
+    const file = path.join(dir, 'config.json');
+    const user = n => ({id: `${n}`, email: `user${n}@example.test`, password: 'synthetic-password'});
+    await writeFile(file, JSON.stringify({id, dir, profile: 'baseline', web: 'http://localhost:3', api: 'http://localhost:4',
+      issuer: 'http://localhost:1', login: 'http://localhost:2/ui/v2/login', ordinaryUserPolicyVerified: true,
+      users: {owner: user(1), unrelated: user(2)}}), {mode: 0o600});
+    const env = {...process.env, ONTOKIT_E2E_CONFIG: file, ONTOKIT_E2E_RUN: id};
+    delete env.ONTOKIT_E2E_HOSTED;
+    const result = spawnSync(process.execPath, ['node_modules/@playwright/test/cli.js', 'test', '--config', 'playwright.config.ts', '--list'], {env, encoding: 'utf8'});
+    assert.equal(result.status, 0, result.stderr);
+    const listed = result.stdout.split('\n').filter(line => /\.spec\.ts:\d+/.test(line));
+    assert.ok(listed.length > 0, 'baseline discovery must list its own specs');
+    assert.ok(listed.every(line => line.includes('[chromium]')), 'every baseline spec runs in the chromium project');
+    for (const owned of ['browser/hosted-personas.spec.ts', ...HOSTED_ONLY_SPECS, ...foreignSpecs('baseline')]) {
+      assert.equal(listed.some(line => line.includes(owned)), false, `baseline lists ${owned}`);
+    }
+  } finally {
+    await rm(dir, {recursive: true, force: true});
+  }
 });
 test('each non-baseline profile discovers exactly its own spec', () => {
   for (const profile of ['lifecycle', 'rehearsal', ...MODE_PROFILES]) {
