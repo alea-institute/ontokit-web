@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Header } from "@/components/layout/header";
+import { SiteFooter } from "@/components/layout/site-footer";
 
 export default function InfoPage() {
   return (
@@ -61,6 +62,7 @@ export default function InfoPage() {
         </div>
       </div>
     </main>
+      <SiteFooter />
     </>
   );
 }
