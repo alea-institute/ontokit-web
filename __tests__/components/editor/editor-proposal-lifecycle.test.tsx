@@ -67,6 +67,14 @@ const lifecycle = vi.hoisted(() => ({
   saveDirectSource: vi.fn(),
   captureSourceConflict: vi.fn(),
   updateClassInTurtle: vi.fn(),
+  creditModalProps: null as null | {
+    onSubmitCredit: (name: string | null, email: string | null, website: string, note?: string) => void;
+  },
+  anonymousSubmit: vi.fn(),
+  anonymousStart: vi.fn(),
+  anonymousActive: true,
+  searchParams: "",
+  routerReplace: vi.fn(),
 }));
 
 const noop = vi.fn();
@@ -78,8 +86,8 @@ vi.mock("next-auth/react", () => ({
 
 vi.mock("next/navigation", () => ({
   useParams: () => ({ id: "project-1" }),
-  useSearchParams: () => new URLSearchParams(),
-  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(lifecycle.searchParams),
+  useRouter: () => ({ replace: lifecycle.routerReplace, push: vi.fn() }),
   usePathname: () => "/projects/project-1/editor",
 }));
 
@@ -123,7 +131,12 @@ vi.mock("@/components/editor/SuggestionSubmitDialog", () => ({ SuggestionSubmitD
 vi.mock("@/components/editor/DeleteImpactAnalysis", () => ({ DeleteImpactAnalysis: () => null }));
 vi.mock("@/components/editor/RemoteSyncIndicator", () => ({ RemoteSyncIndicator: () => null }));
 vi.mock("@/components/editor/ShareButton", () => ({ ShareButton: () => null }));
-vi.mock("@/components/suggestions/CreditModal", () => ({ CreditModal: () => null }));
+vi.mock("@/components/suggestions/CreditModal", () => ({
+  CreditModal: (props: NonNullable<typeof lifecycle.creditModalProps>) => {
+    lifecycle.creditModalProps = props;
+    return null;
+  },
+}));
 vi.mock("@/components/ui/confirm-dialog", () => ({
   ConfirmDialog: (props: DeleteConfirmProps & { title?: string }) => {
     if (props.title === "Delete Class") lifecycle.deleteConfirmProps = props;
@@ -212,10 +225,10 @@ vi.mock("@/lib/hooks/useAnonymousSuggestion", () => ({
       sessionId: "anonymous-session",
       branch: "suggest/anonymous-session",
       changesCount: 0,
-      isActive: true,
-      startSession: vi.fn(),
+      isActive: lifecycle.anonymousActive,
+      startSession: lifecycle.anonymousStart,
       saveToSession: vi.fn(),
-      submitSession: vi.fn(),
+      submitSession: lifecycle.anonymousSubmit,
       discardSession: vi.fn(),
     };
   },
@@ -314,6 +327,12 @@ describe("anonymous proposal submission lifecycle", () => {
     lifecycle.saveDirectSource.mockReset().mockResolvedValue({ commit_hash: "revision-saved" });
     lifecycle.captureSourceConflict.mockReset();
     lifecycle.updateClassInTurtle.mockReset().mockImplementation((source: string) => `${source}\n# modified`);
+    lifecycle.creditModalProps = null;
+    lifecycle.anonymousSubmit.mockReset().mockResolvedValue(undefined);
+    lifecycle.anonymousStart.mockReset().mockResolvedValue("suggest/anonymous-session");
+    lifecycle.anonymousActive = true;
+    lifecycle.searchParams = "";
+    lifecycle.routerReplace.mockReset();
     vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
     vi.stubEnv("NEXT_PUBLIC_ZITADEL_CONFIGURED", "false");
   });
@@ -344,6 +363,64 @@ describe("anonymous proposal submission lifecycle", () => {
     renderWithQueryClient(<EditorPage />);
 
     expect(screen.getByTestId("standard-layout")).toBeDefined();
+  });
+
+  it("forwards the CreditModal reviewer note as the submission summary", async () => {
+    renderWithQueryClient(<EditorPage />);
+
+    await act(async () => {
+      lifecycle.creditModalProps?.onSubmitCredit("Ada", "ada@example.org", "", "Broader term fits better.");
+    });
+
+    expect(lifecycle.anonymousSubmit).toHaveBeenCalledWith(
+      "Broader term fits better.", "Ada", "ada@example.org", "",
+    );
+  });
+
+  it("omits the summary when the CreditModal sends no note", async () => {
+    renderWithQueryClient(<EditorPage />);
+
+    await act(async () => {
+      lifecycle.creditModalProps?.onSubmitCredit(null, null, "bot.example");
+    });
+
+    expect(lifecycle.anonymousSubmit).toHaveBeenCalledWith(undefined, undefined, undefined, "bot.example");
+  });
+
+  it("?propose=1 starts the anonymous proposal session once and drops the param, keeping the selection", async () => {
+    lifecycle.anonymousActive = false;
+    lifecycle.searchParams = "classIri=https%3A%2F%2Fexample.org%2FA&propose=1";
+
+    renderWithQueryClient(<EditorPage />);
+    await act(async () => {});
+
+    expect(lifecycle.anonymousStart).toHaveBeenCalledTimes(1);
+    expect(lifecycle.routerReplace).toHaveBeenCalledWith(
+      "/projects/project-1/editor?classIri=https%3A%2F%2Fexample.org%2FA",
+    );
+  });
+
+  it("?propose=1 does not start an anonymous session for a direct editor", async () => {
+    configureDirectEditor();
+    lifecycle.anonymousActive = false;
+    lifecycle.searchParams = "propose=1";
+
+    renderWithQueryClient(<EditorPage />);
+    await act(async () => {});
+
+    expect(lifecycle.anonymousStart).not.toHaveBeenCalled();
+    expect(lifecycle.routerReplace).toHaveBeenCalledWith("/projects/project-1/editor");
+  });
+
+  it("?propose=1 waits while the session status is loading", async () => {
+    lifecycle.anonymousActive = false;
+    lifecycle.sessionState.status = "loading";
+    lifecycle.searchParams = "propose=1";
+
+    renderWithQueryClient(<EditorPage />);
+    await act(async () => {});
+
+    expect(lifecycle.anonymousStart).not.toHaveBeenCalled();
   });
 
   it("opens from onSubmitted and clears the page-owned dialog state when closed", async () => {

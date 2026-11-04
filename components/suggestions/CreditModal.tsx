@@ -21,9 +21,16 @@ interface CreditModalProps {
    * to the submit payload so the server-side control (filled honeypot ->
    * silent fake success) receives the bot signal. The parent closes the
    * modal itself (controlled `open`).
+   *
+   * `note` is the trimmed "Note for the reviewers" text. It is passed as a
+   * fourth argument ONLY when non-empty, so an empty note is omitted from
+   * the call entirely; the parent forwards it as the submission `summary`.
    */
-  onSubmitCredit: (name: string | null, email: string | null, website: string) => void;
+  onSubmitCredit: (name: string | null, email: string | null, website: string, note?: string) => void;
 }
+
+/** Maximum length of the optional note for the reviewers. */
+export const REVIEWER_NOTE_MAX_LENGTH = 1000;
 
 /**
  * Pre-submission gate that lets anonymous contributors optionally provide
@@ -43,6 +50,7 @@ export function CreditModal({ open, onSubmitCredit }: CreditModalProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [honeypot, setHoneypot] = useState("");
+  const [note, setNote] = useState("");
 
   // Pre-fill from cached credit on open
   useEffect(() => {
@@ -54,8 +62,20 @@ export function CreditModal({ open, onSubmitCredit }: CreditModalProps) {
       setName(creditStore.name ?? "");
       setEmail(creditStore.email ?? "");
       setHoneypot(""); // Always reset honeypot
+      setNote(""); // A note belongs to one proposal; never carry it over
     }
   }, [open, creditStore.name, creditStore.email]);
+
+  // Forward the note only when it has content, so an empty note is omitted
+  // from the submission rather than sent as an empty summary.
+  const submit = (submitName: string | null, submitEmail: string | null) => {
+    const trimmedNote = note.trim().slice(0, REVIEWER_NOTE_MAX_LENGTH);
+    if (trimmedNote) {
+      onSubmitCredit(submitName, submitEmail, honeypot, trimmedNote);
+    } else {
+      onSubmitCredit(submitName, submitEmail, honeypot);
+    }
+  };
 
   const handleSave = () => {
     const trimmedName = name.trim() || null;
@@ -70,11 +90,13 @@ export function CreditModal({ open, onSubmitCredit }: CreditModalProps) {
     // Forward the honeypot verbatim — the SERVER decides what a filled
     // honeypot means (silent fake success). Swallowing it client-side would
     // let the bot's edit through as a real submission.
-    onSubmitCredit(trimmedName, trimmedEmail, honeypot);
+    submit(trimmedName, trimmedEmail);
   };
 
+  // Skip declines credit only; a note the contributor typed still travels
+  // with the proposal on every exit path.
   const handleSkip = () => {
-    onSubmitCredit(null, null, honeypot);
+    submit(null, null);
   };
 
   return (
@@ -127,6 +149,32 @@ export function CreditModal({ open, onSubmitCredit }: CreditModalProps) {
               autoComplete="email"
               className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
+          </div>
+
+          {/* Note for the reviewers — sent as the submission summary */}
+          <div>
+            <label
+              htmlFor="credit-note"
+              className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400"
+            >
+              Note for the reviewers <span className="text-slate-400">(optional)</span>
+            </label>
+            <textarea
+              id="credit-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              maxLength={REVIEWER_NOTE_MAX_LENGTH}
+              rows={3}
+              placeholder="Why does this change help?"
+              aria-describedby="credit-note-count"
+              className="w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 dark:border-slate-600 dark:bg-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
+            />
+            <p
+              id="credit-note-count"
+              className="mt-1 text-right text-xs text-slate-400 dark:text-slate-500"
+            >
+              {note.length}/{REVIEWER_NOTE_MAX_LENGTH} characters
+            </p>
           </div>
 
           {/* Honeypot field — invisible to humans, filled by bots */}

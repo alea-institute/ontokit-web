@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono, Noto_Color_Emoji } from "next/font/google";
 
 import "./globals.css";
 import { Providers } from "./providers";
+import { DemoSiteBanner } from "@/components/layout/demo-site-banner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -42,6 +43,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} ${jetbrainsMono.variable} ${notoColorEmoji.variable} font-sans antialiased`}>
         <a href="#main-content" className="skip-link">Skip to main content</a>
+        <DemoSiteBanner />
         <Providers>{children}</Providers>
       </body>
     </html>
