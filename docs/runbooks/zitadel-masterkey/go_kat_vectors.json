@@ -1,0 +1,50 @@
+[
+ {
+  "masterkey": "MasterkeyNeedsToHave32Characters",
+  "plain_hex": "c0ef8cf86303eb2ab9204678c135b7204d979c61e55c4d00d29d45a9d8b33c6c",
+  "row": "bc0ByPXDwy2n3FAwGb8WYHvN9TEL5e33u73A3k_yXTwrzwh8iAEQBm28o-7v3M6v",
+  "dek_hex": "c0ef8cf86303eb2ab9204678c135b7204d979c61e55c4d00d29d45a9d8b33c6c",
+  "value_plain": "secret-value-0-éü",
+  "value_crypted_std_b64": "I2zCkupwSruCg6PcBcAcFH+3vwTkUc6CmYe6wQH3jJ1aB54="
+ },
+ {
+  "masterkey": "ThisKeyNeedsToHave32Characters!!",
+  "plain_hex": "c2e16ff17e223ad47641884d85fdc7b98350e8e1d07a38a9e9ad7ecbdfce3711",
+  "row": "Ar3V4biX4w_MAlaBYd6l4bL2fd6x3vMaf4CQJ35O831uphiwo2E_nzsKWXENxFsS",
+  "dek_hex": "c2e16ff17e223ad47641884d85fdc7b98350e8e1d07a38a9e9ad7ecbdfce3711",
+  "value_plain": "secret-value-1-éü",
+  "value_crypted_std_b64": "bm0NkuEls3Qw/i+xmoZSAb/SSoZ+mwUcMUbSSFYdzG9T10M="
+ },
+ {
+  "masterkey": "MasterkeyNeedsToHave32Characters",
+  "plain_hex": "357a470c61c09b5331e4ad86b604c0a4360fd4ce59801d6d8eb1f243276a4c9a",
+  "row": "HyqQJsyBnegvB_WNlTdFP4GN5wfxfGxcabnJjxADCe26yHPsiJljx-eAsFuNMR5H",
+  "dek_hex": "357a470c61c09b5331e4ad86b604c0a4360fd4ce59801d6d8eb1f243276a4c9a",
+  "value_plain": "secret-value-2-éü",
+  "value_crypted_std_b64": "E5R+3X3+6u/rjtlqOPNg/HFUAluZ2HeqnMOUXAR/ksckx/I="
+ },
+ {
+  "masterkey": "ThisKeyNeedsToHave32Characters!!",
+  "plain_hex": "1de3d2753eddb646292d79a0222f61d2bb0a5629e1a1f41b3581af916e8f2217",
+  "row": "pP8N0MLqiRGoCoPTLiCkqNbGSamSomGMnDpPdV7Vs8Y38w7eXjscDDdlKDPi6PyP",
+  "dek_hex": "1de3d2753eddb646292d79a0222f61d2bb0a5629e1a1f41b3581af916e8f2217",
+  "value_plain": "secret-value-3-éü",
+  "value_crypted_std_b64": "rAGQw1VrrE5hbwUxUZ5EZ1uFXmJJpAI70U6r4E0EADpbhQY="
+ },
+ {
+  "masterkey": "MasterkeyNeedsToHave32Characters",
+  "plain_hex": "a0055311f2534e2fdcf8bca7bd5a31b0fe4ee3cc0c0539a34baef0e04589c5cb",
+  "row": "HyuEZitMpDQd9lEwbSwMzpDJn1FT-_Wdyp1bD_5X6rgnZDQMdU5CrQHnkaKcgpIJ",
+  "dek_hex": "a0055311f2534e2fdcf8bca7bd5a31b0fe4ee3cc0c0539a34baef0e04589c5cb",
+  "value_plain": "secret-value-4-éü",
+  "value_crypted_std_b64": "Ahi0BjXgpNaL3TudKSj7uNVgThlw79QKJedtCs2SCV4m2LM="
+ },
+ {
+  "masterkey": "ThisKeyNeedsToHave32Characters!!",
+  "plain_hex": "b63bb3c23cc0c2c13688a758311882f0701836218837147d2344b38e28aa8c22",
+  "row": "aIN--hb7Awxw7JAwEnqmkWrPMIhBsY5a-rB58fWX__zXpLRo2jKx5U2tif0TWHLa",
+  "dek_hex": "b63bb3c23cc0c2c13688a758311882f0701836218837147d2344b38e28aa8c22",
+  "value_plain": "secret-value-5-éü",
+  "value_crypted_std_b64": "YCPpjbhU4gzgZT62g2+rcrKvv83qHI1P9me1zWyCcWS86no="
+ }
+]
