@@ -429,10 +429,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   // The popstate our own history.back() causes, which must not be re-handled.
   const ignoreNextPopRef = useRef(false);
   const prevMobilePaneRef = useRef<MobilePane>(mobilePane);
-  const onOwnDetailEntry = () =>
-    ownsDetailEntryRef.current || isMobileDetailEntry(window.history.state);
   const showMobileTree = useCallback(() => {
-    if (isSinglePaneViewport() && (ownsDetailEntryRef.current || isMobileDetailEntry(window.history.state))) {
+    if (isSinglePaneViewport() && ownsDetailEntryRef.current) {
       window.history.back();
       return;
     }
@@ -449,7 +447,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     }
     // The tree showed without a Back (tab switch, selection cleared, graph
     // closed): drop our detail entry so the next device Back is not swallowed.
-    if (previous === "detail" && onOwnDetailEntry()) {
+    if (previous === "detail" && ownsDetailEntryRef.current) {
       ownsDetailEntryRef.current = false;
       ignoreNextPopRef.current = true;
       window.history.back();
@@ -462,7 +460,14 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   const urlKey = `${pathname ?? ""}?${searchParams?.toString() ?? ""}`;
   useEffect(() => {
     if (mobilePane !== "detail" || !ownsDetailEntryRef.current || !isSinglePaneViewport()) return;
-    markMobileDetailEntry();
+    // On Back/Forward the router re-renders with the traversed URL from its
+    // own popstate listener, before ours has settled ownership. Deferring a
+    // task lets every popstate listener run first, so the entry we just
+    // returned to is never marked.
+    const id = window.setTimeout(() => {
+      if (ownsDetailEntryRef.current) markMobileDetailEntry();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [urlKey, mobilePane]);
   const revealMobileTreeRef = useRef(revealMobileTree);
   useEffect(() => {

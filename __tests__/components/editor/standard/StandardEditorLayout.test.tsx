@@ -1382,7 +1382,7 @@ describe("StandardEditorLayout single-pane layout below md", () => {
       back.mockRestore();
     });
 
-    it("re-marks its entry after the router replaces history state", () => {
+    it("re-marks its entry after the router replaces history state", async () => {
       const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
       const props = defaultProps({ nodes: sampleNodes, selectedIri: classA });
       const { rerender } = render(<StandardEditorLayout {...props} />);
@@ -1392,13 +1392,35 @@ describe("StandardEditorLayout single-pane layout below md", () => {
       window.history.replaceState({ __NA: true }, "");
       _searchParams = new URLSearchParams("branch=main");
       rerender(<StandardEditorLayout {...props} />);
-      expect(window.history.state).toEqual({ __NA: true, [MOBILE_DETAIL_HISTORY_KEY]: "detail" });
+      await vi.waitFor(() => expect(window.history.state).toEqual({ __NA: true, [MOBILE_DETAIL_HISTORY_KEY]: "detail" }));
       expect(window.history.length).toBe(length);
 
       // Even while stripped, the on-screen Back goes through history (no orphan entry).
       window.history.replaceState({}, "");
       fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
       expect(back).toHaveBeenCalledTimes(1);
+      back.mockRestore();
+      _searchParams = new URLSearchParams();
+    });
+
+    it("does not mark the entry it returns to when Back changes the URL", async () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const props = defaultProps({ nodes: sampleNodes, selectedIri: classA });
+      const { rerender } = render(<StandardEditorLayout {...props} />);
+      // The router re-renders with the traversed URL before our popstate runs.
+      _searchParams = new URLSearchParams("from=back");
+      window.history.replaceState({ __NA: true }, "");
+      act(() => {
+        rerender(<StandardEditorLayout {...props} />);
+      });
+      act(() => {
+        window.dispatchEvent(new PopStateEvent("popstate", { state: { __NA: true } }));
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(isMobileDetailEntry(window.history.state)).toBe(false);
+      // A marked tree entry would make the next tree reveal step back again.
+      expect(back).not.toHaveBeenCalled();
       back.mockRestore();
       _searchParams = new URLSearchParams();
     });
