@@ -5,8 +5,7 @@ import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
 import {
   buildGraphFromClassDetail,
   getSeeAlsoIris,
-  iriNamespace,
-  isExternalReference,
+  isLanguageBuiltinIri,
   isWellKnownIri,
 } from "@/lib/graph/buildGraphData";
 import { getLocalName } from "@/lib/utils";
@@ -50,26 +49,22 @@ export function useGraphData({
   // Labels + entity types discovered for non-class entities via search API
   const nonClassLabelsRef = useRef<Map<string, { label: string; entityType: string }>>(new Map());
   const [resolvedCount, setResolvedCount] = useState(0);
-  // seeAlso/isDefinedBy targets outside the ontology (web pages, external
-  // vocabularies). They render as external nodes and are never fetched.
+  // seeAlso/isDefinedBy targets in well-known vocabularies: external links,
+  // never fetched. Every other target is fetched once like any IRI.
+  const wellKnownTargetsRef = useRef<Set<string>>(new Set());
+  // IRIs the class API answered 404 for (cached via failedIrisRef too).
+  const notFoundIrisRef = useRef<Set<string>>(new Set());
+  // External nodes in the graph last built, so expanding one does not refetch.
   const externalIrisRef = useRef<Set<string>>(new Set());
-  const labelHintsRef = useRef(labelHints);
-  useEffect(() => {
-    labelHintsRef.current = labelHints;
-  }, [labelHints]);
 
-  /** A detail's seeAlso/isDefinedBy targets that may be classes; records the rest as external. */
+  /** A detail's seeAlso/isDefinedBy targets worth fetching; well-known vocabulary targets are set aside. */
   const referenceTargets = useCallback((detail: OWLClassDetail): string[] => {
-    const namespaces = new Set([...resolvedNodesRef.current.keys()].map(iriNamespace));
-    const internal: string[] = [];
+    const targets: string[] = [];
     for (const target of getSeeAlsoIris(detail)) {
-      if (isExternalReference(target, namespaces, labelHintsRef.current)) {
-        externalIrisRef.current.add(target);
-      } else {
-        internal.push(target);
-      }
+      if (isWellKnownIri(target)) wellKnownTargetsRef.current.add(target);
+      else targets.push(target);
     }
-    return internal;
+    return targets;
   }, []);
 
   const fetchDetail = useCallback(
@@ -81,15 +76,18 @@ export function useGraphData({
       if (resolved.has(iri)) return resolved.get(iri)!;
       if (pending.has(iri)) return pending.get(iri)!;
       if (failed.has(iri) || resolved.size + pending.size >= MAX_RESOLVED_NODES) return null;
-      if (isWellKnownIri(iri) || externalIrisRef.current.has(iri)) return null;
+      if (isLanguageBuiltinIri(iri)) return null;
       const request = (async () => {
         try {
           const detail = await projectOntologyApi.getClassDetail(projectId, iri, accessToken, branch);
           if (generation !== generationRef.current) return null;
           resolved.set(iri, detail);
           return detail;
-        } catch {
-          if (generation === generationRef.current) failed.add(iri);
+        } catch (error) {
+          if (generation === generationRef.current) {
+            failed.add(iri);
+            if ((error as { status?: unknown } | null)?.status === 404) notFoundIrisRef.current.add(iri);
+          }
           return null;
         } finally {
           pending.delete(iri);
@@ -255,7 +253,18 @@ export function useGraphData({
           entityTypes.set(iri, info.entityType);
         }
       }
-      const data = buildGraphFromClassDetail(focus, resolvedNodesRef.current, mergedHints, entityTypes, externalIrisRef.current);
+      // External = a seeAlso/isDefinedBy target that is a well-known vocabulary
+      // IRI or that the class API does not know (404) and the search did not
+      // identify as another entity. The builder never marks structure external.
+      const external = new Set<string>();
+      for (const detail of resolvedNodesRef.current.values()) {
+        for (const target of getSeeAlsoIris(detail)) {
+          if (resolvedNodesRef.current.has(target) || nonClassLabelsRef.current.has(target)) continue;
+          if (wellKnownTargetsRef.current.has(target) || notFoundIrisRef.current.has(target)) external.add(target);
+        }
+      }
+      externalIrisRef.current = external;
+      const data = buildGraphFromClassDetail(focus, resolvedNodesRef.current, mergedHints, entityTypes, external);
       setGraphData(data);
       setResolvedCount(resolvedNodesRef.current.size);
     },
@@ -268,6 +277,8 @@ export function useGraphData({
     resolvedNodesRef.current = new Map();
     failedIrisRef.current = new Set();
     externalIrisRef.current = new Set();
+    wellKnownTargetsRef.current = new Set();
+    notFoundIrisRef.current = new Set();
     nonClassLabelsRef.current = new Map();
     pendingRef.current = new Map();
     setResolvedCount(0);
@@ -343,6 +354,8 @@ export function useGraphData({
   const expandNode = useCallback(
     async (iri: string) => {
       if (!focusIri) return;
+      // An external link node has nothing to expand; its 404 stays cached.
+      if (externalIrisRef.current.has(iri)) return;
       const generation = generationRef.current;
       failedIrisRef.current.delete(iri);
       setIsLoading(true);
@@ -393,6 +406,8 @@ export function useGraphData({
     resolvedNodesRef.current = new Map();
     failedIrisRef.current = new Set();
     externalIrisRef.current = new Set();
+    wellKnownTargetsRef.current = new Set();
+    notFoundIrisRef.current = new Set();
     nonClassLabelsRef.current = new Map();
     setGraphData(null);
     setResolvedCount(0);

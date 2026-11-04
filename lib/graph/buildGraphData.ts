@@ -17,39 +17,29 @@ const WELL_KNOWN_NAMESPACES = new Set([
   ...commonPrefixes.map((p) => p.namespace),
 ]);
 
-/** True for IRIs in a well-known external vocabulary (RDF, OWL, SKOS, …). */
+/**
+ * True for IRIs in a well-known external vocabulary (RDF, OWL, SKOS, the
+ * Turtle editor's commonPrefixes, …). Only consulted for seeAlso/isDefinedBy
+ * targets: a class that subclasses e.g. schema:Person still resolves it.
+ */
 export function isWellKnownIri(iri: string): boolean {
   for (const ns of WELL_KNOWN_NAMESPACES) {
     if (iri.startsWith(ns)) return true;
   }
   return false;
 }
-const isExternalIri = isWellKnownIri;
 
-/** The namespace part of an IRI: everything up to its last `#` or `/`. */
-export function iriNamespace(iri: string): string {
-  const hash = iri.lastIndexOf("#");
-  const cut = hash >= 0 ? hash : iri.lastIndexOf("/");
-  return cut >= 0 ? iri.slice(0, cut + 1) : iri;
-}
+// The modelling language itself (owl:Nothing, rdfs:Resource, xsd:string, …):
+// never a project class, so external wherever it appears and never fetched.
+const LANGUAGE_NAMESPACES = [
+  "http://www.w3.org/2002/07/owl#",
+  "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+  "http://www.w3.org/2000/01/rdf-schema#",
+  "http://www.w3.org/2001/XMLSchema#",
+];
 
-/**
- * Whether a seeAlso/isDefinedBy target points outside the ontology — e.g. a
- * Wikipedia page — rather than at one of its entities. Such targets are web
- * links, not classes, so the graph must not ask the class API about them.
- *
- * Mirrors the Turtle editor's internal/external split: well-known vocabularies
- * are external; otherwise an IRI is internal when it is a known entity (e.g.
- * in the loaded tree) or shares a namespace with a resolved class.
- */
-export function isExternalReference(
-  iri: string,
-  internalNamespaces: ReadonlySet<string>,
-  knownIris?: { has(iri: string): boolean },
-): boolean {
-  if (isWellKnownIri(iri)) return true;
-  if (knownIris?.has(iri)) return false;
-  return !internalNamespaces.has(iriNamespace(iri));
+export function isLanguageBuiltinIri(iri: string): boolean {
+  return LANGUAGE_NAMESPACES.some((ns) => iri.startsWith(ns));
 }
 
 const OWL_THING_IRI = "http://www.w3.org/2002/07/owl#Thing";
@@ -108,6 +98,14 @@ export function buildGraphFromClassDetail(
   // Collect resolved labels from all parent_labels maps so unresolved nodes
   // can display human-readable names instead of raw IRI fragments.
   const knownLabels = new Map<string, string>();
+  // Parents, equivalents and disjoints of resolved classes are ontology
+  // structure, never external links, whatever else points at them.
+  const structuralIris = new Set<string>();
+  for (const detail of resolvedNodes.values()) {
+    for (const iri of detail.parent_iris) structuralIris.add(iri);
+    for (const iri of detail.equivalent_iris ?? []) structuralIris.add(iri);
+    for (const iri of detail.disjoint_iris ?? []) structuralIris.add(iri);
+  }
   for (const detail of resolvedNodes.values()) {
     if (detail.parent_labels) {
       for (const [iri, label] of Object.entries(detail.parent_labels)) {
@@ -126,7 +124,8 @@ export function buildGraphFromClassDetail(
 
   function getNodeType(iri: string): GraphNodeType {
     if (iri === focusIri) return "focus";
-    if (isExternalIri(iri) || externalIris?.has(iri)) return "external";
+    if (isLanguageBuiltinIri(iri)) return "external";
+    if (externalIris?.has(iri) && !resolvedNodes.has(iri) && !structuralIris.has(iri)) return "external";
     // Check entity type for non-class entities
     const et = entityTypes?.get(iri);
     if (et === "individual") return "individual";

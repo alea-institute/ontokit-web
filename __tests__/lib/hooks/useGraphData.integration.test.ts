@@ -164,29 +164,49 @@ describe("graph loading with the real API client, graph builder and layout engin
     expect(result.current.graphData?.edges).toContainEqual(expect.objectContaining({ source: iri("Expansion"), target: iri("Root"), edgeType: "subClassOf" }));
   });
 
-  it("never asks the class API about external references such as a Wikipedia seeAlso", async () => {
+  const SEE_ALSO = "http://www.w3.org/2000/01/rdf-schema#seeAlso";
+  const seeAlso = (...values: string[]) => [{ property_iri: SEE_ALSO, property_label: "see also", values: values.map((value) => ({ value, lang: "" })) }];
+  const classRequests = (calls: URL[]) => calls.filter((url) => url.pathname.includes("/classes/")).map((url) => decodeURIComponent(url.pathname.split("/classes/")[1]));
+
+  it("treats a 404'd seeAlso web page as external, fetched once, and skips well-known vocabulary targets", async () => {
     const wiki = "https://en.wikipedia.org/wiki/ISO_3166-2";
     const skos = "http://www.w3.org/2004/02/skos/core#Concept";
+    const calls = serveGraph([detail("Focus", { annotations: seeAlso(wiki, skos) })]);
+    const { result } = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(classRequests(calls).filter((target) => target === wiki)).toHaveLength(1);
+    expect(classRequests(calls)).not.toContain(skos);
+    expect(result.current.graphData?.nodes).toContainEqual(expect.objectContaining({ id: wiki, nodeType: "external" }));
+    expect(result.current.graphData?.nodes).toContainEqual(expect.objectContaining({ id: skos, nodeType: "external" }));
+
+    // Expanding an external node does not refetch its cached 404.
+    await act(async () => { await result.current.expandNode(wiki); });
+    expect(classRequests(calls).filter((target) => target === wiki)).toHaveLength(1);
+  });
+
+  it("resolves a modular ontology's seeAlso target in another namespace that is also a parent", async () => {
+    const nsB = "https://module-b.test/onto#";
     const calls = serveGraph([
-      detail("Focus", {
-        parent_iris: [skos],
-        annotations: [{ property_iri: "http://www.w3.org/2000/01/rdf-schema#seeAlso", property_label: "see also", values: [{ value: wiki, lang: "" }, { value: iri("Sibling"), lang: "" }] }],
-      }),
-      detail("Sibling"),
+      detail("Focus", { parent_iris: [iri("Parent")], annotations: seeAlso(nsB + "Region", nsB + "Gone") }),
+      detail("Parent", { parent_iris: [nsB + "Region", nsB + "Gone"] }),
+      { ...detail("Region"), iri: nsB + "Region" },
     ]);
     const { result } = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    const classRequests = () => calls.filter((url) => url.pathname.includes("/classes/")).map((url) => decodeURIComponent(url.pathname.split("/classes/")[1]));
-    expect(classRequests()).not.toContain(wiki);
-    expect(classRequests()).not.toContain(skos);
-    // Same-namespace references are still resolved as classes.
-    expect(classRequests()).toContain(iri("Sibling"));
-    expect(result.current.graphData?.nodes).toContainEqual(expect.objectContaining({ id: wiki, nodeType: "external" }));
-    expect(result.current.graphData?.edges).toContainEqual(expect.objectContaining({ source: iri("Focus"), target: wiki, edgeType: "seeAlso" }));
+    const nodes = result.current.graphData!.nodes;
+    expect(classRequests(calls)).toContain(nsB + "Region");
+    expect(nodes.find((node) => node.id === nsB + "Region")?.nodeType).toBe("root");
+    // A 404'd target that is also a parent is structure, not an external link.
+    expect(nodes.find((node) => node.id === nsB + "Gone")?.nodeType).toBe("unexplored");
+  });
 
-    // Expanding the external node does not reach the class API either.
-    await act(async () => { await result.current.expandNode(wiki); });
-    expect(classRequests()).not.toContain(wiki);
+  it("still fetches and renders a well-known class used as a parent (schema:Person)", async () => {
+    const person = "https://schema.org/Person";
+    const calls = serveGraph([detail("Focus", { parent_iris: [person] }), { ...detail("Person"), iri: person }]);
+    const { result } = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(classRequests(calls)).toContain(person);
+    expect(result.current.graphData?.nodes).toContainEqual(expect.objectContaining({ id: person, label: "Person", nodeType: "root" }));
   });
 
   it("supports the empty lifecycle without mocks or a transport", async () => {
