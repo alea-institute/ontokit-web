@@ -52,8 +52,11 @@ export function useGraphData({
   // seeAlso/isDefinedBy targets in well-known vocabularies: external links,
   // never fetched. Every other target is fetched once like any IRI.
   const wellKnownTargetsRef = useRef<Set<string>>(new Set());
-  // IRIs the class API answered 404 for (cached via failedIrisRef too).
+  // IRIs the class API answered 404 for on this project + branch. Kept across
+  // focus changes so a web-page seeAlso is looked up once, not per graph;
+  // cleared by a branch/project switch or an explicit reset.
   const notFoundIrisRef = useRef<Set<string>>(new Set());
+  const notFoundScopeRef = useRef("");
   // External nodes in the graph last built, so expanding one does not refetch.
   const externalIrisRef = useRef<Set<string>>(new Set());
 
@@ -76,6 +79,11 @@ export function useGraphData({
       if (resolved.has(iri)) return resolved.get(iri)!;
       if (pending.has(iri)) return pending.get(iri)!;
       if (failed.has(iri) || resolved.size + pending.size >= MAX_RESOLVED_NODES) return null;
+      if (notFoundIrisRef.current.has(iri)) {
+        failed.add(iri);
+        return null;
+      }
+      const scope = notFoundScopeRef.current;
       if (isLanguageBuiltinIri(iri)) return null;
       const request = (async () => {
         try {
@@ -84,9 +92,10 @@ export function useGraphData({
           resolved.set(iri, detail);
           return detail;
         } catch (error) {
-          if (generation === generationRef.current) {
-            failed.add(iri);
-            if ((error as { status?: unknown } | null)?.status === 404) notFoundIrisRef.current.add(iri);
+          if (generation === generationRef.current) failed.add(iri);
+          // A 404 holds for the whole project + branch, even if this graph moved on.
+          if ((error as { status?: unknown } | null)?.status === 404 && scope === notFoundScopeRef.current) {
+            notFoundIrisRef.current.add(iri);
           }
           return null;
         } finally {
@@ -278,7 +287,11 @@ export function useGraphData({
     failedIrisRef.current = new Set();
     externalIrisRef.current = new Set();
     wellKnownTargetsRef.current = new Set();
-    notFoundIrisRef.current = new Set();
+    const scope = `${projectId}|${branch ?? ""}`;
+    if (notFoundScopeRef.current !== scope) {
+      notFoundScopeRef.current = scope;
+      notFoundIrisRef.current = new Set();
+    }
     nonClassLabelsRef.current = new Map();
     pendingRef.current = new Map();
     setResolvedCount(0);
@@ -349,7 +362,7 @@ export function useGraphData({
       cancelled = true;
       generationRef.current = generation + 1;
     };
-  }, [focusIri, accessToken, branch, fetchDetail, fetchNeighbors, getUnresolvedReferenced, referenceTargets, resolveAncestry, resolveNonClassLabels, buildGraph, initialDepth, resetRevision]);
+  }, [focusIri, accessToken, branch, fetchDetail, fetchNeighbors, getUnresolvedReferenced, referenceTargets, resolveAncestry, resolveNonClassLabels, buildGraph, initialDepth, projectId, resetRevision]);
 
   const expandNode = useCallback(
     async (iri: string) => {
@@ -358,6 +371,7 @@ export function useGraphData({
       if (externalIrisRef.current.has(iri)) return;
       const generation = generationRef.current;
       failedIrisRef.current.delete(iri);
+      notFoundIrisRef.current.delete(iri);
       setIsLoading(true);
 
       try {

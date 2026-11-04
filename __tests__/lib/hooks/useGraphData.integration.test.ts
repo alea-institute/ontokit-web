@@ -184,6 +184,23 @@ describe("graph loading with the real API client, graph builder and layout engin
     expect(classRequests(calls).filter((target) => target === wiki)).toHaveLength(1);
   });
 
+  it("keeps a 404 cached across focus changes, and forgets it on reset", async () => {
+    const wiki = "https://en.wikipedia.org/wiki/ISO_3166-2";
+    const calls = serveGraph([
+      detail("Focus", { annotations: seeAlso(wiki) }),
+      detail("Other", { annotations: seeAlso(wiki) }),
+    ]);
+    const { result, rerender } = renderHook(({ focus }) => useGraphData({ ...options, focusIri: focus }), { initialProps: { focus: iri("Focus") } });
+    await waitFor(() => expect(result.current.graphData?.nodes.some((node) => node.id === wiki)).toBe(true));
+    rerender({ focus: iri("Other") });
+    await waitFor(() => expect(result.current.graphData?.nodes.some((node) => node.id === iri("Other"))).toBe(true));
+    expect(result.current.graphData?.nodes).toContainEqual(expect.objectContaining({ id: wiki, nodeType: "external" }));
+    expect(classRequests(calls).filter((target) => target === wiki)).toHaveLength(1);
+
+    act(() => result.current.resetGraph());
+    await waitFor(() => expect(classRequests(calls).filter((target) => target === wiki)).toHaveLength(2));
+  });
+
   it("resolves a modular ontology's seeAlso target in another namespace that is also a parent", async () => {
     const nsB = "https://module-b.test/onto#";
     const calls = serveGraph([
