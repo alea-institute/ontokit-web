@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { clearGraphLookupCache } from "@/lib/hooks/useGraphData";
 import { OntologyGraph } from "@/components/graph/OntologyGraph";
 
 const iri = (name: string) => `https://example.test/${name}`;
@@ -31,7 +32,7 @@ beforeEach(() => {
   });
   vi.stubGlobal("fetch", fetchBoundary);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); clearGraphLookupCache(); });
 const props = { focusIri: iri("Focus"), projectId: "graph", branch: "review", accessToken: "fixture-token" };
 
 describe("graph with real React Flow, ELK layout, nodes and API loading", () => {

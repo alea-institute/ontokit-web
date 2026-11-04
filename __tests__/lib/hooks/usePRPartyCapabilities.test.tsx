@@ -1,5 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider, focusManager } from "@tanstack/react-query";
+import React, { type ReactNode } from "react";
+import { ApiError } from "@/lib/api/client";
 import { createQueryWrapper } from "../../helpers/renderWithProviders";
 import type { PRPartyMe } from "@/lib/api/prParty";
 
@@ -80,6 +83,49 @@ describe("usePRPartyCapabilities", () => {
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.isReviewer).toBe(false);
+  });
+
+  describe("on a deployment without PR Party (404)", () => {
+    // Production defaults: retries on, so a 404 must opt out explicitly.
+    function productionWrapper() {
+      const client = new QueryClient({ defaultOptions: { queries: { retryDelay: 0 } } });
+      function Wrapper({ children }: { children: ReactNode }) {
+        return React.createElement(QueryClientProvider, { client }, children);
+      }
+      return Wrapper;
+    }
+
+    it("treats 404 as 'not enabled': no error, no retry, no refetch", async () => {
+      mockedGetMe.mockRejectedValue(new ApiError(404, "Not Found", '{"detail":"Not Found"}'));
+      const wrapper = productionWrapper();
+      const first = renderHook(() => usePRPartyCapabilities(), { wrapper });
+
+      await waitFor(() => expect(first.result.current.isLoading).toBe(false));
+      expect(first.result.current.isError).toBe(false);
+      expect(first.result.current.isReviewer).toBe(false);
+      expect(first.result.current.available).toBe(false);
+      expect(mockedGetMe).toHaveBeenCalledTimes(1);
+
+      // Another page's header mounts, and the window regains focus: the
+      // cached negative stands.
+      const second = renderHook(() => usePRPartyCapabilities(), { wrapper });
+      act(() => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(second.result.current.available).toBe(false);
+      expect(mockedGetMe).toHaveBeenCalledTimes(1);
+      focusManager.setFocused(undefined);
+    });
+
+    it("still reports other failures as errors", async () => {
+      mockedGetMe.mockRejectedValue(new ApiError(500, "Server Error", "boom"));
+      const { result } = renderHook(() => usePRPartyCapabilities(), { wrapper: productionWrapper() });
+      await waitFor(() => expect(result.current.isError).toBe(true), { timeout: 2000 });
+      expect(result.current.available).toBe(true);
+      expect(mockedGetMe.mock.calls.length).toBeGreaterThan(1);
+    });
   });
 
   it("reports a non-reviewer answered with 200", async () => {

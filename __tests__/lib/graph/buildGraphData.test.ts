@@ -3,6 +3,8 @@ import {
   getSeeAlsoIris,
   extractTreeLabelMap,
   buildGraphFromClassDetail,
+  isLanguageBuiltinIri,
+  isWellKnownIri,
 } from "@/lib/graph/buildGraphData";
 import type { OWLClassDetail } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
@@ -288,5 +290,46 @@ describe("buildGraphFromClassDetail", () => {
 
     expect(result.nodes.some((n) => n.id === owlThing)).toBe(false);
     expect(result.edges.some((e) => e.source === owlThing || e.target === owlThing)).toBe(false);
+  });
+});
+
+describe("external references", () => {
+  const SEE_ALSO = "http://www.w3.org/2000/01/rdf-schema#seeAlso";
+  const wiki = "https://en.wikipedia.org/wiki/ISO_3166-2";
+
+  it("knows the well-known vocabularies, including the Turtle editor's prefixes", () => {
+    expect(isWellKnownIri("http://www.w3.org/2004/02/skos/core#Concept")).toBe(true);
+    expect(isWellKnownIri("https://schema.org/Person")).toBe(true);
+    expect(isWellKnownIri(wiki)).toBe(false);
+  });
+
+  it("keeps language built-ins (owl:Nothing, xsd:string) external wherever they appear", () => {
+    expect(isLanguageBuiltinIri("http://www.w3.org/2002/07/owl#Nothing")).toBe(true);
+    expect(isLanguageBuiltinIri("http://www.w3.org/2001/XMLSchema#string")).toBe(true);
+    expect(isLanguageBuiltinIri("https://schema.org/Person")).toBe(false);
+    expect(isLanguageBuiltinIri("http://www.w3.org/2004/02/skos/core#Concept")).toBe(false);
+  });
+
+  it("marks caller-supplied external seeAlso targets as external nodes", () => {
+    const focus = makeClassDetail({
+      iri: "https://example.test/onto#A",
+      annotations: [{ property_iri: SEE_ALSO, property_label: "see also", values: [{ value: wiki, lang: "" }] }],
+    } as Partial<OWLClassDetail>);
+    const graph = buildGraphFromClassDetail(focus.iri, new Map([[focus.iri, focus]]), undefined, undefined, new Set([wiki]));
+    expect(graph.nodes.find((n) => n.id === wiki)?.nodeType).toBe("external");
+  });
+
+  it("never marks structure external, even a well-known parent such as schema:Person", () => {
+    const person = "https://schema.org/Person";
+    const other = "https://other.test/Module";
+    const focus = makeClassDetail({
+      iri: "https://example.test/onto#A",
+      parent_iris: [person],
+      equivalent_iris: [other],
+      annotations: [{ property_iri: SEE_ALSO, property_label: "see also", values: [{ value: other, lang: "" }] }],
+    } as Partial<OWLClassDetail>);
+    const graph = buildGraphFromClassDetail(focus.iri, new Map([[focus.iri, focus]]), undefined, undefined, new Set([person, other]));
+    expect(graph.nodes.find((n) => n.id === person)?.nodeType).toBe("unexplored");
+    expect(graph.nodes.find((n) => n.id === other)?.nodeType).toBe("unexplored");
   });
 });

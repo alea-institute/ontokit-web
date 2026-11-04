@@ -1,7 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { act, render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 
+import { isMobileDetailEntry, MOBILE_DETAIL_HISTORY_KEY } from "@/lib/editor/mobilePane";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 
 // --- Mocks ---
@@ -28,6 +29,13 @@ vi.mock("@/lib/hooks/useLLMGate", () => ({
     isError: false,
     error: null,
   }),
+}));
+
+// The layout re-applies its history marker after router commits, keyed on the URL.
+let _searchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/projects/proj-1",
+  useSearchParams: () => _searchParams,
 }));
 
 vi.mock("next/dynamic", () => ({
@@ -1209,6 +1217,40 @@ describe("StandardEditorLayout single-pane layout below md", () => {
     expect(screen.getByTestId("mobile-back-to-tree").textContent).toContain("Properties");
   });
 
+  it("shows the list, not the details, when switching to a tab that already has a selection", () => {
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+    fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
+    fireEvent.click(screen.getByText("Properties"));
+    act(() => {
+      (_propertyTreeProps.onSelect as (iri: string) => void)("http://example.org/hasPart");
+    });
+    expect(hiddenOnMobile(detailPane())).toBe(false);
+    fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
+
+    // Classes still has ClassA selected; the tab switch must land on its tree.
+    fireEvent.click(screen.getByText("Classes"));
+    expect(treePane().dataset.mobilePane).toBe("tree");
+    expect(hiddenOnMobile(treePane())).toBe(false);
+    expect(hiddenOnMobile(detailPane())).toBe(true);
+    expect(screen.getByTestId("class-tree").getAttribute("data-selected")).toBe(classA);
+
+    // ...and back to Properties, which also keeps its selection.
+    fireEvent.click(screen.getByText("Properties"));
+    expect(hiddenOnMobile(treePane())).toBe(false);
+    expect(hiddenOnMobile(detailPane())).toBe(true);
+    expect(_propertyTreeProps.selectedIri).toBe("http://example.org/hasPart");
+  });
+
+  it("still opens the details when an entity link navigates to another tab", () => {
+    const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA, entityNavigationRef: ref })} />);
+    act(() => {
+      ref.current!("http://example.org/hasPart", "property");
+    });
+    expect(hiddenOnMobile(detailPane())).toBe(false);
+    expect(screen.getByTestId("mobile-back-to-tree").textContent).toContain("Properties");
+  });
+
   it("moves focus to the tree after the mobile Back control", async () => {
     render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
     const back = screen.getByTestId("mobile-back-to-tree");
@@ -1247,6 +1289,153 @@ describe("StandardEditorLayout single-pane layout below md", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  describe("hardware Back on a phone", () => {
+    beforeEach(() => {
+      window.history.replaceState(null, "");
+      vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
+      vi.stubGlobal("scrollTo", vi.fn());
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      window.history.replaceState(null, "");
+    });
+    const popTo = (state: unknown) => {
+      act(() => {
+        window.history.replaceState(state, "");
+        window.dispatchEvent(new PopStateEvent("popstate", { state }));
+      });
+    };
+
+    it("pushes a history entry when the details open, and Back returns to the tree", () => {
+      const selectNode = vi.fn();
+      const props = defaultProps({ nodes: sampleNodes, selectNode });
+      const { rerender } = render(<StandardEditorLayout {...props} />);
+      const before = window.history.length;
+      act(() => {
+        (_classTreeProps.onSelect as (iri: string) => void)(classA);
+      });
+      rerender(<StandardEditorLayout {...props} selectedIri={classA} />);
+      expect(hiddenOnMobile(detailPane())).toBe(false);
+      expect(window.history.length).toBe(before + 1);
+      expect(isMobileDetailEntry(window.history.state)).toBe(true);
+
+      popTo(null);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(hiddenOnMobile(detailPane())).toBe(true);
+      expect(selectNode).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("class-tree").getAttribute("data-selected")).toBe(classA);
+
+      // Forward returns to the details.
+      popTo({ [MOBILE_DETAIL_HISTORY_KEY]: "detail" });
+      expect(hiddenOnMobile(detailPane())).toBe(false);
+    });
+
+    it("gives a ?classIri= deep link a tree entry to return to", () => {
+      const before = window.history.length;
+      render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+      expect(window.history.length).toBe(before + 1);
+      popTo(null);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+    });
+
+    it("routes the on-screen Back control through history when it pushed the entry", () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+      fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
+      expect(back).toHaveBeenCalledTimes(1);
+      back.mockRestore();
+    });
+
+    it("drops its detail entry when the tree shows without a Back, so one device Back still leaves", () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+      expect(isMobileDetailEntry(window.history.state)).toBe(true);
+
+      // A tab switch reveals that tab's list without going through history.
+      fireEvent.click(screen.getByText("Properties"));
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(back).toHaveBeenCalledTimes(1);
+
+      // The popstate from that back() is ours and changes nothing...
+      popTo(null);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      // ...and the next one is handled normally: open a property, press Back.
+      act(() => {
+        (_propertyTreeProps.onSelect as (iri: string) => void)("http://example.org/hasPart");
+      });
+      expect(hiddenOnMobile(detailPane())).toBe(false);
+      popTo(null);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(back).toHaveBeenCalledTimes(1);
+      back.mockRestore();
+    });
+
+    it("drops its detail entry when the selection is cleared", () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const props = defaultProps({ nodes: sampleNodes, selectedIri: classA });
+      const { rerender } = render(<StandardEditorLayout {...props} />);
+      rerender(<StandardEditorLayout {...props} selectedIri={null} />);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(back).toHaveBeenCalledTimes(1);
+      back.mockRestore();
+    });
+
+    it("re-marks its entry after the router replaces history state", async () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const props = defaultProps({ nodes: sampleNodes, selectedIri: classA });
+      const { rerender } = render(<StandardEditorLayout {...props} />);
+      const length = window.history.length;
+
+      // router.replace (e.g. consuming ?propose=1) rebuilds state without the marker.
+      window.history.replaceState({ __NA: true }, "");
+      _searchParams = new URLSearchParams("branch=main");
+      rerender(<StandardEditorLayout {...props} />);
+      await vi.waitFor(() => expect(window.history.state).toEqual({ __NA: true, [MOBILE_DETAIL_HISTORY_KEY]: "detail" }));
+      expect(window.history.length).toBe(length);
+
+      // Even while stripped, the on-screen Back goes through history (no orphan entry).
+      window.history.replaceState({}, "");
+      fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
+      expect(back).toHaveBeenCalledTimes(1);
+      back.mockRestore();
+      _searchParams = new URLSearchParams();
+    });
+
+    it("does not mark the entry it returns to when Back changes the URL", async () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const props = defaultProps({ nodes: sampleNodes, selectedIri: classA });
+      const { rerender } = render(<StandardEditorLayout {...props} />);
+      // The router re-renders with the traversed URL before our popstate runs.
+      _searchParams = new URLSearchParams("from=back");
+      window.history.replaceState({ __NA: true }, "");
+      act(() => {
+        rerender(<StandardEditorLayout {...props} />);
+      });
+      act(() => {
+        window.dispatchEvent(new PopStateEvent("popstate", { state: { __NA: true } }));
+      });
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(isMobileDetailEntry(window.history.state)).toBe(false);
+      // A marked tree entry would make the next tree reveal step back again.
+      expect(back).not.toHaveBeenCalled();
+      back.mockRestore();
+      _searchParams = new URLSearchParams();
+    });
+
+    it("leaves history alone on desktop", () => {
+      vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: false }));
+      const before = window.history.length;
+      render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+      act(() => {
+        (_classTreeProps.onSelect as (iri: string) => void)("http://example.org/ClassB");
+      });
+      expect(window.history.length).toBe(before);
+      popTo(null);
+      expect(hiddenOnMobile(detailPane())).toBe(false);
+    });
   });
 
   it("gives the graph a definite height on phones so React Flow can render", () => {

@@ -1,3 +1,4 @@
+import { commonPrefixes } from "@/lib/editor/languages/turtle";
 import { getLocalName } from "@/lib/utils";
 import type { OWLClassDetail } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
@@ -12,13 +13,33 @@ const WELL_KNOWN_NAMESPACES = new Set([
   "http://purl.org/dc/terms/",
   "http://xmlns.com/foaf/0.1/",
   "http://www.w3.org/2004/02/skos/core#",
+  // The Turtle editor treats these as external vocabularies too.
+  ...commonPrefixes.map((p) => p.namespace),
 ]);
 
-function isExternalIri(iri: string): boolean {
+/**
+ * True for IRIs in a well-known external vocabulary (RDF, OWL, SKOS, the
+ * Turtle editor's commonPrefixes, …). Only consulted for seeAlso/isDefinedBy
+ * targets: a class that subclasses e.g. schema:Person still resolves it.
+ */
+export function isWellKnownIri(iri: string): boolean {
   for (const ns of WELL_KNOWN_NAMESPACES) {
     if (iri.startsWith(ns)) return true;
   }
   return false;
+}
+
+// The modelling language itself (owl:Nothing, rdfs:Resource, xsd:string, …):
+// never a project class, so external wherever it appears and never fetched.
+const LANGUAGE_NAMESPACES = [
+  "http://www.w3.org/2002/07/owl#",
+  "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+  "http://www.w3.org/2000/01/rdf-schema#",
+  "http://www.w3.org/2001/XMLSchema#",
+];
+
+export function isLanguageBuiltinIri(iri: string): boolean {
+  return LANGUAGE_NAMESPACES.some((ns) => iri.startsWith(ns));
 }
 
 const OWL_THING_IRI = "http://www.w3.org/2002/07/owl#Thing";
@@ -67,6 +88,7 @@ export function buildGraphFromClassDetail(
   resolvedNodes: Map<string, OWLClassDetail>,
   labelHints?: Map<string, string>,
   entityTypes?: Map<string, string>,
+  externalIris?: ReadonlySet<string>,
 ): GraphData {
   const visited = new Set<string>();
   const nodeMap = new Map<string, OntologyGraphNode>();
@@ -76,6 +98,14 @@ export function buildGraphFromClassDetail(
   // Collect resolved labels from all parent_labels maps so unresolved nodes
   // can display human-readable names instead of raw IRI fragments.
   const knownLabels = new Map<string, string>();
+  // Parents, equivalents and disjoints of resolved classes are ontology
+  // structure, never external links, whatever else points at them.
+  const structuralIris = new Set<string>();
+  for (const detail of resolvedNodes.values()) {
+    for (const iri of detail.parent_iris) structuralIris.add(iri);
+    for (const iri of detail.equivalent_iris ?? []) structuralIris.add(iri);
+    for (const iri of detail.disjoint_iris ?? []) structuralIris.add(iri);
+  }
   for (const detail of resolvedNodes.values()) {
     if (detail.parent_labels) {
       for (const [iri, label] of Object.entries(detail.parent_labels)) {
@@ -94,7 +124,8 @@ export function buildGraphFromClassDetail(
 
   function getNodeType(iri: string): GraphNodeType {
     if (iri === focusIri) return "focus";
-    if (isExternalIri(iri)) return "external";
+    if (isLanguageBuiltinIri(iri)) return "external";
+    if (externalIris?.has(iri) && !resolvedNodes.has(iri) && !structuralIris.has(iri)) return "external";
     // Check entity type for non-class entities
     const et = entityTypes?.get(iri);
     if (et === "individual") return "individual";

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
+import { ApiError } from "@/lib/api/client";
 import { prPartyApi, type PRPartyMe } from "@/lib/api/prParty";
 import { prPartyQueryKeys, prPartyUserKey } from "./usePRPartyQueue";
 
@@ -23,11 +24,22 @@ export function usePRPartyCapabilities() {
   const query = useQuery({
     // User-scoped: a cached reviewer posture must not survive a user switch.
     queryKey: prPartyQueryKeys.capabilities(userKey),
-    queryFn: () => prPartyApi.getMe(token!),
+    // A deployment without PR Party answers 404. That is "feature not
+    // enabled", not a failure: cache `null` as the answer instead of
+    // erroring, so it neither retries nor refetches on every page.
+    queryFn: async (): Promise<PRPartyMe | null> => {
+      try {
+        return await prPartyApi.getMe(token!);
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 404) return null;
+        throw error;
+      }
+    },
     enabled: !!token,
-    // Credential expiry and degraded state change under the user's feet.
-    staleTime: 0,
-    refetchOnWindowFocus: true,
+    // Credential expiry and degraded state change under the user's feet; the
+    // "not enabled" answer does not.
+    staleTime: (q) => (q.state.data === null ? Infinity : 0),
+    refetchOnWindowFocus: (q) => q.state.data !== null,
   });
 
   const capabilities: PRPartyMe | null = query.data ?? null;
@@ -35,6 +47,8 @@ export function usePRPartyCapabilities() {
 
   return {
     capabilities,
+    /** False once the server said PR Party is not enabled here (404). */
+    available: query.data !== null,
     /** Fail-closed: only true once a 200 has said so. */
     isReviewer: settled && capabilities?.is_reviewer === true,
     /** GitHub or the brief generator is unavailable; verdicts record intent. */

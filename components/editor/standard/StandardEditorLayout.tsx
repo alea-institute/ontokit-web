@@ -4,6 +4,7 @@ import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProv
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import { usePathname, useSearchParams } from "next/navigation";
 import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
 import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
 import { useLLMGate } from "@/lib/hooks/useLLMGate";
@@ -34,8 +35,12 @@ import { cn } from "@/lib/utils";
 import {
   MOBILE_BACK_LABEL,
   isSinglePaneViewport,
+  isMobileDetailEntry,
+  markMobileDetailEntry,
+  type MobilePane,
   mobilePaneVisibility,
   mobileSelectionKey,
+  pushMobileDetailEntry,
   resolveMobilePane,
 } from "@/lib/editor/mobilePane";
 
@@ -397,7 +402,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   const paneVisibility = mobilePaneVisibility(mobilePane);
   const treePaneRef = useRef<HTMLDivElement>(null);
   const mobileBackRef = useRef<HTMLButtonElement>(null);
-  const showMobileTree = useCallback(() => {
+  const revealMobileTree = useCallback(() => {
     setShowGraph(false);
     setMobileDismissedKey(mobileKey);
     // The Back button disappears with the detail pane, so move focus (and the
@@ -414,6 +419,78 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
       (tree && tree.tabIndex >= 0 ? tree : pane).focus({ preventScroll: true });
     });
   }, [mobileKey]);
+  // On a phone the details sit on their own history entry (see
+  // pushMobileDetailEntry), so the device's Back returns to the tree. The
+  // on-screen Back control goes through history too, keeping the two in step.
+  // True while the current history entry is the detail entry this layout
+  // pushed. Next's router.replace rebuilds history.state without the marker,
+  // so the marker alone cannot say whether the entry is ours.
+  const ownsDetailEntryRef = useRef(false);
+  // The popstate our own history.back() causes, which must not be re-handled.
+  const ignoreNextPopRef = useRef(false);
+  const prevMobilePaneRef = useRef<MobilePane>(mobilePane);
+  const showMobileTree = useCallback(() => {
+    if (isSinglePaneViewport() && ownsDetailEntryRef.current) {
+      window.history.back();
+      return;
+    }
+    revealMobileTree();
+  }, [revealMobileTree]);
+  useEffect(() => {
+    const previous = prevMobilePaneRef.current;
+    prevMobilePaneRef.current = mobilePane;
+    if (!isSinglePaneViewport()) return;
+    if (mobilePane === "detail") {
+      pushMobileDetailEntry();
+      ownsDetailEntryRef.current = true;
+      return;
+    }
+    // The tree showed without a Back (tab switch, selection cleared, graph
+    // closed): drop our detail entry so the next device Back is not swallowed.
+    if (previous === "detail" && ownsDetailEntryRef.current) {
+      ownsDetailEntryRef.current = false;
+      ignoreNextPopRef.current = true;
+      window.history.back();
+    }
+  }, [mobilePane]);
+  // Restore the marker after a router commit (router.replace, demo banners'
+  // replaceState) stripped it from the entry we own.
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlKey = `${pathname ?? ""}?${searchParams?.toString() ?? ""}`;
+  useEffect(() => {
+    if (mobilePane !== "detail" || !ownsDetailEntryRef.current || !isSinglePaneViewport()) return;
+    // On Back/Forward the router re-renders with the traversed URL from its
+    // own popstate listener, before ours has settled ownership. Deferring a
+    // task lets every popstate listener run first, so the entry we just
+    // returned to is never marked.
+    const id = window.setTimeout(() => {
+      if (ownsDetailEntryRef.current) markMobileDetailEntry();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [urlKey, mobilePane]);
+  const revealMobileTreeRef = useRef(revealMobileTree);
+  useEffect(() => {
+    revealMobileTreeRef.current = revealMobileTree;
+  }, [revealMobileTree]);
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      if (ignoreNextPopRef.current) {
+        ignoreNextPopRef.current = false;
+        return;
+      }
+      if (!isSinglePaneViewport()) return;
+      if (isMobileDetailEntry(event.state)) {
+        ownsDetailEntryRef.current = true;
+        setMobileDismissedKey(null);
+      } else {
+        ownsDetailEntryRef.current = false;
+        revealMobileTreeRef.current();
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   // Re-picking the same entity after backing out must reopen its details;
   // the detail pane then starts at its top instead of the tree's scroll offset.
   const openMobileDetail = useCallback(() => {
@@ -436,6 +513,20 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     openMobileDetail();
     setSelectedIndividualIri(iri);
   }, [openMobileDetail]);
+
+  // A tab switch on a phone lands on that tab's list even when the tab kept a
+  // selection from earlier: the visitor switched tabs to browse, and picking
+  // an entity there opens its details. Programmatic navigation (lint issues,
+  // entity links) goes through `setActiveTab` directly and still opens them.
+  const handleTabChange = useCallback((tab: EntityTab) => {
+    const tabSelection =
+      tab === "classes" ? selectedIri
+        : tab === "properties" ? selectedPropertyIri
+          : selectedIndividualIri;
+    setActiveTab(tab);
+    setMobileDismissedKey(mobileSelectionKey(tab, tabSelection));
+    if (isSinglePaneViewport()) setShowGraph(false);
+  }, [selectedIri, selectedPropertyIri, selectedIndividualIri]);
 
   const handleSearchSelect = (iri: string) => {
     openMobileDetail();
@@ -481,7 +572,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         style={{ "--tree-panel-width": `${treePanelWidth}px` } as React.CSSProperties}
       >
         {/* Entity Type Tabs */}
-        <EntityTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        <EntityTabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
         {/* Toolbar: add + expand/collapse + search */}
         <EntityTreeToolbar

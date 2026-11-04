@@ -59,6 +59,46 @@ export function isSinglePaneViewport(): boolean {
   return window.matchMedia("(width < 48rem)").matches;
 }
 
+/**
+ * History-state key that marks a "detail pane" entry. Opening the details on a
+ * phone pushes a same-URL entry carrying this marker, so the browser's (or the
+ * device's) Back returns to the tree instead of leaving the viewer. The URL and
+ * its `?classIri=` deep link stay untouched.
+ */
+export const MOBILE_DETAIL_HISTORY_KEY = "__ontokitMobilePane";
+
+export function isMobileDetailEntry(state: unknown): boolean {
+  return typeof state === "object" && state !== null
+    && (state as Record<string, unknown>)[MOBILE_DETAIL_HISTORY_KEY] === "detail";
+}
+
+/**
+ * Push a detail-pane entry unless the current entry already is one. Keeps the
+ * existing state (the Next.js router stores its own keys there) and the URL.
+ * Client-only; returns whether an entry was pushed.
+ */
+export function pushMobileDetailEntry(): boolean {
+  if (typeof window === "undefined") return false;
+  const current: unknown = window.history.state;
+  if (isMobileDetailEntry(current)) return false;
+  const base = typeof current === "object" && current !== null ? current : {};
+  window.history.pushState({ ...base, [MOBILE_DETAIL_HISTORY_KEY]: "detail" }, "");
+  return true;
+}
+
+/**
+ * Re-mark the current entry as a detail entry in place. The Next.js router
+ * rebuilds `history.state` on `router.replace` (and `history.replaceState`
+ * calls go through its patch), dropping the marker; this restores it.
+ */
+export function markMobileDetailEntry(): void {
+  if (typeof window === "undefined") return;
+  const current: unknown = window.history.state;
+  if (isMobileDetailEntry(current)) return;
+  const base = typeof current === "object" && current !== null ? current : {};
+  window.history.replaceState({ ...base, [MOBILE_DETAIL_HISTORY_KEY]: "detail" }, "");
+}
+
 export const MOBILE_BACK_LABEL: Record<string, string> = {
   classes: "Classes",
   properties: "Properties",

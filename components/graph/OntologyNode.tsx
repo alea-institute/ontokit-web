@@ -55,8 +55,15 @@ export const OntologyNode = memo(function OntologyNode({
 }: OntologyNodeProps) {
   const { label, nodeType, deprecated, childCount, isExpanded, onNavigate, onExpandNode } = data;
 
+  const isWebLink = nodeType === "external" && /^https?:\/\//i.test(id);
+
   const handleClick = () => {
-    if (nodeType === "external") return;
+    // External nodes are not ontology entities: open web IRIs in a new tab,
+    // like the Turtle editor does for external vocabulary links.
+    if (nodeType === "external") {
+      if (isWebLink) window.open(id, "_blank", "noopener,noreferrer");
+      return;
+    }
     onNavigate?.(id);
   };
 
@@ -88,7 +95,8 @@ export const OntologyNode = memo(function OntologyNode({
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onKeyDown={handleKeyDown}
-      aria-label={`${label}${nodeType === "unexplored" ? " (click to expand)" : ""}`}
+      aria-label={`${label}${nodeType === "unexplored" ? " (click to expand)" : isWebLink ? " (opens in a new tab)" : ""}`}
+      title={nodeType === "external" ? id : undefined}
     >
       <Handle type="target" position={Position.Bottom} className="bg-slate-400! w-2! h-2! border-0!" />
 

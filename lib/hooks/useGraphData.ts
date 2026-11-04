@@ -2,11 +2,34 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
-import { buildGraphFromClassDetail, getSeeAlsoIris } from "@/lib/graph/buildGraphData";
+import {
+  buildGraphFromClassDetail,
+  getSeeAlsoIris,
+  isLanguageBuiltinIri,
+  isWellKnownIri,
+} from "@/lib/graph/buildGraphData";
 import { getLocalName } from "@/lib/utils";
 import type { GraphData } from "@/lib/graph/types";
 
 const MAX_RESOLVED_NODES = 100;
+
+// IRIs the class API answered 404 for, per "project|branch". Module-level so
+// the answer survives the graph closing and reopening (the hook remounts),
+// and a web-page seeAlso is looked up once per session, not once per graph.
+const notFoundByScope = new Map<string, Set<string>>();
+function notFoundFor(scope: string): Set<string> {
+  let set = notFoundByScope.get(scope);
+  if (!set) {
+    set = new Set();
+    notFoundByScope.set(scope, set);
+  }
+  return set;
+}
+
+/** Forget every cached 404 (tests; a sign-in change could also call it). */
+export function clearGraphLookupCache(): void {
+  notFoundByScope.clear();
+}
 
 interface UseGraphDataOptions {
   focusIri: string | null;
@@ -44,6 +67,25 @@ export function useGraphData({
   // Labels + entity types discovered for non-class entities via search API
   const nonClassLabelsRef = useRef<Map<string, { label: string; entityType: string }>>(new Map());
   const [resolvedCount, setResolvedCount] = useState(0);
+  // seeAlso/isDefinedBy targets in well-known vocabularies: external links,
+  // never fetched. Every other target is fetched once like any IRI.
+  const wellKnownTargetsRef = useRef<Set<string>>(new Set());
+  // This project + branch's cached 404s (see notFoundByScope); an explicit
+  // reset clears them, and expanding a node retries it.
+  const notFoundIrisRef = useRef<Set<string>>(new Set());
+  const notFoundScopeRef = useRef("");
+  // External nodes in the graph last built, so expanding one does not refetch.
+  const externalIrisRef = useRef<Set<string>>(new Set());
+
+  /** A detail's seeAlso/isDefinedBy targets worth fetching; well-known vocabulary targets are set aside. */
+  const referenceTargets = useCallback((detail: OWLClassDetail): string[] => {
+    const targets: string[] = [];
+    for (const target of getSeeAlsoIris(detail)) {
+      if (isWellKnownIri(target)) wellKnownTargetsRef.current.add(target);
+      else targets.push(target);
+    }
+    return targets;
+  }, []);
 
   const fetchDetail = useCallback(
     async (iri: string): Promise<OWLClassDetail | null> => {
@@ -54,14 +96,24 @@ export function useGraphData({
       if (resolved.has(iri)) return resolved.get(iri)!;
       if (pending.has(iri)) return pending.get(iri)!;
       if (failed.has(iri) || resolved.size + pending.size >= MAX_RESOLVED_NODES) return null;
+      if (notFoundIrisRef.current.has(iri)) {
+        failed.add(iri);
+        return null;
+      }
+      const scope = notFoundScopeRef.current;
+      if (isLanguageBuiltinIri(iri)) return null;
       const request = (async () => {
         try {
           const detail = await projectOntologyApi.getClassDetail(projectId, iri, accessToken, branch);
           if (generation !== generationRef.current) return null;
           resolved.set(iri, detail);
           return detail;
-        } catch {
+        } catch (error) {
           if (generation === generationRef.current) failed.add(iri);
+          // A 404 holds for the whole project + branch, even if this graph moved on.
+          if ((error as { status?: unknown } | null)?.status === 404 && scope === notFoundScopeRef.current) {
+            notFoundIrisRef.current.add(iri);
+          }
           return null;
         } finally {
           pending.delete(iri);
@@ -108,7 +160,7 @@ export function useGraphData({
               newNeighborIris.push(djIri);
             }
           }
-          for (const seeAlsoIri of getSeeAlsoIris(detail)) {
+          for (const seeAlsoIri of referenceTargets(detail)) {
             if (!resolvedNodesRef.current.has(seeAlsoIri)) {
               newNeighborIris.push(seeAlsoIri);
             }
@@ -117,7 +169,7 @@ export function useGraphData({
       }
       return [...new Set(newNeighborIris)];
     },
-    [fetchDetail],
+    [fetchDetail, referenceTargets],
   );
 
   /**
@@ -171,12 +223,12 @@ export function useGraphData({
       for (const iri of detail.parent_iris) referenced.add(iri);
       for (const iri of detail.equivalent_iris ?? []) referenced.add(iri);
       for (const iri of detail.disjoint_iris ?? []) referenced.add(iri);
-      for (const iri of getSeeAlsoIris(detail)) referenced.add(iri);
+      for (const iri of referenceTargets(detail)) referenced.add(iri);
     }
     return [...referenced].filter(
       (iri) => !resolvedNodesRef.current.has(iri) && !failedIrisRef.current.has(iri),
     );
-  }, []);
+  }, [referenceTargets]);
 
   /**
    * Resolve labels for non-class entities (individuals, properties) via search API.
@@ -227,7 +279,18 @@ export function useGraphData({
           entityTypes.set(iri, info.entityType);
         }
       }
-      const data = buildGraphFromClassDetail(focus, resolvedNodesRef.current, mergedHints, entityTypes);
+      // External = a seeAlso/isDefinedBy target that is a well-known vocabulary
+      // IRI or that the class API does not know (404) and the search did not
+      // identify as another entity. The builder never marks structure external.
+      const external = new Set<string>();
+      for (const detail of resolvedNodesRef.current.values()) {
+        for (const target of getSeeAlsoIris(detail)) {
+          if (resolvedNodesRef.current.has(target) || nonClassLabelsRef.current.has(target)) continue;
+          if (wellKnownTargetsRef.current.has(target) || notFoundIrisRef.current.has(target)) external.add(target);
+        }
+      }
+      externalIrisRef.current = external;
+      const data = buildGraphFromClassDetail(focus, resolvedNodesRef.current, mergedHints, entityTypes, external);
       setGraphData(data);
       setResolvedCount(resolvedNodesRef.current.size);
     },
@@ -239,6 +302,13 @@ export function useGraphData({
     const generation = ++generationRef.current;
     resolvedNodesRef.current = new Map();
     failedIrisRef.current = new Set();
+    externalIrisRef.current = new Set();
+    wellKnownTargetsRef.current = new Set();
+    const scope = `${projectId}|${branch ?? ""}`;
+    if (notFoundScopeRef.current !== scope) {
+      notFoundScopeRef.current = scope;
+      notFoundIrisRef.current = notFoundFor(scope);
+    }
     nonClassLabelsRef.current = new Map();
     pendingRef.current = new Map();
     setResolvedCount(0);
@@ -269,7 +339,7 @@ export function useGraphData({
           ...focusDetail.parent_iris,
           ...(focusDetail.equivalent_iris ?? []),
           ...(focusDetail.disjoint_iris ?? []),
-          ...getSeeAlsoIris(focusDetail),
+          ...referenceTargets(focusDetail),
         ];
         const depth2Candidates = await fetchNeighbors(depth1Iris);
         if (cancelled) return;
@@ -309,13 +379,16 @@ export function useGraphData({
       cancelled = true;
       generationRef.current = generation + 1;
     };
-  }, [focusIri, accessToken, branch, fetchDetail, fetchNeighbors, getUnresolvedReferenced, resolveAncestry, resolveNonClassLabels, buildGraph, initialDepth, resetRevision]);
+  }, [focusIri, accessToken, branch, fetchDetail, fetchNeighbors, getUnresolvedReferenced, referenceTargets, resolveAncestry, resolveNonClassLabels, buildGraph, initialDepth, projectId, resetRevision]);
 
   const expandNode = useCallback(
     async (iri: string) => {
       if (!focusIri) return;
+      // An external link node has nothing to expand; its 404 stays cached.
+      if (externalIrisRef.current.has(iri)) return;
       const generation = generationRef.current;
       failedIrisRef.current.delete(iri);
+      notFoundIrisRef.current.delete(iri);
       setIsLoading(true);
 
       try {
@@ -326,7 +399,7 @@ export function useGraphData({
             ...detail.parent_iris,
             ...(detail.equivalent_iris ?? []),
             ...(detail.disjoint_iris ?? []),
-            ...getSeeAlsoIris(detail),
+            ...referenceTargets(detail),
           ];
           await fetchNeighbors(neighborIris);
           if (generation !== generationRef.current) return;
@@ -354,7 +427,7 @@ export function useGraphData({
         if (generation === generationRef.current) setIsLoading(false);
       }
     },
-    [focusIri, fetchDetail, fetchNeighbors, getUnresolvedReferenced, resolveAncestry, resolveNonClassLabels, buildGraph],
+    [focusIri, fetchDetail, fetchNeighbors, getUnresolvedReferenced, referenceTargets, resolveAncestry, resolveNonClassLabels, buildGraph],
   );
 
   const resetGraph = useCallback(() => {
@@ -363,6 +436,9 @@ export function useGraphData({
     setResetRevision((revision) => revision + 1);
     resolvedNodesRef.current = new Map();
     failedIrisRef.current = new Set();
+    externalIrisRef.current = new Set();
+    wellKnownTargetsRef.current = new Set();
+    notFoundIrisRef.current.clear();
     nonClassLabelsRef.current = new Map();
     setGraphData(null);
     setResolvedCount(0);
