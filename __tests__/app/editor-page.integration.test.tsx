@@ -244,6 +244,25 @@ describe("Editor page real access and empty-state chains", () => {
     expect(within(dialog).getByText("Add new entity")).toBeTruthy();
     expect(within(dialog).getByText("Ctrl+N")).toBeTruthy();
   });
+  it("keeps branch, history, health and PR tools on phones for a signed-in editor", async () => {
+    authenticate();
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl" };
+    mount();
+    const shortcuts = await screen.findByRole("button", { name: "Keyboard shortcuts" });
+    const group = shortcuts.closest(".contents") as HTMLElement;
+    expect(group.className.split(/\s+/)).not.toContain("max-md:hidden");
+  });
+  it("drops desktop-only tools from the phone header for an anonymous proposer", async () => {
+    vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
+    projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
+    mount();
+    const shortcuts = await screen.findByRole("button", { name: "Keyboard shortcuts" });
+    const group = shortcuts.closest(".contents") as HTMLElement;
+    expect(group.className.split(/\s+/)).toContain("max-md:hidden");
+    // The Standard/Developer switcher stays reachable on phones.
+    const modeGroup = screen.getByRole("group", { name: "Editor mode" });
+    expect(modeGroup.className).not.toContain("max-md:hidden");
+  });
   it("allows an anonymous public project into the proposal route when authentication is optional", async () => {
     vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
     projectResponse = { ...projectResponse, user_role: null, is_public: true };

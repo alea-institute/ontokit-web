@@ -1209,6 +1209,52 @@ describe("StandardEditorLayout single-pane layout below md", () => {
     expect(screen.getByTestId("mobile-back-to-tree").textContent).toContain("Properties");
   });
 
+  it("moves focus to the tree after the mobile Back control", async () => {
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+    const back = screen.getByTestId("mobile-back-to-tree");
+    back.focus();
+    fireEvent.click(back);
+    // The mocked tree has no role="tree" container, so the pane is the target.
+    await vi.waitFor(() => expect(document.activeElement).toBe(treePane()));
+  });
+
+  it("moves focus to the detail pane's Back control after picking an entity on a phone", async () => {
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
+    vi.stubGlobal("scrollTo", vi.fn());
+    try {
+      const selectNode = vi.fn();
+      const { rerender } = render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectNode })} />);
+      act(() => {
+        (_classTreeProps.onSelect as (iri: string) => void)(classA);
+      });
+      rerender(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectNode, selectedIri: classA })} />);
+      await vi.waitFor(() => expect(document.activeElement).toBe(screen.getByTestId("mobile-back-to-tree")));
+      expect(window.scrollTo).toHaveBeenCalledWith({ top: 0 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("does not move focus after picking an entity on desktop", async () => {
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: false }));
+    try {
+      render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes })} />);
+      act(() => {
+        (_classTreeProps.onSelect as (iri: string) => void)(classA);
+      });
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      expect(document.activeElement).toBe(document.body);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("gives the graph a definite height on phones so React Flow can render", () => {
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show relationship graph" }));
+    expect(screen.getByTestId("graph-pane").className).toContain("max-md:h-[calc(100dvh-7.25rem)]");
+  });
+
   it("keeps the desktop tree width as a CSS variable applied only from md up", () => {
     render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes })} />);
     expect(treePane().className).toContain("md:w-(--tree-panel-width)");

@@ -287,8 +287,8 @@ function ViewerContent({
               </h1>
               <span className="text-sm text-slate-500 max-md:shrink-0 max-md:text-xs dark:text-slate-400">{totalClasses} classes</span>
               {canSuggest && <ViewerEditorSwitcher projectId={projectId} className="max-md:shrink-0" />}
-              {/* Developer mode (Monaco source editor) needs a desktop-width screen. */}
-              <ModeSwitcher className="max-md:hidden" />
+              {/* Stays visible on phones so a stored Developer preference is never a dead end. */}
+              <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2 max-md:w-full max-md:flex-wrap">
               {canPropose && (

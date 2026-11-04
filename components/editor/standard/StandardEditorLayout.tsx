@@ -396,21 +396,33 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   });
   const paneVisibility = mobilePaneVisibility(mobilePane);
   const treePaneRef = useRef<HTMLDivElement>(null);
+  const mobileBackRef = useRef<HTMLButtonElement>(null);
   const showMobileTree = useCallback(() => {
     setShowGraph(false);
     setMobileDismissedKey(mobileKey);
-    // Bring the entity the visitor came from back into view in the tree.
+    // The Back button disappears with the detail pane, so move focus (and the
+    // scroll position) to the entity the visitor came from. The tree uses
+    // aria-activedescendant, so the focus target is the tree container; the
+    // pane itself is the fallback (e.g. while the tree is still loading).
     requestAnimationFrame(() => {
-      treePaneRef.current
-        ?.querySelector<HTMLElement>('[role="treeitem"][aria-selected="true"]')
+      const pane = treePaneRef.current;
+      if (!pane) return;
+      pane
+        .querySelector<HTMLElement>('[role="treeitem"][aria-selected="true"]')
         ?.scrollIntoView({ block: "center" });
+      const tree = pane.querySelector<HTMLElement>('[role="tree"][tabindex], [role="tree"]');
+      (tree && tree.tabIndex >= 0 ? tree : pane).focus({ preventScroll: true });
     });
   }, [mobileKey]);
   // Re-picking the same entity after backing out must reopen its details;
   // the detail pane then starts at its top instead of the tree's scroll offset.
   const openMobileDetail = useCallback(() => {
     setMobileDismissedKey(null);
-    if (isSinglePaneViewport()) window.scrollTo({ top: 0 });
+    if (!isSinglePaneViewport()) return;
+    window.scrollTo({ top: 0 });
+    // The tree the visitor tapped in is now hidden; land focus on the
+    // detail pane's Back control so keyboard/screen-reader users follow.
+    requestAnimationFrame(() => mobileBackRef.current?.focus({ preventScroll: true }));
   }, []);
   const selectClassFromTree = useCallback((iri: string) => {
     openMobileDetail();
@@ -459,10 +471,11 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
       {/* Left Panel - Entity Tree/List with tabs */}
       <div
         ref={treePaneRef}
+        tabIndex={-1}
         data-testid="standard-tree-pane"
         data-mobile-pane={mobilePane}
         className={cn(
-          "w-full flex-shrink-0 bg-white md:w-(--tree-panel-width) dark:bg-slate-800",
+          "w-full flex-shrink-0 bg-white outline-hidden md:w-(--tree-panel-width) dark:bg-slate-800",
           paneVisibility.tree,
         )}
         style={{ "--tree-panel-width": `${treePanelWidth}px` } as React.CSSProperties}
@@ -601,6 +614,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         {/* Narrow screens only: return to the tree without losing the selection. */}
         <div className="sticky top-16 z-30 border-b border-slate-200 bg-white/95 px-2 py-1 backdrop-blur-sm md:hidden dark:border-slate-700 dark:bg-slate-800/95">
           <button
+            ref={mobileBackRef}
             type="button"
             data-testid="mobile-back-to-tree"
             onClick={showMobileTree}
@@ -612,7 +626,10 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         </div>
         <div className="max-md:min-h-0 max-md:flex-1 md:h-full">
         {showGraph ? (
-          <div className="flex h-full flex-col">
+          // Phones drop the fixed-height chain, but React Flow needs a definite
+          // height: fill the viewport below the sticky header (4rem) and the
+          // sticky Back bar (~3.25rem).
+          <div data-testid="graph-pane" className="flex h-full flex-col max-md:h-[calc(100dvh-7.25rem)] max-md:min-h-80">
             <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
               <button
                 onClick={() => setShowGraph(false)}
@@ -623,7 +640,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                 Back to Details
               </button>
             </div>
-            <div className="flex-1">
+            <div className="min-h-0 flex-1">
               <OntologyGraph
                 focusIri={selectedIri}
                 projectId={projectId}

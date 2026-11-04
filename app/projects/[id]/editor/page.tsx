@@ -1391,8 +1391,8 @@ export default function EditorPage() {
               <span className="text-sm text-slate-500 max-md:text-xs dark:text-slate-400">{totalClasses} classes</span>
               {/* Viewer / Editor switcher */}
               <ViewerEditorSwitcher projectId={projectId} />
-              {/* Standard / Developer mode switcher — Developer mode needs a desktop-width screen */}
-              <ModeSwitcher className="max-md:hidden" />
+              {/* Standard / Developer mode switcher — stays on phones so a stored Developer preference is never a dead end */}
+              <ModeSwitcher />
               {/* Suggestion mode indicator */}
               {isSuggestionMode && (
                 <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
@@ -1491,9 +1491,10 @@ export default function EditorPage() {
                 </Link>
               )}
 
-              {/* Desktop-width tools: `contents` keeps the desktop flex layout
-                  unchanged while letting phones drop them as one group. */}
-              <div className="contents max-md:hidden">
+              {/* Tools an anonymous proposer doesn't need: `contents` keeps the
+                  desktop flex layout unchanged while phones drop them as one
+                  group. Signed-in users keep them (the row wraps). */}
+              <div className={hasValidAccess ? "contents" : "contents max-md:hidden"}>
                 {/* WebSocket Connection Status */}
                 <div className="flex items-center gap-1">
                   <ConnectionStatus
@@ -1514,7 +1515,7 @@ export default function EditorPage() {
                 selectedLabel={selectedNodeFallback?.label}
               />
 
-              <div className="contents max-md:hidden">
+              <div className={hasValidAccess ? "contents" : "contents max-md:hidden"}>
                 {/* History Button */}
                 <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
 
