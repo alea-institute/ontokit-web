@@ -437,6 +437,20 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     setSelectedIndividualIri(iri);
   }, [openMobileDetail]);
 
+  // A tab switch on a phone lands on that tab's list even when the tab kept a
+  // selection from earlier: the visitor switched tabs to browse, and picking
+  // an entity there opens its details. Programmatic navigation (lint issues,
+  // entity links) goes through `setActiveTab` directly and still opens them.
+  const handleTabChange = useCallback((tab: EntityTab) => {
+    const tabSelection =
+      tab === "classes" ? selectedIri
+        : tab === "properties" ? selectedPropertyIri
+          : selectedIndividualIri;
+    setActiveTab(tab);
+    setMobileDismissedKey(mobileSelectionKey(tab, tabSelection));
+    if (isSinglePaneViewport()) setShowGraph(false);
+  }, [selectedIri, selectedPropertyIri, selectedIndividualIri]);
+
   const handleSearchSelect = (iri: string) => {
     openMobileDetail();
     baseSearchSelect(iri);
@@ -481,7 +495,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         style={{ "--tree-panel-width": `${treePanelWidth}px` } as React.CSSProperties}
       >
         {/* Entity Type Tabs */}
-        <EntityTabBar activeTab={activeTab} onTabChange={setActiveTab} />
+        <EntityTabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
         {/* Toolbar: add + expand/collapse + search */}
         <EntityTreeToolbar

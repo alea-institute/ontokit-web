@@ -1209,6 +1209,40 @@ describe("StandardEditorLayout single-pane layout below md", () => {
     expect(screen.getByTestId("mobile-back-to-tree").textContent).toContain("Properties");
   });
 
+  it("shows the list, not the details, when switching to a tab that already has a selection", () => {
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+    fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
+    fireEvent.click(screen.getByText("Properties"));
+    act(() => {
+      (_propertyTreeProps.onSelect as (iri: string) => void)("http://example.org/hasPart");
+    });
+    expect(hiddenOnMobile(detailPane())).toBe(false);
+    fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
+
+    // Classes still has ClassA selected; the tab switch must land on its tree.
+    fireEvent.click(screen.getByText("Classes"));
+    expect(treePane().dataset.mobilePane).toBe("tree");
+    expect(hiddenOnMobile(treePane())).toBe(false);
+    expect(hiddenOnMobile(detailPane())).toBe(true);
+    expect(screen.getByTestId("class-tree").getAttribute("data-selected")).toBe(classA);
+
+    // ...and back to Properties, which also keeps its selection.
+    fireEvent.click(screen.getByText("Properties"));
+    expect(hiddenOnMobile(treePane())).toBe(false);
+    expect(hiddenOnMobile(detailPane())).toBe(true);
+    expect(_propertyTreeProps.selectedIri).toBe("http://example.org/hasPart");
+  });
+
+  it("still opens the details when an entity link navigates to another tab", () => {
+    const ref = { current: null } as React.RefObject<((iri: string, type?: string) => void) | null>;
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA, entityNavigationRef: ref })} />);
+    act(() => {
+      ref.current!("http://example.org/hasPart", "property");
+    });
+    expect(hiddenOnMobile(detailPane())).toBe(false);
+    expect(screen.getByTestId("mobile-back-to-tree").textContent).toContain("Properties");
+  });
+
   it("moves focus to the tree after the mobile Back control", async () => {
     render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
     const back = screen.getByTestId("mobile-back-to-tree");
