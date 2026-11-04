@@ -38,8 +38,4 @@ The demo is live at `https://ontokit-demo.damienriehl.com` and ready for BAIF (T
    - **Mobile edge cases:** hash links and device rotation.
    - **Tree reload:** a rare tree reload when the URL is replaced.
    - **Coverage cache:** a per-commit cache for translation coverage.
-5. **ce-compound captures still pending:**
-   - **Hetzner SMTP:** outbound ports 25 and 465 are blocked, so mail uses 587.
-   - **Masterkey verification:** a wrong masterkey fails silently, so verify through real operations.
-   - **Shell SIGPIPE:** `tr | head` under `pipefail`.
-   - **Cloudflare UA block:** error 1010 for Python's default User-Agent.
+5. **ce-compound:** done. The two learnings are in `docs/solutions/integration-issues/`: the ZITADEL IdP options trap and Hetzner's SMTP 25/465 block. The other candidates are already covered by code, tests, or runbooks.
