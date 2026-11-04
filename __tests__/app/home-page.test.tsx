@@ -101,6 +101,17 @@ describe("HomePage public projects", () => {
     expect(screen.queryByText("No projects available")).toBeNull();
   });
 
+  it("links the privacy policy from the home page footer", async () => {
+    listProjects.mockResolvedValue(seededResponse);
+
+    renderPage();
+
+    await screen.findByText("FOLIO DEV");
+    const footer = screen.getByRole("navigation", { name: "Footer" });
+    const link = footer.querySelector('a[href="/privacy"]');
+    expect(link?.textContent).toBe("Privacy");
+  });
+
   it("does not gate the public list on a loading session in auth-disabled mode", async () => {
     sessionState.status = "loading";
     listProjects.mockResolvedValue(seededResponse);

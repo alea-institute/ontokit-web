@@ -6,6 +6,7 @@ import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { Plus, Search, Globe, Lock, FolderOpen, LogIn, User } from "lucide-react";
 import { Header } from "@/components/layout/header";
+import { SiteFooter } from "@/components/layout/site-footer";
 import { Button } from "@/components/ui/button";
 import { ProjectCard } from "@/components/projects/project-card";
 import { DemoProjectEntry } from "@/components/projects/demo-project-entry";
@@ -341,6 +342,7 @@ export default function HomePage() {
           </div>
         </div>
       </main>
+      <SiteFooter />
     </>
   );
 }

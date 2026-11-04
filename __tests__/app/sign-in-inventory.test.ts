@@ -94,6 +94,11 @@ const SIGN_IN_INVENTORY: Entry[] = [
     counts: { "sign-in-copy": 1 },
     note: "A 'Sign in required' heading with no control; the page is linked only from the provider-gated user menu.",
   },
+  {
+    file: "app/privacy/page.tsx", route: "/privacy", gate: "copy-only",
+    counts: { "sign-in-copy": 4 },
+    note: "Approved privacy policy prose describing OntoKit sign-in; no control.",
+  },
 ];
 
 const PATTERNS: Record<Kind, RegExp> = {
