@@ -1,25 +1,45 @@
-# Handoff: BAIF demo site, 2026-11-04
+---
+session: "f3ed339a-41c9-5c79-a202-808b59a585a4"
+written_at: "2026-11-04T20:25:10.837Z"
+head: "3527044938115186767679a6c7ce1923a35338bf"
+worktree: "/home/damienriehl/Coding Projects/ontokit-web"
+branch: "docs/d01-release-readiness-20260920"
+---
+# Handoff: BAIF demo site, 2026-11-04 (evening refresh)
 
-The demo is live at `https://ontokit-demo.damienriehl.com` and has passed hosted UAT. The receipt with full evidence is at `docs/releases/baif-2026-11/README.md`, and the plan at `docs/plans/2026-11-03-1846-feat-baif-ontokit-demo-site-plan.md`.
+The demo is live at `https://ontokit-demo.damienriehl.com` and ready for BAIF (Thursday, 2026-11-05). **Freeze it:** no deploys or ZITADEL changes before the talk unless something breaks. Full evidence is in `docs/releases/baif-2026-11/README.md`.
 
 ## State
 
-- **Deployed:** API `0c8289d4`, web `65ae751c`, both from the alea-institute forks' `dev` branches. Six PRs are merged: web #77–#79 and api #78–#80.
-- **Projects:** both are public. The Catholic Semantic Canon and FOLIO each push to their `*-ontokit-demo` fork, and embeddings are at 100%.
-- **Labels:** the rehearsal labels are reverted ("Holy See", "Canon Law"), so the stage edits can repeat.
+- **Deployed:** API `751c3509`, web `0df6e7ec`, both from the alea-institute forks' `dev` branches.
+- **Merged PRs:** web #77–#81 and api #78–#81.
+- **Projects:** both are public. The Catholic Semantic Canon and FOLIO each push to their `*-ontokit-demo` fork with no-reply commit authors. Embeddings are at 100%, and LLM assist (Anthropic, $25/month cap) works for admins only.
+- **Sign-in:**
+  - **Methods:** Google, GitHub, and email/password, with self-registration on and email-code verification on.
+  - **Auto-linking:** the IdPs link by email; this is safe only because verification is on.
+  - **Email:** delivered by Resend (EU) over SMTP port 587.
+  - **Organizations:** OntoKit, ALEA / FOLIO, and CDCF. The recipe is in `docs/runbooks/identity-hub.md`.
+- **Privacy policy:** live at `/privacy`. Google's consent screen is published but not brand-verified, so it shows "damienriehl.com".
+- **ZITADEL masterkey:** rotated 2026-11-04 and now supplied through an environment variable (`docs/runbooks/zitadel-masterkey/`).
 
 ## Operating rules
 
-- **Restart the worker before deploying.** It holds the embedding model (about 2.5 GB), and the box has no swap. A deploy that builds while the model is loaded thrashed the host on 2026-11-04.
-- **Don't edit an ontology while embeddings run.** The job aborts with "branch changed". A full run takes about 16 minutes.
-- **Use a browser-like User-Agent for scripted API calls.** Cloudflare blocks the default Python client (error 1010).
+- **Restart the worker before any deploy.** It holds the embedding model (about 2.5 GB), and the 8 GB box has no swap. A deploy build otherwise thrashes the host.
+- **Edit ZITADEL IdPs safely.** Never build an update from the v1 template search: send the full option set and verify via `GET /v2/idps/{id}` (see `docs/solutions/integration-issues/zitadel-idp-update-resets-provider-options.md`).
+- **Don't edit an ontology while embeddings run.** The job aborts with "branch changed".
+- **Use a browser-like User-Agent for scripted API calls.** Cloudflare blocks Python's default client.
 
-## Next
+## Next (after BAIF)
 
-1. **LLM:** configure LLM assist (Anthropic key, $25/month cap) for both projects once Damien provides the key. Then verify it in a browser as an admin.
-2. **Sign-in:** Damien signs in once on the demo host.
-3. **PR mirroring (optional):** grant the push token Pull requests write.
-4. **Follow-ups:**
-   - Mobile tab-jump and hardware Back behaviors.
-   - A per-commit graph cache for translation coverage.
-   - A harmless 404 when the graph includes an external-IRI node.
+1. **Deploy memory guard:** make deploys memory-safe, with the deploy script freeing memory before building, or with images built in CI and only pulled on the box.
+2. **riehl-dev:** investigate the saturated `riehl-dev` box (cockpit services).
+3. **Production:** plan a CDCF/ALEA domain, a dedicated Google project with brand verification, and a production ZITADEL.
+4. **Small follow-ups:**
+   - **Mobile edge cases:** hash links and device rotation.
+   - **Tree reload:** a rare tree reload when the URL is replaced.
+   - **Coverage cache:** a per-commit cache for translation coverage.
+5. **ce-compound captures still pending:**
+   - **Hetzner SMTP:** outbound ports 25 and 465 are blocked, so mail uses 587.
+   - **Masterkey verification:** a wrong masterkey fails silently, so verify through real operations.
+   - **Shell SIGPIPE:** `tr | head` under `pipefail`.
+   - **Cloudflare UA block:** error 1010 for Python's default User-Agent.
