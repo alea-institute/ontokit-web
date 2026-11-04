@@ -49,10 +49,10 @@ describe('similar concepts through React Query and the actual embeddings HTTP cl
     expect(decodeURIComponent(new URL(String(fetcher.mock.calls[1][0])).pathname)).toContain(entities[0].iri);
   });
 
-  it('shows unknown deprecated entities by local name and reopens cached public results', async () => {
+  it('shows unknown deprecated entities by local name and reopens cached results', async () => {
     const entity = { ...entities[0], iri: 'https://example.org/#Legacy', label: '', entity_type: 'future-type', score: .555, deprecated: true };
     const fetcher = transport(() => jsonResponse([entity]));
-    render(<SimilarConceptsPanel projectId="project" classIri={iri} />, { wrapper: llmHookHarness().wrapper });
+    render(<SimilarConceptsPanel projectId="project" classIri={iri} accessToken="test-token" />, { wrapper: llmHookHarness().wrapper });
     const toggle = await screen.findByRole('button', { name: 'Similar (1)' });
     fireEvent.click(toggle);
     const result = screen.getByTitle(entity.iri);
@@ -66,17 +66,17 @@ describe('similar concepts through React Query and the actual embeddings HTTP cl
     fireEvent.click(toggle);
     expect(screen.getByTitle(entity.iri)).toBeDefined();
     expect(fetcher).toHaveBeenCalledTimes(1);
-    expect(new Headers(fetcher.mock.calls[0][1]?.headers).has('Authorization')).toBe(false);
+    expect(new Headers(fetcher.mock.calls[0][1]?.headers).get('Authorization')).toBe('Bearer test-token');
     expect(new URL(String(fetcher.mock.calls[0][0])).searchParams.has('branch')).toBe(false);
   });
 
   it.each([403, 404])('distinguishes HTTP %s and recovers when switching to an indexed branch', async status => {
     const fetcher = transport(url => url.searchParams.get('branch') === 'ready' ? jsonResponse(entities) : jsonResponse({ detail: 'Unavailable' }, status));
-    const { rerender } = render(<SimilarConceptsPanel projectId="project" classIri={iri} branch="missing" />, { wrapper: llmHookHarness().wrapper });
+    const { rerender } = render(<SimilarConceptsPanel projectId="project" classIri={iri} accessToken="test-token" branch="missing" />, { wrapper: llmHookHarness().wrapper });
     fireEvent.click(await screen.findByRole('button', { name: 'Similar (0)' }));
     const message = status === 404 ? 'Generate embeddings in project settings to see similar concepts.' : 'Failed to load similar concepts.';
     expect(screen.getByText(message)).toBeDefined();
-    rerender(<SimilarConceptsPanel projectId="project" classIri={iri} branch="ready" />);
+    rerender(<SimilarConceptsPanel projectId="project" classIri={iri} accessToken="test-token" branch="ready" />);
     expect(await screen.findByTitle(entities[0].iri)).toBeDefined();
     expect(screen.queryByText(message)).toBeNull();
     expect(fetcher).toHaveBeenCalledTimes(2);
@@ -84,11 +84,27 @@ describe('similar concepts through React Query and the actual embeddings HTTP cl
 
   it('does not request without selection and hides a successful empty response', async () => {
     const fetcher = transport(() => jsonResponse([]));
-    const { container, rerender } = render(<SimilarConceptsPanel projectId="project" classIri={null} />, { wrapper: llmHookHarness().wrapper });
+    const { container, rerender } = render(<SimilarConceptsPanel projectId="project" classIri={null} accessToken="test-token" />, { wrapper: llmHookHarness().wrapper });
     expect(container.innerHTML).toBe('');
     expect(fetcher).not.toHaveBeenCalled();
-    rerender(<SimilarConceptsPanel projectId="project" classIri={iri} />);
+    rerender(<SimilarConceptsPanel projectId="project" classIri={iri} accessToken="test-token" />);
     await waitFor(() => expect(fetcher).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(container.innerHTML).toBe(''));
+  });
+
+  it('neither renders nor requests for anonymous visitors', async () => {
+    const fetcher = transport(() => jsonResponse(entities));
+    const { container } = render(<SimilarConceptsPanel projectId="project" classIri={iri} />, { wrapper: llmHookHarness().wrapper });
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(container.innerHTML).toBe('');
+    expect(screen.queryByRole('button', { name: /Similar/ })).toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it('renders the row for a signed-in visitor', async () => {
+    const fetcher = transport(() => jsonResponse(entities));
+    render(<SimilarConceptsPanel projectId="project" classIri={iri} accessToken="test-token" />, { wrapper: llmHookHarness().wrapper });
+    expect(await screen.findByRole('button', { name: 'Similar (3)' })).toBeDefined();
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
 });

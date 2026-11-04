@@ -118,10 +118,10 @@ describe("useSimilarEntities", () => {
     );
   });
 
-  it("works without accessToken or branch", async () => {
+  it("works without branch", async () => {
     mockedGetSimilar.mockResolvedValue(mockResponse);
     const { result } = renderHook(
-      () => useSimilarEntities("proj-1", "http://example.org/E"),
+      () => useSimilarEntities("proj-1", "http://example.org/E", "token"),
       { wrapper: createWrapper() },
     );
 
@@ -129,10 +129,19 @@ describe("useSimilarEntities", () => {
     expect(mockedGetSimilar).toHaveBeenCalledWith(
       "proj-1",
       "http://example.org/E",
-      undefined,
+      "token",
       undefined,
       10,
     );
+  });
+
+  it("is disabled without an access token (endpoint requires auth)", () => {
+    const { result } = renderHook(
+      () => useSimilarEntities("proj-1", "http://example.org/E"),
+      { wrapper: createWrapper() },
+    );
+    expect(result.current.isFetching).toBe(false);
+    expect(mockedGetSimilar).not.toHaveBeenCalled();
   });
 
   it("is disabled when entityIri is empty string", () => {

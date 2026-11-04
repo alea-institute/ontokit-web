@@ -743,13 +743,13 @@ export default function SuggestionReviewPage() {
                               </p>
                             </div>
 
-                            {/* Summary text */}
-                            {s.summary && (
+                            {/* Submitter's note for the reviewers (plain text, never rendered as markup) */}
+                            {s.summary?.trim() && (
                               <div>
                                 <h4 className="text-xs font-medium uppercase tracking-wider text-slate-600 dark:text-slate-400">
-                                  Summary
+                                  Note from submitter
                                 </h4>
-                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                                <p className="mt-1 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">
                                   {s.summary}
                                 </p>
                               </div>

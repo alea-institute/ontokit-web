@@ -81,6 +81,28 @@ describe("Suggestion review page through real project hook, API client and revie
     expect(new Headers(posted()[0][1].headers).get("Authorization")).toBe("Bearer review-token");
   });
 
+  it("shows the submitter's note as plain, whitespace-preserving text", async () => {
+    const note = "Please check the label.\n\n  <b>not bold</b> **not markdown**";
+    items = [{ ...suggestion("Noted"), summary: note }];
+    mount(); await ready();
+    fireEvent.click(screen.getByRole("button", { name: /Noted.*1 change/ }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Note from submitter")).toBeDefined();
+    const body = panel.getByText((_, el) => el?.tagName === "P" && el.textContent === note);
+    expect(body.className).toContain("whitespace-pre-wrap");
+    expect(body.className).toContain("break-words");
+    expect(body.querySelector("b")).toBeNull();
+  });
+
+  it.each([undefined, "", "   "])("omits the note block when the summary is %j", async summary => {
+    items = [{ ...suggestion("Quiet"), summary }];
+    mount(); await ready();
+    fireEvent.click(screen.getByRole("button", { name: /Quiet.*1 change/ }));
+    const panel = within(screen.getByRole("tabpanel"));
+    expect(panel.getByText("Submitted by")).toBeDefined();
+    expect(panel.queryByText("Note from submitter")).toBeNull();
+  });
+
   it("shares the real project query between page and home-link hook and authenticates queue requests", async () => {
     mount(); await ready();
     expect(fetchMock.mock.calls.filter(([url]) => new URL(url).pathname === "/api/v1/projects/project-review")).toHaveLength(1);

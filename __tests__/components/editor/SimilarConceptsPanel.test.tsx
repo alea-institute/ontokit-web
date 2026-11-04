@@ -20,6 +20,19 @@ describe("SimilarConceptsPanel", () => {
     expect(container.innerHTML).toBe("");
   });
 
+  it("renders nothing for anonymous visitors even if the hook had data", () => {
+    mockUseSimilarEntities.mockReturnValue({
+      data: [{ iri: "http://example.org/B", label: "ConceptB", entity_type: "class", score: 0.9, deprecated: false }],
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useSimilarEntities>);
+    const { container } = render(
+      <SimilarConceptsPanel projectId="p1" classIri="http://example.org/A" />
+    );
+    expect(container.innerHTML).toBe("");
+    expect(screen.queryByText(/Similar/)).toBeNull();
+  });
+
   it("returns null when not loading and no results", () => {
     mockUseSimilarEntities.mockReturnValue({
       data: [],
@@ -27,7 +40,7 @@ describe("SimilarConceptsPanel", () => {
       error: null,
     } as unknown as ReturnType<typeof useSimilarEntities>);
     const { container } = render(
-      <SimilarConceptsPanel projectId="p1" classIri="http://example.org/A" />
+      <SimilarConceptsPanel projectId="p1" classIri="http://example.org/A" accessToken="token" />
     );
     expect(container.innerHTML).toBe("");
   });
@@ -39,7 +52,7 @@ describe("SimilarConceptsPanel", () => {
       error: null,
     } as ReturnType<typeof useSimilarEntities>);
     render(
-      <SimilarConceptsPanel projectId="p1" classIri="http://example.org/A" />
+      <SimilarConceptsPanel projectId="p1" classIri="http://example.org/A" accessToken="token" />
     );
     expect(screen.getByText("Similar (...)")).toBeDefined();
   });
@@ -51,7 +64,7 @@ describe("SimilarConceptsPanel", () => {
       error: { status: 404, message: "Not found" },
     } as unknown as ReturnType<typeof useSimilarEntities>);
     render(
-      <SimilarConceptsPanel projectId="p1" classIri="http://example.org/A" />
+      <SimilarConceptsPanel projectId="p1" classIri="http://example.org/A" accessToken="token" />
     );
     await userEvent.click(screen.getByText("Similar (0)"));
     expect(
@@ -66,7 +79,7 @@ describe("SimilarConceptsPanel", () => {
       error: { status: 500, message: "Server error" },
     } as unknown as ReturnType<typeof useSimilarEntities>);
     render(
-      <SimilarConceptsPanel projectId="p1" classIri="http://example.org/A" />
+      <SimilarConceptsPanel projectId="p1" classIri="http://example.org/A" accessToken="token" />
     );
     await userEvent.click(screen.getByText("Similar (0)"));
     expect(screen.getByText("Failed to load similar concepts.")).toBeDefined();
@@ -86,6 +99,7 @@ describe("SimilarConceptsPanel", () => {
       <SimilarConceptsPanel
         projectId="p1"
         classIri="http://example.org/A"
+        accessToken="token"
         onNavigateToClass={onNavigate}
       />
     );
