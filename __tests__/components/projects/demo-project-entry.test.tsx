@@ -140,11 +140,31 @@ describe("DemoProjectEntry", () => {
     expect(screen.queryByText("Demo workspaces are temporarily unavailable.")).toBeNull();
   });
 
-  it("shows a preparation state when no server-marked demo exists", async () => {
+  it("renders nothing when the server confirms no demo exists", async () => {
     listProjects.mockResolvedValue(projectList([], 2));
-    renderEntry();
+    const { container } = renderEntry();
 
-    expect(await screen.findByText("Demo workspaces are being prepared.")).toBeDefined();
+    await waitFor(() => expect(listProjects).toHaveBeenCalledOnce());
+    // Let the resolved query settle before asserting absence.
+    await act(async () => {});
+    expect(screen.queryByText("Resettable workspace")).toBeNull();
+    expect(screen.queryByText("Demo workspaces are being prepared.")).toBeNull();
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("renders nothing while the demo lookup is loading", async () => {
+    const pending = deferred<ProjectListResponse>();
+    listProjects.mockReturnValueOnce(pending.promise);
+    const { container } = renderEntry();
+
+    await waitFor(() => expect(listProjects).toHaveBeenCalledOnce());
+    expect(screen.queryByText("Resettable workspace")).toBeNull();
+    expect(screen.queryByText("Checking the demo workspaces…")).toBeNull();
+    expect(container.innerHTML).toBe("");
+
+    await act(async () => pending.resolve(projectList([demoProject()], 1)));
+    expect(await screen.findByText("Resettable workspace")).toBeDefined();
+    expect(screen.getByText("FOLIO Demo")).toBeDefined();
   });
 
   it("links a live source project to only its server-linked demo", async () => {

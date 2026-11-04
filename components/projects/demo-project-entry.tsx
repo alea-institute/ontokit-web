@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpRight, FlaskConical, Network, PencilLine, RefreshCw } from "lucide-react";
+import { ArrowUpRight, FlaskConical, Network, PencilLine } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,14 @@ export function DemoProjectEntry() {
     queryFn: loadDemoProjects,
     staleTime: 5 * 60 * 1000,
   });
+  const data = query.data;
+
+  // Render nothing while loading (avoids a flash of the panel) and when the
+  // server confirms no demo workspaces exist: the panel's "resettable" copy is
+  // only true when demos are present.
+  if (query.isLoading || !data || (!data.unavailable && data.projects.length === 0)) {
+    return null;
+  }
 
   return (
     <section
@@ -93,12 +101,7 @@ export function DemoProjectEntry() {
         </div>
 
         <div aria-live="polite">
-          {query.isLoading ? (
-            <div className="flex min-h-24 items-center justify-center rounded-xl border border-slate-700 bg-slate-900/80 px-5 text-sm text-slate-300">
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin text-cyan-300" />
-              Checking the demo workspaces…
-            </div>
-          ) : query.data?.unavailable ? (
+          {data.unavailable ? (
             <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 p-4">
               <p className="font-medium text-amber-100">Demo workspaces are temporarily unavailable.</p>
               <p className="mt-1 text-sm text-amber-100/75">Public projects still work normally.</p>
@@ -112,9 +115,9 @@ export function DemoProjectEntry() {
                 {query.isFetching ? "Trying again…" : "Try again"}
               </Button>
             </div>
-          ) : query.data?.projects.length ? (
+          ) : (
             <div className="grid gap-2 sm:grid-cols-2">
-              {query.data.projects.map((project) => (
+              {data.projects.map((project) => (
                 <div key={project.id} className="rounded-xl border border-slate-700 bg-slate-900/90 p-4 backdrop-blur-sm">
                   <div className="flex items-center gap-2">
                     <Network className="h-4 w-4 text-cyan-300" />
@@ -131,11 +134,6 @@ export function DemoProjectEntry() {
                   </div>
                 </div>
               ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-4 text-sm text-slate-300">
-              <p className="font-medium text-white">Demo workspaces are being prepared.</p>
-              <p className="mt-1">Browse the public projects below in the meantime.</p>
             </div>
           )}
         </div>
