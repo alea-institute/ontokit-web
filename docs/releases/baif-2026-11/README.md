@@ -44,6 +44,8 @@ Final deployed pair: API `0c8289d47618e9521883b6ee6f7658b8ea7c0e9b`, web `65ae75
 - **Phone (iPhone 14):** `scrollWidth == innerWidth == 390` on the viewer and editor (before: 602 and 625). Suggest an edit and Submit Proposal are 44px full-width buttons.
 - **Rehearsal edits:** reverted afterward through OntoKit, so the stage demo can repeat them. Both labels are back to "Holy See" and "Canon Law".
 
+- **LLM assist (2026-11-04):** both projects use `anthropic` / `claude-sonnet-5-5` with a $25/month cap. As a signed-in owner, one "Get LLM suggestions" click per project returned 13 multilingual label suggestions for Holy See and synonyms plus an example for Canon Law, each in about 10–11 s. Nothing was accepted or saved. Total spend was $0.0207. After configuration, an anonymous generate call returns 401 and a non-member returns 403.
+
 ## Incidents
 
 - **Outage, 04:25–04:56 UTC.** A 2.1 GB embedding process left over from a pre-fix timeout, plus a no-cache web build on a swap-less 8 GB box, thrashed the host. SSH stalled, and a Hetzner soft reboot was ignored under load. Recovery: kill the orphan, stop the worker during the build. Prevention: api #79 stops leaving jobs behind. **Before any deploy, restart the worker to release the embedding model (about 2.5 GB).**
@@ -51,7 +53,6 @@ Final deployed pair: API `0c8289d47618e9521883b6ee6f7658b8ea7c0e9b`, web `65ae75
 
 ## Still open
 
-- **LLM assist:** needs an Anthropic API key (`~/.config/anthropic/` was empty). Once Damien runs the paste-safe prompt, set it per project with a $25/month cap.
 - **Damien's sign-in:** his account is verified and an admin on both projects, but he hasn't signed in on the demo host yet.
 - **GitHub PR mirroring:** each approval logs a failed attempt to mirror the suggestion as a GitHub PR, because the token has Contents only. Commits push fine. Adding Pull requests write to the token enables the mirror.
 - **Minor follow-ups:**
