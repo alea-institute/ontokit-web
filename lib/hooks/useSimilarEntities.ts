@@ -18,7 +18,9 @@ export function useSimilarEntities(
         branch,
         limit
       ),
-    enabled: !!entityIri && !!projectId,
+    // The similarity endpoint requires authentication; anonymous visitors
+    // would only collect 401s, so never fire without an access token.
+    enabled: !!entityIri && !!projectId && !!accessToken,
     staleTime: 60_000,
   });
 }

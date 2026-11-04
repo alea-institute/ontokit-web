@@ -40,7 +40,8 @@ export function SimilarConceptsPanel({
     branch
   );
 
-  if (!classIri) return null;
+  // Similarity needs a signed-in session; hide the row for anonymous visitors.
+  if (!classIri || !accessToken) return null;
 
   const entities = data ?? [];
   const hasResults = !isLoading && entities.length > 0;
