@@ -22,6 +22,19 @@ describe("DemoSiteBanner", () => {
     expect(region.querySelector("button")).toBeNull();
   });
 
+  it("uses the calm info treatment: decorative Info icon, blue surface, no amber warning styling", () => {
+    vi.stubEnv("NEXT_PUBLIC_DEMO_SITE", "true");
+    render(<DemoSiteBanner />);
+
+    const region = screen.getByRole("region", { name: "Demo site notice" });
+    const icon = screen.getByTestId("demo-site-banner-icon");
+    expect(region.contains(icon)).toBe(true);
+    expect(icon.getAttribute("aria-hidden")).toBe("true");
+    expect(icon.getAttribute("class")).toContain("lucide-info");
+    expect(region.className).toContain("bg-blue-50");
+    expect(region.className).not.toMatch(/amber/);
+  });
+
   it.each([["unset", undefined], ["empty", ""], ["false", "false"], ["TRUE", "TRUE"], ["1", "1"]])(
     "renders nothing when the flag is %s",
     (_label, value) => {
