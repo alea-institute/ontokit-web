@@ -930,8 +930,8 @@ export function ClassDetailPanel({
             <span className="text-sm font-bold text-owl-class">C</span>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate">
+            <div className="flex items-center justify-between gap-2 max-md:flex-wrap">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white truncate max-md:w-full max-md:whitespace-normal max-md:break-words">
                 {displayLabel}
                 {classDetail.deprecated && (
                   <span className="ml-2 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
@@ -940,7 +940,7 @@ export function ClassDetailPanel({
                   </span>
                 )}
               </h2>
-              <div className="flex shrink-0 items-center gap-1">
+              <div className="flex shrink-0 items-center gap-1 max-md:flex-wrap">
                 {headerActions}
                 {!canEdit && canPropose && !isEditing && onProposeEdit && (
                   <>
@@ -948,7 +948,7 @@ export function ClassDetailPanel({
                       onClick={onProposeEdit}
                       disabled={isProposeEditStarting}
                       aria-busy={isProposeEditStarting}
-                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
+                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium text-emerald-600 hover:bg-emerald-50 max-md:min-h-11 dark:text-emerald-400 dark:hover:bg-emerald-900/20"
                       title="Propose an edit to this class"
                     >
                       <Pencil className="h-3.5 w-3.5" />
@@ -1623,9 +1623,9 @@ interface SectionProps {
 
 function Section({ title, tooltip, icon, children, headerActions }: SectionProps) {
   return (
-    <div className="flex gap-4">
+    <div className="flex gap-4 max-md:flex-col max-md:gap-1">
       <div
-        className="w-40 shrink-0 flex items-start gap-1.5 pt-1"
+        className="w-40 shrink-0 flex items-start gap-1.5 pt-1 max-md:w-full"
         title={tooltip}
       >
         {icon && <span className="text-slate-400 dark:text-slate-500">{icon}</span>}

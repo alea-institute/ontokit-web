@@ -86,8 +86,8 @@ export function InlineAnnotationAdder({ excludeIris, onAdd, onSaveNeeded }: Inli
   };
 
   return (
-    <div className="flex gap-4">
-      <div className="w-40 shrink-0 pt-1">
+    <div className="flex gap-4 max-md:flex-col max-md:gap-1">
+      <div className="w-40 shrink-0 max-md:w-full pt-1">
         {/* Property combobox */}
         <div ref={containerRef} className="relative">
           {selectedProperty ? (

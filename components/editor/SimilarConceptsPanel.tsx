@@ -54,8 +54,8 @@ export function SimilarConceptsPanel({
   if (!isLoading && !hasResults && !noEmbeddings && !fetchError) return null;
 
   return (
-    <div className="flex gap-4">
-      <div className="w-40 shrink-0 flex items-start gap-1.5 pt-1">
+    <div className="flex gap-4 max-md:flex-col max-md:gap-1">
+      <div className="w-40 shrink-0 max-md:w-full flex items-start gap-1.5 pt-1">
         <span className="text-slate-400 dark:text-slate-500">
           <Sparkles className="h-4 w-4" />
         </span>

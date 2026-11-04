@@ -1374,15 +1374,24 @@ export default function EditorPage() {
             onLoadLatest={handleLoadLatest}
           />
         )}
-        {/* Editor Header */}
-        <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="font-semibold text-slate-900 dark:text-white">{project.name}</h1>
-              <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
+        {/* Editor Header — one row on desktop; on phones it wraps and keeps
+            only the controls a proposer needs (desktop-only tools hide). */}
+        <div className="border-b border-slate-200 bg-white px-4 py-3 max-md:px-3 max-md:py-2 dark:border-slate-700 dark:bg-slate-800">
+          <div
+            data-testid="editor-header-row"
+            className="flex items-center justify-between max-md:flex-wrap max-md:gap-y-2"
+          >
+            <div className="flex items-center gap-4 max-md:w-full max-md:min-w-0 max-md:flex-wrap max-md:gap-2">
+              <h1
+                title={project.name}
+                className="font-semibold text-slate-900 max-md:min-w-0 max-md:flex-1 max-md:truncate dark:text-white"
+              >
+                {project.name}
+              </h1>
+              <span className="text-sm text-slate-500 max-md:text-xs dark:text-slate-400">{totalClasses} classes</span>
               {/* Viewer / Editor switcher */}
               <ViewerEditorSwitcher projectId={projectId} />
-              {/* Standard / Developer mode switcher */}
+              {/* Standard / Developer mode switcher — stays on phones so a stored Developer preference is never a dead end */}
               <ModeSwitcher />
               {/* Suggestion mode indicator */}
               {isSuggestionMode && (
@@ -1413,7 +1422,7 @@ export default function EditorPage() {
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 max-md:w-full max-md:flex-wrap">
               {/* Submit Suggestions button */}
               {canEditSuggestion && suggestionSession.changesCount > 0 && (
                 <Button
@@ -1436,7 +1445,7 @@ export default function EditorPage() {
                 <Button
                   variant="primary"
                   size="sm"
-                  className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  className="gap-2 bg-emerald-600 hover:bg-emerald-700 max-md:min-h-11 max-md:flex-1 max-md:justify-center"
                   onClick={() => setCreditModalOpen(true)}
                 >
                   <Pencil className="h-4 w-4" />
@@ -1452,7 +1461,7 @@ export default function EditorPage() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="gap-2 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                  className="gap-2 text-red-600 hover:text-red-700 max-md:min-h-11 dark:text-red-400 dark:hover:text-red-300"
                   onClick={() => setDiscardProposalConfirmOpen(true)}
                 >
                   Discard
@@ -1482,17 +1491,22 @@ export default function EditorPage() {
                 </Link>
               )}
 
-              {/* WebSocket Connection Status */}
-              <div className="flex items-center gap-1">
-                <ConnectionStatus
-                  state={connectionStatus}
-                  purpose={wsPurpose}
-                  endpoint={wsEndpoint}
-                />
-              </div>
+              {/* Tools an anonymous proposer doesn't need: `contents` keeps the
+                  desktop flex layout unchanged while phones drop them as one
+                  group. Signed-in users keep them (the row wraps). */}
+              <div className={hasValidAccess ? "contents" : "contents max-md:hidden"}>
+                {/* WebSocket Connection Status */}
+                <div className="flex items-center gap-1">
+                  <ConnectionStatus
+                    state={connectionStatus}
+                    purpose={wsPurpose}
+                    endpoint={wsEndpoint}
+                  />
+                </div>
 
-              {/* Branch Selector */}
-              <BranchSelector onBranchChange={handleBranchChange} canCreateBranch={canEdit} readOnly={!hasValidAccess} />
+                {/* Branch Selector */}
+                <BranchSelector onBranchChange={handleBranchChange} canCreateBranch={canEdit} readOnly={!hasValidAccess} />
+              </div>
 
               {/* Share */}
               <ShareButton
@@ -1501,77 +1515,79 @@ export default function EditorPage() {
                 selectedLabel={selectedNodeFallback?.label}
               />
 
-              {/* History Button */}
-              <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
+              <div className={hasValidAccess ? "contents" : "contents max-md:hidden"}>
+                {/* History Button */}
+                <HistoryButton onClick={() => setShowHistory(!showHistory)} isOpen={showHistory} />
 
-              {/* Remote Sync Status (auth-only) */}
-              {hasValidAccess && (
-                <RemoteSyncIndicator
-                  projectId={projectId}
-                  accessToken={session?.accessToken}
-                />
-              )}
-
-              {/* Normalization Status (auth-only) */}
-              {hasValidAccess && normalizationStatus?.needs_normalization && (
-                <Link href={`/projects/${projectId}/settings#normalization`}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2 text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
-                    title="Ontology normalization recommended"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    <span className="hidden sm:inline">Normalize</span>
-                  </Button>
-                </Link>
-              )}
-
-              {/* Health Check */}
-              <Button
-                variant={showHealthCheck ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setShowHealthCheck(!showHealthCheck)}
-                className="gap-2"
-              >
-                <Activity className="h-4 w-4" />
-                <span className="hidden sm:inline">Health</span>
-                {lintSummary && lintSummary.total_issues > 0 && (
-                  <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${
-                    lintSummary.error_count > 0
-                      ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
-                      : lintSummary.warning_count > 0
-                      ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-                      : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                  }`}>
-                    {lintSummary.total_issues}
-                  </span>
+                {/* Remote Sync Status (auth-only) */}
+                {hasValidAccess && (
+                  <RemoteSyncIndicator
+                    projectId={projectId}
+                    accessToken={session?.accessToken}
+                  />
                 )}
-              </Button>
 
-              {/* PR Link */}
-              <Link href={`/projects/${projectId}/pull-requests`}>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <GitPullRequest className="h-4 w-4" />
-                  <span className="hidden sm:inline">PRs</span>
-                  {openPRCount > 0 && (
-                    <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
-                      {openPRCount}
+                {/* Normalization Status (auth-only) */}
+                {hasValidAccess && normalizationStatus?.needs_normalization && (
+                  <Link href={`/projects/${projectId}/settings#normalization`}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 text-amber-600 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-300"
+                      title="Ontology normalization recommended"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      <span className="hidden sm:inline">Normalize</span>
+                    </Button>
+                  </Link>
+                )}
+
+                {/* Health Check */}
+                <Button
+                  variant={showHealthCheck ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => setShowHealthCheck(!showHealthCheck)}
+                  className="gap-2"
+                >
+                  <Activity className="h-4 w-4" />
+                  <span className="hidden sm:inline">Health</span>
+                  {lintSummary && lintSummary.total_issues > 0 && (
+                    <span className={`rounded-full px-1.5 py-0.5 text-xs font-medium ${
+                      lintSummary.error_count > 0
+                        ? "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"
+                        : lintSummary.warning_count > 0
+                        ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                        : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                    }`}>
+                      {lintSummary.total_issues}
                     </span>
                   )}
                 </Button>
-              </Link>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShortcutDialogOpen(true)}
-                aria-label="Keyboard shortcuts"
-                className="gap-2"
-              >
-                <Keyboard aria-hidden="true" className="h-4 w-4" />
-                <span className="hidden lg:inline">Shortcuts</span>
-              </Button>
+                {/* PR Link */}
+                <Link href={`/projects/${projectId}/pull-requests`}>
+                  <Button variant="ghost" size="sm" className="gap-2">
+                    <GitPullRequest className="h-4 w-4" />
+                    <span className="hidden sm:inline">PRs</span>
+                    {openPRCount > 0 && (
+                      <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-900/30 dark:text-primary-400">
+                        {openPRCount}
+                      </span>
+                    )}
+                  </Button>
+                </Link>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShortcutDialogOpen(true)}
+                  aria-label="Keyboard shortcuts"
+                  className="gap-2"
+                >
+                  <Keyboard aria-hidden="true" className="h-4 w-4" />
+                  <span className="hidden lg:inline">Shortcuts</span>
+                </Button>
+              </div>
 
               {canManage && !settingsUnavailable && (
                 <Link href={`/projects/${projectId}/settings`}>
@@ -1591,8 +1607,9 @@ export default function EditorPage() {
         )}
 
         {/* Main Editor Layout — mode-dependent */}
-        <div className="relative flex h-[calc(100vh-4rem-3.5rem)]">
-          <div className="flex-1 flex overflow-hidden">
+        {/* Phones: the page itself scrolls instead of fixed-height panes. */}
+        <div className="relative flex h-[calc(100vh-4rem-3.5rem)] max-md:h-auto max-md:min-h-[calc(100dvh-4rem)]">
+          <div className="flex-1 flex min-w-0 overflow-hidden max-md:overflow-visible">
             {editorMode === "developer" ? (
               <div className="flex-1 flex flex-col">
                 <DeveloperEditorLayout
