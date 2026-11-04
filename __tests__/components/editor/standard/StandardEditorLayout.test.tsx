@@ -31,6 +31,13 @@ vi.mock("@/lib/hooks/useLLMGate", () => ({
   }),
 }));
 
+// The layout re-applies its history marker after router commits, keyed on the URL.
+let _searchParams = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/projects/proj-1",
+  useSearchParams: () => _searchParams,
+}));
+
 vi.mock("next/dynamic", () => ({
   __esModule: true,
   default: () => () => <div data-testid="ontology-graph" />,
@@ -1339,6 +1346,61 @@ describe("StandardEditorLayout single-pane layout below md", () => {
       fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
       expect(back).toHaveBeenCalledTimes(1);
       back.mockRestore();
+    });
+
+    it("drops its detail entry when the tree shows without a Back, so one device Back still leaves", () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+      expect(isMobileDetailEntry(window.history.state)).toBe(true);
+
+      // A tab switch reveals that tab's list without going through history.
+      fireEvent.click(screen.getByText("Properties"));
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(back).toHaveBeenCalledTimes(1);
+
+      // The popstate from that back() is ours and changes nothing...
+      popTo(null);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      // ...and the next one is handled normally: open a property, press Back.
+      act(() => {
+        (_propertyTreeProps.onSelect as (iri: string) => void)("http://example.org/hasPart");
+      });
+      expect(hiddenOnMobile(detailPane())).toBe(false);
+      popTo(null);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(back).toHaveBeenCalledTimes(1);
+      back.mockRestore();
+    });
+
+    it("drops its detail entry when the selection is cleared", () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const props = defaultProps({ nodes: sampleNodes, selectedIri: classA });
+      const { rerender } = render(<StandardEditorLayout {...props} />);
+      rerender(<StandardEditorLayout {...props} selectedIri={null} />);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(back).toHaveBeenCalledTimes(1);
+      back.mockRestore();
+    });
+
+    it("re-marks its entry after the router replaces history state", () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      const props = defaultProps({ nodes: sampleNodes, selectedIri: classA });
+      const { rerender } = render(<StandardEditorLayout {...props} />);
+      const length = window.history.length;
+
+      // router.replace (e.g. consuming ?propose=1) rebuilds state without the marker.
+      window.history.replaceState({ __NA: true }, "");
+      _searchParams = new URLSearchParams("branch=main");
+      rerender(<StandardEditorLayout {...props} />);
+      expect(window.history.state).toEqual({ __NA: true, [MOBILE_DETAIL_HISTORY_KEY]: "detail" });
+      expect(window.history.length).toBe(length);
+
+      // Even while stripped, the on-screen Back goes through history (no orphan entry).
+      window.history.replaceState({}, "");
+      fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
+      expect(back).toHaveBeenCalledTimes(1);
+      back.mockRestore();
+      _searchParams = new URLSearchParams();
     });
 
     it("leaves history alone on desktop", () => {

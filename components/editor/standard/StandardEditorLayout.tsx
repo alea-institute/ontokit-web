@@ -4,6 +4,7 @@ import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProv
 
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
+import { usePathname, useSearchParams } from "next/navigation";
 import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
 import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
 import { useLLMGate } from "@/lib/hooks/useLLMGate";
@@ -35,6 +36,8 @@ import {
   MOBILE_BACK_LABEL,
   isSinglePaneViewport,
   isMobileDetailEntry,
+  markMobileDetailEntry,
+  type MobilePane,
   mobilePaneVisibility,
   mobileSelectionKey,
   pushMobileDetailEntry,
@@ -419,25 +422,66 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   // On a phone the details sit on their own history entry (see
   // pushMobileDetailEntry), so the device's Back returns to the tree. The
   // on-screen Back control goes through history too, keeping the two in step.
+  // True while the current history entry is the detail entry this layout
+  // pushed. Next's router.replace rebuilds history.state without the marker,
+  // so the marker alone cannot say whether the entry is ours.
+  const ownsDetailEntryRef = useRef(false);
+  // The popstate our own history.back() causes, which must not be re-handled.
+  const ignoreNextPopRef = useRef(false);
+  const prevMobilePaneRef = useRef<MobilePane>(mobilePane);
+  const onOwnDetailEntry = () =>
+    ownsDetailEntryRef.current || isMobileDetailEntry(window.history.state);
   const showMobileTree = useCallback(() => {
-    if (isSinglePaneViewport() && isMobileDetailEntry(window.history.state)) {
+    if (isSinglePaneViewport() && (ownsDetailEntryRef.current || isMobileDetailEntry(window.history.state))) {
       window.history.back();
       return;
     }
     revealMobileTree();
   }, [revealMobileTree]);
   useEffect(() => {
-    if (mobilePane === "detail" && isSinglePaneViewport()) pushMobileDetailEntry();
+    const previous = prevMobilePaneRef.current;
+    prevMobilePaneRef.current = mobilePane;
+    if (!isSinglePaneViewport()) return;
+    if (mobilePane === "detail") {
+      pushMobileDetailEntry();
+      ownsDetailEntryRef.current = true;
+      return;
+    }
+    // The tree showed without a Back (tab switch, selection cleared, graph
+    // closed): drop our detail entry so the next device Back is not swallowed.
+    if (previous === "detail" && onOwnDetailEntry()) {
+      ownsDetailEntryRef.current = false;
+      ignoreNextPopRef.current = true;
+      window.history.back();
+    }
   }, [mobilePane]);
+  // Restore the marker after a router commit (router.replace, demo banners'
+  // replaceState) stripped it from the entry we own.
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlKey = `${pathname ?? ""}?${searchParams?.toString() ?? ""}`;
+  useEffect(() => {
+    if (mobilePane !== "detail" || !ownsDetailEntryRef.current || !isSinglePaneViewport()) return;
+    markMobileDetailEntry();
+  }, [urlKey, mobilePane]);
   const revealMobileTreeRef = useRef(revealMobileTree);
   useEffect(() => {
     revealMobileTreeRef.current = revealMobileTree;
   }, [revealMobileTree]);
   useEffect(() => {
     const onPopState = (event: PopStateEvent) => {
+      if (ignoreNextPopRef.current) {
+        ignoreNextPopRef.current = false;
+        return;
+      }
       if (!isSinglePaneViewport()) return;
-      if (isMobileDetailEntry(event.state)) setMobileDismissedKey(null);
-      else revealMobileTreeRef.current();
+      if (isMobileDetailEntry(event.state)) {
+        ownsDetailEntryRef.current = true;
+        setMobileDismissedKey(null);
+      } else {
+        ownsDetailEntryRef.current = false;
+        revealMobileTreeRef.current();
+      }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);

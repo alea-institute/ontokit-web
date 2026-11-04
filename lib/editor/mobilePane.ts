@@ -86,6 +86,19 @@ export function pushMobileDetailEntry(): boolean {
   return true;
 }
 
+/**
+ * Re-mark the current entry as a detail entry in place. The Next.js router
+ * rebuilds `history.state` on `router.replace` (and `history.replaceState`
+ * calls go through its patch), dropping the marker; this restores it.
+ */
+export function markMobileDetailEntry(): void {
+  if (typeof window === "undefined") return;
+  const current: unknown = window.history.state;
+  if (isMobileDetailEntry(current)) return;
+  const base = typeof current === "object" && current !== null ? current : {};
+  window.history.replaceState({ ...base, [MOBILE_DETAIL_HISTORY_KEY]: "detail" }, "");
+}
+
 export const MOBILE_BACK_LABEL: Record<string, string> = {
   classes: "Classes",
   properties: "Properties",
