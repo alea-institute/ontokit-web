@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
-import { useGraphData } from "@/lib/hooks/useGraphData";
+import { clearGraphLookupCache, useGraphData } from "@/lib/hooks/useGraphData";
 import type { OWLClassDetail } from "@/lib/api/client";
 import { computeLayout } from "@/lib/graph/elkLayout";
 
@@ -42,7 +42,7 @@ function serveGraph(
   return calls;
 }
 const options = { projectId: "graph-project", accessToken: "test-token", branch: "work/graph" };
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); clearGraphLookupCache(); });
 
 describe("graph loading with the real API client, graph builder and layout engine", () => {
   it("resolves a root discovered only by ancestry beyond the initial detail passes", async () => {
@@ -199,6 +199,17 @@ describe("graph loading with the real API client, graph builder and layout engin
 
     act(() => result.current.resetGraph());
     await waitFor(() => expect(classRequests(calls).filter((target) => target === wiki)).toHaveLength(2));
+  });
+
+  it("keeps the 404 when the graph closes and reopens (the hook remounts)", async () => {
+    const wiki = "https://en.wikipedia.org/wiki/ISO_3166-2";
+    const calls = serveGraph([detail("Focus", { annotations: seeAlso(wiki) })]);
+    const first = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
+    await waitFor(() => expect(first.result.current.graphData?.nodes.some((node) => node.id === wiki)).toBe(true));
+    first.unmount();
+    const second = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
+    await waitFor(() => expect(second.result.current.graphData?.nodes).toContainEqual(expect.objectContaining({ id: wiki, nodeType: "external" })));
+    expect(classRequests(calls).filter((target) => target === wiki)).toHaveLength(1);
   });
 
   it("resolves a modular ontology's seeAlso target in another namespace that is also a parent", async () => {

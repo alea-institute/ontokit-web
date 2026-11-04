@@ -1,10 +1,10 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useGraphData } from '@/lib/hooks/useGraphData';
+import { clearGraphLookupCache, useGraphData } from '@/lib/hooks/useGraphData';
 
 const iri = (value: string) => `https://example.invalid/${value}`;
 const detail = (name: string, parent_iris: string[] = []) => ({ iri: iri(name), labels: [{ value: name, lang: 'en' }], comments: [], annotations: [], parent_iris, equivalent_iris: null, disjoint_iris: null, deprecated: false });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); clearGraphLookupCache(); });
 
 describe('graph lifecycle through HTTP, neighbor resolution and graph construction', () => {
   it.each(['focus', 'neighbor', 'depth-two', 'label-resolution', 'ancestry', 'search'])('does not publish the old graph after changing focus during %s resolution', async phase => {

@@ -13,6 +13,24 @@ import type { GraphData } from "@/lib/graph/types";
 
 const MAX_RESOLVED_NODES = 100;
 
+// IRIs the class API answered 404 for, per "project|branch". Module-level so
+// the answer survives the graph closing and reopening (the hook remounts),
+// and a web-page seeAlso is looked up once per session, not once per graph.
+const notFoundByScope = new Map<string, Set<string>>();
+function notFoundFor(scope: string): Set<string> {
+  let set = notFoundByScope.get(scope);
+  if (!set) {
+    set = new Set();
+    notFoundByScope.set(scope, set);
+  }
+  return set;
+}
+
+/** Forget every cached 404 (tests; a sign-in change could also call it). */
+export function clearGraphLookupCache(): void {
+  notFoundByScope.clear();
+}
+
 interface UseGraphDataOptions {
   focusIri: string | null;
   projectId: string;
@@ -52,9 +70,8 @@ export function useGraphData({
   // seeAlso/isDefinedBy targets in well-known vocabularies: external links,
   // never fetched. Every other target is fetched once like any IRI.
   const wellKnownTargetsRef = useRef<Set<string>>(new Set());
-  // IRIs the class API answered 404 for on this project + branch. Kept across
-  // focus changes so a web-page seeAlso is looked up once, not per graph;
-  // cleared by a branch/project switch or an explicit reset.
+  // This project + branch's cached 404s (see notFoundByScope); an explicit
+  // reset clears them, and expanding a node retries it.
   const notFoundIrisRef = useRef<Set<string>>(new Set());
   const notFoundScopeRef = useRef("");
   // External nodes in the graph last built, so expanding one does not refetch.
@@ -290,7 +307,7 @@ export function useGraphData({
     const scope = `${projectId}|${branch ?? ""}`;
     if (notFoundScopeRef.current !== scope) {
       notFoundScopeRef.current = scope;
-      notFoundIrisRef.current = new Set();
+      notFoundIrisRef.current = notFoundFor(scope);
     }
     nonClassLabelsRef.current = new Map();
     pendingRef.current = new Map();
@@ -421,7 +438,7 @@ export function useGraphData({
     failedIrisRef.current = new Set();
     externalIrisRef.current = new Set();
     wellKnownTargetsRef.current = new Set();
-    notFoundIrisRef.current = new Set();
+    notFoundIrisRef.current.clear();
     nonClassLabelsRef.current = new Map();
     setGraphData(null);
     setResolvedCount(0);
