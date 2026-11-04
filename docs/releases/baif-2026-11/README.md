@@ -27,8 +27,21 @@ Demo URL: `https://ontokit-demo.damienriehl.com` (QR code: [`ontokit-demo-qr.png
 | api #79 | Persist the submitter's note on first submit; embedding job gets its own timeout (`EMBEDDING_JOB_TIMEOUT_SECONDS`, 7200), never stranded "in progress", no resurrection, `max_tries=1` |
 | web #79 | Phone layout: single-pane viewer and propose editor, 44px actions, graph height, role-aware tools, focus handoff |
 | api #80 | Translation coverage reads the configured ontology file by format (fixed a 500 for signed-in members) |
+| api #82 | Translation entity-state skips the full-ontology parse unless the entity has a verified record, and parses off the event loop. Signed-in class clicks fell from 4.7–7.5 s to 0.4–1.2 s for the detail heading |
+| web #82 | Demo banner restyled as calm blue info (Info icon); copy unchanged |
 
-Final deployed pair: API `0c8289d47618e9521883b6ee6f7658b8ea7c0e9b`, web `65ae751c47278f2bc544ff832ee63b0b1d649911`. Each deploy was verified from running image labels and container start times, not from `status` alone.
+Pair deployed earlier on 2026-11-04: API `0c8289d4`, web `65ae751c`, then API `751c3509`, web `0df6e7ec`.
+
+Current deployed pair (2026-11-04, 21:35 UTC): API `fd52eff6f8e6b06ede05d140e7068bf016c92b2c`, web `09f68ff9b9fbdaf8b754a92ebd64dd9623f1b5aa`. Rollback: redeploy API `751c3509`, web `0df6e7ec`. Each deploy was verified from running image labels and container start times, not from `status` alone.
+
+### Class-click latency (signed-in owner, Playwright, 4 clicks each on Canon and FOLIO)
+
+| | Detail heading | All facets settled |
+|---|---|---|
+| Before api #82 | 4.7–7.5 s | 5.4–7.9 s |
+| After api #82 | 0.38–1.17 s | 0.78–1.91 s |
+
+Anonymous visitors never call entity-state and saw about 0.2–0.4 s before and after.
 
 ## Hosted UAT evidence (real browser, Playwright Chromium)
 
@@ -72,4 +85,4 @@ Final deployed pair: API `0c8289d47618e9521883b6ee6f7658b8ea7c0e9b`, web `65ae75
   - A graph node for an external IRI (Wikipedia) triggers a harmless 404.
   - `/pr-party/me` returns 404 because PR Party is off.
   - Mobile hardware Back and tab-jump behaviors.
-  - Coverage parses the full file on each request.
+  - The project-wide coverage view still parses the full file on each request; it now runs off the event loop (api #82). Entity-state skips the parse unless a record is verified.

@@ -1,7 +1,7 @@
 ---
-session: "f3ed339a-41c9-5c79-a202-808b59a585a4"
-written_at: "2026-11-04T20:25:10.837Z"
-head: "3527044938115186767679a6c7ce1923a35338bf"
+session: "8b933b67-126d-48ff-98ce-771967010cbe"
+written_at: "2026-11-04T21:39:04.581Z"
+head: "661de93e38b68a3b9c96546d651bb32cedcd261f"
 worktree: "/home/damienriehl/Coding Projects/ontokit-web"
 branch: "docs/d01-release-readiness-20260920"
 ---
@@ -11,7 +11,7 @@ The demo is live at `https://ontokit-demo.damienriehl.com` and ready for BAIF (T
 
 ## State
 
-- **Deployed:** API `751c3509`, web `0df6e7ec`, both from the alea-institute forks' `dev` branches.
+- **Deployed:** API `fd52eff6`, web `09f68ff9` (2026-11-04, 21:35 UTC; api #82 entity-state speedup, web #82 banner restyle), both from the alea-institute forks' `dev` branches. Rollback pair: API `751c3509`, web `0df6e7ec`.
 - **Merged PRs:** web #77–#81 and api #78–#81.
 - **Projects:** both are public. The Catholic Semantic Canon and FOLIO each push to their `*-ontokit-demo` fork with no-reply commit authors. Embeddings are at 100%, and LLM assist (Anthropic, $25/month cap) works for admins only.
 - **Sign-in:**
