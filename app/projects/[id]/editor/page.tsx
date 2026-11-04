@@ -1035,6 +1035,26 @@ export default function EditorPage() {
     // which re-renders ClassDetailPanel with canEdit=true allowing form editing
   }, [anonymousSuggestion]);
 
+  // `?propose=1` is the viewer's "Suggest an edit" entry point: once the
+  // project and session state settle, start the anonymous proposal session
+  // exactly as the "Propose Edit" button would, then drop the one-shot param
+  // (keeping ?classIri= and the rest). Waiting for the session status keeps
+  // a signed-in editor from briefly looking anonymous and starting a session.
+  const proposeRequested = searchParams.get("propose") === "1";
+  const proposeConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!proposeRequested || proposeConsumedRef.current) return;
+    if (isLoading || status === "loading" || !project) return;
+    proposeConsumedRef.current = true;
+    const next = new URLSearchParams(searchParamsString);
+    next.delete("propose");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname);
+    if (canPropose && !anonymousSuggestion.isActive) {
+      void handleProposeEdit();
+    }
+  }, [proposeRequested, isLoading, status, project, canPropose, anonymousSuggestion.isActive, handleProposeEdit, searchParamsString, router, pathname]);
+
   // Handle "Submit Proposal" — called by CreditModal for EVERY exit path
   // (save / skip / dismiss). The honeypot value is forwarded verbatim so the
   // server-side control (filled honeypot -> silent fake success) actually
@@ -1043,9 +1063,12 @@ export default function EditorPage() {
     name: string | null,
     email: string | null,
     website: string = "",
+    note?: string,
   ) => {
     setCreditModalOpen(false);
-    await anonymousSuggestion.submitSession(undefined, name ?? undefined, email ?? undefined, website);
+    // The optional reviewer note becomes the submission summary; CreditModal
+    // omits it entirely when empty, so the API never receives a blank summary.
+    await anonymousSuggestion.submitSession(note || undefined, name ?? undefined, email ?? undefined, website);
   }, [anonymousSuggestion]);
 
   // Handle drag-and-drop reparent class

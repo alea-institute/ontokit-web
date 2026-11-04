@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { NoOntologyFileEmptyState } from "@/components/projects/NoOntologyFileEmptyState";
 import { ModeSwitcher } from "@/components/editor/ModeSwitcher";
 import { ViewerEditorSwitcher } from "@/components/editor/ViewerEditorSwitcher";
+import { SuggestEditButton } from "@/components/editor/SuggestEditButton";
 import { readSelectionFromSearchParams } from "@/lib/utils/selectionUrl";
 import { DeveloperEditorLayout } from "@/components/editor/developer/DeveloperEditorLayout";
 import { StandardEditorLayout } from "@/components/editor/standard/StandardEditorLayout";
@@ -189,7 +190,7 @@ function ViewerContent({
   });
 
   const {
-    project, canManage, canSuggest, hasValidAccess,
+    project, canManage, canEdit, canSuggest, hasValidAccess,
     nodes, totalClasses, isTreeLoading, treeError,
     selectedIri, expandNode, collapseNode, selectNode,
     navigateToNode, collapseAll, collapseOneLevel, expandOneLevel, expandAllFully,
@@ -199,6 +200,13 @@ function ViewerContent({
     loadSourceContent, sourceIriIndex,
   } = viewer;
   const showAuthUI = shouldShowAuthUI();
+  // Same predicate as the editor's anonymous proposal mode: AUTH_MODE is not
+  // "required", the visitor can neither edit nor suggest normally, and the
+  // project is public (the api only allows anonymous sessions there). Wait for
+  // the session to settle so a signed-in editor never sees it flash.
+  const authMode = process.env.NEXT_PUBLIC_AUTH_MODE || "required";
+  const canPropose = authMode !== "required" && sessionStatus !== "loading"
+    && !canEdit && !canSuggest && !!project?.is_public;
 
   const sourceEditorRef = useRef<OntologySourceEditorRef>(null);
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
@@ -273,6 +281,7 @@ function ViewerContent({
               <ModeSwitcher />
             </div>
             <div className="flex items-center gap-2">
+              {canPropose && <SuggestEditButton projectId={projectId} />}
               <DemoProjectLink sourceProjectId={projectId} />
               {/* Share */}
               <ShareButton

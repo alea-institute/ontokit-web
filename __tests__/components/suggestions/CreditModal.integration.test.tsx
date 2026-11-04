@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CreditModal } from "@/components/suggestions/CreditModal";
 import { useAnonymousCreditStore } from "@/lib/stores/anonymousCreditStore";
 
-type Credit = [string | null, string | null, string];
+type Credit = [string | null, string | null, string, string?];
 
 function Gate({ submissions }: { submissions: Credit[] }) {
   const [open, setOpen] = useState(false);
