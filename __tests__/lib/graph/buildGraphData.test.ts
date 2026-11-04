@@ -3,6 +3,8 @@ import {
   getSeeAlsoIris,
   extractTreeLabelMap,
   buildGraphFromClassDetail,
+  iriNamespace,
+  isExternalReference,
 } from "@/lib/graph/buildGraphData";
 import type { OWLClassDetail } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
@@ -288,5 +290,33 @@ describe("buildGraphFromClassDetail", () => {
 
     expect(result.nodes.some((n) => n.id === owlThing)).toBe(false);
     expect(result.edges.some((e) => e.source === owlThing || e.target === owlThing)).toBe(false);
+  });
+});
+
+describe("external references", () => {
+  const internal = new Set(["https://example.test/onto#"]);
+
+  it("splits an IRI's namespace at its last # or /", () => {
+    expect(iriNamespace("https://example.test/onto#Thing")).toBe("https://example.test/onto#");
+    expect(iriNamespace("https://en.wikipedia.org/wiki/ISO_3166-2")).toBe("https://en.wikipedia.org/wiki/");
+    expect(iriNamespace("urn:x")).toBe("urn:x");
+  });
+
+  it("treats web pages and well-known vocabularies as external, ontology IRIs as internal", () => {
+    expect(isExternalReference("https://en.wikipedia.org/wiki/ISO_3166-2", internal)).toBe(true);
+    expect(isExternalReference("https://schema.org/Country", internal)).toBe(true);
+    expect(isExternalReference("https://example.test/onto#Region", internal)).toBe(false);
+    // A known entity (e.g. in the loaded tree) is internal whatever its namespace.
+    expect(isExternalReference("https://other.test/Thing", internal, new Set(["https://other.test/Thing"]))).toBe(false);
+  });
+
+  it("marks caller-supplied external IRIs as external nodes", () => {
+    const wiki = "https://en.wikipedia.org/wiki/ISO_3166-2";
+    const focus = makeClassDetail({
+      iri: "https://example.test/onto#A",
+      annotations: [{ property_iri: "http://www.w3.org/2000/01/rdf-schema#seeAlso", property_label: "see also", values: [{ value: wiki, lang: "" }] }],
+    } as Partial<OWLClassDetail>);
+    const graph = buildGraphFromClassDetail(focus.iri, new Map([[focus.iri, focus]]), undefined, undefined, new Set([wiki]));
+    expect(graph.nodes.find((n) => n.id === wiki)?.nodeType).toBe("external");
   });
 });

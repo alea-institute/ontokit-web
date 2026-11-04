@@ -164,6 +164,31 @@ describe("graph loading with the real API client, graph builder and layout engin
     expect(result.current.graphData?.edges).toContainEqual(expect.objectContaining({ source: iri("Expansion"), target: iri("Root"), edgeType: "subClassOf" }));
   });
 
+  it("never asks the class API about external references such as a Wikipedia seeAlso", async () => {
+    const wiki = "https://en.wikipedia.org/wiki/ISO_3166-2";
+    const skos = "http://www.w3.org/2004/02/skos/core#Concept";
+    const calls = serveGraph([
+      detail("Focus", {
+        parent_iris: [skos],
+        annotations: [{ property_iri: "http://www.w3.org/2000/01/rdf-schema#seeAlso", property_label: "see also", values: [{ value: wiki, lang: "" }, { value: iri("Sibling"), lang: "" }] }],
+      }),
+      detail("Sibling"),
+    ]);
+    const { result } = renderHook(() => useGraphData({ ...options, focusIri: iri("Focus") }));
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const classRequests = () => calls.filter((url) => url.pathname.includes("/classes/")).map((url) => decodeURIComponent(url.pathname.split("/classes/")[1]));
+    expect(classRequests()).not.toContain(wiki);
+    expect(classRequests()).not.toContain(skos);
+    // Same-namespace references are still resolved as classes.
+    expect(classRequests()).toContain(iri("Sibling"));
+    expect(result.current.graphData?.nodes).toContainEqual(expect.objectContaining({ id: wiki, nodeType: "external" }));
+    expect(result.current.graphData?.edges).toContainEqual(expect.objectContaining({ source: iri("Focus"), target: wiki, edgeType: "seeAlso" }));
+
+    // Expanding the external node does not reach the class API either.
+    await act(async () => { await result.current.expandNode(wiki); });
+    expect(classRequests()).not.toContain(wiki);
+  });
+
   it("supports the empty lifecycle without mocks or a transport", async () => {
     const { result } = renderHook(() => useGraphData({ projectId: "empty", focusIri: null }));
     await act(async () => { await result.current.expandNode(iri("Anything")); });

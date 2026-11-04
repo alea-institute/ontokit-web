@@ -1,3 +1,4 @@
+import { commonPrefixes } from "@/lib/editor/languages/turtle";
 import { getLocalName } from "@/lib/utils";
 import type { OWLClassDetail } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
@@ -12,13 +13,43 @@ const WELL_KNOWN_NAMESPACES = new Set([
   "http://purl.org/dc/terms/",
   "http://xmlns.com/foaf/0.1/",
   "http://www.w3.org/2004/02/skos/core#",
+  // The Turtle editor treats these as external vocabularies too.
+  ...commonPrefixes.map((p) => p.namespace),
 ]);
 
-function isExternalIri(iri: string): boolean {
+/** True for IRIs in a well-known external vocabulary (RDF, OWL, SKOS, …). */
+export function isWellKnownIri(iri: string): boolean {
   for (const ns of WELL_KNOWN_NAMESPACES) {
     if (iri.startsWith(ns)) return true;
   }
   return false;
+}
+const isExternalIri = isWellKnownIri;
+
+/** The namespace part of an IRI: everything up to its last `#` or `/`. */
+export function iriNamespace(iri: string): string {
+  const hash = iri.lastIndexOf("#");
+  const cut = hash >= 0 ? hash : iri.lastIndexOf("/");
+  return cut >= 0 ? iri.slice(0, cut + 1) : iri;
+}
+
+/**
+ * Whether a seeAlso/isDefinedBy target points outside the ontology — e.g. a
+ * Wikipedia page — rather than at one of its entities. Such targets are web
+ * links, not classes, so the graph must not ask the class API about them.
+ *
+ * Mirrors the Turtle editor's internal/external split: well-known vocabularies
+ * are external; otherwise an IRI is internal when it is a known entity (e.g.
+ * in the loaded tree) or shares a namespace with a resolved class.
+ */
+export function isExternalReference(
+  iri: string,
+  internalNamespaces: ReadonlySet<string>,
+  knownIris?: { has(iri: string): boolean },
+): boolean {
+  if (isWellKnownIri(iri)) return true;
+  if (knownIris?.has(iri)) return false;
+  return !internalNamespaces.has(iriNamespace(iri));
 }
 
 const OWL_THING_IRI = "http://www.w3.org/2002/07/owl#Thing";
@@ -67,6 +98,7 @@ export function buildGraphFromClassDetail(
   resolvedNodes: Map<string, OWLClassDetail>,
   labelHints?: Map<string, string>,
   entityTypes?: Map<string, string>,
+  externalIris?: ReadonlySet<string>,
 ): GraphData {
   const visited = new Set<string>();
   const nodeMap = new Map<string, OntologyGraphNode>();
@@ -94,7 +126,7 @@ export function buildGraphFromClassDetail(
 
   function getNodeType(iri: string): GraphNodeType {
     if (iri === focusIri) return "focus";
-    if (isExternalIri(iri)) return "external";
+    if (isExternalIri(iri) || externalIris?.has(iri)) return "external";
     // Check entity type for non-class entities
     const et = entityTypes?.get(iri);
     if (et === "individual") return "individual";

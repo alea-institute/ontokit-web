@@ -2,7 +2,13 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { projectOntologyApi, type OWLClassDetail } from "@/lib/api/client";
-import { buildGraphFromClassDetail, getSeeAlsoIris } from "@/lib/graph/buildGraphData";
+import {
+  buildGraphFromClassDetail,
+  getSeeAlsoIris,
+  iriNamespace,
+  isExternalReference,
+  isWellKnownIri,
+} from "@/lib/graph/buildGraphData";
 import { getLocalName } from "@/lib/utils";
 import type { GraphData } from "@/lib/graph/types";
 
@@ -44,6 +50,27 @@ export function useGraphData({
   // Labels + entity types discovered for non-class entities via search API
   const nonClassLabelsRef = useRef<Map<string, { label: string; entityType: string }>>(new Map());
   const [resolvedCount, setResolvedCount] = useState(0);
+  // seeAlso/isDefinedBy targets outside the ontology (web pages, external
+  // vocabularies). They render as external nodes and are never fetched.
+  const externalIrisRef = useRef<Set<string>>(new Set());
+  const labelHintsRef = useRef(labelHints);
+  useEffect(() => {
+    labelHintsRef.current = labelHints;
+  }, [labelHints]);
+
+  /** A detail's seeAlso/isDefinedBy targets that may be classes; records the rest as external. */
+  const referenceTargets = useCallback((detail: OWLClassDetail): string[] => {
+    const namespaces = new Set([...resolvedNodesRef.current.keys()].map(iriNamespace));
+    const internal: string[] = [];
+    for (const target of getSeeAlsoIris(detail)) {
+      if (isExternalReference(target, namespaces, labelHintsRef.current)) {
+        externalIrisRef.current.add(target);
+      } else {
+        internal.push(target);
+      }
+    }
+    return internal;
+  }, []);
 
   const fetchDetail = useCallback(
     async (iri: string): Promise<OWLClassDetail | null> => {
@@ -54,6 +81,7 @@ export function useGraphData({
       if (resolved.has(iri)) return resolved.get(iri)!;
       if (pending.has(iri)) return pending.get(iri)!;
       if (failed.has(iri) || resolved.size + pending.size >= MAX_RESOLVED_NODES) return null;
+      if (isWellKnownIri(iri) || externalIrisRef.current.has(iri)) return null;
       const request = (async () => {
         try {
           const detail = await projectOntologyApi.getClassDetail(projectId, iri, accessToken, branch);
@@ -108,7 +136,7 @@ export function useGraphData({
               newNeighborIris.push(djIri);
             }
           }
-          for (const seeAlsoIri of getSeeAlsoIris(detail)) {
+          for (const seeAlsoIri of referenceTargets(detail)) {
             if (!resolvedNodesRef.current.has(seeAlsoIri)) {
               newNeighborIris.push(seeAlsoIri);
             }
@@ -117,7 +145,7 @@ export function useGraphData({
       }
       return [...new Set(newNeighborIris)];
     },
-    [fetchDetail],
+    [fetchDetail, referenceTargets],
   );
 
   /**
@@ -171,12 +199,12 @@ export function useGraphData({
       for (const iri of detail.parent_iris) referenced.add(iri);
       for (const iri of detail.equivalent_iris ?? []) referenced.add(iri);
       for (const iri of detail.disjoint_iris ?? []) referenced.add(iri);
-      for (const iri of getSeeAlsoIris(detail)) referenced.add(iri);
+      for (const iri of referenceTargets(detail)) referenced.add(iri);
     }
     return [...referenced].filter(
       (iri) => !resolvedNodesRef.current.has(iri) && !failedIrisRef.current.has(iri),
     );
-  }, []);
+  }, [referenceTargets]);
 
   /**
    * Resolve labels for non-class entities (individuals, properties) via search API.
@@ -227,7 +255,7 @@ export function useGraphData({
           entityTypes.set(iri, info.entityType);
         }
       }
-      const data = buildGraphFromClassDetail(focus, resolvedNodesRef.current, mergedHints, entityTypes);
+      const data = buildGraphFromClassDetail(focus, resolvedNodesRef.current, mergedHints, entityTypes, externalIrisRef.current);
       setGraphData(data);
       setResolvedCount(resolvedNodesRef.current.size);
     },
@@ -239,6 +267,7 @@ export function useGraphData({
     const generation = ++generationRef.current;
     resolvedNodesRef.current = new Map();
     failedIrisRef.current = new Set();
+    externalIrisRef.current = new Set();
     nonClassLabelsRef.current = new Map();
     pendingRef.current = new Map();
     setResolvedCount(0);
@@ -269,7 +298,7 @@ export function useGraphData({
           ...focusDetail.parent_iris,
           ...(focusDetail.equivalent_iris ?? []),
           ...(focusDetail.disjoint_iris ?? []),
-          ...getSeeAlsoIris(focusDetail),
+          ...referenceTargets(focusDetail),
         ];
         const depth2Candidates = await fetchNeighbors(depth1Iris);
         if (cancelled) return;
@@ -309,7 +338,7 @@ export function useGraphData({
       cancelled = true;
       generationRef.current = generation + 1;
     };
-  }, [focusIri, accessToken, branch, fetchDetail, fetchNeighbors, getUnresolvedReferenced, resolveAncestry, resolveNonClassLabels, buildGraph, initialDepth, resetRevision]);
+  }, [focusIri, accessToken, branch, fetchDetail, fetchNeighbors, getUnresolvedReferenced, referenceTargets, resolveAncestry, resolveNonClassLabels, buildGraph, initialDepth, resetRevision]);
 
   const expandNode = useCallback(
     async (iri: string) => {
@@ -326,7 +355,7 @@ export function useGraphData({
             ...detail.parent_iris,
             ...(detail.equivalent_iris ?? []),
             ...(detail.disjoint_iris ?? []),
-            ...getSeeAlsoIris(detail),
+            ...referenceTargets(detail),
           ];
           await fetchNeighbors(neighborIris);
           if (generation !== generationRef.current) return;
@@ -354,7 +383,7 @@ export function useGraphData({
         if (generation === generationRef.current) setIsLoading(false);
       }
     },
-    [focusIri, fetchDetail, fetchNeighbors, getUnresolvedReferenced, resolveAncestry, resolveNonClassLabels, buildGraph],
+    [focusIri, fetchDetail, fetchNeighbors, getUnresolvedReferenced, referenceTargets, resolveAncestry, resolveNonClassLabels, buildGraph],
   );
 
   const resetGraph = useCallback(() => {
@@ -363,6 +392,7 @@ export function useGraphData({
     setResetRevision((revision) => revision + 1);
     resolvedNodesRef.current = new Map();
     failedIrisRef.current = new Set();
+    externalIrisRef.current = new Set();
     nonClassLabelsRef.current = new Map();
     setGraphData(null);
     setResolvedCount(0);

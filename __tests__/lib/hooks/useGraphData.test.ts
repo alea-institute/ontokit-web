@@ -14,6 +14,9 @@ vi.mock("@/lib/api/client", () => ({
 vi.mock("@/lib/graph/buildGraphData", () => ({
   buildGraphFromClassDetail: vi.fn(),
   getSeeAlsoIris: vi.fn().mockReturnValue([]),
+  iriNamespace: vi.fn((iri: string) => iri),
+  isExternalReference: vi.fn().mockReturnValue(false),
+  isWellKnownIri: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock("@/lib/utils", () => ({

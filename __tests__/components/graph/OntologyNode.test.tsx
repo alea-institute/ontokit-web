@@ -67,6 +67,32 @@ describe("OntologyNode", () => {
     expect(onNavigate).not.toHaveBeenCalled();
   });
 
+  it("opens an external node's IRI in a new tab instead of navigating", () => {
+    const onNavigate = vi.fn();
+    const onExpandNode = vi.fn();
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const wiki = "https://en.wikipedia.org/wiki/ISO_3166-2";
+    render(<OntologyNode {...makeProps({ nodeType: "external", onNavigate, onExpandNode }, wiki)} />);
+    const node = screen.getByRole("button");
+    expect(node.getAttribute("aria-label")).toContain("opens in a new tab");
+    fireEvent.click(node);
+    fireEvent.doubleClick(node);
+    fireEvent.keyDown(node, { key: "Enter" });
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(open).toHaveBeenCalledWith(wiki, "_blank", "noopener,noreferrer");
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(onExpandNode).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
+  it("does nothing for an external node whose IRI is not a web URL", () => {
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    render(<OntologyNode {...makeProps({ nodeType: "external" }, "urn:isbn:0451450523")} />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(open).not.toHaveBeenCalled();
+    open.mockRestore();
+  });
+
   it("calls onExpandNode on double-click for unexplored nodes", () => {
     const onExpandNode = vi.fn();
     render(
