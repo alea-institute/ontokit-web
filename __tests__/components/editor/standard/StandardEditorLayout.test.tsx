@@ -1,7 +1,8 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { act, render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 
+import { isMobileDetailEntry, MOBILE_DETAIL_HISTORY_KEY } from "@/lib/editor/mobilePane";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 
 // --- Mocks ---
@@ -1281,6 +1282,76 @@ describe("StandardEditorLayout single-pane layout below md", () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  describe("hardware Back on a phone", () => {
+    beforeEach(() => {
+      window.history.replaceState(null, "");
+      vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
+      vi.stubGlobal("scrollTo", vi.fn());
+    });
+    afterEach(() => {
+      vi.unstubAllGlobals();
+      window.history.replaceState(null, "");
+    });
+    const popTo = (state: unknown) => {
+      act(() => {
+        window.history.replaceState(state, "");
+        window.dispatchEvent(new PopStateEvent("popstate", { state }));
+      });
+    };
+
+    it("pushes a history entry when the details open, and Back returns to the tree", () => {
+      const selectNode = vi.fn();
+      const props = defaultProps({ nodes: sampleNodes, selectNode });
+      const { rerender } = render(<StandardEditorLayout {...props} />);
+      const before = window.history.length;
+      act(() => {
+        (_classTreeProps.onSelect as (iri: string) => void)(classA);
+      });
+      rerender(<StandardEditorLayout {...props} selectedIri={classA} />);
+      expect(hiddenOnMobile(detailPane())).toBe(false);
+      expect(window.history.length).toBe(before + 1);
+      expect(isMobileDetailEntry(window.history.state)).toBe(true);
+
+      popTo(null);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+      expect(hiddenOnMobile(detailPane())).toBe(true);
+      expect(selectNode).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("class-tree").getAttribute("data-selected")).toBe(classA);
+
+      // Forward returns to the details.
+      popTo({ [MOBILE_DETAIL_HISTORY_KEY]: "detail" });
+      expect(hiddenOnMobile(detailPane())).toBe(false);
+    });
+
+    it("gives a ?classIri= deep link a tree entry to return to", () => {
+      const before = window.history.length;
+      render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+      expect(window.history.length).toBe(before + 1);
+      popTo(null);
+      expect(hiddenOnMobile(treePane())).toBe(false);
+    });
+
+    it("routes the on-screen Back control through history when it pushed the entry", () => {
+      const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+      render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+      fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
+      expect(back).toHaveBeenCalledTimes(1);
+      back.mockRestore();
+    });
+
+    it("leaves history alone on desktop", () => {
+      vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: false }));
+      const before = window.history.length;
+      render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA })} />);
+      act(() => {
+        (_classTreeProps.onSelect as (iri: string) => void)("http://example.org/ClassB");
+      });
+      expect(window.history.length).toBe(before);
+      popTo(null);
+      expect(hiddenOnMobile(detailPane())).toBe(false);
+    });
   });
 
   it("gives the graph a definite height on phones so React Flow can render", () => {

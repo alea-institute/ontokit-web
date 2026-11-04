@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  isMobileDetailEntry,
   isSinglePaneViewport,
+  MOBILE_DETAIL_HISTORY_KEY,
+  pushMobileDetailEntry,
   mobilePaneVisibility,
   mobileSelectionKey,
   resolveMobilePane,
@@ -58,5 +61,33 @@ describe("isSinglePaneViewport", () => {
   it("is false when matchMedia is unavailable", () => {
     vi.stubGlobal("matchMedia", undefined);
     expect(isSinglePaneViewport()).toBe(false);
+  });
+});
+
+describe("mobile detail history entries", () => {
+  afterEach(() => {
+    window.history.replaceState(null, "");
+  });
+
+  it("recognises only entries it marked", () => {
+    expect(isMobileDetailEntry(null)).toBe(false);
+    expect(isMobileDetailEntry("detail")).toBe(false);
+    expect(isMobileDetailEntry({ __NA: true })).toBe(false);
+    expect(isMobileDetailEntry({ [MOBILE_DETAIL_HISTORY_KEY]: "detail" })).toBe(true);
+  });
+
+  it("pushes one same-URL entry that keeps the router's state", () => {
+    window.history.replaceState({ __NA: true, tree: "t" }, "", "/projects/p?classIri=x");
+    const before = window.history.length;
+    const href = window.location.href;
+
+    expect(pushMobileDetailEntry()).toBe(true);
+    expect(window.history.length).toBe(before + 1);
+    expect(window.location.href).toBe(href);
+    expect(window.history.state).toEqual({ __NA: true, tree: "t", [MOBILE_DETAIL_HISTORY_KEY]: "detail" });
+
+    // Already on a detail entry: no second push.
+    expect(pushMobileDetailEntry()).toBe(false);
+    expect(window.history.length).toBe(before + 1);
   });
 });

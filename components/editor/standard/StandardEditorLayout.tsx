@@ -34,8 +34,10 @@ import { cn } from "@/lib/utils";
 import {
   MOBILE_BACK_LABEL,
   isSinglePaneViewport,
+  isMobileDetailEntry,
   mobilePaneVisibility,
   mobileSelectionKey,
+  pushMobileDetailEntry,
   resolveMobilePane,
 } from "@/lib/editor/mobilePane";
 
@@ -397,7 +399,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   const paneVisibility = mobilePaneVisibility(mobilePane);
   const treePaneRef = useRef<HTMLDivElement>(null);
   const mobileBackRef = useRef<HTMLButtonElement>(null);
-  const showMobileTree = useCallback(() => {
+  const revealMobileTree = useCallback(() => {
     setShowGraph(false);
     setMobileDismissedKey(mobileKey);
     // The Back button disappears with the detail pane, so move focus (and the
@@ -414,6 +416,32 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
       (tree && tree.tabIndex >= 0 ? tree : pane).focus({ preventScroll: true });
     });
   }, [mobileKey]);
+  // On a phone the details sit on their own history entry (see
+  // pushMobileDetailEntry), so the device's Back returns to the tree. The
+  // on-screen Back control goes through history too, keeping the two in step.
+  const showMobileTree = useCallback(() => {
+    if (isSinglePaneViewport() && isMobileDetailEntry(window.history.state)) {
+      window.history.back();
+      return;
+    }
+    revealMobileTree();
+  }, [revealMobileTree]);
+  useEffect(() => {
+    if (mobilePane === "detail" && isSinglePaneViewport()) pushMobileDetailEntry();
+  }, [mobilePane]);
+  const revealMobileTreeRef = useRef(revealMobileTree);
+  useEffect(() => {
+    revealMobileTreeRef.current = revealMobileTree;
+  }, [revealMobileTree]);
+  useEffect(() => {
+    const onPopState = (event: PopStateEvent) => {
+      if (!isSinglePaneViewport()) return;
+      if (isMobileDetailEntry(event.state)) setMobileDismissedKey(null);
+      else revealMobileTreeRef.current();
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   // Re-picking the same entity after backing out must reopen its details;
   // the detail pane then starts at its top instead of the tree's scroll offset.
   const openMobileDetail = useCallback(() => {
