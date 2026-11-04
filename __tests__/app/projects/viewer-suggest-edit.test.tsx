@@ -122,6 +122,19 @@ describe("viewer \"Suggest an edit\" entry point", () => {
     expect(suggestButton()).toBeNull();
   });
 
+  it("stays visible and tappable on phones: a 44px target in a header row that wraps", () => {
+    render(<ProjectViewerPage />);
+    const link = suggestButton()!;
+    expect(link.className).toContain("max-md:min-h-11");
+    expect(link.className).toContain("max-md:flex-1");
+
+    const row = screen.getByTestId("viewer-header-row");
+    expect(row.className).toContain("max-md:flex-wrap");
+    expect(row.contains(link)).toBe(true);
+    // The project name truncates instead of pushing the actions off-screen.
+    expect(screen.getByRole("heading", { level: 1, name: "Public Ontology" }).className).toContain("max-md:truncate");
+  });
+
   it("is hidden while the session status is still loading", () => {
     viewerState.session = { data: null, status: "loading" };
     render(<ProjectViewerPage />);

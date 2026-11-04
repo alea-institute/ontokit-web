@@ -942,8 +942,8 @@ export function PropertyDetailPanel({
             </Section>
           ) : detail.annotations.length > 0 ? (
             <div className="space-y-1">
-              <div className="flex gap-4">
-                <div className="w-40 shrink-0 flex items-start gap-1.5 pt-1">
+              <div className="flex gap-4 max-md:flex-col max-md:gap-1">
+                <div className="w-40 shrink-0 max-md:w-full flex items-start gap-1.5 pt-1">
                   <span className="text-slate-400 dark:text-slate-500"><StickyNote className="h-4 w-4" /></span>
                   <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Annotations</span>
                 </div>
@@ -953,8 +953,8 @@ export function PropertyDetailPanel({
                   const { displayLabel: propLabel, curie } = getAnnotationPropertyInfo(ann.property_iri);
                   const effectiveLabel = resolvedLabels[ann.property_iri] || propLabel;
                   return (
-                    <div key={`${ann.property_iri}-${vi}`} className="flex gap-4">
-                      <div className="w-40 shrink-0 flex items-center">
+                    <div key={`${ann.property_iri}-${vi}`} className="flex gap-4 max-md:flex-col max-md:gap-1">
+                      <div className="w-40 shrink-0 max-md:w-full flex items-center">
                         <span className="rounded-sm bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300" title={curie}>{effectiveLabel}</span>
                       </div>
                       <div className="min-w-0 flex-1 flex items-center gap-2">
@@ -1023,9 +1023,9 @@ export function PropertyDetailPanel({
 
 function Section({ title, tooltip, icon, children, headerActions }: { title: string; tooltip?: string; icon?: React.ReactNode; children: React.ReactNode; headerActions?: React.ReactNode }) {
   return (
-    <div className="flex gap-4">
+    <div className="flex gap-4 max-md:flex-col max-md:gap-1">
       <div
-        className="w-40 shrink-0 flex items-start gap-1.5 pt-1"
+        className="w-40 shrink-0 flex items-start gap-1.5 pt-1 max-md:w-full"
         title={tooltip}
       >
         {icon && <span className="text-slate-400 dark:text-slate-500">{icon}</span>}

@@ -1138,3 +1138,80 @@ describe("StandardEditorLayout", () => {
     });
   });
 });
+
+describe("StandardEditorLayout single-pane layout below md", () => {
+  const classA = "http://example.org/ClassA";
+  const treePane = () => screen.getByTestId("standard-tree-pane");
+  const detailPane = () => screen.getByTestId("standard-detail-pane");
+  const hiddenOnMobile = (el: HTMLElement) => el.className.split(/\s+/).includes("max-md:hidden");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    _useTreeSearchOverride = null;
+    _classTreeProps = {};
+    _propertyTreeProps = {};
+  });
+
+  it("shows only the tree when nothing is selected", () => {
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes })} />);
+    expect(treePane().dataset.mobilePane).toBe("tree");
+    expect(hiddenOnMobile(treePane())).toBe(false);
+    expect(hiddenOnMobile(detailPane())).toBe(true);
+  });
+
+  it("switches to the detail pane when a class is selected (e.g. restored from ?classIri=)", () => {
+    const props = defaultProps({ nodes: sampleNodes });
+    const { rerender } = render(<StandardEditorLayout {...props} />);
+    rerender(<StandardEditorLayout {...props} selectedIri={classA} />);
+    expect(treePane().dataset.mobilePane).toBe("detail");
+    expect(hiddenOnMobile(treePane())).toBe(true);
+    expect(hiddenOnMobile(detailPane())).toBe(false);
+  });
+
+  it("returns to the tree via the Classes back control without clearing the selection", () => {
+    const selectNode = vi.fn();
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA, selectNode })} />);
+    const back = screen.getByTestId("mobile-back-to-tree");
+    expect(back.textContent).toContain("Classes");
+    // The control only exists on narrow screens.
+    expect(back.parentElement!.className).toContain("md:hidden");
+
+    fireEvent.click(back);
+    expect(hiddenOnMobile(treePane())).toBe(false);
+    expect(hiddenOnMobile(detailPane())).toBe(true);
+    expect(selectNode).not.toHaveBeenCalled();
+    expect(screen.getByTestId("class-tree").getAttribute("data-selected")).toBe(classA);
+  });
+
+  it("re-opens the details when the visitor picks a class in the tree, even the same one", () => {
+    const selectNode = vi.fn();
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes, selectedIri: classA, selectNode })} />);
+    fireEvent.click(screen.getByTestId("mobile-back-to-tree"));
+    expect(hiddenOnMobile(detailPane())).toBe(true);
+
+    act(() => {
+      (_classTreeProps.onSelect as (iri: string) => void)(classA);
+    });
+    expect(selectNode).toHaveBeenCalledWith(classA);
+    expect(hiddenOnMobile(detailPane())).toBe(false);
+    expect(hiddenOnMobile(treePane())).toBe(true);
+  });
+
+  it("applies the same switching to the Properties tab with a matching back label", () => {
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes })} />);
+    fireEvent.click(screen.getByText("Properties"));
+    expect(hiddenOnMobile(detailPane())).toBe(true);
+
+    act(() => {
+      (_propertyTreeProps.onSelect as (iri: string) => void)("http://example.org/hasPart");
+    });
+    expect(hiddenOnMobile(detailPane())).toBe(false);
+    expect(screen.getByTestId("mobile-back-to-tree").textContent).toContain("Properties");
+  });
+
+  it("keeps the desktop tree width as a CSS variable applied only from md up", () => {
+    render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes })} />);
+    expect(treePane().className).toContain("md:w-(--tree-panel-width)");
+    expect(treePane().style.getPropertyValue("--tree-panel-width")).toBe("320px");
+  });
+});

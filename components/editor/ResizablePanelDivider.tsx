@@ -12,6 +12,8 @@ interface ResizablePanelDividerProps {
   minWidth?: number;
   /** Maximum width in pixels (default: 600) */
   maxWidth?: number;
+  /** Extra classes for the divider root (e.g. hiding it on narrow screens) */
+  className?: string;
 }
 
 export function ResizablePanelDivider({
@@ -19,6 +21,7 @@ export function ResizablePanelDivider({
   onWidthChange,
   minWidth = 200,
   maxWidth = 600,
+  className,
 }: ResizablePanelDividerProps) {
   const [isDragging, setIsDragging] = useState(false);
   const startXRef = useRef(0);
@@ -64,7 +67,7 @@ export function ResizablePanelDivider({
   return (
     <div
       onMouseDown={handleMouseDown}
-      className="group relative z-10 flex w-0 cursor-col-resize items-center justify-center"
+      className={`group relative z-10 flex w-0 cursor-col-resize items-center justify-center${className ? ` ${className}` : ""}`}
       title="Drag to resize"
     >
       {/* Invisible hit area — wider than the visual line for easy grabbing */}

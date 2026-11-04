@@ -111,9 +111,9 @@ export function RelationshipSection({
   return (
     <div className="space-y-3">
       {visibleGroups.map((group, gIdx) => (
-        <div key={`${group.property_iri}-${gIdx}`} className="flex gap-4">
+        <div key={`${group.property_iri}-${gIdx}`} className="flex gap-4 max-md:flex-col max-md:gap-1">
           {/* Property label (left column) */}
-          <div className="w-40 shrink-0 pt-1">
+          <div className="w-40 shrink-0 pt-1 max-md:w-full">
             <RelationshipPropertyPicker
               currentIri={group.property_iri}
               currentLabel={group.property_label}

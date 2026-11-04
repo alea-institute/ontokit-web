@@ -193,9 +193,9 @@ function AssertionAdder({ assertionType, projectId, accessToken, branch, onAdd }
   }, [selectedPropIri, dataValue, dataLang, onAdd]);
 
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-2 max-md:flex-col">
       {/* Property selector */}
-      <div ref={propContainerRef} className="relative w-40 shrink-0">
+      <div ref={propContainerRef} className="relative w-40 shrink-0 max-md:w-full">
         {selectedPropIri ? (
           <button
             onClick={() => { setSelectedPropIri(null); setSelectedPropLabel(""); }}

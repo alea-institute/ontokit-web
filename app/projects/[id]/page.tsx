@@ -263,25 +263,40 @@ function ViewerContent({
     <>
       <Header />
       <main id="main-content" className="min-h-[calc(100vh-4rem)] bg-slate-100 dark:bg-slate-900">
-        {/* Viewer Header */}
-        <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-700 dark:bg-slate-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        {/* Viewer Header — one row on desktop; on phones the project title gets
+            its own row and the actions wrap beneath it so nothing is cut off. */}
+        <div className="border-b border-slate-200 bg-white px-4 py-3 max-md:px-3 max-md:py-2 dark:border-slate-700 dark:bg-slate-800">
+          <div
+            data-testid="viewer-header-row"
+            className="flex items-center justify-between max-md:flex-wrap max-md:gap-y-2"
+          >
+            <div className="flex items-center gap-4 max-md:w-full max-md:min-w-0 max-md:gap-2">
               <Link
                 href="/"
-                className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200"
+                className="flex items-center gap-2 text-sm text-slate-600 max-md:shrink-0 hover:text-slate-900 max-md:-ml-1 max-md:min-h-11 max-md:px-1 dark:text-slate-400 dark:hover:text-slate-200"
               >
-                <ArrowLeft className="h-4 w-4" />
-                Back
+                <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+                <span className="max-md:sr-only">Back</span>
               </Link>
-              <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
-              <h1 className="font-semibold text-slate-900 dark:text-white">{project?.name}</h1>
-              <span className="text-sm text-slate-500 dark:text-slate-400">{totalClasses} classes</span>
-              {canSuggest && <ViewerEditorSwitcher projectId={projectId} />}
-              <ModeSwitcher />
+              <div className="h-5 w-px bg-slate-200 max-md:hidden dark:bg-slate-700" />
+              <h1
+                title={project?.name}
+                className="font-semibold text-slate-900 max-md:min-w-0 max-md:truncate dark:text-white"
+              >
+                {project?.name}
+              </h1>
+              <span className="text-sm text-slate-500 max-md:shrink-0 max-md:text-xs dark:text-slate-400">{totalClasses} classes</span>
+              {canSuggest && <ViewerEditorSwitcher projectId={projectId} className="max-md:shrink-0" />}
+              {/* Developer mode (Monaco source editor) needs a desktop-width screen. */}
+              <ModeSwitcher className="max-md:hidden" />
             </div>
-            <div className="flex items-center gap-2">
-              {canPropose && <SuggestEditButton projectId={projectId} />}
+            <div className="flex items-center gap-2 max-md:w-full max-md:flex-wrap">
+              {canPropose && (
+                <SuggestEditButton
+                  projectId={projectId}
+                  className="max-md:min-h-11 max-md:flex-1 max-md:justify-center"
+                />
+              )}
               <DemoProjectLink sourceProjectId={projectId} />
               {/* Share */}
               <ShareButton
@@ -291,9 +306,9 @@ function ViewerContent({
               />
 
               {/* Dashboard link */}
-              <Link href={`/projects/${projectId}/dashboard`}>
-                <Button variant="ghost" size="sm" title="Project dashboard" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
-                  <LayoutDashboard className="h-4 w-4" />
+              <Link href={`/projects/${projectId}/dashboard`} aria-label="Project dashboard">
+                <Button variant="ghost" size="sm" title="Project dashboard" className="text-slate-500 hover:text-slate-900 max-md:h-11 max-md:w-11 dark:text-slate-400 dark:hover:text-white">
+                  <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
                 </Button>
               </Link>
 
@@ -315,10 +330,10 @@ function ViewerContent({
                   variant="ghost"
                   size="sm"
                   onClick={() => signIn("zitadel")}
-                  className="gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
+                  className="gap-1 rounded-full bg-primary-50 px-3 py-1 text-xs font-medium text-primary-700 hover:bg-primary-100 max-md:h-11 max-md:min-w-11 max-md:justify-center max-md:px-0 dark:bg-primary-900/20 dark:text-primary-400 dark:hover:bg-primary-900/30"
                 >
-                  <LogIn className="h-3 w-3" />
-                  Sign in to edit
+                  <LogIn aria-hidden="true" className="h-3 w-3 max-md:h-4 max-md:w-4" />
+                  <span className="max-md:sr-only">Sign in to edit</span>
                 </Button>
               )}
 
@@ -334,8 +349,10 @@ function ViewerContent({
         </div>
 
         {/* Main Viewer Layout — mode-dependent, fully read-only */}
-        <div className="relative flex h-[calc(100vh-4rem-3.5rem)]">
-          <div className="flex-1 flex overflow-hidden">
+        {/* Phones: the page itself scrolls (no fixed-height panes), so the
+            sticky "Back to classes" bar and the native scroll both work. */}
+        <div className="relative flex h-[calc(100vh-4rem-3.5rem)] max-md:h-auto max-md:min-h-[calc(100dvh-4rem)]">
+          <div className="flex-1 flex min-w-0 overflow-hidden max-md:overflow-visible">
             {editorMode === "developer" ? (
               <div className="flex-1 flex flex-col">
                 <DeveloperEditorLayout

@@ -2,7 +2,7 @@
 
 import type { AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
 import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
@@ -30,6 +30,14 @@ import { useAutoSuggestNavigation } from "@/lib/hooks/useAutoSuggestNavigation";
 import { BranchNavigator } from "@/components/editor/BranchNavigator";
 import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 import { useByoKeyStore } from "@/lib/stores/byoKeyStore";
+import { cn } from "@/lib/utils";
+import {
+  MOBILE_BACK_LABEL,
+  isSinglePaneViewport,
+  mobilePaneVisibility,
+  mobileSelectionKey,
+  resolveMobilePane,
+} from "@/lib/editor/mobilePane";
 
 const OntologyGraph = dynamic(
   () => import("@/components/graph/OntologyGraph").then((mod) => mod.OntologyGraph),
@@ -371,7 +379,54 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     branch: activeBranch,
   });
 
+  // Narrow screens show one pane at a time (see lib/editor/mobilePane.ts).
+  // `mobileDismissedKey` records the selection the visitor backed out of, so
+  // the tree shows without clearing the selection or its URL param.
+  const [mobileDismissedKey, setMobileDismissedKey] = useState<string | null>(null);
+  const activeSelectionIri =
+    activeTab === "classes" ? selectedIri
+      : activeTab === "properties" ? selectedPropertyIri
+        : selectedIndividualIri;
+  const mobileKey = mobileSelectionKey(activeTab, activeSelectionIri);
+  const mobilePane = resolveMobilePane({
+    selectedIri: activeSelectionIri,
+    showGraph,
+    dismissedKey: mobileDismissedKey,
+    selectionKey: mobileKey,
+  });
+  const paneVisibility = mobilePaneVisibility(mobilePane);
+  const treePaneRef = useRef<HTMLDivElement>(null);
+  const showMobileTree = useCallback(() => {
+    setShowGraph(false);
+    setMobileDismissedKey(mobileKey);
+    // Bring the entity the visitor came from back into view in the tree.
+    requestAnimationFrame(() => {
+      treePaneRef.current
+        ?.querySelector<HTMLElement>('[role="treeitem"][aria-selected="true"]')
+        ?.scrollIntoView({ block: "center" });
+    });
+  }, [mobileKey]);
+  // Re-picking the same entity after backing out must reopen its details;
+  // the detail pane then starts at its top instead of the tree's scroll offset.
+  const openMobileDetail = useCallback(() => {
+    setMobileDismissedKey(null);
+    if (isSinglePaneViewport()) window.scrollTo({ top: 0 });
+  }, []);
+  const selectClassFromTree = useCallback((iri: string) => {
+    openMobileDetail();
+    selectNode(iri);
+  }, [openMobileDetail, selectNode]);
+  const selectPropertyFromTree = useCallback((iri: string) => {
+    openMobileDetail();
+    setSelectedPropertyIri(iri);
+  }, [openMobileDetail]);
+  const selectIndividualFromTree = useCallback((iri: string) => {
+    openMobileDetail();
+    setSelectedIndividualIri(iri);
+  }, [openMobileDetail]);
+
   const handleSearchSelect = (iri: string) => {
+    openMobileDetail();
     baseSearchSelect(iri);
     closeSearch();
   };
@@ -402,7 +457,16 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
 
       <div className="flex min-h-0 flex-1">
       {/* Left Panel - Entity Tree/List with tabs */}
-      <div className="flex-shrink-0 bg-white dark:bg-slate-800" style={{ width: treePanelWidth }}>
+      <div
+        ref={treePaneRef}
+        data-testid="standard-tree-pane"
+        data-mobile-pane={mobilePane}
+        className={cn(
+          "w-full flex-shrink-0 bg-white md:w-(--tree-panel-width) dark:bg-slate-800",
+          paneVisibility.tree,
+        )}
+        style={{ "--tree-panel-width": `${treePanelWidth}px` } as React.CSSProperties}
+      >
         {/* Entity Type Tabs */}
         <EntityTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -468,7 +532,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                   <ClassTree
                     nodes={nodes}
                     selectedIri={selectedIri}
-                    onSelect={selectNode}
+                    onSelect={selectClassFromTree}
                     onExpand={expandNode}
                     onCollapse={collapseNode}
                     onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
@@ -500,7 +564,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
               accessToken={accessToken}
               branch={activeBranch}
               selectedIri={selectedPropertyIri}
-              onSelect={setSelectedPropertyIri}
+              onSelect={selectPropertyFromTree}
               onNodesLoaded={setPropertyNodes}
             />
           )}
@@ -511,7 +575,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
               accessToken={accessToken}
               branch={activeBranch}
               selectedIri={selectedIndividualIri}
-              onSelect={setSelectedIndividualIri}
+              onSelect={selectIndividualFromTree}
             />
           )}
         </div>
@@ -523,10 +587,30 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         onWidthChange={setTreePanelWidth}
         minWidth={200}
         maxWidth={600}
+        className="max-md:hidden"
       />
 
       {/* Right Panel - Entity Details or Graph */}
-      <div className="min-w-0 flex-1 bg-white dark:bg-slate-800">
+      <div
+        data-testid="standard-detail-pane"
+        className={cn(
+          "min-w-0 flex-1 bg-white max-md:flex max-md:flex-col dark:bg-slate-800",
+          paneVisibility.detail,
+        )}
+      >
+        {/* Narrow screens only: return to the tree without losing the selection. */}
+        <div className="sticky top-16 z-30 border-b border-slate-200 bg-white/95 px-2 py-1 backdrop-blur-sm md:hidden dark:border-slate-700 dark:bg-slate-800/95">
+          <button
+            type="button"
+            data-testid="mobile-back-to-tree"
+            onClick={showMobileTree}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-primary-700 hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 dark:text-primary-400 dark:hover:bg-slate-700"
+          >
+            <ArrowLeft aria-hidden="true" className="h-4 w-4" />
+            {MOBILE_BACK_LABEL[activeTab] ?? "Back"}
+          </button>
+        </div>
+        <div className="max-md:min-h-0 max-md:flex-1 md:h-full">
         {showGraph ? (
           <div className="flex h-full flex-col">
             <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
@@ -643,6 +727,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             labelHints={treeLabelHintsRecord}
           />
         )}
+        </div>
       </div>
 
       </div>{/* end flex min-h-0 flex-1 */}
