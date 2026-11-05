@@ -31,3 +31,10 @@ Reuse the Playwright approach from this session: sign in as the owner persona, o
 
 - **BAIF demo:** Thursday 2026-11-05. Do not deploy again before the talk unless something breaks. Restart the worker before any build (8 GB host, no swap).
 - **Deploys:** use the forced-command deploy (see `docs/handoffs/2026-11-04-baif-demo-site.md`). Verify from running image labels.
+
+## New request: promote OntoKit to PROD (ontokit.openlegalstandard.org)
+
+- **Settled earlier (2026-08-13):** promote the main line with sign-in on, and port the gated DEV deploy (Cockpit ask `ontokit-web-2026-08-13-0830-prod-push`).
+- **Access:** SSH to the AWS PROD box works again through the Hetzner jump host (folio-enrich memory, 2026-11-04). The auto-mode classifier blocked this session's read-only inspection, so it needs a permission rule from Damien.
+- **Blocker:** the main-line stack needs about 6–8 GB RAM. The AWS box has about 2.2 GB free and also runs folio-enrich and folio-mapper. The hosting choice is a spend decision: Cockpit ask `ontokit-web-2026-11-05-0054-prod-host` (hard block).
+- **Procedure:** ontokit-api `deploy/RUNBOOK.md`, "Parallel PROD activation checklist (Stage B)".
