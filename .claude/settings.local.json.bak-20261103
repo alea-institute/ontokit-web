@@ -1,0 +1,54 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(gsd:new-milestone)",
+      "Skill(gsd:quick)",
+      "Skill(gsd:plan-phase)",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__wait_for",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__list_console_messages",
+      "mcp__chrome-devtools__list_network_requests",
+      "Skill(gsd:add-phase)",
+      "Skill(gsd:discuss-phase)",
+      "mcp__chrome-devtools__new_page",
+      "mcp__chrome-devtools__list_pages",
+      "Skill(gsd-execute-phase)",
+      "Skill(gsd-code-review)",
+      "Skill(gsd-code-review-fix)",
+      "Skill(update-config)",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__evaluate_script",
+      "mcp__chrome-devtools__resize_page",
+      "mcp__chrome-devtools__fill",
+      "mcp__chrome-devtools__select_page",
+      "Skill(gsd-debug)",
+      "Skill(gsd-explore)",
+      "Skill(gsd-sketch)",
+      "Skill(gsd-spec-phase)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/bin/cockpit-inbox-hook.sh ontokit-web"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.local/bin/cockpit-queue-drain.sh --hook Stop ontokit-web"
+          }
+        ]
+      }
+    ]
+  }
+}
