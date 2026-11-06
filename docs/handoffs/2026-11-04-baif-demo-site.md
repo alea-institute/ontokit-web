@@ -22,6 +22,19 @@ The demo is live at `https://ontokit-demo.damienriehl.com` and ready for BAIF (T
 - **Privacy policy:** live at `/privacy`. Google's consent screen is published but not brand-verified, so it shows "damienriehl.com".
 - **ZITADEL masterkey:** rotated 2026-11-04 and now supplied through an environment variable (`docs/runbooks/zitadel-masterkey/`).
 
+## Pre-talk UAT and hardening (2026-11-06)
+
+- **Live pair:** API `fd52eff6`, web `09f68ff9`. Web #82 restyled the banner as calm info; api #82 fixed translation entity-state parsing. All services are healthy.
+- **UAT passed on the live site:**
+  - **Visitor:** the anonymous crawl had 0 issues, with no LLM controls for anonymous visitors. Detail panels and the graph work. The phone tests (Back, tab switch, graph fit) pass.
+  - **Proposals:** an anonymous proposal was submitted, then the reviewer dismissed it, so the ontology is unchanged.
+  - **Sign-in:** owner sign-in works, and the Google and GitHub handoffs work.
+  - **LLM:** one call took about 9 s; month-to-date spend is $0.016 of $25.
+  - **Email:** the Resend test email reached the inbox.
+- **Click to details:** 0.2–1.3 s on both projects (Damien reported 1–5 s earlier).
+- **Disk:** pruned 89.6 GB of Docker build cache. The root disk went from 100 GB to 20 GB used (14%).
+- **Backup:** a pre-talk backup of the ontokit and zitadel databases plus the git repos, checksum-verified off-box.
+
 ## Operating rules
 
 - **Restart the worker before any deploy.** It holds the embedding model (about 2.5 GB), and the 8 GB box has no swap. A deploy build otherwise thrashes the host.
