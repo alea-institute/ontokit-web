@@ -1,0 +1,53 @@
+{
+  "date": "2026-11-08",
+  "disposition": "already-resolved",
+  "semgrep": {
+    "version": "1.184.0",
+    "core_revision": "ec0383d093",
+    "engine": "OSS",
+    "io_backend": "posix",
+    "baseline_filter": false,
+    "failure_on_findings": true
+  },
+  "rule": {
+    "id": "javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp",
+    "source": "https://semgrep.dev/c/r/javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp",
+    "config_sha256": "68c0a7972623b2d2050839dd9b0335246e7e6f9dcfd130cac74cd2f7666438d6"
+  },
+  "original": {
+    "revision": "15ead867f4691ca9bf041d550c9cddda063a172b",
+    "path": "e2e/browser/rehearsal.spec.ts",
+    "git_blob": "87d023fc61a930c8a498d427daecac46544e8a4d",
+    "analyzed": true,
+    "exit_code": 1,
+    "findings": [
+      {
+        "rule_id": "javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp",
+        "line": 49,
+        "column": 32
+      }
+    ],
+    "errors": []
+  },
+  "current": {
+    "revision": "46a948295a3b2d4b24c4036a9c37dcb5ee2ccdac",
+    "path": "e2e/browser/rehearsal.spec.ts",
+    "git_blob": "49e025c775a3dfb8396c36e6fbb0dfaeb89d19d8",
+    "analyzed": true,
+    "exit_code": 0,
+    "findings": [],
+    "errors": []
+  },
+  "inherited_repair": {
+    "commit": "e4fc61fca2322976c5aef14a230b4229212c3824",
+    "integrated_commit": "4e0ed6a62fa95769813703097fa68c24dc8a878b",
+    "file_blobs_equal": true,
+    "pr": "https://github.com/alea-institute/ontokit-web/pull/75",
+    "merged_date": "2026-10-31"
+  },
+  "current_authenticated_policy_scan": {
+    "completed": false,
+    "exit_code": 13,
+    "reason": "No authenticated policy is available in this worker; controller gate remains open."
+  }
+}
