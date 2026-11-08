@@ -141,3 +141,10 @@ Before publication, the controller must:
 
 These are controller gates, not new Damien-only decisions. No push, PR creation,
 merge, deployment or new external service occurred in this worker.
+
+Local `ce-code-review` reviewed commit `78284cf0` against the starting plan commit:
+no findings or required corrections. It checked the documentation against the
+plan and repository instructions, verified the source-blob identities and links,
+and preserved the open controller gates. The review ran in the current context;
+no independent Astra/Fable review is claimed. Code simplification was inapplicable
+to this documentation-only diff, and browser scope mapping found no changed route.
