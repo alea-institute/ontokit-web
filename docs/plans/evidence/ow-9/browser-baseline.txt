@@ -6,10 +6,10 @@ Running 3 tests using 1 worker
   ✓  1 e2e/ui/entity-source-preview-evidence.spec.ts:14:7 › entity source preview evidence (desktop 1440x900) (3.6s)
   ✓  2 e2e/ui/entity-source-preview-evidence.spec.ts:14:7 › entity source preview evidence (mobile 390x844) (1.4s)
   ✘  3 e2e/ui/entity-source-preview.spec.ts:5:5 › entity preview follows selections, preserves source edits and captures light/dark page evidence (3.3s)
-[WebServer] 
+[WebServer]
 [WebServer] Session terminated, killing shell...
 
-  1) e2e/ui/entity-source-preview.spec.ts:5:5 › entity preview follows selections, preserves source edits and captures light/dark page evidence 
+  1) e2e/ui/entity-source-preview.spec.ts:5:5 › entity preview follows selections, preserves source edits and captures light/dark page evidence
 
     Error: expect(received).toBe(expected) // Object.is equality
 
@@ -28,5 +28,5 @@ Running 3 tests using 1 worker
     Error Context: test-results/ow4-ui/entity-source-preview-enti-1bd58-es-light-dark-page-evidence/error-context.md
 
   1 failed
-    e2e/ui/entity-source-preview.spec.ts:5:5 › entity preview follows selections, preserves source edits and captures light/dark page evidence 
+    e2e/ui/entity-source-preview.spec.ts:5:5 › entity preview follows selections, preserves source edits and captures light/dark page evidence
   2 passed (13.1s)
