@@ -56,6 +56,15 @@ export async function installFixtures(context: BrowserContext) {
       return route.fulfill({ status: 409, json: { detail: "The source-preview test must not write" } });
     }
     const reply = (json: unknown) => route.fulfill({ json, headers: { "Access-Control-Allow-Origin": "*" } });
+    // The viewer checks for a linked demo workspace; this project has none.
+    if (url.pathname === "/api/v1/projects"
+      && url.searchParams.get("filter") === "public"
+      && url.searchParams.get("is_demo") === "true"
+      && url.searchParams.get("demo_source_project_id") === projectId
+      && url.searchParams.get("skip") === "0"
+      && url.searchParams.get("limit") === "1") {
+      return reply({ items: [], total: 0, unfiltered_total: 0, skip: 0, limit: 1 });
+    }
     if (suffix === "") return reply({
       id: projectId, name: "Entity source demo", is_public: true, user_role: "editor", owner_id: "synthetic-owner",
       source_file_path: filePath, git_ontology_path: filePath, member_count: 2, created_at: "2026-01-01T00:00:00Z",
