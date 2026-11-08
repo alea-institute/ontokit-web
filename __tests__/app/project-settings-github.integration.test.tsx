@@ -10,7 +10,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }), usePar
 const session: Session = { user: { id: 'owner', name: 'Owner' }, accessToken: 'fixture-token', expires: '2099-01-01T00:00:00Z' };
 const repo = { owner: 'example', name: 'ontology', full_name: 'example/ontology', default_branch: 'develop', private: true, description: 'Test vocabulary', html_url: 'https://github.com/example/ontology' };
 const integration = { id: 'github', repo_owner: repo.owner, repo_name: repo.name, repo_url: repo.html_url, default_branch: repo.default_branch, ontology_file_path: 'source.ttl', turtle_file_path: 'output.ttl', sync_enabled: true, sync_status: 'idle', webhooks_enabled: false, github_hook_id: null, connected_by_user_id: 'owner', last_sync_at: '2026-09-01T12:00:00Z' };
-function mount(options: { token?: boolean; connected?: boolean; syncStatus?: string; legacy?: boolean } = {}) {
+function mount(options: { token?: boolean; connected?: boolean; syncStatus?: string; legacy?: boolean; ontologyFilePath?: string | null } = {}) {
   let failure: 'repos' | 'scan' | 'connect' | 'remove' | null = null;
   let repos = [repo];
   class Socket extends EventTarget { static OPEN = 1; static CONNECTING = 0; readyState = 1; close = vi.fn(); }
@@ -30,7 +30,7 @@ function mount(options: { token?: boolean; connected?: boolean; syncStatus?: str
     if (path.endsWith('/notifications')) return jsonResponse({ items: [], unread_count: 0 });
     if (path.endsWith('/trust/members')) return jsonResponse([]);
     if (path.endsWith('/members')) return jsonResponse({ items: [], total: 0 });
-    if (path.endsWith('/pr-settings')) return jsonResponse({ pr_approval_required: 0, github_integration: options.connected ? { ...integration, sync_enabled: !options.legacy, connected_by_user_id: options.legacy ? undefined : integration.connected_by_user_id, sync_status: options.syncStatus ?? 'idle', sync_error: 'Remote requires attention' } : null });
+    if (path.endsWith('/pr-settings')) return jsonResponse({ pr_approval_required: 0, github_integration: options.connected ? { ...integration, ontology_file_path: options.ontologyFilePath === undefined ? integration.ontology_file_path : options.ontologyFilePath, sync_enabled: !options.legacy, connected_by_user_id: options.legacy ? undefined : integration.connected_by_user_id, sync_status: options.syncStatus ?? 'idle', sync_error: 'Remote requires attention' } : null });
     if (path.endsWith('/github-token')) return jsonResponse({ has_token: options.token ?? true });
     if (init?.method && init.method !== 'GET') throw new Error(`Unexpected mutation: ${init.method} ${path}`);
     return new Response('Ancillary setting unavailable', { status: 403 });
@@ -141,8 +141,19 @@ describe('repository connections through settings, the actual output picker and 
     await screen.findByText('GitHub integration removed'); expect(ui.getByRole('button', { name: 'Connect to GitHub' })).toBeDefined();
   });
 
+  it.each([
+    ['source.ttl', /^In sync\s*— source\.ttl$/],
+    [null, /^In sync$/],
+  ] as const)('renders the idle status with source path %s', async (ontologyFilePath, expected) => {
+    mount({ connected: true, syncStatus: 'idle', ontologyFilePath });
+    const ui = await section();
+    const status = await ui.findByText('In sync', { selector: 'p' });
+    expect(status.textContent?.replace(/\s+/g, ' ').trim()).toMatch(expected);
+  });
+
   it.each([['syncing', 'Syncing...'], ['conflict', 'Merge conflict detected'], ['error', 'Sync error']])('renders the connected repository %s status', async (syncStatus, text) => {
     mount({ connected: true, syncStatus }); const ui = await section(); await ui.findByText(text);
     if (syncStatus !== 'syncing') expect(ui.getByText('Remote requires attention')).toBeDefined();
+    expect(ui.queryByText('In sync', { selector: 'p' })).toBeNull();
   });
 });
