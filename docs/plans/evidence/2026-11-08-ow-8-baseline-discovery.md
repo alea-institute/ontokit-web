@@ -85,6 +85,21 @@ All six harness suites passed, totaling 296 tests. These results cover the
 unchanged executable source at `9cfe4a38`; the follow-up changes only this
 receipt and the roadmap.
 
+## Local review and browser scope
+
+`ce-code-review` reviewed `78886803` against build-stage base `9cfe4a38`:
+no actionable findings. The lite review ran inline, checking correctness,
+the explicit plan, `AGENTS.md`, captured test results, links and artifact
+safety. No independent reviewer or external peer ran in this sandbox;
+campaign Astra/Fable reviews remain separate controller gates.
+
+Simplification was skipped because the diff contains only documentation.
+The plan and existing discovery regression already preserve the ignore-list
+lesson, so no separate learning artifact was added. `ce-test-browser` scope
+mapping found no changed product routes: zero pages exercised and no
+screenshot required. The Playwright CLI discovery above is the relevant
+runtime proof for this item.
+
 ## Remaining controller work
 
 1. Reconcile the chief Goal Capsule and cited campaign rules with this receipt.
