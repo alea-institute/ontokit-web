@@ -1,0 +1,15 @@
+
+> ontokit-web@0.4.0-dev test:ui:demo-polish
+> playwright test --config playwright.demo-polish.config.ts
+
+
+Running 4 tests using 1 worker
+
+(node:11975) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 ui-tests/demo-polish.spec.ts:26:5 › projects announce loading and recover from no matches with keyboard focus (1.5s)
+  ✓  2 ui-tests/demo-polish.spec.ts:58:5 › editor help opens with physical Shift+Slash and restores opener focus (1.3s)
+  ✓  3 ui-tests/demo-polish.spec.ts:90:5 › hydration preserves drafts through filters and restores corrections from IndexedDB (1.2s)
+  ✓  4 ui-tests/demo-polish.spec.ts:132:5 › hydration controls fit a narrow dark viewport with RTL and long IRIs (836ms)
+
+  4 passed (5.2s)
