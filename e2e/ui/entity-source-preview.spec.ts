@@ -28,11 +28,11 @@ test("entity preview follows selections, preserves source edits and captures lig
   await expect(excerpts).toContainText(":alice a owl:NamedIndividual, :Person");
   await expect(excerpts).not.toContainText(":hasGuide a owl:ObjectProperty");
   await expect(entity(page, "alice")).toBeVisible();
-  await mkdir("docs/plans/evidence", { recursive: true });
-  await page.screenshot({ path: "docs/plans/evidence/2026-10-26-ow-4-entity-source-preview.png", fullPage: true, animations: "disabled" });
+  await mkdir("docs/plans/evidence/ow-12", { recursive: true });
+  await page.screenshot({ path: "docs/plans/evidence/ow-12/editor-entity-source-preview-acceptance.png", fullPage: true, animations: "disabled" });
   await page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await page.screenshot({ path: "docs/plans/evidence/2026-10-26-ow-4-entity-source-preview-dark.png", fullPage: true, animations: "disabled" });
+  await page.screenshot({ path: "docs/plans/evidence/ow-12/editor-entity-source-preview-acceptance-dark.png", fullPage: true, animations: "disabled" });
 
   await page.getByRole("button", { name: "Open full source", exact: true }).click();
   const editor = page.locator(".monaco-editor textarea").first();

@@ -1,0 +1,33 @@
+
+Running 4 tests using 1 worker
+
+(node:1960) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/ui/entity-source-preview-evidence.spec.ts:14:7 › entity source preview evidence (desktop 1440x900) (4.1s)
+  ✓  2 e2e/ui/entity-source-preview-evidence.spec.ts:14:7 › entity source preview evidence (mobile 390x844) (977ms)
+  ✓  3 e2e/ui/entity-source-preview-evidence.spec.ts:45:5 › project viewer source preview evidence (desktop 1440x900) and read-only full source (3.3s)
+  ✘  4 e2e/ui/entity-source-preview.spec.ts:5:5 › entity preview follows selections, preserves source edits and captures light/dark page evidence (15.9s)
+[WebServer]
+[WebServer] Session terminated, killing shell...
+
+  1) e2e/ui/entity-source-preview.spec.ts:5:5 › entity preview follows selections, preserves source edits and captures light/dark page evidence
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      50 |   expect(bounds).not.toBeNull();
+      51 |   expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(768);
+    > 52 |   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+         |                                                                                                ^
+      53 |   await expect(page.getByRole("button", { name: "Open full source", exact: true })).toBeVisible();
+      54 |   await page.setViewportSize({ width: 1440, height: 1000 });
+      55 |
+        at e2e/ui/entity-source-preview.spec.ts:52:96
+
+    Error Context: test-results/ow4-ui/entity-source-preview-enti-1bd58-es-light-dark-page-evidence/error-context.md
+
+  1 failed
+    e2e/ui/entity-source-preview.spec.ts:5:5 › entity preview follows selections, preserves source edits and captures light/dark page evidence
+  3 passed (28.4s)

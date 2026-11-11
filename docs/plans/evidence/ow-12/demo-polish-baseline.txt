@@ -1,0 +1,38 @@
+
+> ontokit-web@0.4.0-dev test:ui:demo-polish
+> playwright test --config playwright.demo-polish.config.ts
+
+
+Running 4 tests using 1 worker
+
+(node:10395) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 ui-tests/demo-polish.spec.ts:26:5 › projects announce loading and recover from no matches with keyboard focus (1.8s)
+  ✘  2 ui-tests/demo-polish.spec.ts:58:5 › editor help opens with physical Shift+Slash and restores opener focus (16.5s)
+(node:10803) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  3 ui-tests/demo-polish.spec.ts:90:5 › hydration preserves drafts through filters and restores corrections from IndexedDB (1.8s)
+  ✓  4 ui-tests/demo-polish.spec.ts:132:5 › hydration controls fit a narrow dark viewport with RTL and long IRIs (938ms)
+
+
+  1) ui-tests/demo-polish.spec.ts:58:5 › editor help opens with physical Shift+Slash and restores opener focus
+
+    TimeoutError: locator.click: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for getByRole('button', { name: /Keyboard shortcuts/ })
+
+
+      79 |   await page.keyboard.press("Escape");
+      80 |   await page.setViewportSize({ width: 390, height: 844 });
+    > 81 |   await trigger.click();
+         |                 ^
+      82 |   await expect(dialog).toBeVisible();
+      83 |   const box = await dialog.boundingBox();
+      84 |   expect(box!.x).toBeGreaterThanOrEqual(0);
+        at ui-tests/demo-polish.spec.ts:81:17
+
+    Error Context: test-results/demo-polish/demo-polish-editor-help-op-96803-h-and-restores-opener-focus/error-context.md
+
+  1 failed
+    ui-tests/demo-polish.spec.ts:58:5 › editor help opens with physical Shift+Slash and restores opener focus
+  3 passed (22.0s)

@@ -469,7 +469,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   }, [sourceIriIndex, sourceEditorRef, setPendingScrollIri]);
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 flex-col max-md:h-auto">
       {/* LLM Budget Banner — spans full width, below toolbar, above content */}
       {!llmGate.isAnonymous && (
         <LLMBudgetBanner
@@ -480,9 +480,10 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
       )}
 
       {/* Developer Sub-Header: View Mode Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-800">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-800">
         <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-900">
           <button
+            aria-label="Tree"
             onClick={() => handleViewModeChange("tree")}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
@@ -495,6 +496,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             <span className="hidden sm:inline">Tree</span>
           </button>
           <button
+            aria-label="Source"
             onClick={() => handleViewModeChange("source")}
             onMouseEnter={handleSourceTabHover}
             className={cn(
@@ -511,6 +513,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
             )}
           </button>
           <button
+            aria-label="Graph"
             onClick={() => handleViewModeChange("graph")}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
@@ -534,9 +537,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
       </div>
 
       {/* Content Area */}
-      <div className="relative flex flex-1 overflow-hidden">
+      <div className="relative flex min-w-0 flex-1 overflow-hidden max-md:flex-col max-md:overflow-visible">
         {viewMode === "graph" ? (
-          <div className="flex-1 bg-white dark:bg-slate-800">
+          <div className="min-w-0 flex-1 bg-white max-md:h-[70dvh] max-md:flex-none dark:bg-slate-800">
             <OntologyGraph
               focusIri={selectedIri}
               projectId={projectId}
@@ -552,7 +555,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
         ) : viewMode === "tree" ? (
           <>
             {/* Left Panel - Entity Tree/List with tabs */}
-            <div className="flex-shrink-0 bg-white dark:bg-slate-800" style={{ width: treePanelWidth }}>
+            <div className="flex-shrink-0 bg-white max-md:w-full! dark:bg-slate-800" style={{ width: treePanelWidth }}>
               {/* Entity Type Tabs */}
               <EntityTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -586,7 +589,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               )}
 
               {/* Tab Content */}
-              <div className="h-[calc(100%-5.5rem)] overflow-y-auto">
+              <div className="h-[calc(100%-5.5rem)] overflow-y-auto max-md:max-h-64">
                 {activeTab === "classes" && (
                   <>
                     {isTreeLoading && nodes.length === 0 ? (
@@ -670,6 +673,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
             {/* Draggable Divider */}
             <ResizablePanelDivider
+              className="max-md:hidden"
               width={treePanelWidth}
               onWidthChange={setTreePanelWidth}
               minWidth={200}
@@ -783,7 +787,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
           </>
         ) : (
           /* Source View */
-          <div className="flex-1 bg-white dark:bg-slate-800">
+          <div className="min-w-0 flex-1 bg-white max-md:h-[70dvh] max-md:flex-none dark:bg-slate-800">
             {isLoadingSource || isPreloading ? (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center">

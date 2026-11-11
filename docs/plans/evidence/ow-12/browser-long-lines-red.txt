@@ -1,0 +1,95 @@
+
+Running 4 tests using 1 worker
+
+(node:4726) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › editor preview contains long lines and keeps actions reachable at 390px (1.3s)
+(node:4861) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  2 e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › editor preview contains long lines and keeps actions reachable at 768px (913ms)
+(node:4978) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  3 e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › viewer preview contains long lines and keeps actions reachable at 390px (968ms)
+(node:5098) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  4 e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › viewer preview contains long lines and keeps actions reachable at 768px (789ms)
+[WebServer]
+[WebServer] Session terminated, killing shell...
+
+  1) e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › editor preview contains long lines and keeps actions reachable at 390px
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 390
+    Received:    7705.609375
+
+      109 |       expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      110 |       expect(bounds!.width).toBeGreaterThan(250);
+    > 111 |       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+          |                                         ^
+      112 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      113 |       // A long line scrolls within the snippet body, preserving exact text.
+      114 |       expect(await excerpts.evaluate(el => {
+        at e2e/ui/entity-source-preview-evidence.spec.ts:111:41
+
+    Error Context: test-results/ow4-ui/entity-source-preview-evid-0ffac--actions-reachable-at-390px/error-context.md
+
+  2) e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › editor preview contains long lines and keeps actions reachable at 768px
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 768
+    Received:    7781.609375
+
+      109 |       expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      110 |       expect(bounds!.width).toBeGreaterThan(250);
+    > 111 |       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+          |                                         ^
+      112 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      113 |       // A long line scrolls within the snippet body, preserving exact text.
+      114 |       expect(await excerpts.evaluate(el => {
+        at e2e/ui/entity-source-preview-evidence.spec.ts:111:41
+
+    Error Context: test-results/ow4-ui/entity-source-preview-evid-6bdc2--actions-reachable-at-768px/error-context.md
+
+  3) e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › viewer preview contains long lines and keeps actions reachable at 390px
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 390
+    Received:    7705.609375
+
+      109 |       expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      110 |       expect(bounds!.width).toBeGreaterThan(250);
+    > 111 |       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+          |                                         ^
+      112 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      113 |       // A long line scrolls within the snippet body, preserving exact text.
+      114 |       expect(await excerpts.evaluate(el => {
+        at e2e/ui/entity-source-preview-evidence.spec.ts:111:41
+
+    Error Context: test-results/ow4-ui/entity-source-preview-evid-704f3--actions-reachable-at-390px/error-context.md
+
+  4) e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › viewer preview contains long lines and keeps actions reachable at 768px
+
+    Error: expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 768
+    Received:    7781.609375
+
+      109 |       expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      110 |       expect(bounds!.width).toBeGreaterThan(250);
+    > 111 |       expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+          |                                         ^
+      112 |       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      113 |       // A long line scrolls within the snippet body, preserving exact text.
+      114 |       expect(await excerpts.evaluate(el => {
+        at e2e/ui/entity-source-preview-evidence.spec.ts:111:41
+
+    Error Context: test-results/ow4-ui/entity-source-preview-evid-9ae9e--actions-reachable-at-768px/error-context.md
+
+  4 failed
+    e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › editor preview contains long lines and keeps actions reachable at 390px
+    e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › editor preview contains long lines and keeps actions reachable at 768px
+    e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › viewer preview contains long lines and keeps actions reachable at 390px
+    e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › viewer preview contains long lines and keeps actions reachable at 768px

@@ -1379,9 +1379,9 @@ export default function EditorPage() {
         <div className="border-b border-slate-200 bg-white px-4 py-3 max-md:px-3 max-md:py-2 dark:border-slate-700 dark:bg-slate-800">
           <div
             data-testid="editor-header-row"
-            className="flex items-center justify-between max-md:flex-wrap max-md:gap-y-2"
+            className="flex flex-wrap items-center justify-between gap-y-2"
           >
-            <div className="flex items-center gap-4 max-md:w-full max-md:min-w-0 max-md:flex-wrap max-md:gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-4 max-md:w-full max-md:gap-2">
               <h1
                 title={project.name}
                 className="font-semibold text-slate-900 max-md:min-w-0 max-md:flex-1 max-md:truncate dark:text-white"
@@ -1422,7 +1422,7 @@ export default function EditorPage() {
                 </Button>
               )}
             </div>
-            <div className="flex items-center gap-2 max-md:w-full max-md:flex-wrap">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 max-md:w-full">
               {/* Submit Suggestions button */}
               {canEditSuggestion && suggestionSession.changesCount > 0 && (
                 <Button
@@ -1576,18 +1576,18 @@ export default function EditorPage() {
                     )}
                   </Button>
                 </Link>
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShortcutDialogOpen(true)}
-                  aria-label="Keyboard shortcuts"
-                  className="gap-2"
-                >
-                  <Keyboard aria-hidden="true" className="h-4 w-4" />
-                  <span className="hidden lg:inline">Shortcuts</span>
-                </Button>
               </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShortcutDialogOpen(true)}
+                aria-label="Keyboard shortcuts"
+                className="gap-2"
+              >
+                <Keyboard aria-hidden="true" className="h-4 w-4" />
+                <span className="hidden lg:inline">Shortcuts</span>
+              </Button>
 
               {canManage && !settingsUnavailable && (
                 <Link href={`/projects/${projectId}/settings`}>
@@ -1611,7 +1611,7 @@ export default function EditorPage() {
         <div className="relative flex h-[calc(100vh-4rem-3.5rem)] max-md:h-auto max-md:min-h-[calc(100dvh-4rem)]">
           <div className="flex-1 flex min-w-0 overflow-hidden max-md:overflow-visible">
             {editorMode === "developer" ? (
-              <div className="flex-1 flex flex-col">
+              <div className="flex min-w-0 flex-1 flex-col">
                 <DeveloperEditorLayout
                   projectId={projectId}
                   accessToken={session?.accessToken}

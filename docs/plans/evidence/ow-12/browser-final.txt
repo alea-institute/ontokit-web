@@ -1,0 +1,16 @@
+
+Running 8 tests using 1 worker
+
+(node:18386) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/ui/entity-source-preview-evidence.spec.ts:14:7 › entity source preview evidence (desktop 1440x900) (1.5s)
+  ✓  2 e2e/ui/entity-source-preview-evidence.spec.ts:14:7 › entity source preview evidence (mobile 390x844) (928ms)
+  ✓  3 e2e/ui/entity-source-preview-evidence.spec.ts:45:5 › project viewer source preview evidence (desktop 1440x900) and read-only full source (2.1s)
+  ✓  4 e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › editor preview contains long lines and keeps actions reachable at 390px (2.2s)
+  ✓  5 e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › editor preview contains long lines and keeps actions reachable at 768px (2.9s)
+  ✓  6 e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › viewer preview contains long lines and keeps actions reachable at 390px (2.1s)
+  ✓  7 e2e/ui/entity-source-preview-evidence.spec.ts:94:9 › viewer preview contains long lines and keeps actions reachable at 768px (2.1s)
+  ✓  8 e2e/ui/entity-source-preview.spec.ts:5:5 › entity preview follows selections, preserves source edits and captures light/dark page evidence (3.9s)
+[WebServer]
+[WebServer] Session terminated, killing shell...
+  8 passed (21.0s)

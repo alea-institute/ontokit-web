@@ -1,0 +1,47 @@
+ow-12 local verification — 2026-11-11
+Final application/test revision: 361731c6
+Final application/test tree: 9d41953deeaf3ab00edaa0b386d4f22888134689
+Node 24.22.2; npm 11.6.2; unchanged package.json/package-lock.json
+
+npm run test:coverage -- --run --maxWorkers=4
+Exit 0: 383 files / 5743 tests pass, 135.41 seconds.
+Statements 97.93%; branches 95.01%; functions 98.21%; lines 99.10%.
+
+npm run type-check
+Exit 0.
+
+npm run lint
+Exit 0: 0 errors, 21 existing warnings.
+
+AUTH_MODE=optional NEXT_PUBLIC_API_URL=http://localhost:8000 NEXT_PUBLIC_WS_URL=ws://localhost:8000 NEXT_TELEMETRY_DISABLED=1 npm run build
+Exit 0. Existing sitemap dynamic-import tracing warnings remain.
+
+npm run test:e2e:ownership
+Exit 0: 35 tests on isolated rerun after concurrent readiness-window failure.
+npm run test:e2e:profiles
+Exit 0: 61 tests.
+npm run test:e2e:evidence
+Exit 0: 107 tests.
+npm run test:e2e:identity
+Exit 0: 13 tests.
+npm run test:ctt
+Exit 0: 68 tests.
+npm run test:e2e:hosted-unit
+Exit 0: 12 tests.
+All hermetic suites unchanged by final application/test fixes; 296 tests total.
+
+OW4_UI_PORT=38715 npx playwright test --config=playwright.ui.config.ts --list
+Exit 0: 8 cases listed.
+OW4_UI_PORT=38715 npx playwright test --config=playwright.ui.config.ts
+Exit 0: 8 passed (21.0 seconds), source 066d1a6b.
+Final 361731c6 only removes ignored, unsupported Testing Library query options;
+application and Playwright source unchanged since that browser run.
+
+npm run test:ui:demo-polish
+Exit 0: 4 passed; unchanged suite, shared editor implementation 451333a5.
+The subsequent viewer wrapping-class spelling and unit-test query fixes do not
+change that suite's exercised production surfaces.
+
+Original ow-9 PNGs: 7 checksums pass; supplied PR evidence bytes preserved.
+Fresh ow-12 PNGs: 12 visually inspected, checksums in SHA256SUMS.
+No hosted DEV acceptance or controller security/Astra/Fable review is claimed.
