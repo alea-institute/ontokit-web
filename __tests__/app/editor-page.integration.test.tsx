@@ -249,7 +249,10 @@ describe("Editor page real access and empty-state chains", () => {
     projectResponse = { ...projectResponse, source_file_path: "ontology.ttl" };
     mount();
     const shortcuts = await screen.findByRole("button", { name: "Keyboard shortcuts" });
-    const group = shortcuts.closest(".contents") as HTMLElement;
+    const group = screen.getByRole("button", { name: "History", exact: true }).closest(".contents") as HTMLElement;
+    expect(group.contains(screen.getByRole("button", { name: "Health", exact: true }))).toBe(true);
+    expect(group.contains(screen.getByRole("button", { name: "PRs", exact: true }))).toBe(true);
+    expect(group.contains(shortcuts)).toBe(false);
     expect(group.className.split(/\s+/)).not.toContain("max-md:hidden");
   });
   it("drops desktop-only tools from the phone header for an anonymous proposer", async () => {
@@ -257,7 +260,10 @@ describe("Editor page real access and empty-state chains", () => {
     projectResponse = { ...projectResponse, source_file_path: "ontology.ttl", user_role: null, is_public: true };
     mount();
     const shortcuts = await screen.findByRole("button", { name: "Keyboard shortcuts" });
-    const group = shortcuts.closest(".contents") as HTMLElement;
+    const group = screen.getByRole("button", { name: "History", exact: true }).closest(".contents") as HTMLElement;
+    expect(group.contains(screen.getByRole("button", { name: "Health", exact: true }))).toBe(true);
+    expect(group.contains(screen.getByRole("button", { name: "PRs", exact: true }))).toBe(true);
+    expect(group.contains(shortcuts)).toBe(false);
     expect(group.className.split(/\s+/)).toContain("max-md:hidden");
     // The Standard/Developer switcher stays reachable on phones.
     const modeGroup = screen.getByRole("group", { name: "Editor mode" });

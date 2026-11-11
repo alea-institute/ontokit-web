@@ -268,7 +268,7 @@ function ViewerContent({
         <div className="border-b border-slate-200 bg-white px-4 py-3 max-md:px-3 max-md:py-2 dark:border-slate-700 dark:bg-slate-800">
           <div
             data-testid="viewer-header-row"
-            className="flex flex-wrap items-center justify-between gap-y-2"
+            className="flex items-center justify-between gap-y-2 max-md:flex-wrap md:flex-wrap"
           >
             <div className="flex min-w-0 flex-wrap items-center gap-4 max-md:w-full max-md:gap-2">
               <Link
