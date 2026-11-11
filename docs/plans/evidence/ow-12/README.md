@@ -117,6 +117,26 @@ process-ownership safeguards. No forced restart or security change was needed.
 These are local presentation/interaction results, not hosted DEV authentication,
 API authorization, real FOLIO data or BAIF rehearsal acceptance.
 
+## Local workflow and review
+
+The `lfg` build completed U1–U3. Simplification found no warranted code changes.
+The final test-locator/query corrections retain all assertions and add no new
+abstraction. Full-depth `ce-code-review` of `728a731f` completed correctness,
+project-standards and testing passes with no findings; see [review.json](review.json).
+The review made no source changes. Later changes only archive this result.
+
+The browser acceptance covers the two affected project routes through eight
+preview cases and four shared-page demo-polish cases, with no skips or manual
+verification. Browser console diagnostics were not separately audited by these
+suites; the result covers their explicit assertions and inspected images.
+`ce-compound` documentation was skipped: the demonstrated overflow, focus-order
+and tools-group failures already have durable regression assertions in the
+existing suites. No duplicate lesson document is needed.
+
+An automatic compaction hook briefly committed two unrelated GSD pause files.
+Their bytes remain backed up in `309ad6a0`; the next commit removed only those
+hook-generated files. They are absent from the final against-base diff.
+
 ## Controller handoff
 
 The clone has no remote; all changes are local. Controller publication must

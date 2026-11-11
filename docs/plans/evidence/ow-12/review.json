@@ -1,0 +1,146 @@
+{
+  "status": "complete",
+  "verdict": "Ready to merge",
+  "verdict_reasoning": "No actionable defects were identified in the reviewed local diff. The local implementation and evidence satisfy the planned build scope. Actual current-dev comparison, chief-campaign reconciliation, required CI/security checks, and Astra/Fable reviews remain controller prerequisites for publication and merge; this verdict does not claim those gates passed.",
+  "scope": {
+    "base": "6dff05a0e01a37e24c57e8f22716d2af7a32bcd7",
+    "branch": "drawdown/ow-12",
+    "head_sha": "728a731fa6c26586d7f2b70a74bff77bb4da4ec1",
+    "pr_url": null,
+    "files_changed": 41
+  },
+  "intent": "Integrate the complete supplied PR #84 range while preserving current-base work, tests and evidence; repair source-preview overflow on both routes and verify keyboard, copy, read-only and unsaved-source behavior. Hand local evidence to the controller for a replacement PR superseding #84 and #73.",
+  "intent_confidence": "explicit",
+  "reviewers": [
+    "correctness",
+    "project-standards",
+    "testing"
+  ],
+  "findings": [],
+  "actionable_findings": [],
+  "triage_groups": [],
+  "pre_existing_findings": [],
+  "requirements_completeness": {
+    "plan": "docs/plans/2026-11-11-0035-fix-ow12-pr84-integration-plan.md",
+    "source": "explicit",
+    "requirements": [
+      {
+        "id": "R1",
+        "status": "met",
+        "evidence": "All four supplied PR commits were integrated; the reviewed history retains the supplied base and newer ow-11 work. Live dev reconciliation is assigned to the controller."
+      },
+      {
+        "id": "R2",
+        "status": "met",
+        "evidence": "Executable viewer coverage and fixture changes are present. Existing behavioral assertions remain, with additive layout and tools-group checks."
+      },
+      {
+        "id": "R3",
+        "status": "met",
+        "evidence": "The committed baseline reproduces the 768px failure; the final browser record reports all eight source-preview cases passing, including four added long-line boundary cases."
+      },
+      {
+        "id": "R4",
+        "status": "met",
+        "evidence": "Seven original PR PNGs and historical provenance are preserved; twelve fresh captures, checksums and route/state mappings are committed under docs/plans/evidence/ow-12/."
+      },
+      {
+        "id": "R5",
+        "status": "met",
+        "evidence": "Recorded local verification passes 5,743 Vitest tests, 296 hermetic tests, eight preview browser cases, four demo-polish cases, types, lint and production build. Evidence distinguishes the tested source revisions and later documentation-only commits."
+      },
+      {
+        "id": "R6",
+        "status": "met",
+        "evidence": "The roadmap and local receipt identify the replacement as superseding #84 and #73 and hand publication and remaining campaign gates to the controller."
+      },
+      {
+        "id": "R7",
+        "status": "met",
+        "evidence": "The diff remains within integration, demonstrated layout repairs, additive coverage and evidence. No credential, infrastructure, CTT implementation or ALEA provisioning change appears."
+      }
+    ],
+    "implementation_units": [
+      {
+        "id": "U1",
+        "status": "met",
+        "evidence": "Complete PR integration and preservation are represented in history, executable changes and retained evidence."
+      },
+      {
+        "id": "U2",
+        "status": "met",
+        "evidence": "Bounded shared-layout and header repairs have recorded failing and passing browser proof on both routes."
+      },
+      {
+        "id": "U3",
+        "status": "met",
+        "evidence": "Verification records, fresh screenshots, checksums, roadmap updates and the controller handoff are committed."
+      }
+    ],
+    "unrequested_behavior_rules": [],
+    "controller_follow_up": "Actual current-dev comparison, chief-campaign reconciliation, required CI/security checks, Astra/Fable reviews, and replacement-PR publication remain intentionally outside this local build stage."
+  },
+  "learnings": [],
+  "deployment_notes": [],
+  "residual_risks": [],
+  "testing_gaps": [],
+  "coverage": {
+    "depth": "full",
+    "mode": "agent report-only",
+    "reviewer_selection": [
+      {
+        "reviewer": "correctness",
+        "reason": "Always-on correctness review."
+      },
+      {
+        "reviewer": "project-standards",
+        "reason": "AGENTS.md governs all changed files."
+      },
+      {
+        "reviewer": "testing",
+        "reason": "Layout regression coverage and preservation of existing tests."
+      }
+    ],
+    "reviewers_completed": 3,
+    "failed_reviewers": [],
+    "bound_exceeded": [],
+    "suppressed_by_confidence": {},
+    "mode_aware_demotions": 0,
+    "malformed_returns": 0,
+    "malformed_findings": 0,
+    "first_evidence_backfilled": 0,
+    "missing_first_evidence_demotions": 0,
+    "settlement_removals": 0,
+    "semantic_merges": 0,
+    "detail_hydration_drops": 0,
+    "validation": {
+      "outcome": "empty-batch",
+      "selected": 0,
+      "confirmed": 0,
+      "rejected": 0,
+      "unresolved": 0,
+      "malformed": 0,
+      "failed": 0,
+      "shortcut_skipped": 0,
+      "protected_subject_reclassifications": [],
+      "degraded_blockers": [],
+      "reason": "Three reviewers returned no findings; merge selected no validator findings. No validator was launched, no shortcut evidence was used, and no wait bound was exceeded."
+    },
+    "cross_model": "Cross-model review is off in local configuration; required campaign Astra/Fable reviews remain controller gates.",
+    "notes": [
+      "Full depth selected because binary screenshot changes are uncounted by scope sizing.",
+      "No deleted files or untracked exclusions in final against-base scope.",
+      "Generic subagents inherit the campaign cloud build default; no independent cross-model review is claimed.",
+      "383 Vitest files/5743 tests, 296 hermetic tests, 8 preview browser and 4 demo-polish browser cases pass; types, lint (21 existing warnings), and production build pass.",
+      "Supplied base is the controller snapshot; live dev is unavailable in this remote-free clone.",
+      "All three reviewer artifacts and compact returns were available and valid; no finding candidates, residual risks or testing gaps were returned.",
+      "No repository review policy was supplied; no findings were removed or regraded by policy.",
+      "The explicit plan and reviewed diff were checked in both directions; no unrequested behavior rule was identified.",
+      "Local apply was disabled. This review made no project changes and reran no tests.",
+      "Synthetic fixtures establish local presentation and interaction behavior, not hosted DEV authentication, API authorization or hosted acceptance.",
+      "Learnings and deployment specialist reviews were not selected; their output arrays are empty."
+    ]
+  },
+  "artifact_path": "docs/plans/evidence/ow-12/review.json",
+  "run_id": "ow12-20261111"
+}
