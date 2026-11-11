@@ -1,0 +1,68 @@
+{
+  "source_commit": "43b541a53f682290bdd281ad0ab50ead11387355",
+  "baseline": "6dff05a0e01a37e24c57e8f22716d2af7a32bcd7",
+  "source_sha256": {
+    "app/projects/[id]/editor/page.tsx": "47a7427bc26f3505ed58423f155670973074bf4a4fe5b7de17dbad9075e883d4",
+    "__tests__/app/editor-page.integration.test.tsx": "71727f73ce513ecdbf5e770a363dfdeb3b03ab5efdbac9e7849313aa1c1181c8",
+    "__tests__/app/project-settings-github.integration.test.tsx": "301307d7e8477e61af4aa9336c180f614483c65fc6ec2adb74051ddccdc40499",
+    "ui-tests/demo-polish.spec.ts": "f43fdfa586fe2af94527ab4e669e5a9bcbd9829d3a798e7eb4de6ba5df22a0a5",
+    "ui-tests/fixtures/demo-polish.ts": "6679043fe01ca8aae15521539b3a057bffab86ad0805fe3f5346c749ec7aa604",
+    "package-lock.json": "995f91ee6b71f9df76e2dafe2133f021f2c66b4f8da44d911079cc1fdc7d2842"
+  },
+  "screenshots": [
+    {
+      "path": "docs/plans/evidence/ow-13/editor-desktop.png",
+      "width": 1440,
+      "height": 908,
+      "sha256": "760c663f6c07c10b96e01b785a716bd69ba81cd4bb2cd6567a5cd93a23b85a68"
+    },
+    {
+      "path": "docs/plans/evidence/ow-13/editor-mobile.png",
+      "width": 390,
+      "height": 954,
+      "sha256": "64fec88f0d73241970d134c35129bbe6c40a2804088668e37d45e920c135548e"
+    },
+    {
+      "path": "docs/plans/evidence/ow-13/editor-shortcuts-mobile.png",
+      "width": 390,
+      "height": 954,
+      "sha256": "185ee77d91471afd0b1abdcbd6c7683dc7e03bff49e3d2d8fa126babe85dae9a"
+    },
+    {
+      "path": "docs/plans/evidence/ow-13/editor-shortcuts.png",
+      "width": 1440,
+      "height": 908,
+      "sha256": "165966b854f3464cb2785859d3edb09b55c8b25b7def83069c2ebfe6e177ffad"
+    },
+    {
+      "path": "docs/plans/evidence/ow-13/hydration-entry.png",
+      "width": 1440,
+      "height": 901,
+      "sha256": "18ffbc155936bb25cae44f7acb7bfabac1e7c3e24c18edfa50ac986b03b5ad3f"
+    },
+    {
+      "path": "docs/plans/evidence/ow-13/hydration-review-desktop.png",
+      "width": 1440,
+      "height": 1159,
+      "sha256": "333fe537b584e248f7bb13506344540938400d15ae80a39d6400bdf43fd9753a"
+    },
+    {
+      "path": "docs/plans/evidence/ow-13/hydration-review-narrow-dark.png",
+      "width": 390,
+      "height": 2246,
+      "sha256": "5d2922b9d52429b47fc92c8189238ad78069064b59bac1a4dace145121a529d4"
+    },
+    {
+      "path": "docs/plans/evidence/ow-13/projects-loading.png",
+      "width": 1440,
+      "height": 954,
+      "sha256": "668bf41a9d0960b8a1145e097a7f3966933da53527a9050c8667f005c580060b"
+    },
+    {
+      "path": "docs/plans/evidence/ow-13/projects-no-results.png",
+      "width": 1440,
+      "height": 954,
+      "sha256": "32846213510509abef5dd9c13923b3a941b3ff606b7156233edcbc2c604f23b8"
+    }
+  ]
+}
