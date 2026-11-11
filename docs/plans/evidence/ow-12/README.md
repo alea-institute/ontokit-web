@@ -20,7 +20,8 @@ The replacement PR targets `dev` and **supersedes #84 and #73**.
   narrow-layout repair and additive checks; it is not a documentation-only PR.
 - Final production code is in `066d1a6b`; its tree is
   `82199e3cb886cbfed2505728eb13c910c14272d7`. Later changes correct test-only
-  query typing and add evidence. Final verification revision is recorded below.
+  query typing and add evidence. Full coverage, types, lint and build verify `361731c6` (tree
+  `9d41953deeaf3ab00edaa0b386d4f22888134689`); later commits contain evidence only.
 
 ## What failed and changed
 
@@ -49,7 +50,9 @@ positions only after the geometry, scrolling, focus and clipboard assertions.
 
 ## Verification
 
-Final coverage, static checks and build are being reconciled before acceptance.
+All local gates pass. Commands and exit results are recorded in
+[verification.txt](verification.txt). Campaign publication gates remain with the
+controller.
 
 | Check | Result |
 |---|---|
@@ -62,11 +65,11 @@ Final coverage, static checks and build are being reconciled before acceptance.
 | Hermetic identity | 13/13 pass |
 | Existing CTT/rehearsal tests | 68/68 pass; no CTT implementation changes |
 | Hosted-runner unit tests | 12/12 pass; no hosted execution |
-| Full Vitest coverage | Final run pending |
-| Type-check | Final run pending |
-| ESLint | Final run pending |
-| Production build | Final run pending |
-| Browser discovery | Final run pending |
+| Full Vitest coverage | 383 files / 5,743 tests pass; statements 97.93%, branches 95.01%, functions 98.21%, lines 99.10% |
+| Type-check | Pass |
+| ESLint | Pass; 0 errors and 21 existing warnings |
+| Production build | Pass with public optional-auth/loopback configuration; existing dynamic sitemap tracing warnings |
+| Browser discovery | All 8 cases listed |
 | Preservation | Original PNGs, ow-9 evidence and ow-11 files match their source revisions |
 
 Runtime: Node 24.22.2, npm 11.6.2, Next.js 16.3.1, Playwright 1.63.0,
@@ -122,7 +125,8 @@ Capsule/cited requirements unavailable in this clone, run policy/security checks
 and Astra/Fable reviews, then open the replacement PR superseding #84 and #73.
 No controller review, push, merge or deployment is claimed here.
 
-The source-preview slice is ready once the final gates above are recorded.
+The source-preview slice passes its local acceptance gates and is ready for
+controller review and publication.
 B27's full-source modal/maximize/restore and overlay synchronization, the broader
 B24–B27 work, and hosted rehearsal/persona acceptance keep their existing owners.
 No migration, data rewrite, package release, outside service, spend or Damien-only
