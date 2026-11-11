@@ -29,7 +29,7 @@ const classDetail = {
 };
 const node = { iri: `${ns}Person`, label: "Person", child_count: 0, deprecated: false };
 
-export async function installFixtures(context: BrowserContext) {
+export async function installFixtures(context: BrowserContext, sourceContent = source) {
   const writes: string[] = [];
   const unexpected: string[] = [];
   await context.addInitScript(() => {
@@ -76,7 +76,7 @@ export async function installFixtures(context: BrowserContext) {
       has_github_remote: false, last_sync_at: null, sync_status: null,
     });
     if (suffix === "/revisions/file") return reply({
-      project_id: projectId, version: url.searchParams.get("version"), revision: "a".repeat(40), filename: filePath, content: source,
+      project_id: projectId, version: url.searchParams.get("version"), revision: "a".repeat(40), filename: filePath, content: sourceContent,
     });
     if (suffix === "/ontology/tree") return reply({ nodes: [node], total_classes: 1 });
     if (suffix.endsWith("/ancestors") || suffix.endsWith("/children")) return reply({ nodes: [], total_classes: 1 });

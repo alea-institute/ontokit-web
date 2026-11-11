@@ -268,9 +268,9 @@ function ViewerContent({
         <div className="border-b border-slate-200 bg-white px-4 py-3 max-md:px-3 max-md:py-2 dark:border-slate-700 dark:bg-slate-800">
           <div
             data-testid="viewer-header-row"
-            className="flex items-center justify-between max-md:flex-wrap max-md:gap-y-2"
+            className="flex flex-wrap items-center justify-between gap-y-2"
           >
-            <div className="flex items-center gap-4 max-md:w-full max-md:min-w-0 max-md:gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-4 max-md:w-full max-md:gap-2">
               <Link
                 href="/"
                 className="flex items-center gap-2 text-sm text-slate-600 max-md:shrink-0 hover:text-slate-900 max-md:-ml-1 max-md:min-h-11 max-md:px-1 dark:text-slate-400 dark:hover:text-slate-200"
@@ -290,7 +290,7 @@ function ViewerContent({
               {/* Stays visible on phones so a stored Developer preference is never a dead end. */}
               <ModeSwitcher />
             </div>
-            <div className="flex items-center gap-2 max-md:w-full max-md:flex-wrap">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 max-md:w-full">
               {canPropose && (
                 <SuggestEditButton
                   projectId={projectId}
@@ -354,7 +354,7 @@ function ViewerContent({
         <div className="relative flex h-[calc(100vh-4rem-3.5rem)] max-md:h-auto max-md:min-h-[calc(100dvh-4rem)]">
           <div className="flex-1 flex min-w-0 overflow-hidden max-md:overflow-visible">
             {editorMode === "developer" ? (
-              <div className="flex-1 flex flex-col">
+              <div className="flex min-w-0 flex-1 flex-col">
                 <DeveloperEditorLayout
                   projectId={projectId}
                   accessToken={accessToken}
