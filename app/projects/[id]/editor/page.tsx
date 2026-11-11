@@ -1589,6 +1589,18 @@ export default function EditorPage() {
                 </Button>
               </div>
 
+              {!hasValidAccess && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShortcutDialogOpen(true)}
+                  aria-label="Keyboard shortcuts for mobile viewers"
+                  className="md:hidden"
+                >
+                  <Keyboard aria-hidden="true" className="h-4 w-4" />
+                </Button>
+              )}
+
               {canManage && !settingsUnavailable && (
                 <Link href={`/projects/${projectId}/settings`}>
                   <Button variant="ghost" size="sm" title="Project settings" className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white">
