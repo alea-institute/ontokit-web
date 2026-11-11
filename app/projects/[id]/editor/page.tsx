@@ -1583,11 +1583,22 @@ export default function EditorPage() {
                 size="sm"
                 onClick={() => setShortcutDialogOpen(true)}
                 aria-label="Keyboard shortcuts"
-                className="gap-2"
+                className={hasValidAccess ? "gap-2" : "gap-2 max-md:hidden"}
               >
                 <Keyboard aria-hidden="true" className="h-4 w-4" />
                 <span className="hidden lg:inline">Shortcuts</span>
               </Button>
+              {!hasValidAccess && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShortcutDialogOpen(true)}
+                  aria-label="Keyboard shortcuts for mobile viewers"
+                  className="md:hidden"
+                >
+                  <Keyboard aria-hidden="true" className="h-4 w-4" />
+                </Button>
+              )}
 
               {canManage && !settingsUnavailable && (
                 <Link href={`/projects/${projectId}/settings`}>
