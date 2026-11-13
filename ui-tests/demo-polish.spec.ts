@@ -95,6 +95,24 @@ test("editor help opens with physical Shift+Slash and restores opener focus", as
   await capture(page, "editor-shortcuts-mobile");
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
+  for (const width of [767, 768, 767, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(trigger).toHaveCount(1);
+    await expect(trigger).toHaveAccessibleName(
+      width < 768 ? "Keyboard shortcuts for mobile viewers" : "Keyboard shortcuts",
+    );
+    await expectNoPageOverflow(page);
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Add new entity", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("Accept focused suggestion", { exact: true })).toHaveCount(0);
+    const boundaryBox = await dialog.boundingBox();
+    expect(boundaryBox!.x).toBeGreaterThanOrEqual(0);
+    expect(boundaryBox!.x + boundaryBox!.width).toBeLessThanOrEqual(width);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  }
   await page.setViewportSize({ width: 1440, height: 900 });
   await expect(trigger).toHaveCount(1);
   await expect(trigger).toHaveAccessibleName("Keyboard shortcuts");
