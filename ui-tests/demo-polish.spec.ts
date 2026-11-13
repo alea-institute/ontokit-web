@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { bundleText } from "../__tests__/fixtures/hydrationBundle";
 import { test, expect, project, projectList } from "./fixtures/demo-polish";
 
-const evidence = "docs/plans/evidence/ow-5";
+const evidence = process.env.DEMO_POLISH_EVIDENCE_DIR || "docs/plans/evidence/ow-5";
 async function capture(page: Page, name: string) {
   await mkdir(evidence, { recursive: true });
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -58,9 +58,14 @@ test("projects announce loading and recover from no matches with keyboard focus"
 test("editor help opens with physical Shift+Slash and restores opener focus", async ({ page }) => {
   await page.goto(`/projects/${project.id}/editor`);
   const trigger = page.getByRole("button", { name: /Keyboard shortcuts/ });
+  await expect(trigger).toHaveCount(1);
+  await expectNoPageOverflow(page);
+  await capture(page, "editor-desktop");
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Keyboard Shortcuts" });
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByText("Add new entity", { exact: true })).toHaveCount(0);
+  await expect(dialog.getByText("Accept focused suggestion", { exact: true })).toHaveCount(0);
   await capture(page, "editor-shortcuts");
   await page.keyboard.press("Escape");
   await expect(dialog).toBeHidden();
@@ -78,13 +83,40 @@ test("editor help opens with physical Shift+Slash and restores opener focus", as
   await search.fill("");
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 390, height: 844 });
+  await expect(trigger).toHaveCount(1);
+  await expect(trigger).toHaveAccessibleName("Keyboard shortcuts for mobile viewers");
+  await expectNoPageOverflow(page);
+  await capture(page, "editor-mobile");
   await trigger.click();
   await expect(dialog).toBeVisible();
   const box = await dialog.boundingBox();
   expect(box!.x).toBeGreaterThanOrEqual(0);
   expect(box!.x + box!.width).toBeLessThanOrEqual(390);
+  await capture(page, "editor-shortcuts-mobile");
   await page.keyboard.press("Escape");
   await expect(trigger).toBeFocused();
+  for (const width of [767, 768, 767, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(trigger).toHaveCount(1);
+    await expect(trigger).toHaveAccessibleName(
+      width < 768 ? "Keyboard shortcuts for mobile viewers" : "Keyboard shortcuts",
+    );
+    await expectNoPageOverflow(page);
+    await trigger.click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText("Add new entity", { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText("Accept focused suggestion", { exact: true })).toHaveCount(0);
+    const boundaryBox = await dialog.boundingBox();
+    expect(boundaryBox!.x).toBeGreaterThanOrEqual(0);
+    expect(boundaryBox!.x + boundaryBox!.width).toBeLessThanOrEqual(width);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    await expect(trigger).toBeFocused();
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(trigger).toHaveCount(1);
+  await expect(trigger).toHaveAccessibleName("Keyboard shortcuts");
+  await expectNoPageOverflow(page);
 });
 
 test("hydration preserves drafts through filters and restores corrections from IndexedDB", async ({ page }) => {
