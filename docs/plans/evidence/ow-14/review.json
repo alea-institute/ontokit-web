@@ -1,0 +1,120 @@
+{
+  "status": "complete",
+  "verdict": "Not ready",
+  "verdict_reason": "No code findings were retained, but the explicit plan's current browser verification and fresh inspected screenshots remain incomplete; full verification and controller gates also remain open.",
+  "scope": {
+    "base": "a12c78663bcf14b55740fe18077aa876cda3cab3",
+    "branch": "drawdown/ow-14",
+    "head_sha": "06d6a4f734fbd1e0260088c8907c376cb21af8f9",
+    "pr_url": null,
+    "files_changed": 21
+  },
+  "intent": "Integrate PR88 on supplied dev, preserving source-status regression and layout, with exactly one keyboard-accessible shortcut opener at all viewports and access states. Preserve tests and report browser proof honestly.",
+  "intent_confidence": "explicit",
+  "reviewers": [
+    "correctness",
+    "testing",
+    "project-standards"
+  ],
+  "findings": [],
+  "actionable_findings": [],
+  "triage_groups": [],
+  "pre_existing_findings": [],
+  "requirements_completeness": {
+    "plan": "docs/plans/2026-11-11-0723-fix-ow14-pr88-integration-plan.md",
+    "requirements": [
+      {
+        "id": "R1",
+        "status": "partially addressed",
+        "note": "Integration present; controller must check actual current dev."
+      },
+      {
+        "id": "R2",
+        "status": "met",
+        "note": "Idle path and non-idle regression assertions are present."
+      },
+      {
+        "id": "R3",
+        "status": "partially addressed",
+        "note": "Complementary opener implementation and browser cases are present; real-browser proof is pending."
+      },
+      {
+        "id": "R4",
+        "status": "partially addressed",
+        "note": "Additive integration and viewport coverage present; full browser execution remains pending."
+      },
+      {
+        "id": "R5",
+        "status": "partially addressed",
+        "note": "Historical images retained; fresh visually inspected combined-tree screenshots are not committed."
+      },
+      {
+        "id": "R6",
+        "status": "partially addressed",
+        "note": "Source and tests changed; full verification contract remains open."
+      },
+      {
+        "id": "R7",
+        "status": "partially addressed",
+        "note": "Controller-owned checks, independent reviews and publication remain open."
+      },
+      {
+        "id": "R8",
+        "status": "met",
+        "note": "Review honored supplied restrictions; controller retains remaining responsibility."
+      }
+    ],
+    "implementation_units": [
+      {
+        "id": "U1",
+        "status": "met",
+        "note": "Integration and additive regression coverage appear in the reviewed diff."
+      },
+      {
+        "id": "U2",
+        "status": "partially addressed",
+        "note": "Browser cases exist; execution and fresh inspected captures are pending."
+      },
+      {
+        "id": "U3",
+        "status": "partially addressed",
+        "note": "Final receipt and verification gates are pending with controller."
+      }
+    ],
+    "unrequested_behavior_rules": []
+  },
+  "learnings": [],
+  "deployment_notes": [],
+  "residual_risks": [],
+  "testing_gaps": [
+    "Combined-tree real-browser demo-polish and source-preview verification, responsive opener visibility and containment at 767/768px, dialog focus and authorized editor coverage remain pending. Imported ow-13 screenshots are historical, not current acceptance.",
+    "Fresh inspected screenshots and the full verification contract are not complete."
+  ],
+  "coverage": {
+    "depth": "full",
+    "notes": [
+      "Full depth required because nine PNG files were uncounted.",
+      "Project standards used AGENTS.md fallback; correctness was always-on and testing covered changed tests and browser harness.",
+      "Cross-model peer and adversarial lens were not selected: no evidenced material-consequence scenario; external review was prohibited. Controller separately owns independent Astra/Fable reviews.",
+      "Validator batch was empty: 0 confirmed, 0 rejected, 0 unresolved, 0 malformed, 0 failed, 0 shortcut-skipped; no candidates selected.",
+      "No candidates suppressed by confidence, malformed, demoted, or skipped; first_evidence backfilled: 0; quote-line demotions: 0.",
+      "The untracked docs/plans/evidence/ow-14/ draft was excluded; controller is preparing it separately.",
+      "Initial full Vitest overlapped build and had 11 timing/async failures. Controller reports a two-worker rerun passed 383 files and 5748 tests; coverage was in progress.",
+      "Testing reviewer inspected the subsequently committed authorized viewport case and found it addresses the earlier coverage gap; browser execution remains pending.",
+      "Controller owns actual current-dev check, Semgrep/Docker, independent reviews and publication. No reviewers failed or exceeded their bound."
+    ],
+    "validator": {
+      "outcome": "empty-batch",
+      "confirmed": 0,
+      "rejected": 0,
+      "unresolved": 0,
+      "malformed": 0,
+      "failed": 0,
+      "shortcut_skipped": 0
+    },
+    "failed_reviewers": []
+  },
+  "artifact_path": "docs/plans/evidence/ow-14/review.json",
+  "run_id": "20261113-115801-fe5d2f17",
+  "archive_note": "Public-safe copy of the completed review snapshot; only artifact_path was replaced. Later verification results are recorded in README.md."
+}
