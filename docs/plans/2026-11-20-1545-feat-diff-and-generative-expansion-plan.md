@@ -80,6 +80,7 @@ Experience
 - OC5. Ledger retention: the purge function exists but nothing schedules it; pick a retention period (suggest 365 days) when U3 lands.
 - OC7. "Programmatically" (the owner's word): read here as bulk expansion in the browser over the existing endpoint (U7, built as recommended). Alternative: a scripted path (personal API tokens plus a background bulk-generation job), which is a larger, security-bearing unit and is not planned.
 - OC8. Origin covers created classes only. AI-suggested annotations, parents, and edges on existing entities still read as Human. Extending the ledger to those is a follow-up; say whether it should precede announcing the Changes page.
+- OC9. The Changes page now opens with an at-a-glance digest whose tiles filter by origin. The older "Events by origin" chips in the summary strip remain (kept as built); removing them would leave one origin control in the digest and one in Filters.
 - OC6. History backfill (U3) depth: the last 90 days of the default branch (recommended) versus full history.
 
 ## Planning Contract
@@ -290,8 +291,47 @@ Findings that change the design or stay open:
 - **Equal event times order by random id** (wrong net change for same-second commits), **blank-node ids fabricate `other` changes**, and **an IRI over 2,000 characters blocks later commits**: a fix was in progress when the session ended.
 - **Feed consistency during backfill**: page, payload, and summary run as separate queries and can disagree while the reconciler writes; a heavily edited entity loads its whole window of events despite the 20-event cap.
 - **`field_changes` never contains `other`**: the contract both allows it with null values and says to omit equal before and after. Choose one.
-- **Not verified anywhere:** migrations up and down on a real PostgreSQL, the integration tests, cross-process locking, the web client against real API responses, and the end-to-end check in the Verification Contract.
+- **Verified since (see the UAT record):** migrations up on a real PostgreSQL, the web client against real API responses, and the end-to-end check in the Verification Contract. **Still not verified:** migration downgrade, the API integration tests, and cross-process locking.
 - **Packet lesson:** web units verified only their own test folders and twice broke tests elsewhere (`__tests__/app/`). Every web packet now runs the whole Vitest suite.
+
+## UAT record (2026-11-20, evening): real stack, real browser
+
+**Setup.** The repo's isolated full-stack harness (`scripts/e2e`, `suggestions` profile) brought up PostgreSQL with pgvector, Redis, MinIO, Zitadel with its Login UI, and the API and worker built from the API branch's pushed head (`e17f1d15`), all in throwaway containers on free ports. Migrations applied and matched every head. A custom workflow replaced the fixed Playwright inventory: it started the integration branch's dev server on the reserved port and held the stack. The LLM was stubbed at the HTTP boundary: a small OpenAI-compatible server inside the API container on the local-provider address, with the project configured for that provider. Sign-in ran through real OIDC as the harness's owner and editor personas. Seed: an 18-class property-law ontology imported through the API, then one rename and one removal saved by the editor persona. Import events were backdated ten days in the scratch database to exercise the windows.
+
+**Walked, as a user (Chromium, 1440 px and 390 px, light and dark):**
+
+| Step | Saw |
+|---|---|
+| Open Changes from the project header; switch 24 hours, 7, 30 days | Counts and rows followed the window; the 7-day view dropped the ten-day-old import, and 30 days showed it as System. The URL carried `days`. |
+| Filter by origin and by author; open a row; follow an entity link | Rows, summary, and URL agreed; the row showed before and after per field and the event list with model name; the link opened the class in the editor on the same branch. |
+| Tree menu: Suggest Subclasses on a class | One request; five cards with definitions; focus moved to the batch heading. |
+| Accept one unchanged, edit and accept one, reject one, restore it, reject it again | Each accept saved a commit and added the class to the tree; counts updated. |
+| Suggest Siblings, then Accept all, by keyboard only (Tab, arrows, Shift+F10, Enter) | Menu, batch, confirmation dialog, and toast all reachable; focus returned to the tree when the batch resolved. |
+| Bulk expansion on a class with 11 subclasses | The dialog checked the first 10 and disabled the eleventh (the cap); 10 sequential requests; per-class groups; accepting one group confirmed first and named the undo path. |
+| Back to Changes | Unchanged accepts read **AI**, edited accepts read **AI edited**, the editor's saves read **Human**; the model name showed on each create event. This is the plan's end-to-end check, passing on a real stack. |
+| Show recent changes in the tree; entity history | Markers and accessible names matched the feed ("added by AI", "added by AI and edited by a person", "modified"); history showed the origin badge and model. |
+
+**Found and fixed in the web client (each with a test that failed first, unless noted):**
+
+- Accepting a suggestion selected the new class, which pulled the reviewer off the batch after every accept. Acceptance now leaves the selection alone.
+- Adding a class under a collapsed parent showed the new class alone and hid the parent's existing subclasses. The tree now loads the rest.
+- Accepted cards looked and acted like pending ones. They now read "Accepted" and carry no actions.
+- Every card's buttons had the same accessible name with nothing tying them to a suggestion, and the label field had no name. Buttons are now described by their suggestion's label, and the field is named.
+- A rejected suggestion could not be brought back. "Restore rejected" returns them to pending.
+- The confirmation and toast said accepted classes "join the current draft"; on a direct-write branch they are committed at once. The wording now says each class is saved as it is accepted.
+- The grounding line counted "existing siblings" for a subclass batch; it now says "existing subclasses" (copy change, no failing test first).
+- The tree menu explained a disabled bulk action with "No subclasses loaded."; it now says to expand the class, or that the class has no subclasses.
+- The generative UI spec had broken when bulk expansion added a second menu item matching "Suggest Subclasses"; its lookup is exact now.
+- Changes rows wrapped unevenly at phone width; name and change kind now sit on one line and the rest on a second.
+
+**Changes page polish.** The page opens with "Last N days at a glance": two tiles, classes added by AI (accepted as suggested versus edited first) and entities changed by people (added, modified, removed), plus a line for sync or import. The counts come from the light changed-entities feed, cover the whole window whatever the list is filtered to, and each tile filters the list below. A class a person edits after accepting it counts once under AI and once as modified by people; an imported entity a person renames counts as modified, not added.
+
+**API defects for the API branch (not fixed here):**
+
+1. `POST /projects/import` by a signed-in user records create events with `origin: "system"` and `user_id: "system"` but `user_name` set to the importer's display name, so `summary.authors` returns `{"user_id": "system", "user_name": "<importer>"}` and the Author filter offers a person who is really the system. Expected: either attribute the import to the importing user (`origin: "human"`, their `user_id`), or return `user_name: null` for system events.
+2. `POST /llm/generate-suggestions` (`suggestion_type: "children"`) on a class that already has a subclass with the identical label returns that label with `duplicate_verdict: "pass"` and no candidates when no embedding index exists. Accepting it twice produced two sibling classes with the same label. Expected: an exact normalized label match under the same parent returns at least `warn`, without depending on embeddings.
+
+**Not covered:** suggester-role and anonymous flows, rate-limit and budget refusals from the real limiter, migration downgrade, pull-request merge attribution, remote sync, and a 5,000-plus-entity feed. A pre-existing layout fault remains outside these features: the "Suggest improvements" buttons overlap the field labels in the class panel at 1440 px.
 
 ## Verification Contract
 
