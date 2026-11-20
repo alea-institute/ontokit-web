@@ -24,10 +24,18 @@ export interface UseSuggestionsOptions {
 
 export interface UseSuggestionsReturn {
   items: StoredSuggestion[];
+  batchId?: string;
+  hasBatch: boolean;
+  isAcceptingAll: boolean;
+  eligibleCount: number;
+  requestError: string | null;
   isLoading: boolean;
   error: string | null;
-  request: () => Promise<void>;
+  request(): Promise<void>;
+  request(batchSize?: number): Promise<void>;
   accept: (index: number) => Promise<void>;
+  acceptAll: () => Promise<{ accepted: number; skipped: number }>;
+  rejectAll: () => void;
   acceptingIndices: ReadonlySet<number>;
   reject: (index: number) => void;
   edit: (index: number, value: string) => void;
@@ -72,45 +80,54 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [isAcceptingAll, setIsAcceptingAll] = useState(false);
+  const acceptingAllRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const acceptingRef = useRef(new Set<number>());
   const [acceptingIndices, setAcceptingIndices] = useState<ReadonlySet<number>>(new Set());
 
   const store = useSuggestionStore;
   const scope = useMemo(() => ({ projectId, branch }), [projectId, branch]);
-  const items = useSuggestionStore((s) =>
-    entityIri
-      ? (s.suggestions[storeKey(scope, entityIri, suggestionType)] ?? NO_SUGGESTIONS)
-      : NO_SUGGESTIONS
-  );
+  const key = entityIri ? storeKey(scope, entityIri, suggestionType) : null;
+  const batch = useSuggestionStore((s) => key ? s.suggestions[key] : undefined);
+  const batchId = useSuggestionStore((s) => key ? s.batchIds[key] : undefined);
+  const items = batch ?? NO_SUGGESTIONS;
 
-  // Abort in-flight request when entityIri changes (Pitfall 6 defense)
+  const canAcceptInBatch = useCallback(({ suggestion, status }: StoredSuggestion) =>
+    status === "pending" &&
+    !suggestion.validation_errors?.length &&
+    suggestion.duplicate_verdict !== "block" &&
+    !getAcceptanceError?.(suggestion),
+  [getAcceptanceError]);
+
   useEffect(() => {
     return () => { abortRef.current?.abort(); };
   }, [entityIri]);
 
-  const request = useCallback(async () => {
-    if (!entityIri || !canUseLLM || !accessToken || acceptingRef.current.size > 0) return;
+  const request = useCallback(async (size?: number) => {
+    if (!entityIri || !canUseLLM || !accessToken || acceptingRef.current.size > 0 || acceptingAllRef.current) return;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     setIsLoading(true);
     setError(null);
+    setRequestError(null);
     try {
       const response = await generationApi.generateSuggestions(
         projectId,
-        { class_iri: entityIri, branch, suggestion_type: suggestionType, batch_size: batchSize },
+        { class_iri: entityIri, branch, suggestion_type: suggestionType, batch_size: typeof size === "number" ? size : batchSize },
         accessToken,
         byoKey,
         controller.signal,
       );
       if (!controller.signal.aborted) {
-        store.getState().setSuggestions(scope, entityIri, suggestionType, response.suggestions);
+        store.getState().setSuggestions(scope, entityIri, suggestionType, response.suggestions, response.batch_id);
       }
     } catch (err) {
       if (!controller.signal.aborted) {
-        setError(generationErrorMessage(err));
+        setRequestError(generationErrorMessage(err));
         if (err instanceof ApiError && (err.status === 402 || err.status === 429)) {
           window.dispatchEvent(
             new CustomEvent(LLM_STATUS_INVALIDATION_EVENT, { detail: { projectId } }),
@@ -122,51 +139,89 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     }
   }, [projectId, entityIri, branch, suggestionType, batchSize, canUseLLM, accessToken, byoKey, store, scope]);
 
-  const accept = useCallback(async (index: number) => {
-    if (!entityIri) return;
-    if (acceptingRef.current.has(index)) return;
-    const stored = store.getState().suggestions[storeKey(scope, entityIri, suggestionType)]?.[index];
-    if (!stored || stored.status !== "pending") return;
+  const acceptItem = useCallback(async (index: number, expectedItem?: StoredSuggestion) => {
+    if (!entityIri || !key || acceptingRef.current.has(index)) return false;
+    const stored = store.getState().suggestions[key]?.[index];
+    if (!stored || stored.status !== "pending" || (expectedItem && stored !== expectedItem)) {
+      if (expectedItem) setError("The suggestion list changed. Review the new suggestions and try again.");
+      return false;
+    }
     if ((stored.suggestion.validation_errors?.length ?? 0) > 0) {
       setError("This suggestion cannot be accepted until its validation errors are resolved.");
-      return;
+      return false;
     }
     const acceptanceError = getAcceptanceError?.(stored.suggestion);
     if (acceptanceError) {
       setError(acceptanceError);
-      return;
+      return false;
     }
     setError(null);
     acceptingRef.current.add(index);
     setAcceptingIndices(new Set(acceptingRef.current));
     try {
       await onAccepted?.(stored.suggestion, stored.editedValue);
-      const current = store.getState().suggestions[
-        storeKey(scope, entityIri, suggestionType)
-      ]?.[index];
+      const current = store.getState().suggestions[key]?.[index];
       if (current !== stored) {
         setError("The suggestion list changed before acceptance completed. Review the new suggestions and retry.");
-        return;
+        return false;
       }
       store.getState().acceptSuggestion(scope, entityIri, suggestionType, index);
+      return true;
     } catch (err) {
       const reason = err instanceof Error && err.message
         ? err.message
         : "The change could not be persisted.";
       setError(`Could not accept this suggestion. ${reason}`);
+      return false;
     } finally {
       acceptingRef.current.delete(index);
       setAcceptingIndices(new Set(acceptingRef.current));
     }
-  }, [entityIri, suggestionType, store, onAccepted, getAcceptanceError, scope]);
+  }, [entityIri, suggestionType, store, onAccepted, getAcceptanceError, scope, key]);
+
+  const accept = useCallback(async (index: number) => {
+    if (!acceptingAllRef.current) {
+      setRequestError(null);
+      await acceptItem(index);
+    }
+  }, [acceptItem]);
+
+  const acceptAll = useCallback(async () => {
+    const current = key ? store.getState().suggestions[key] ?? NO_SUGGESTIONS : NO_SUGGESTIONS;
+    const pending = current.filter((item) => item.status === "pending").length;
+    let accepted = 0;
+    if (acceptingAllRef.current || acceptingRef.current.size > 0 || isLoading) {
+      return { accepted, skipped: pending };
+    }
+    acceptingAllRef.current = true;
+    setIsAcceptingAll(true);
+    setRequestError(null);
+    try {
+      for (const [index, item] of current.entries()) {
+        if (!canAcceptInBatch(item)) continue;
+        if (!(await acceptItem(index, item))) break;
+        accepted += 1;
+      }
+      return { accepted, skipped: pending - accepted };
+    } finally {
+      acceptingAllRef.current = false;
+      setIsAcceptingAll(false);
+    }
+  }, [acceptItem, canAcceptInBatch, isLoading, key, store]);
+
+  const rejectAll = useCallback(() => {
+    if (!entityIri || acceptingAllRef.current || acceptingRef.current.size > 0 || isLoading) return;
+    store.getState().rejectPendingSuggestions(scope, entityIri, suggestionType);
+    setError(null);
+  }, [entityIri, isLoading, scope, store, suggestionType]);
 
   const reject = useCallback((index: number) => {
-    if (!entityIri) return;
+    if (!entityIri || acceptingAllRef.current || acceptingRef.current.has(index)) return;
     store.getState().rejectSuggestion(scope, entityIri, suggestionType, index);
   }, [entityIri, suggestionType, store, scope]);
 
   const edit = useCallback((index: number, value: string) => {
-    if (!entityIri) return;
+    if (!entityIri || acceptingAllRef.current || acceptingRef.current.has(index)) return;
     store.getState().editSuggestion(scope, entityIri, suggestionType, index, value);
   }, [entityIri, suggestionType, store, scope]);
 
@@ -183,10 +238,17 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
 
   return {
     items,
+    batchId,
+    hasBatch: batch !== undefined,
+    eligibleCount: items.filter(canAcceptInBatch).length,
     isLoading,
-    error,
+    isAcceptingAll,
+    requestError,
+    error: error ?? requestError,
     request,
     accept,
+    acceptAll,
+    rejectAll,
     acceptingIndices,
     reject,
     edit,

@@ -1,6 +1,6 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DeveloperEditorLayout, type DeveloperEditorLayoutProps } from "@/components/editor/developer/DeveloperEditorLayout";
 import userEvent from "@testing-library/user-event";
 import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
@@ -8,7 +8,12 @@ import { layoutFetch, layoutNs, layoutProps, LayoutProviders } from "../../fixtu
 import { useSelectionStore } from "@/lib/stores/selectionStore";
 import { useSuggestionStore } from "@/lib/stores/suggestionStore";
 
-vi.mock("next-auth/react", () => ({ useSession: () => ({ data: null, status: "unauthenticated" }) }));
+const session = vi.hoisted(() => ({ signedIn: false }));
+vi.mock("next-auth/react", () => ({
+  useSession: () => session.signedIn
+    ? { data: { user: {}, accessToken: "fixture" }, status: "authenticated" }
+    : { data: null, status: "unauthenticated" },
+}));
 // Browser-only source/graph surfaces terminate the chain; all tree/detail children stay real.
 vi.mock("next/dynamic", () => ({ default: (loader: () => unknown) => {
   if (!String(loader).includes("OntologySourceEditor")) return function GraphBoundary() { return <div>Browser graph boundary</div>; };
@@ -18,7 +23,7 @@ vi.mock("next/dynamic", () => ({ default: (loader: () => unknown) => {
     return <div><pre data-testid="source-value">{value}</pre><button onClick={props.onScrollComplete}>Finish source scroll</button></div>;
   };
 } }));
-beforeEach(() => { useSelectionStore.getState().clear(); useSuggestionStore.getState().clearAllSuggestions(); vi.stubGlobal("fetch", layoutFetch()); });
+beforeEach(() => { session.signedIn = false; useSelectionStore.getState().clear(); useSuggestionStore.getState().clearAllSuggestions(); vi.stubGlobal("fetch", layoutFetch()); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 function props(overrides: Partial<DeveloperEditorLayoutProps> = {}): DeveloperEditorLayoutProps {
   return { ...layoutProps(), sourceContent: layoutProps().sourceContent!, setSourceContent: vi.fn(), isLoadingSource: false,
@@ -28,6 +33,50 @@ function props(overrides: Partial<DeveloperEditorLayoutProps> = {}): DeveloperEd
 const mount = (p = props()) => render(<LayoutProviders><DeveloperEditorLayout {...p} /></LayoutProviders>);
 
 describe("developer layout real tree/detail integration", () => {
+  it("selects the tree class and requests siblings exactly once", async () => {
+    session.signedIn = true;
+    const root = layoutNs + "Root";
+    const child = layoutNs + "Child";
+    const requests: unknown[] = [];
+    const normal = layoutFetch();
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      let body: unknown;
+      if (url.includes("/llm/status")) body = { configured: true, budget_exhausted: false };
+      else if (url.includes("/llm/generate-suggestions")) {
+        requests.push(JSON.parse(String(init?.body)));
+        body = {
+          suggestions: [{ iri: layoutNs + "Peer", label: "Peer", suggestion_type: "siblings", provenance: "llm-proposed", validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }],
+          input_tokens: 12, output_tokens: 5,
+        };
+      } else if (url.includes("/ontology/classes/")) {
+        body = { iri: child, labels: [{ value: "Child", lang: "en" }], comments: [], annotations: [],
+          parent_iris: [root], parent_labels: { [root]: "Root" }, child_count: 0, is_defined: true };
+      } else if (url.includes("/lint/")) body = { items: [] };
+      else return normal(input);
+      return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" } });
+    });
+
+    function Editor() {
+      const [selectedIri, selectNode] = React.useState<string | null>(null);
+      return <DeveloperEditorLayout {...props({
+        selectedIri, selectNode, userRole: "editor",
+        nodes: [{ iri: root, label: "Root", isExpanded: true, isLoading: false, hasChildren: true,
+          children: [{ iri: child, label: "Child", isExpanded: false, isLoading: false, hasChildren: false, children: [] }] }],
+      })} />;
+    }
+
+    render(<LayoutProviders><Editor /></LayoutProviders>);
+    fireEvent.contextMenu(screen.getByRole("treeitem", { name: "Child" }));
+    const item = await screen.findByRole("menuitem", { name: "Suggest Siblings" });
+    await waitFor(() => expect(item.hasAttribute("data-disabled")).toBe(false));
+    fireEvent.click(item);
+    const heading = await screen.findByRole("heading", { name: "Suggested siblings of Child" });
+    await waitFor(() => expect(document.activeElement).toBe(heading));
+    expect(useSelectionStore.getState()).toMatchObject({ iri: child, type: "class" });
+    expect(requests).toEqual([{ class_iri: child, branch: "work", suggestion_type: "siblings", batch_size: 5 }]);
+  });
+
   it("scrolls to a pending card and updates the badge after acceptance", () => {
     const scope = { projectId: "layout-project", branch: "work" };
     useSuggestionStore.getState().setSuggestions(scope, layoutNs + "first", "children", [{ iri: layoutNs + "new", label: "New", suggestion_type: "children", provenance: "llm-proposed", validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }]);

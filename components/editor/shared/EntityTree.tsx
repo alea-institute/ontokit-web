@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
-import { EntityTreeNodeRow } from "./EntityTreeNode";
+import { EntityTreeNodeRow, treeItemId } from "./EntityTreeNode";
 import type { EntityTreeNode } from "@/lib/ontology/types";
+import type { OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
 import type { DragState } from "@/lib/hooks/useTreeDragDrop";
 
 interface EntityTreeProps {
@@ -15,6 +16,8 @@ interface EntityTreeProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  onSuggest?: OnClassSuggest;
+  suggestLockedReason?: string;
   /** Trust ladder (R8): minting is above this contributor's rung. */
   addChildLocked?: boolean;
   /** Plain-language reason shown on the disabled affordance (AE2). */
@@ -91,6 +94,8 @@ export function EntityTree({
   onCopyIri,
   onDelete,
   onViewInSource,
+  onSuggest,
+  suggestLockedReason,
   addChildLocked,
   addChildLockedReason,
   draftIris,
@@ -114,10 +119,21 @@ export function EntityTree({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (!enableKeyboardNav) return;
+      if (!enableKeyboardNav || (e.target as HTMLElement).closest('[role="menu"]')) return;
 
       const currentIri = focusedIri || selectedIri;
       const currentIdx = currentIri ? visibleIris.indexOf(currentIri) : -1;
+
+      if (onSuggest && (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) {
+        const iri = currentIri ?? visibleIris[0];
+        const row = iri ? document.getElementById(treeItemId(iri)) : null;
+        if (row && e.currentTarget.contains(row)) {
+          e.preventDefault();
+          const { left, bottom } = row.getBoundingClientRect();
+          row.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, clientX: left, clientY: bottom }));
+        }
+        return;
+      }
 
       switch (e.key) {
         case "ArrowDown": {
@@ -181,12 +197,11 @@ export function EntityTree({
         }
       }
     },
-    [enableKeyboardNav, focusedIri, selectedIri, visibleIris, nodes, onExpand, onCollapse, onSelect, scrollToIri],
+    [enableKeyboardNav, focusedIri, selectedIri, visibleIris, nodes, onSuggest, onExpand, onCollapse, onSelect, scrollToIri],
   );
 
-  const activeDescendantId = focusedIri
-    ? `tree-item-${focusedIri.replace(/[^a-zA-Z0-9-_]/g, "_")}`
-    : undefined;
+  const activeIri = focusedIri || (onSuggest ? selectedIri : null);
+  const activeDescendantId = activeIri ? treeItemId(activeIri) : undefined;
 
   return (
     <div
@@ -197,7 +212,7 @@ export function EntityTree({
       tabIndex={enableKeyboardNav ? 0 : undefined}
       onKeyDown={enableKeyboardNav ? handleKeyDown : undefined}
       onBlur={() => setFocusedIri(null)}
-      className="py-2 outline-hidden"
+      className={onSuggest ? "py-2 focus-visible:outline-2 focus-visible:outline-primary-600 dark:focus-visible:outline-primary-400" : "py-2 outline-hidden"}
     >
       {nodes.map((node, index) => (
         <EntityTreeNodeRow
@@ -214,6 +229,8 @@ export function EntityTree({
           onCopyIri={onCopyIri}
           onDelete={onDelete}
           onViewInSource={onViewInSource}
+          onSuggest={onSuggest}
+          suggestLockedReason={suggestLockedReason}
           addChildLocked={addChildLocked}
           addChildLockedReason={addChildLockedReason}
           draftIris={draftIris}

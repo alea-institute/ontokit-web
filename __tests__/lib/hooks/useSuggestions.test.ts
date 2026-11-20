@@ -50,6 +50,68 @@ describe("useSuggestions", () => {
     useSuggestionStore.getState().clearAllSuggestions();
   });
 
+  describe("batch review", () => {
+    const entityIri = "https://example.org/Parent";
+    const options = { ...SCOPE, entityIri, suggestionType: "children" as const, canUseLLM: true, accessToken: "fixture" };
+
+    it("overrides the request size and stores optional batch metadata", async () => {
+      mockGenerate.mockResolvedValueOnce({ ...MOCK_RESPONSE, batch_id: "4db8a311-fa5f-4ce0-a5d7-849985e9de56" })
+        .mockResolvedValueOnce(MOCK_RESPONSE);
+      const { result } = renderHook(() => useSuggestions(options));
+      await act(async () => { await result.current.request(10); });
+      expect(mockGenerate.mock.calls[0][1]).toMatchObject({ batch_size: 10 });
+      expect(result.current.batchId).toBe("4db8a311-fa5f-4ce0-a5d7-849985e9de56");
+      await act(async () => { await result.current.request(); });
+      expect(mockGenerate.mock.calls[1][1]).toMatchObject({ batch_size: 5 });
+      expect(result.current.batchId).toBeUndefined();
+      expect(result.current.items).toHaveLength(2);
+    });
+
+    it("accepts only eligible pending suggestions and rejects what remains", async () => {
+      const suggestions = [
+        makeSuggestion({ label: "Eligible", duplicate_verdict: "warn" }),
+        makeSuggestion({ label: "Duplicate", duplicate_verdict: "block" }),
+        makeSuggestion({ label: "Invalid", validation_errors: [{ field: "label", code: "invalid", message: "Invalid label" }] }),
+        makeSuggestion({ label: "Missing parent" }),
+        makeSuggestion({ label: "Already rejected" }),
+      ];
+      useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, "children", suggestions);
+      const onAccepted = vi.fn();
+      const { result } = renderHook(() => useSuggestions({
+        ...options, onAccepted,
+        getAcceptanceError: (item) => item.label === "Missing parent" ? "Choose a parent." : null,
+      }));
+      act(() => result.current.reject(4));
+      await act(async () => {
+        expect(await result.current.acceptAll()).toEqual({ accepted: 1, skipped: 3 });
+      });
+      expect(onAccepted).toHaveBeenCalledExactlyOnceWith(suggestions[0], undefined);
+      act(() => result.current.rejectAll());
+      expect(result.current.items.map((item) => item.status)).toEqual([
+        "accepted", "rejected", "rejected", "rejected", "rejected",
+      ]);
+    });
+
+    it("waits for persistence and stops on the first failure", async () => {
+      const suggestions = ["First", "Second", "Third"].map((label) => makeSuggestion({ label }));
+      useSuggestionStore.getState().setSuggestions(SCOPE, entityIri, "children", suggestions);
+      let finish!: () => void;
+      const first = new Promise<void>((resolve) => { finish = resolve; });
+      const onAccepted = vi.fn().mockReturnValueOnce(first).mockRejectedValueOnce(new Error("Draft could not be saved."));
+      const { result } = renderHook(() => useSuggestions({ ...options, onAccepted }));
+      let acceptance!: ReturnType<typeof result.current.acceptAll>;
+      act(() => { acceptance = result.current.acceptAll(); });
+      expect(onAccepted).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        finish();
+        expect(await acceptance).toEqual({ accepted: 1, skipped: 2 });
+      });
+      expect(onAccepted).toHaveBeenCalledTimes(2);
+      expect(result.current.error).toContain("Draft could not be saved.");
+      expect(result.current.items.map((item) => item.status)).toEqual(["accepted", "pending", "pending"]);
+    });
+  });
+
   it("request() calls generationApi.generateSuggestions and stores results", async () => {
     mockGenerate.mockResolvedValue(MOCK_RESPONSE);
 

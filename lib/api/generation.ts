@@ -64,6 +64,7 @@ export interface GenerateSuggestionsRequest {
 }
 
 export interface GenerateSuggestionsResponse {
+  batch_id?: string;
   suggestions: GeneratedSuggestion[];
   input_tokens: number;
   output_tokens: number;

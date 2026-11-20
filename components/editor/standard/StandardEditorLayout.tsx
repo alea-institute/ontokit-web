@@ -9,8 +9,9 @@ import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
 import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
 import { useLLMGate } from "@/lib/hooks/useLLMGate";
 import type { ProjectRole } from "@/lib/api/projects";
+import { suggestionLockReason, type OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
 import { ClassTree } from "@/components/editor/ClassTree";
-import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
+import { ClassDetailPanel, type TreeNodeFallback, type ClassSuggestionIntent } from "@/components/editor/ClassDetailPanel";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
 import { PropertyTree } from "@/components/editor/standard/PropertyTree";
 import { IndividualList } from "@/components/editor/standard/IndividualList";
@@ -196,6 +197,10 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   const toast = useToast();
   const { announce } = useAnnounce();
   const llmGate = useLLMGate(projectId, userRole);
+  const [suggestionIntent, setSuggestionIntent] = useState<ClassSuggestionIntent | null>(null);
+  const consumeSuggestionIntent = useCallback((intent: ClassSuggestionIntent) => {
+    setSuggestionIntent((current) => current === intent ? null : current);
+  }, []);
 
   // Suggestion store for pending count badge
   const pendingCount = useSuggestionStore((s) =>
@@ -505,6 +510,11 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     openMobileDetail();
     selectNode(iri);
   }, [openMobileDetail, selectNode]);
+  const suggestFromTree = useCallback<OnClassSuggest>((iri, kind) => {
+    setSuggestionIntent({ iri, kind, projectId, branch: activeBranch });
+    setShowGraph(false);
+    selectClassFromTree(iri);
+  }, [activeBranch, projectId, selectClassFromTree]);
   const selectPropertyFromTree = useCallback((iri: string) => {
     openMobileDetail();
     setSelectedPropertyIri(iri);
@@ -637,6 +647,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                     nodes={nodes}
                     selectedIri={selectedIri}
                     onSelect={selectClassFromTree}
+                    onSuggest={suggestFromTree}
+                    suggestLockedReason={suggestionLockReason(llmGate)}
                     onExpand={expandNode}
                     onCollapse={collapseNode}
                     onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
@@ -771,6 +783,13 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             byoKey={byoEntry?.key}
             onAddSuggestedChild={onAddSuggestedChild}
             autoSuggestAnnotationsOnMount={isAutoSuggesting}
+            autoSuggestOnMount={suggestionIntent}
+            onAutoSuggestConsumed={consumeSuggestionIntent}
+            restoreHiddenTreeFocus={() => {
+              if (!isSinglePaneViewport()) return false;
+              showMobileTree();
+              return true;
+            }}
             headerActions={selectedIri ? (
               <>
                 <BranchNavigator

@@ -52,10 +52,13 @@ import { useTranslationConfig } from "@/lib/hooks/useTranslationConfig";
 import { useTranslationState } from "@/lib/hooks/useTranslationState";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
 import { getTranslationErrorMessage, type OnDemandTranslationPredicate, type TranslationEntityStateItem } from "@/lib/api/translations";
-import { SuggestionCard, SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
-import type { GeneratedSuggestion } from "@/lib/api/generation";
+import { SuggestionSkeleton, SuggestImprovementsButton } from "@/components/editor/suggestions";
+import { SuggestionBatchReview } from "@/components/editor/suggestions/SuggestionBatchReview";
+import { SuggestionReviewCards, type MarkSuggestionDistinct } from "@/components/editor/suggestions/SuggestionReviewCards";
+import type { DuplicateCandidate, GeneratedSuggestion } from "@/lib/api/generation";
 import { provenanceFromSuggestion, type AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
 import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
+import { treeItemId } from "@/components/editor/shared/EntityTreeNode";
 import type { ProjectRole } from "@/lib/api/projects";
 
 /** Ensure an array of localized strings always ends with an empty placeholder row */
@@ -72,6 +75,15 @@ export interface TreeNodeFallback {
   iri: string;
   parentIri?: string;
   parentLabel?: string;
+}
+
+export type ClassSuggestionKind = Extract<GeneratedSuggestion["suggestion_type"], "children" | "siblings">;
+
+export interface ClassSuggestionIntent {
+  kind: ClassSuggestionKind;
+  iri: string;
+  projectId: string;
+  branch?: string;
 }
 
 interface ClassDetailPanelProps {
@@ -108,6 +120,9 @@ interface ClassDetailPanelProps {
   onAddSuggestedChild?: (iri: string, label: string, parentIri: string, provenance?: AcceptedSuggestionProvenance) => Promise<void>;
   /** When true, auto-fire annotation suggestions when classIri changes (D-09) */
   autoSuggestAnnotationsOnMount?: boolean;
+  autoSuggestOnMount?: ClassSuggestionIntent | null;
+  onAutoSuggestConsumed?: (intent: ClassSuggestionIntent) => void;
+  restoreHiddenTreeFocus?: () => boolean;
 }
 
 export function ClassDetailPanel({
@@ -134,9 +149,19 @@ export function ClassDetailPanel({
   userRole: _userRole,
   onAddSuggestedChild,
   autoSuggestAnnotationsOnMount,
+  autoSuggestOnMount,
+  onAutoSuggestConsumed,
+  restoreHiddenTreeFocus,
 }: ClassDetailPanelProps) {
   const labelId = useId();
-  const [classDetail, setClassDetail] = useState<OWLClassDetail | null>(null);
+  const [batchSize, setBatchSize] = useState(5);
+  const [requestVersions, setRequestVersions] = useState({ children: 0, siblings: 0 });
+  const subclassTrigger = useRef<HTMLButtonElement>(null);
+  const siblingTrigger = useRef<HTMLButtonElement>(null);
+  const treeRequests = useRef({ children: false, siblings: false });
+  const detailKey = JSON.stringify([projectId, branch, classIri]);
+  const [detailResult, setDetailResult] = useState<{ key: string; detail: OWLClassDetail } | null>(null);
+  const classDetail = detailResult?.key === detailKey ? detailResult.detail : null;
   const [classIssues, setClassIssues] = useState<LintIssue[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -380,7 +405,7 @@ export function ClassDetailPanel({
   // Fetch class data
   useEffect(() => {
     if (!classIri) {
-      setClassDetail(null);
+      setDetailResult(null);
       setClassIssues([]);
       return;
     }
@@ -396,7 +421,7 @@ export function ClassDetailPanel({
           lintApi.getIssues(projectId, accessToken, { subject_iri: classIri, limit: 50 }).catch(() => ({ items: [] })),
         ]);
         if (cancelled) return;
-        setClassDetail(detail);
+        setDetailResult({ key: detailKey, detail });
         setClassIssues(issuesResponse.items);
       } catch (err) {
         if (cancelled) return;
@@ -411,7 +436,7 @@ export function ClassDetailPanel({
         } else {
           setError(err instanceof Error ? err.message : "Failed to load class details");
         }
-        setClassDetail(null);
+        setDetailResult(null);
         setClassIssues([]);
       } finally {
         if (!cancelled) {
@@ -424,7 +449,7 @@ export function ClassDetailPanel({
     return () => {
       cancelled = true;
     };
-  }, [projectId, classIri, accessToken, branch, selectedNodeFallback, refreshKey]);
+  }, [projectId, classIri, accessToken, branch, detailKey, selectedNodeFallback, refreshKey]);
 
   // Resolve labels for relationship target IRIs
   useEffect(() => {
@@ -620,8 +645,8 @@ export function ClassDetailPanel({
     if (parentCount > 1) {
       return "Cannot accept this sibling suggestion because the selected class has multiple parents. Choose which parent should receive the sibling first.";
     }
-    return null;
-  }, [classDetail?.parent_iris]);
+    return onAddSuggestedChild ? null : "Generated entity persistence is unavailable.";
+  }, [classDetail?.parent_iris, onAddSuggestedChild]);
 
   const handleAcceptSiblingSuggestion = useCallback(
     async (suggestion: GeneratedSuggestion, editedValue?: string) => {
@@ -696,6 +721,7 @@ export function ClassDetailPanel({
     ...suggestionOpts,
     suggestionType: "children",
     onAccepted: handleAcceptChildSuggestion,
+    getAcceptanceError: onAddSuggestedChild ? undefined : () => "Generated entity persistence is unavailable.",
   });
 
   const siblingsSuggestions = useSuggestions({
@@ -738,10 +764,67 @@ export function ClassDetailPanel({
     }
   }, [classIri, autoSuggestAnnotationsOnMount, canUseLLM]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Helper: Render suggestion slot for a section ──
-  const renderSuggestionSlot = useCallback((
-    suggestions: ReturnType<typeof useSuggestions>,
-  ) => (
+  const requestClassSuggestions = useCallback(async (kind: ClassSuggestionKind, fromTree = false) => {
+    const request = kind === "children" ? childrenSuggestions.request : siblingsSuggestions.request;
+    treeRequests.current[kind] = fromTree;
+    await request(batchSize);
+    setRequestVersions((previous) => ({ ...previous, [kind]: previous[kind] + 1 }));
+  }, [batchSize, childrenSuggestions.request, siblingsSuggestions.request]);
+
+  const consumedIntent = useRef<ClassSuggestionIntent>(null);
+  useEffect(() => {
+    if (!autoSuggestOnMount || consumedIntent.current === autoSuggestOnMount ||
+      autoSuggestOnMount.iri !== classIri || autoSuggestOnMount.projectId !== projectId ||
+      autoSuggestOnMount.branch !== branch || !classDetail || !canUseLLM || !accessToken) return;
+
+    consumedIntent.current = autoSuggestOnMount;
+    onAutoSuggestConsumed?.(autoSuggestOnMount);
+    if (autoSuggestOnMount.kind === "siblings" && classDetail.parent_iris.length === 0) {
+      siblingTrigger.current?.focus();
+      return;
+    }
+    void requestClassSuggestions(autoSuggestOnMount.kind, true);
+  }, [accessToken, autoSuggestOnMount, branch, canUseLLM, classDetail, classIri, onAutoSuggestConsumed, projectId, requestClassSuggestions]);
+
+  const returnSuggestionFocus = (kind: ClassSuggestionKind) => {
+    if (treeRequests.current[kind] && classIri) {
+      const row = document.getElementById(treeItemId(classIri));
+      const tree = row?.closest<HTMLElement>('[role="tree"]');
+      if (tree?.getClientRects().length) {
+        tree.focus();
+        return;
+      }
+      if (restoreHiddenTreeFocus?.()) return;
+    }
+    (kind === "children" ? subclassTrigger : siblingTrigger).current?.focus();
+  };
+
+  const markDistinct = useCallback<MarkSuggestionDistinct>(async (
+    suggestion: GeneratedSuggestion, candidate: DuplicateCandidate, reason: string,
+  ) => {
+    if (!accessToken) return;
+    const parentIri = suggestion.suggestion_type === "children"
+      ? classIri
+      : suggestion.suggestion_type === "siblings"
+        ? (classDetail?.parent_iris[0] ?? classIri)
+        : null;
+    await distinctDecisionsApi.mark(projectId, {
+      proposed_iri: suggestion.iri,
+      label: suggestion.label,
+      candidate_iri: candidate.iri,
+      candidate_branch: candidate.branch,
+      entity_type: "class",
+      parent_iri: parentIri,
+      reason,
+    }, accessToken);
+    toast.success(
+      "Distinct entities recorded",
+      `${suggestion.label} will no longer be blocked by ${candidate.label} while their relevant content remains unchanged.`,
+    );
+  }, [accessToken, classDetail?.parent_iris, classIri, projectId, toast]);
+  const onMarkDistinct = canEdit && accessToken ? markDistinct : undefined;
+
+  const renderSuggestionSlot = (suggestions: ReturnType<typeof useSuggestions>) => (
     <>
       {suggestions.isLoading && (
         <div role="list" className="space-y-2 mt-2">
@@ -752,49 +835,21 @@ export function ClassDetailPanel({
       )}
       {suggestions.error && (
         <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
-          {suggestions.error} <button onClick={suggestions.request} className="underline">Retry</button>
+          {suggestions.error} <button onClick={() => { void suggestions.request(); }} className="underline">Retry</button>
         </div>
       )}
-      {suggestions.items.filter((s) => s.status !== "rejected").length > 0 && (
-        <div role="list" className="space-y-2 mt-2">
-          {suggestions.items.map((item, i) =>
-            item.status !== "rejected" ? (
-              <SuggestionCard
-                key={item.suggestion.iri ?? i}
-                item={item}
-                onAccept={() => { void suggestions.accept(i); }}
-                onReject={() => suggestions.reject(i)}
-                onEdit={(val) => { suggestions.edit(i, val); void suggestions.accept(i); }}
-                busy={suggestions.acceptingIndices.has(i)}
-                onMarkDistinct={canEdit && accessToken ? async (candidate, reason) => {
-                  const parentIri = item.suggestion.suggestion_type === "children"
-                    ? classIri
-                    : item.suggestion.suggestion_type === "siblings"
-                      ? (classDetail?.parent_iris[0] ?? classIri)
-                      : null;
-                  await distinctDecisionsApi.mark(projectId, {
-                    proposed_iri: item.suggestion.iri,
-                    label: item.suggestion.label,
-                    candidate_iri: candidate.iri,
-                    candidate_branch: candidate.branch,
-                    entity_type: "class",
-                    parent_iri: parentIri,
-                    reason,
-                  }, accessToken);
-                  suggestions.markDistinct(i, candidate);
-                  toast.success(
-                    "Distinct entities recorded",
-                    `${item.suggestion.label} will no longer be blocked by ${candidate.label} while their relevant content remains unchanged.`,
-                  );
-                } : undefined}
-                disabled={item.suggestion.duplicate_verdict === "block"}
-              />
-            ) : null,
-          )}
-        </div>
-      )}
+      <SuggestionReviewCards review={suggestions} onMarkDistinct={onMarkDistinct} />
     </>
-  ), [accessToken, canEdit, classDetail?.parent_iris, classIri, projectId, toast]);
+  );
+
+  const getExistingSiblingCount = async () => {
+    const children = await Promise.all((classDetail?.parent_iris ?? []).map((parent) =>
+      projectOntologyApi.getClassChildren(projectId, parent, accessToken, branch),
+    ));
+    const siblings = new Set(children.flatMap((response) => response.nodes.map((node) => node.iri)));
+    if (classIri) siblings.delete(classIri);
+    return siblings.size;
+  };
 
   const translationValues = (predicate: string) =>
     translationItems.filter((item) => item.predicate === predicate);
@@ -848,7 +903,10 @@ export function ClassDetailPanel({
     );
   }
 
-  if (isLoading) {
+  // A saved suggestion refreshes the class. Keep the current review mounted
+  // so its progress, confirmation and requester focus survive that refresh.
+  const reviewingBatch = classDetail && (childrenSuggestions.hasBatch || siblingsSuggestions.hasBatch);
+  if (isLoading && !reviewingBatch) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
@@ -1481,21 +1539,63 @@ export function ClassDetailPanel({
             );
           })()}
 
-          {/* ═══ CHILDREN (LLM suggestions) ═══ */}
-          {canUseLLM && (
-            <Section
-              title="Subclasses"
-              tooltip="Suggest child classes"
-              icon={<Plus className="h-4 w-4" />}
-              headerActions={
-                <SuggestImprovementsButton onRequest={childrenSuggestions.request} isLoading={childrenSuggestions.isLoading} disabled={!classIri} />
-              }
-            >
-              <div className="text-xs text-slate-400 dark:text-slate-500">
-                {classDetail.child_count} existing subclass{classDetail.child_count !== 1 ? "es" : ""}
+          {(canUseLLM || childrenSuggestions.error || siblingsSuggestions.error ||
+            childrenSuggestions.hasBatch || siblingsSuggestions.hasBatch) && (
+            <Section title="Subclasses" icon={<Plus className="h-4 w-4" />}>
+              <div className="flex flex-wrap items-center gap-2">
+                <SuggestImprovementsButton
+                  ref={subclassTrigger}
+                  label="Suggest subclasses"
+                  onRequest={() => { void requestClassSuggestions("children"); }}
+                  isLoading={childrenSuggestions.isLoading}
+                  disabled={!canUseLLM || childrenSuggestions.isAcceptingAll || childrenSuggestions.acceptingIndices.size > 0}
+                />
+                <SuggestImprovementsButton
+                  ref={siblingTrigger}
+                  label="Suggest siblings"
+                  onRequest={() => { void requestClassSuggestions("siblings"); }}
+                  isLoading={siblingsSuggestions.isLoading}
+                  disabled={!canUseLLM || classDetail.parent_iris.length === 0 || siblingsSuggestions.isAcceptingAll || siblingsSuggestions.acceptingIndices.size > 0}
+                  disabledReason={classDetail.parent_iris.length === 0 ? "This class has no parent, so it has no siblings." : undefined}
+                />
+                <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                  Batch size
+                  <select
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-slate-900 focus-visible:outline-2 focus-visible:outline-primary-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus-visible:outline-primary-400"
+                    value={batchSize}
+                    onChange={(event) => setBatchSize(Number(event.target.value))}
+                  >
+                    <option value={3}>3</option>
+                    <option value={5}>5</option>
+                    <option value={10}>10</option>
+                  </select>
+                </label>
               </div>
-              {renderSuggestionSlot(childrenSuggestions)}
-              {renderSuggestionSlot(siblingsSuggestions)}
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {classDetail.child_count} existing subclass{classDetail.child_count !== 1 ? "es" : ""}
+              </p>
+              <SuggestionBatchReview
+                title={`Suggested subclasses for ${displayLabel}`}
+                parentLabel={displayLabel}
+                review={childrenSuggestions}
+                onRequest={() => { void requestClassSuggestions("children"); }}
+                canRequest={canUseLLM ?? false}
+                requestVersion={requestVersions.children}
+                returnFocus={() => returnSuggestionFocus("children")}
+                siblingCount={classDetail.child_count}
+                onMarkDistinct={onMarkDistinct}
+              />
+              <SuggestionBatchReview
+                title={`Suggested siblings of ${displayLabel}`}
+                parentLabel={classDetail.parent_iris.map((iri) => classDetail.parent_labels?.[iri] || getLocalName(iri)).join(", ")}
+                review={siblingsSuggestions}
+                onRequest={() => { void requestClassSuggestions("siblings"); }}
+                canRequest={!!canUseLLM && classDetail.parent_iris.length > 0}
+                requestVersion={requestVersions.siblings}
+                returnFocus={() => returnSuggestionFocus("siblings")}
+                siblingCount={getExistingSiblingCount}
+                onMarkDistinct={onMarkDistinct}
+              />
             </Section>
           )}
 

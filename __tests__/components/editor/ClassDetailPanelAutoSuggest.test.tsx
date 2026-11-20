@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, type Mock } from "vitest";
-import { render, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 // ── Mocks (must precede component import) ──
 
@@ -57,6 +57,7 @@ vi.mock("@/lib/hooks/useSuggestions", () => ({
     if (!requestFns[key]) requestFns[key] = vi.fn();
     return {
       items: [],
+      acceptingIndices: new Set(),
       isLoading: false,
       error: null,
       request: requestFns[key],
@@ -116,6 +117,26 @@ describe("ClassDetailPanel auto-suggest on navigate (M-1)", () => {
     for (const key of Object.keys(requestFns)) delete requestFns[key];
     mockGetClassDetail.mockResolvedValue(makeClassDetail());
     mockGetIssues.mockResolvedValue({ items: [] });
+  });
+
+  it("requests siblings using the selected batch size", async () => {
+    mockGetClassDetail.mockResolvedValue({
+      ...makeClassDetail(), parent_iris: ["https://example.org/Agent"],
+    });
+    render(<ClassDetailPanel {...BASE_PROPS} canUseLLM />);
+    const button = await screen.findByRole("button", { name: "Suggest siblings" });
+    fireEvent.change(screen.getByLabelText("Batch size"), { target: { value: "10" } });
+    fireEvent.click(button);
+    expect(requestFns.siblings).toHaveBeenCalledExactlyOnceWith(10);
+  });
+
+  it("explains why sibling suggestions are disabled for a root", async () => {
+    render(<ClassDetailPanel {...BASE_PROPS} canUseLLM />);
+    const button = await screen.findByRole("button", { name: "Suggest siblings" });
+    expect(button.getAttribute("aria-disabled")).toBe("true");
+    expect(button.getAttribute("title")).toMatch(/no parent/i);
+    fireEvent.click(button);
+    expect(requestFns.siblings).not.toHaveBeenCalled();
   });
 
   it("fires the annotation request exactly once on mount when flagged", async () => {

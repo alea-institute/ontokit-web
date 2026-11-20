@@ -490,7 +490,7 @@ describe("ClassDetailPanel", () => {
     await userEvent.click(within(card!).getByRole("button", { name: "Accept suggestion" }));
 
     expect(onAddSuggestedChild).not.toHaveBeenCalled();
-    expect(await screen.findByText(expectedError)).toBeDefined();
+    expect(await within(card!.closest("section")!).findByText(expectedError)).toBeDefined();
     expect(useSuggestionStore.getState().suggestions[
       "proj-1::main::http://example.org/ontology#Person::siblings"
     ][0].status).toBe("pending");

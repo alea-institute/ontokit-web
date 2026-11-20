@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -62,6 +63,50 @@ async function savePanel() {
   await screen.findByText("Saved");
 }
 describe("class detail real editing and suggestion chains", () => {
+  it("keeps the batch review mounted and restores the requester after a save refresh", async () => {
+    const { client } = llmHookHarness();
+    clients.push(client);
+    const genericFetch = fetcher.getMockImplementation()!;
+    let releaseRefresh!: () => void;
+    const refreshing = new Promise<void>((resolve) => { releaseRefresh = resolve; });
+    let refreshStarted = false;
+    fetcher.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/generate-suggestions")) {
+        return jsonResponse({
+          suggestions: [{
+            iri: "https://example.org/Suggested", label: "Suggested class", suggestion_type: "children",
+            provenance: "llm-proposed", validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [],
+          }],
+          input_tokens: 10, output_tokens: 5,
+        });
+      }
+      if (refreshStarted && url.includes("/ontology/classes/")) await refreshing;
+      return genericFetch(input);
+    });
+
+    function Panel() {
+      const [refreshKey, setRefreshKey] = useState(0);
+      return <ClassDetailPanel {...scope} classIri={iri} accessToken="fixture" canUseLLM refreshKey={refreshKey}
+        onAddSuggestedChild={async () => {
+          refreshStarted = true;
+          setRefreshKey(1);
+        }}
+      />;
+    }
+    render(<QueryClientProvider client={client}><TooltipProvider><ToastProvider><Panel /></ToastProvider></TooltipProvider></QueryClientProvider>);
+    const trigger = await screen.findByRole("button", { name: "Suggest subclasses" });
+    fireEvent.click(trigger);
+    const region = await screen.findByRole("region", { name: "Suggested subclasses for Person" });
+    fireEvent.click(await within(region).findByRole("button", { name: "Accept all (1)" }));
+    try {
+      await waitFor(() => expect(document.activeElement).toBe(trigger));
+      expect(region.textContent).toContain("0 pending, 1 accepted");
+    } finally {
+      releaseRefresh();
+    }
+  });
+
   it.each([true, false])("offers sign-in without creating an editable draft when proposals are enabled: %s", async canPropose => {
     const signIn = vi.fn();
     const propose = vi.fn();

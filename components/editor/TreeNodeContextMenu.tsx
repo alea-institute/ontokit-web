@@ -1,18 +1,35 @@
 "use client";
 
-import { Plus, Copy, Code, Trash2, Lock } from "lucide-react";
+import { Plus, Copy, Code, Trash2, Lock, Sparkles } from "lucide-react";
 import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
+import type { useLLMGate } from "@/lib/hooks/useLLMGate";
+import type { SuggestionType } from "@/lib/api/generation";
+
+export type OnClassSuggest = (iri: string, kind: Extract<SuggestionType, "children" | "siblings">) => void;
+
+export function suggestionLockReason(gate: ReturnType<typeof useLLMGate>): string | undefined {
+  if (gate.canUseLLM) return undefined;
+  if (gate.isAnonymous) return "Sign in to use AI suggestions.";
+  if (!gate.hasRoleAccess) return "Your project role does not allow AI suggestions.";
+  if (gate.budgetExhausted) return "This project's AI budget has been exhausted.";
+  if (gate.notConfigured) return "Choose a generation model in project AI settings.";
+  return "AI suggestions are currently unavailable.";
+}
+
 interface TreeNodeContextMenuProps {
   node: { iri: string; label: string };
   onAddChild?: (parentIri: string) => void;
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  onSuggest?: OnClassSuggest;
+  suggestLockedReason?: string;
+  siblingLockedReason?: string;
   /** Trust ladder (R8): creating entities is above this contributor's rung. */
   addChildLocked?: boolean;
   /** Plain-language reason, rendered under the disabled item (AE2). */
@@ -25,6 +42,9 @@ export function TreeNodeContextMenu({
   onCopyIri,
   onDelete,
   onViewInSource,
+  onSuggest,
+  suggestLockedReason,
+  siblingLockedReason,
   addChildLocked = false,
   addChildLockedReason,
 }: TreeNodeContextMenuProps) {
@@ -48,6 +68,25 @@ export function TreeNodeContextMenu({
           {addChildLocked && addChildLockedReason && (
             <ContextMenuLabel className="max-w-[220px] whitespace-normal font-normal leading-snug">
               {addChildLockedReason}
+            </ContextMenuLabel>
+          )}
+          <ContextMenuSeparator />
+        </>
+      )}
+
+      {onSuggest && (
+        <>
+          <ContextMenuItem disabled={!!suggestLockedReason} onSelect={() => onSuggest(node.iri, "children")}>
+            {suggestLockedReason ? <Lock className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+            Suggest Subclasses
+          </ContextMenuItem>
+          <ContextMenuItem disabled={!!(suggestLockedReason || siblingLockedReason)} onSelect={() => onSuggest(node.iri, "siblings")}>
+            {suggestLockedReason || siblingLockedReason ? <Lock className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+            Suggest Siblings
+          </ContextMenuItem>
+          {(suggestLockedReason || siblingLockedReason) && (
+            <ContextMenuLabel className="max-w-[220px] whitespace-normal font-normal leading-snug">
+              {suggestLockedReason || siblingLockedReason}
             </ContextMenuLabel>
           )}
           <ContextMenuSeparator />
