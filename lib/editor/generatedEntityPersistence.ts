@@ -15,9 +15,12 @@ export interface GeneratedEntitySessionWriter {
   saveToSession: (content: string, entityIri: string, entityLabel: string) => Promise<boolean>;
 }
 
-interface GeneratedEntityInput {
+export type AcceptedClassSuggestion = AcceptedSuggestionProvenance & { definition?: string | null };
+
+export interface GeneratedEntityInput {
   iri: string;
   label: string;
+  definition?: string | null;
   parentIri: string;
   entityType: EntityType;
   provenance?: AcceptedSuggestionProvenance;

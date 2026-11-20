@@ -38,7 +38,7 @@ export interface UseSuggestionsReturn {
   rejectAll: () => void;
   acceptingIndices: ReadonlySet<number>;
   reject: (index: number) => void;
-  edit: (index: number, value: string) => void;
+  edit: (index: number, value: string, definition?: string) => void;
   markDistinct: (index: number, candidate: DuplicateCandidate) => void;
 }
 
@@ -159,7 +159,10 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     acceptingRef.current.add(index);
     setAcceptingIndices(new Set(acceptingRef.current));
     try {
-      await onAccepted?.(stored.suggestion, stored.editedValue);
+      const suggestion = stored.editedDefinition === undefined
+        ? stored.suggestion
+        : { ...stored.suggestion, definition: stored.editedDefinition };
+      await onAccepted?.(suggestion, stored.editedValue);
       const current = store.getState().suggestions[key]?.[index];
       if (current !== stored) {
         setError("The suggestion list changed before acceptance completed. Review the new suggestions and retry.");
@@ -220,9 +223,9 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     store.getState().rejectSuggestion(scope, entityIri, suggestionType, index);
   }, [entityIri, suggestionType, store, scope]);
 
-  const edit = useCallback((index: number, value: string) => {
+  const edit = useCallback((index: number, value: string, definition?: string) => {
     if (!entityIri || acceptingAllRef.current || acceptingRef.current.has(index)) return;
-    store.getState().editSuggestion(scope, entityIri, suggestionType, index, value);
+    store.getState().editSuggestion(scope, entityIri, suggestionType, index, value, definition);
   }, [entityIri, suggestionType, store, scope]);
 
   const markDistinct = useCallback((index: number, candidate: DuplicateCandidate) => {

@@ -85,6 +85,11 @@ const SIGN_IN_INVENTORY: Entry[] = [
     note: "Sign-in copy and button render only when gate.onSignIn is set, which the editor page sets only when shouldShowAuthUI() is true.",
   },
   {
+    file: "components/editor/TreeNodeContextMenu.tsx", route: "/projects/[id]/editor", gate: "copy-only",
+    counts: { "sign-in-copy": 1 },
+    note: "The menu explains why AI suggestion items are disabled for anonymous users. It offers no sign-in action.",
+  },
+  {
     file: "app/docs/page.tsx", route: "/docs", gate: "copy-only",
     counts: { "sign-in-copy": 2 },
     note: "Documentation prose describing browsing without signing in; no control.",

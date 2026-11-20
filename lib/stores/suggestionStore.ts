@@ -11,6 +11,7 @@ export interface StoredSuggestion {
   suggestion: GeneratedSuggestion;
   status: SuggestionReviewStatus;
   editedValue?: string;
+  editedDefinition?: string;
 }
 
 export interface SuggestionScope {
@@ -30,7 +31,7 @@ interface SuggestionStoreState {
   rejectPendingSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string) => void;
   acceptSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
   rejectSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
-  editSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number, value: string) => void;
+  editSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number, value: string, definition?: string) => void;
   removeDuplicateCandidate: (
     scope: SuggestionScope,
     entityIri: string,
@@ -86,7 +87,7 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
       };
     });
   },
-  editSuggestion: (scope, entityIri, suggestionType, index, value) => {
+  editSuggestion: (scope, entityIri, suggestionType, index, value, definition) => {
     const key = storeKey(scope, entityIri, suggestionType);
     set((state) => {
       const arr = [...(state.suggestions[key] || [])];
@@ -98,19 +99,18 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
         const original = item.suggestion.property_iri
           ? (item.suggestion.value ?? item.suggestion.label)
           : item.suggestion.label;
-        if (value === original) {
-          arr[index] = {
-            ...item,
-            editedValue: undefined,
-            suggestion: { ...item.suggestion, provenance: "llm-proposed" },
-          };
-        } else {
-          arr[index] = {
-            ...item,
-            editedValue: value,
-            suggestion: { ...item.suggestion, provenance: "user-edited-from-llm" },
-          };
-        }
+        const editedValue = value === original ? undefined : value;
+        const currentDefinition = definition ?? item.editedDefinition;
+        const editedDefinition = currentDefinition === item.suggestion.definition ? undefined : currentDefinition;
+        arr[index] = {
+          ...item,
+          editedValue,
+          editedDefinition,
+          suggestion: {
+            ...item.suggestion,
+            provenance: editedValue === undefined && editedDefinition === undefined ? "llm-proposed" : "user-edited-from-llm",
+          },
+        };
       }
       return { suggestions: { ...state.suggestions, [key]: arr } };
     });
