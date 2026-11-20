@@ -58,6 +58,7 @@ Generative
 - R10. Accepted items land through the existing draft-and-save or suggestion-session path, with no new write path.
 - R11. The server records what the LLM proposed, so an accepted entity is tagged `ai` (unchanged) or `ai_edited` (changed before landing) in the change feed, with model and batch id.
 - R12. Existing cost and abuse limits remain in force and their refusals read as plain-language messages in the batch region.
+- R14. A user can expand several classes in one action ("programmatically"): pick up to 10 classes, or every direct subclass of one class, and receive one combined review. Each class still costs one metered generation call, and nothing lands without review (U7).
 
 Experience
 - R13. Both surfaces meet the UX rules under "UX design": keyboard access, non-color status, announcements, empty/loading/error states, confirmation or undo on bulk actions, and progressive disclosure.
@@ -77,6 +78,8 @@ Experience
 - OC3. "Accept all" confirms above 3 items (built). Alternative: always confirm, or never confirm and rely on draft undo.
 - OC4. Blocked-duplicate and invalid proposals are still logged in the AI ledger so a later resolved acceptance is tagged AI (built). Alternative: log only clean proposals.
 - OC5. Ledger retention: the purge function exists but nothing schedules it; pick a retention period (suggest 365 days) when U3 lands.
+- OC7. "Programmatically" (the owner's word): read here as bulk expansion in the browser over the existing endpoint (U7, built as recommended). Alternative: a scripted path (personal API tokens plus a background bulk-generation job), which is a larger, security-bearing unit and is not planned.
+- OC8. Origin covers created classes only. AI-suggested annotations, parents, and edges on existing entities still read as Human. Extending the ledger to those is a follow-up; say whether it should precede announcing the Changes page.
 - OC6. History backfill (U3) depth: the last 90 days of the default branch (recommended) versus full history.
 
 ## Planning Contract
@@ -86,6 +89,8 @@ Experience
 - KTD1. **The API computes the diff and stores it as events.** The existing `entity_change_events` table is the index for the feed. Reading git and parsing two ontology graphs per commit on every page view would not scale (FOLIO holds about 18,000 classes); recording once per landing and querying rows does. Git stays the source of truth: U3 adds a reconciler that walks a branch's commits, compares each commit's graph with its parent's, and records events for commits that have none.
 - KTD2. **One row per entity, net over the window.** The feed groups events by entity and reports net field changes, so ten edits to one label read as one before/after. Individual events stay available under each row.
 - KTD3. **Origin is server-owned.** The generation route writes each proposed subclass or sibling to `llm_generated_entities`. When a create event is recorded, a resolver matches created IRIs against that ledger and marks them `ai` or `ai_edited` by comparing label and definition. The client never claims origin, so a hand-typed class cannot pose as AI or the reverse. Matching ignores branch because suggestion branches merge.
+- KTD7. **A per-branch watermark makes the reconciler the one catch-up path (review, 2026-11-20).** Checking "commits that have no events" cannot tell an unrecorded commit from a commit that changed no entity, so it re-parses those forever. U3 stores the last reconciled commit per project and branch. Every path that moves a branch head enqueues the reconciler; the direct save keeps recording inline and advances the watermark. A path nobody wired is caught on the next run instead of lost.
+- KTD8. **Events carry the time the change landed, not the time the row was written (review).** Backfilled and reconciled events take the commit's committer time (clamped to now), or every backfilled change would read as "changed today".
 - KTD4. **The two API tracks meet at a plain-dict resolver seam**, so they build in parallel with no shared imports; U3 wires them together at the call sites.
 - KTD5. **Generation is finished, not rebuilt.** The request, gates, validation, and duplicate detection stay. The API adds `batch_id` and the ledger; the web adds the missing siblings trigger, the tree entry, and batch review on top of `useSuggestions`.
 - KTD6. **One migration for both tracks** (`j8k9l0m1n2o3`, after head `i7j8k9l0m1n2`) avoids two Alembic heads from parallel units.
@@ -189,9 +194,20 @@ Request unchanged: `{class_iri, branch, suggestion_type, batch_size}` with `sugg
 
 Change-event recording accepts an optional async resolver: `async (project_id: UUID, created: dict[str, dict[str, list[str]]]) -> dict[str, dict[str, str | None]]`. Input maps each created entity IRI to `{"labels": [...], "definitions": [...]}`; output maps a subset of those IRIs to `{"origin": "ai" | "ai_edited", "model": str | None, "batch_id": str | None}`. IRIs absent from the output are `human`. Plain dicts only, no shared classes, so the two tracks stay import-independent. The ledger side exposes it as `AIOriginService(db).resolve`. A match is the newest ledger row with the same `project_id` and `entity_iri` (any branch, because suggestion branches merge); `ai` when the ledger label equals one current label and the ledger definition (if any) equals one current definition after trimming and whitespace collapse, else `ai_edited`.
 
+### Contract amendments from review (2026-11-20)
+
+These override the text above where they differ. U1 and U4 were launched against the earlier text; the orchestrator issues fix packets (listed in the review report).
+
+- **A1. Filters select entities; net change covers the whole window.** `origin`, `author`, and `event_type` choose which entities appear (an entity qualifies when at least one of its events in the window matches). `net_change`, `field_changes`, `label`, `origins`, `authors`, `event_count`, and `events` are then computed from all of that entity's events in the window on the branch. Filtering events first would report a stale "after" (author A's value when author B changed it later) and a wrong `net_change`. `days`, `branch`, and `entity_type` still filter events. In `summary`, `entities_changed` and `by_net_change` count qualifying entities; `total_events`, `by_origin`, and `authors` count those entities' events.
+- **A2. `net_change` follows existence at the window's edges.** Existed before = the entity's earliest event in the window is not a create. Exists after = its latest event is not a delete. Before and after: `modified` (this covers delete-then-recreate). After only: `added`. Before only: `removed`. Neither (created and deleted inside the window): `transient`, a fourth value, shown as "Added, then removed" and counted under `by_net_change.transient`. It never existed at either edge, so calling it `removed` overstates removals.
+- **A3. Event time.** `record_event` and `record_events_from_diff` accept an optional `occurred_at` (UTC; default now) stored in `created_at`. Owned by U3.
+- **A4. Index build.** The index on the existing `entity_change_events` table is created with `postgresql_concurrently=True` inside `op.get_context().autocommit_block()`, as `g5h6i7j8k9l0` does, so writers are not blocked while it builds. The two `ADD COLUMN`s are metadata-only on PostgreSQL 11+ (constant default), and old application code keeps inserting during a rolling deploy because of the server default.
+- **A5. Known limits of the diff model, stated in the UI help text.** An IRI rename reads as one removal plus one addition (events key on IRI; the `rename` event type means a label change). The window is a rolling `days x 24h` in UTC ending at request time, so "1 day" is labelled "Last 24 hours"; times render in the viewer's zone. Origin describes how a class was created; AI-suggested annotations, parents, and edges on existing entities are not tracked yet (OC8).
+- **A6. Origin is a provenance record, not an attestation.** The server owns it, so a client cannot assert `ai` or `human` directly. A member who can save source can still reuse a ledger IRI for hand-written content (it reads `ai_edited`) or re-mint an accepted suggestion's IRI (it reads `human`). No cheap server check closes that; the plan does not claim it does. Parent changes before landing do not make an entity `ai_edited` (the ledger keeps label and definition only).
+
 ## Implementation Units
 
-Parallelism: U1 and U2 run together in one API worktree on disjoint files. U4 and U5 run together in two web worktrees. U1/U2 and U4/U5 are independent of each other because all four build against the contract above. U3 waits on U1 and U2. U6 waits on U4 and U5 (it edits tree and history files U5 touches and uses U4's hooks).
+Parallelism: U1 and U2 run together in one API worktree on disjoint files. U4 and U5 run together in two web worktrees. U1/U2 and U4/U5 are independent of each other because all four build against the contract above. U3 waits on U1 and U2. U6 waits on U4 and U5 (it edits tree and history files U5 touches and uses U4's hooks). U7 waits on U5 and should follow U6 (both edit the tree files). Packets for U3, U6, and U7 exist (`ok-u3`, `ok-u6`, `ok-u7`, dated 20261120) and are not launched.
 
 ### U1. Change-origin storage, definition-aware diff, and the changes feed (ontokit-api)
 
@@ -209,13 +225,13 @@ Parallelism: U1 and U2 run together in one API worktree on disjoint files. U4 an
 - **Test scenarios:** rows written for children and siblings only; distinct batch ids; ledger failure tolerated; resolver exact, edited, whitespace, null-definition, cross-project, newest-wins, and cross-branch cases.
 - **Verification:** as U1.
 
-### U3. Wire origin into every landing path and backfill from git (ontokit-api) — second wave
+### U3. Record every landing path through a watermark reconciler, and backfill from git (ontokit-api) — second wave
 
 - **Goal:** R6, and R11 end to end. **Requirements:** R4, R6, R11.
-- **Files:** `ontokit/api/routes/projects.py` (pass the resolver at the existing source-save call), the pull-request merge and suggestion-approval paths in `ontokit/services/pull_request_service.py` and `ontokit/services/suggestion_service.py`, the remote-sync path (default origin `system`), a new `ontokit/services/change_history_reconciler.py` plus its worker job, and tests.
-- **Approach:** record events wherever a branch head moves; the reconciler walks commits on a branch that have no events (by `commit_hash`), compares each with its parent, attributes author from the commit, and is idempotent; schedule the ledger purge.
-- **Test scenarios:** a merged suggestion containing an accepted AI child yields a create event tagged `ai` on the default branch; an edited one yields `ai_edited`; remote sync yields `system`; the reconciler fills a gap once and is a no-op on rerun; a commit that fails to parse is skipped and reported.
-- **Verification:** unit suite plus the repo's integration tests for save and merge.
+- **Files:** new `ontokit/services/change_history_reconciler.py`; new migration `k9l0m1n2o3p4` (down_revision `j8k9l0m1n2o3`) adding `change_history_watermarks` and a concurrent `(project_id, branch, commit_hash)` index on `entity_change_events`; new model `ontokit/models/change_history_watermark.py`; `ontokit/services/change_event_service.py` (`occurred_at`, batch insert); `ontokit/api/routes/projects.py` (pass the resolver at the existing source-save call; advance the watermark); one enqueue line after each head move in `ontokit/services/pull_request_service.py` (merge), `ontokit/services/github_sync.py` (fast-forward and merge), `ontokit/services/normalization_service.py`, `ontokit/services/translation_service.py`, `ontokit/services/translation_review.py`, `ontokit/services/project_service.py`; `ontokit/worker.py` (job, daily sweep, ledger purge); tests.
+- **Approach (KTD7, KTD8):** the reconciler walks first-parent commits from the branch's watermark to its head, oldest first, diffing each commit's graph against the previous one (one parse per commit), recording events with the commit's time, and advancing the watermark in the same transaction. First-parent means a merge commit yields the pull request's net diff once. Attribution: a merge commit that matches `pull_requests.merge_commit_hash` is attributed to the pull request's author; sync, normalization, and unmapped commits are `system`; the AI resolver runs on every create. With no watermark, start 90 days back on the default branch (OC6). Bounded work per run, then re-enqueue.
+- **Test scenarios:** a merged suggestion containing an accepted AI child yields a create event tagged `ai` on the default branch, attributed to the suggestion's author; an edited one yields `ai_edited`; a fast-forward sync yields `system` events with commit times; a commit that changes no entity advances the watermark and is not re-read; rerun is a no-op; two concurrent runs record once; a commit that fails to parse is skipped, reported, and passed; an 18,000-class first commit inserts in batches.
+- **Verification:** unit suite plus the repo's integration tests for save and merge; migration up and down on a scratch database.
 - **Waits on:** U1 and U2 merged.
 
 ### U4. Project Changes page (ontokit-web)
@@ -238,10 +254,19 @@ Parallelism: U1 and U2 run together in one API worktree on disjoint files. U4 an
 
 - **Goal:** R5. **Requirements:** R5, R13.
 - **Files:** `components/editor/shared/EntityTreeNode.tsx`, `components/editor/shared/EntityTree.tsx`, `components/editor/EntityHistoryTab.tsx`, `lib/api/analytics.ts`, both editor layouts, tests.
-- **Approach:** a "Show recent changes" toggle that loads `changed-entities` once and marks matching nodes; the origin badge from U4 in the history tab; a "View all changes" link from the tree toolbar.
+- **Approach:** a "Show recent changes" toggle that loads `changed-entities` once and marks matching nodes; the origin badge from U4 in the history tab; a "View all changes" link from the tree toolbar. The tree loads lazily, so markers show only on loaded nodes; the toggle's caption says so and the link to the Changes page is the complete view. Lookups use one memoized map shared through context, never a per-node request.
 - **Test scenarios:** markers appear only with the toggle on; accessible names; truncated feed shows a notice; history rows show origin.
 - **Verification:** as U4.
 - **Waits on:** U4 and U5 merged.
+
+### U7. Expand several classes in one action (ontokit-web) — third wave, proposed by review
+
+- **Goal:** R14. **Requirements:** R12, R13, R14.
+- **Why:** the owner asked to expand siblings and children "programmatically". U5 expands one class per click. The generation endpoint is already a callable API; what is missing is a many-at-once path. This unit adds it in the browser with no new endpoint, no new write path, and no change to any gate.
+- **Files:** new `lib/hooks/useBulkExpansion.ts`, new `components/editor/suggestions/BulkExpansionReview.tsx` and dialog, `components/editor/TreeNodeContextMenu.tsx` ("Suggest subclasses for each subclass…"), editor layouts, tests, `ui-tests/bulk-expansion.spec.ts`.
+- **Approach:** a queue that calls the existing endpoint one class at a time (never in parallel) for at most 10 classes; a pre-flight dialog naming the classes, the number of metered calls, and the batch size; Stop at any time; the first rate-limit or budget refusal halts the queue and keeps finished results; results group by focus class in the U5 batch review; "Accept all eligible" works per group only and always confirms.
+- **Test scenarios:** sequential calls; cap at 10; halt on refusal with partial results kept; Stop cancels the rest; per-group accept; announcements.
+- **Waits on:** U5 merged (U6 first, since both edit tree files).
 
 ## Verification Contract
 
@@ -252,7 +277,7 @@ Parallelism: U1 and U2 run together in one API worktree on disjoint files. U4 an
 
 ## Definition of Done
 
-- Every requirement R1–R13 has passing tests in its owning unit.
+- Every requirement R1–R14 has passing tests in its owning unit.
 - Both origin and feed behavior match the contract, or the plan is amended where implementation proved the contract wrong.
 - No existing gate loosened; no client-supplied origin accepted anywhere.
 - Abandoned-attempt code, stray screenshots, and scratch servers are removed.
@@ -263,4 +288,18 @@ Parallelism: U1 and U2 run together in one API worktree on disjoint files. U4 an
 - **Feed gaps until U3:** before U3, only direct saves record events, so the feed under-reports merged work. U4 ships behind that known limit; the page should not be announced as complete until U3 lands.
 - **Label drift in matching:** an entity whose IRI was regenerated at acceptance would miss the ledger. U3's end-to-end test covers the accepted-IRI path; if IRIs are re-minted, match on batch id carried through the draft instead.
 - **Large windows:** 365 days on a busy project can hold tens of thousands of events; U1 groups in the database and pages by entity.
+- **Bulk accept weakens review:** prompt-injected or low-quality suggestions land faster when accepted in bulk. Blocked and invalid items never join a bulk accept, definitions stay visible in the review, and everything lands in the draft (or suggestion session) rather than on the default branch.
+- **Rate limiter fails open:** when Redis is down the per-user daily cap does not apply; the project budget still does. U7 runs calls one at a time and halts on the first refusal so a queue cannot outrun the budget check.
 - **Parallel workers in one API worktree:** file ownership is disjoint, and the single migration lives with U1.
+
+## Review notes (2026-11-20)
+
+A second reader reviewed this plan against the code while the first wave was building. Verified by reading: the single `record_events_from_diff` caller (source save in `projects.py`); the member-and-role gate, rate limit, budget, and untrusted-data wrapping on the generation route; `mint_iri` on the server and the web accept path reusing `suggestion.iri` (so ledger matching by IRI holds); `pull_requests.merge_commit_hash` and `author_id`; migration head `i7j8k9l0m1n2`; the repo's concurrent-index precedent. Not verified: test baselines, the remote-sync internals, and any personal-token API authentication.
+
+**Is this the right build?** Yes. Storing net diffs as events and tagging origin from a server ledger reuses what exists and answers both asks. Three objections shaped the amendments:
+
+1. **Strongest objection: the feed's truth depends on wiring every writer.** About ten call sites move a branch head (saves, merges, sync, normalization, translation); one records events. Wiring each by hand in services of 2,500+ lines invites a missed path and a silently wrong page. The sharper version (KTD7) makes a watermark reconciler the single catch-up mechanism and reduces each call site to one enqueue.
+2. **The net-diff rules were wrong at the edges.** Filtering events before grouping corrupts before/after; created-then-deleted is not a removal; backfilled events would all date to the backfill run (A1, A2, KTD8).
+3. **"AI origin" promises more than it tracks.** It covers created classes only and is a record, not proof (A5, A6, OC8). The UI should say so.
+
+Also added: R14 and U7 for the owner's "programmatically", read as bulk expansion (OC7). The Changes page should not be announced until U3 lands (see Risks).
