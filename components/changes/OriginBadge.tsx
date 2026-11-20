@@ -25,7 +25,7 @@ const originDetails = {
   },
   ai_edited: {
     icon: Sparkles,
-    description: "Proposed by AI and edited by a person before it landed.",
+    description: "Created from an AI suggestion with edits to the suggested label or definition.",
     color: "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
   },
   system: {

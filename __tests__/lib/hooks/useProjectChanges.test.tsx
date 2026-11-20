@@ -12,7 +12,7 @@ vi.mock("@/lib/api/changes", () => ({
 const response: ProjectChangesResponse = {
   window: { days: 7, since: "2026-11-13T00:00:00Z", until: "2026-11-20T00:00:00Z", branch: "main" },
   summary: {
-    total_events: 0, entities_changed: 0, by_net_change: { added: 0, modified: 0, removed: 0 },
+    total_events: 0, entities_changed: 0, by_net_change: { added: 0, modified: 0, removed: 0, transient: 0 },
     by_origin: { human: 0, ai: 0, ai_edited: 0, system: 0 }, authors: [],
   },
   items: [],

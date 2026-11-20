@@ -5,7 +5,7 @@ export const lease: EntityChange = {
   entity_type: "class",
   label: "Lease",
   net_change: "modified",
-  origins: ["ai"],
+  origins: ["human"],
   last_changed_at: "2026-11-19T18:30:00Z",
   event_count: 1,
   authors: [{ user_id: "reviewer", user_name: "Reviewer" }],
@@ -32,8 +32,8 @@ export const lease: EntityChange = {
     user_name: "Reviewer",
     changed_fields: ["definitions", "parents"],
     created_at: "2026-11-19T18:30:00Z",
-    origin: "ai",
-    origin_model: "example-model",
+    origin: "human",
+    origin_model: null,
     origin_batch_id: null,
   }],
 };
@@ -68,7 +68,7 @@ export const renewal: EntityChange = {
   entity_type: "object_property",
   label: "has renewal",
   net_change: "added",
-  origins: ["ai_edited"],
+  origins: ["human"],
   last_changed_at: "2026-11-17T14:00:00Z",
   event_count: 1,
   authors: lease.authors,
@@ -81,8 +81,55 @@ export const renewal: EntityChange = {
     event_type: "create",
     changed_fields: ["labels"],
     created_at: "2026-11-17T14:00:00Z",
-    origin: "ai_edited",
   }],
+};
+
+const temporaryClauseIri = "https://example.org/onto#TemporaryClause";
+
+export const temporaryClause: EntityChange = {
+  entity_iri: temporaryClauseIri,
+  entity_type: "class",
+  label: "Trial clause",
+  net_change: "transient",
+  origins: ["human", "ai"],
+  last_changed_at: "2026-11-16T15:00:00Z",
+  event_count: 3,
+  authors: [...legacyTenant.authors, ...lease.authors],
+  field_changes: [],
+  events: [
+    {
+      ...legacyTenant.events[0],
+      id: "event-4",
+      entity_iri: temporaryClauseIri,
+      entity_type: "class",
+      created_at: "2026-11-16T15:00:00Z",
+    },
+    {
+      ...lease.events[0],
+      id: "event-5",
+      entity_iri: temporaryClauseIri,
+      event_type: "rename",
+      user_id: "editor",
+      user_name: "Editor",
+      changed_fields: ["labels"],
+      old_values: { labels: ["Temporary clause"] },
+      new_values: { labels: ["Trial clause"] },
+      created_at: "2026-11-16T14:30:00Z",
+      origin: "human",
+      origin_model: null,
+    },
+    {
+      ...lease.events[0],
+      id: "event-6",
+      entity_iri: temporaryClauseIri,
+      event_type: "create",
+      changed_fields: ["labels"],
+      new_values: { labels: ["Temporary clause"] },
+      created_at: "2026-11-16T14:00:00Z",
+      origin: "ai",
+      origin_model: "example-model",
+    },
+  ],
 };
 
 export const changes: ProjectChangesResponse = {
@@ -90,8 +137,8 @@ export const changes: ProjectChangesResponse = {
   summary: {
     total_events: 3,
     entities_changed: 3,
-    by_net_change: { added: 1, modified: 1, removed: 1 },
-    by_origin: { human: 1, ai: 1, ai_edited: 1, system: 0 },
+    by_net_change: { added: 1, modified: 1, removed: 1, transient: 0 },
+    by_origin: { human: 3, ai: 0, ai_edited: 0, system: 0 },
     authors: [
       { user_id: "reviewer", user_name: "Reviewer", event_count: 2 },
       { user_id: "editor", user_name: "Editor", event_count: 1 },
@@ -99,4 +146,19 @@ export const changes: ProjectChangesResponse = {
   },
   items: [lease, legacyTenant, renewal],
   next_cursor: null,
+};
+
+export const changesWithTransient: ProjectChangesResponse = {
+  ...changes,
+  summary: {
+    total_events: 6,
+    entities_changed: 4,
+    by_net_change: { added: 1, modified: 1, removed: 1, transient: 1 },
+    by_origin: { human: 5, ai: 1, ai_edited: 0, system: 0 },
+    authors: [
+      { user_id: "reviewer", user_name: "Reviewer", event_count: 3 },
+      { user_id: "editor", user_name: "Editor", event_count: 3 },
+    ],
+  },
+  items: [...changes.items, temporaryClause],
 };
