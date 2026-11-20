@@ -69,6 +69,29 @@ test("shows Changes in light and dark and expands an AI-filtered row", async ({ 
   await screenshot(page, "light");
   expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
 
+  const sevenDays = page.getByRole("radio", { name: "7 days" });
+  await page.getByRole("link", { name: "Back to project" }).focus();
+  await page.keyboard.press("Tab");
+  await expect(sevenDays).toBeFocused();
+  await expect(sevenDays.locator("..").locator("span")).not.toHaveCSS("box-shadow", "none");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.getByRole("radio", { name: "Last 24 hours" })).toBeChecked();
+  await expect(page).toHaveURL(/\bdays=1\b/);
+  await page.getByRole("button", { name: "Clear filters" }).press("Enter");
+  await expect(sevenDays).toBeChecked();
+
+  const leaseLink = page.getByRole("link", { name: "Lease", exact: true });
+  const leaseTime = page.getByRole("listitem").filter({ has: leaseLink }).locator("time");
+  await leaseTime.hover();
+  await expect(page.getByRole("tooltip")).toHaveText("Nov 19, 2026, 10:30:00 AM PST");
+  await leaseLink.focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("Tab");
+  await expect(leaseTime).toBeFocused();
+  await expect(leaseTime).not.toHaveCSS("box-shadow", "none");
+  await expect(page.getByRole("tooltip")).toHaveText("Nov 19, 2026, 10:30:00 AM PST");
+  await page.keyboard.press("Escape");
+
   const transient = page.getByRole("button", { name: "1 Added, then removed", exact: true });
   await transient.press("Enter");
   await expect(page).toHaveURL(/\bnet_change=transient\b/);
@@ -94,12 +117,23 @@ test("shows Changes in light and dark and expands an AI-filtered row", async ({ 
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
   await screenshot(page, "dark");
 
-  const ai = page.getByRole("group", { name: "Origin", exact: true })
+  const summary = page.getByRole("region", { name: "Change summary" });
+  const summaryAi = summary.getByRole("group", { name: "Origin", exact: true })
     .getByRole("button", { name: "AI", exact: true });
-  await ai.press("Enter");
+  const ai = page.getByRole("region", { name: "Filters" }).getByRole("group", { name: "Origin", exact: true })
+    .getByRole("button", { name: "AI", exact: true });
+  await expect(summaryAi).toHaveAccessibleDescription("1 event");
+  await summaryAi.press("Enter");
+  await expect(summaryAi).toHaveAttribute("aria-pressed", "true");
   await expect(ai).toHaveAttribute("aria-pressed", "true");
   await expect(page).toHaveURL(/\borigin=ai\b/);
-  await expect(page.getByRole("region", { name: "Change summary" })).toContainText("1 entity changed");
+  await expect(summary).toContainText("1 entity changed");
+  await ai.press("Space");
+  await expect(page).toHaveURL(/\/projects\/project-1\/changes$/);
+  await expect(summaryAi).toHaveAttribute("aria-pressed", "false");
+  await expect(ai).toHaveAttribute("aria-pressed", "false");
+  await ai.press("Enter");
+  await expect(page).toHaveURL(/\borigin=ai\b/);
   await expect(page.getByText("LegacyTenant")).toHaveCount(0);
   expect(seen.some((params) => params.get("days") === "7" && params.get("origin") === "ai")).toBe(true);
 
@@ -107,6 +141,7 @@ test("shows Changes in light and dark and expands an AI-filtered row", async ({ 
   await expect(details).toHaveAttribute("aria-expanded", "false");
   await details.press("Enter");
   await expect(details).toHaveAttribute("aria-expanded", "true");
+  await expect(details).not.toHaveCSS("box-shadow", "none");
   await expect(page.getByText("Label changed")).toBeVisible();
   await expect(page.getByText("Deleted", { exact: true })).toBeVisible();
   await expect(page.getByText("example-model")).toBeVisible();

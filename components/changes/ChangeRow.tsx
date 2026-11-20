@@ -8,13 +8,12 @@ import type { ChangeEntityType, EntityChange, FieldChange, NetChange } from "@/l
 import { buildSelectionQuery } from "@/lib/utils/selectionUrl";
 import { cn, getLocalName } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Tooltip } from "@/components/ui/tooltip";
 import { OriginBadge } from "./OriginBadge";
 
 export const ENTITY_TYPE_LABELS: Record<ChangeEntityType, string> = {
   class: "Class",
-  object_property: "Object property",
-  data_property: "Data property",
-  annotation_property: "Annotation property",
+  property: "Property",
   individual: "Individual",
 };
 
@@ -45,6 +44,7 @@ const EVENT_LABELS: Record<ChangeEventType, string> = {
 
 function ChangeTime({ timestamp, referenceTime }: { timestamp: string; referenceTime: number }) {
   const date = new Date(timestamp);
+  const absoluteTime = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "long" });
   const minutes = Math.max(0, Math.floor((referenceTime - date.getTime()) / 60_000));
   const relativeTime = minutes === 0 ? "just now"
     : minutes < 60 ? `${minutes}m ago`
@@ -52,19 +52,20 @@ function ChangeTime({ timestamp, referenceTime }: { timestamp: string; reference
     : `${Math.floor(minutes / 1440)}d ago`;
 
   return (
-    <time
-      dateTime={timestamp}
-      title={date.toLocaleString()}
-      className="shrink-0"
-    >
-      {relativeTime}
-    </time>
+    <Tooltip content={absoluteTime}>
+      <time
+        dateTime={timestamp}
+        tabIndex={0}
+        className="shrink-0 rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400"
+      >
+        {relativeTime}
+      </time>
+    </Tooltip>
   );
 }
 
-function fieldValues(value: FieldChange["before"]): string[] {
-  if (Array.isArray(value)) return value;
-  if (value === null) return [];
+function fieldValues(value: FieldChange["before"]): string[] | null {
+  if (Array.isArray(value) || value === null) return value;
   return [value ? "Yes" : "No"];
 }
 
@@ -74,28 +75,36 @@ function FieldValues({
   field,
   side,
 }: {
-  values: string[];
-  otherValues: string[];
+  values: string[] | null;
+  otherValues: string[] | null;
   field: FieldChange["field"];
   side: "before" | "after";
 }) {
   const removed = side === "before";
   const Marker = removed ? Minus : Plus;
   const Markup = removed ? "del" : "ins";
+  const retainedCounts = new Map<string, number>();
+  for (const value of otherValues ?? []) {
+    retainedCounts.set(value, (retainedCounts.get(value) ?? 0) + 1);
+  }
 
   return (
     <div className="min-w-0">
       <p className="mb-1 text-xs font-medium text-slate-500 dark:text-slate-400">{removed ? "Before" : "After"}</p>
-      {values.length === 0 ? (
+      {values === null ? (
+        <p className="text-sm text-slate-500 dark:text-slate-400">Value unavailable</p>
+      ) : values.length === 0 ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">None</p>
       ) : (
         <ul className="space-y-1">
           {values.map((value, index) => {
+            const retained = retainedCounts.get(value) ?? 0;
+            if (retained > 0) retainedCounts.set(value, retained - 1);
             const isParent = field === "parents";
             const text = <span title={isParent ? value : undefined}>{isParent ? getLocalName(value) : value}</span>;
             return (
               <li key={index} className="wrap-break-word text-sm text-slate-700 dark:text-slate-300">
-                {otherValues.includes(value) ? text : (
+                {otherValues === null || retained > 0 ? text : (
                   <Markup
                     className={cn(
                       "flex items-start gap-1.5",
@@ -135,10 +144,7 @@ export function ChangeRow({
   const { icon: ChangeIcon, label: changeLabel, color } = NET_CHANGES[item.net_change];
   const hasEditorLink = item.net_change === "added" || item.net_change === "modified";
   const DisclosureIcon = expanded ? ChevronDown : ChevronRight;
-  const selectionType = item.entity_type === "class" || item.entity_type === "individual"
-    ? item.entity_type
-    : "property";
-  const selection = buildSelectionQuery({ iri: item.entity_iri, type: selectionType });
+  const selection = buildSelectionQuery({ iri: item.entity_iri, type: item.entity_type });
   const editorHref = `/projects/${projectId}/editor${selection}&branch=${encodeURIComponent(branch)}`;
 
   return (

@@ -3,16 +3,11 @@ import { api } from "./client";
 
 export type ChangeOrigin = "human" | "ai" | "ai_edited" | "system";
 export type NetChange = "added" | "modified" | "removed" | "transient";
-export type ChangeEntityType =
-  | "class"
-  | "object_property"
-  | "data_property"
-  | "annotation_property"
-  | "individual";
+export type ChangeEntityType = "class" | "property" | "individual";
 
 interface ChangeAuthor {
   user_id: string;
-  user_name?: string | null;
+  user_name: string | null;
 }
 
 export interface FieldChange {
@@ -21,9 +16,11 @@ export interface FieldChange {
   after: string[] | boolean | null;
 }
 
-export interface OriginChangeEvent extends Omit<ChangeEvent, "user_id" | "user_name"> {
-  user_id: string | null;
-  user_name?: string | null;
+export interface OriginChangeEvent extends Omit<ChangeEvent, "user_name" | "commit_hash" | "old_values" | "new_values"> {
+  user_name: string | null;
+  commit_hash: string | null;
+  old_values: Record<string, unknown> | null;
+  new_values: Record<string, unknown> | null;
   origin: ChangeOrigin;
   origin_model: string | null;
   origin_batch_id: string | null;
@@ -91,15 +88,21 @@ function serializeFilters(filters: ProjectChangesFilters & { cursor?: string }) 
 }
 
 export const changesApi = {
-  list: (projectId: string, token?: string, filters: ProjectChangesFilters & { cursor?: string } = {}) =>
+  list: (
+    projectId: string,
+    token?: string,
+    { days, branch, origin, author, entity_type, event_type, limit, cursor }: ProjectChangesFilters & { cursor?: string } = {},
+  ) =>
     api.get<ProjectChangesResponse>(
-      `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/changes${serializeFilters(filters)}`,
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/changes${serializeFilters({
+        days, branch, origin, author, entity_type, event_type, limit, cursor,
+      })}`,
       { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
     ),
 
-  listChangedEntities: (projectId: string, token?: string, filters: ChangedEntitiesFilters = {}) =>
+  listChangedEntities: (projectId: string, token?: string, { days, branch, origin }: ChangedEntitiesFilters = {}) =>
     api.get<ChangedEntitiesResponse>(
-      `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/changed-entities${serializeFilters(filters)}`,
+      `/api/v1/projects/${encodeURIComponent(projectId)}/analytics/changed-entities${serializeFilters({ days, branch, origin })}`,
       { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
     ),
 };
