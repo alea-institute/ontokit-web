@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -9,6 +9,7 @@ import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
 import {
   CHANGE_WINDOWS,
+  DEFAULT_CHANGE_WINDOW,
   ChangeFilters,
   ChangeHelp,
   ChangeSummary,
@@ -39,36 +40,50 @@ export default function ProjectChangesPage() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const projectHomeHref = useProjectHomeHref(id);
+  const resultsHeading = useRef<HTMLHeadingElement>(null);
+  const keepResultsFocus = useCallback((button: HTMLButtonElement | null) => {
+    if (!button) return;
+    return () => {
+      if (document.activeElement === button) resultsHeading.current?.focus();
+    };
+  }, []);
 
-  const days = CHANGE_WINDOWS.find((preset) => String(preset) === searchParams.get("days")) ?? 7;
+  const days = CHANGE_WINDOWS.find((preset) => String(preset) === searchParams.get("days")) ?? DEFAULT_CHANGE_WINDOW;
   const branch = searchParams.get("branch") || undefined;
+  const requestedAuthors = searchParams.getAll("author").filter(Boolean);
+  // Resolve URL author IDs against the whole window so combining filters
+  // neither hides valid choices nor sends unknown author IDs to the feed.
+  const windowFilters = { days, branch };
+  const authorFeed = useProjectChanges(id, session?.accessToken, windowFilters);
+  const windowAuthors = authorFeed.data?.pages[0]?.summary.authors;
+  const waitingForAuthors = requestedAuthors.length > 0 && !windowAuthors;
+  const knownAuthors = new Set(windowAuthors?.map(({ user_id }) => user_id));
   const selected: SelectedChangeFilters = {
     origin: searchParams.getAll("origin").filter((value): value is ChangeFilterValues["origin"] => Object.hasOwn(ORIGIN_LABELS, value)),
-    author: searchParams.getAll("author").filter(Boolean),
+    author: requestedAuthors.filter((author) => knownAuthors.has(author)),
     entity_type: searchParams.getAll("entity_type").filter((value): value is ChangeFilterValues["entity_type"] => Object.hasOwn(ENTITY_TYPE_LABELS, value)),
-    net_change: searchParams.getAll("net_change").filter((value): value is NetChange => Object.hasOwn(NET_CHANGES, value)),
+    net_change: Array.from(new Set(searchParams.getAll("net_change"))).filter((value): value is NetChange => Object.hasOwn(NET_CHANGES, value)),
   };
 
-  const filtersWithoutAuthor = { days, branch, origin: selected.origin, entity_type: selected.entity_type };
   const feed = useProjectChanges(id, session?.accessToken, {
-    ...filtersWithoutAuthor,
+    ...windowFilters,
+    origin: selected.origin.length ? selected.origin : undefined,
+    entity_type: selected.entity_type.length ? selected.entity_type : undefined,
     author: selected.author.length ? selected.author : undefined,
-  });
-  // The summary only includes authors of qualifying entities. Reuse the
-  // request without the author filter to keep other authors selectable.
-  const authorFeed = useProjectChanges(
-    id, session?.accessToken, filtersWithoutAuthor, selected.author.length > 0,
-  );
+  }, !waitingForAuthors);
 
-  const pages = feed.data?.pages;
+  const pages = waitingForAuthors ? undefined : feed.data?.pages;
   const firstPage = pages?.[0];
   const activeBranch = firstPage?.window.branch ?? branch;
   const items = matchingItems(pages ?? [], selected.net_change);
-  const authorSummary = authorFeed.data?.pages[0]?.summary ?? firstPage?.summary;
-  const authors = new Map(authorSummary?.authors.map(({ user_id, user_name }) => [user_id, user_name || user_id]));
-  for (const author of selected.author) {
-    if (!authors.has(author)) authors.set(author, author);
-  }
+  const matchingCount = firstPage && selected.net_change.length > 0
+    ? selected.net_change.reduce((sum, kind) => sum + firstPage.summary.by_net_change[kind], 0)
+    : undefined;
+  const hasMoreMatches = feed.hasNextPage && (matchingCount === undefined || items.length < matchingCount);
+  const hasEntityFilters = Object.values(selected).some((values) => values.length > 0);
+  const authors = (windowAuthors ?? firstPage?.summary.authors ?? []).map(({ user_id, user_name }) => ({
+    value: user_id, label: user_name || user_id,
+  }));
 
   const [paginationNotice, setPaginationNotice] = useState<{
     pages: ProjectChangesResponse[];
@@ -99,10 +114,12 @@ export default function ProjectChangesPage() {
   function clearFilters() {
     updateUrl((next) => {
       for (const key of Object.keys(selected)) next.delete(key);
+      next.delete("days");
     });
   }
 
   async function loadMore() {
+    if (feed.isFetching) return;
     const result = await feed.fetchNextPage();
     if (result.isFetchNextPageError || !result.data) return;
     setPaginationNotice({
@@ -113,10 +130,13 @@ export default function ProjectChangesPage() {
   }
 
   const windowLabel = days === 1 ? "24 hours" : `${days} days`;
-  const status = feed.isLoading ? "Loading changes."
+  const isLoading = waitingForAuthors ? authorFeed.isLoading : feed.isLoading;
+  const isError = waitingForAuthors ? authorFeed.isError : feed.isError && !pages;
+  const retry = waitingForAuthors ? authorFeed.refetch : feed.refetch;
+  const status = isLoading ? "Loading changes."
     : feed.isFetchingNextPage ? "Loading more changes."
     : feed.isFetchNextPageError ? "Failed to load more changes."
-    : feed.isError && !pages ? "Failed to load changes."
+    : isError ? "Failed to load changes."
     : lastAdded !== undefined ? `${lastAdded} more ${lastAdded === 1 ? "change" : "changes"} loaded.`
     : `${countLabel(items.length)} loaded.`;
 
@@ -156,16 +176,27 @@ export default function ProjectChangesPage() {
         />
         <ChangeFilters
           selected={selected}
-          authors={Array.from(authors, ([value, label]) => ({ value, label }))}
+          authors={authors}
+          hasFilters={hasEntityFilters || days !== DEFAULT_CHANGE_WINDOW}
           onToggle={toggleFilter}
           onClear={clearFilters}
         />
 
-        <section aria-labelledby="changed-entities-heading" aria-busy={feed.isLoading || feed.isFetchingNextPage} className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
-          <h2 id="changed-entities-heading" className="border-b border-slate-200 px-4 py-3 font-semibold text-slate-900 dark:border-slate-700 dark:text-white sm:px-5">
+        <section aria-labelledby="changed-entities-heading" aria-busy={isLoading || feed.isFetchingNextPage} className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+          <h2
+            id="changed-entities-heading"
+            ref={resultsHeading}
+            tabIndex={-1}
+            className="border-b border-slate-200 px-4 py-3 font-semibold text-slate-900 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary-500 dark:border-slate-700 dark:text-white dark:focus-visible:ring-primary-400 sm:px-5"
+          >
             Changed entities
           </h2>
-          {feed.isLoading ? (
+          {hasMoreMatches && matchingCount !== undefined && (
+            <p className="px-4 pt-3 text-sm text-slate-600 dark:text-slate-400 sm:px-5">
+              {items.length} of {matchingCount} matching {matchingCount === 1 ? "entity" : "entities"} shown from loaded pages.
+            </p>
+          )}
+          {isLoading ? (
             <div aria-hidden="true" className="space-y-4 p-5">
               {[0, 1, 2].map((row) => (
                 <div key={row} className="flex gap-4 border-b border-slate-100 pb-4 last:border-0 last:pb-0 dark:border-slate-800">
@@ -177,13 +208,13 @@ export default function ProjectChangesPage() {
                 </div>
               ))}
             </div>
-          ) : feed.isError && !pages ? (
+          ) : isError ? (
             <div className="space-y-3 p-8 text-center">
               <p className="flex items-center justify-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
                 <AlertTriangle aria-hidden="true" className="h-4 w-4" />
                 Failed to load changes
               </p>
-              <Button type="button" size="sm" onClick={() => void feed.refetch()}>Retry</Button>
+              <Button ref={keepResultsFocus} type="button" size="sm" onClick={() => void retry()}>Retry</Button>
             </div>
           ) : (
             <>
@@ -203,14 +234,18 @@ export default function ProjectChangesPage() {
                 <div className="space-y-2 p-8 text-center">
                   <History aria-hidden="true" className="mx-auto h-5 w-5 text-slate-500 dark:text-slate-400" />
                   <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {feed.hasNextPage ? "No matching changes on loaded pages" : `No changes in the last ${windowLabel}`}
+                    {hasMoreMatches ? "No matching changes on loaded pages"
+                      : hasEntityFilters ? "No changes match your filters"
+                      : `No changes in the last ${windowLabel}`}
                   </p>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    {feed.hasNextPage ? "Load more to look for matching changes." : "Widen the time window or clear filters."}
+                    {hasMoreMatches ? "Load more to look for matching changes."
+                      : hasEntityFilters ? "Widen the time window or clear filters."
+                      : "Widen the time window to look for earlier changes."}
                   </p>
                 </div>
               )}
-              {(feed.hasNextPage || feed.isFetchNextPageError) && (
+              {hasMoreMatches && (
                 <div className="flex flex-wrap items-center justify-center gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
                   {feed.isFetchNextPageError && (
                     <p className="flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
@@ -219,12 +254,13 @@ export default function ProjectChangesPage() {
                     </p>
                   )}
                   <Button
+                    ref={keepResultsFocus}
                     type="button"
                     variant="outline"
                     size="sm"
-                    disabled={feed.isFetching}
+                    aria-disabled={feed.isFetching}
                     onClick={() => void loadMore()}
-                    className="text-slate-700 focus-visible:ring-primary-500 dark:text-slate-200 dark:focus-visible:ring-primary-400"
+                    className="text-slate-700 focus-visible:ring-primary-500 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 dark:text-slate-200 dark:focus-visible:ring-primary-400"
                   >
                     {feed.isFetchNextPageError ? "Retry" : feed.isFetchingNextPage ? "Loading more…" : "Load more"}
                   </Button>

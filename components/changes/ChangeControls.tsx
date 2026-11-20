@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, HelpCircle } from "lucide-react";
-import { useId, useRef, useState, type ComponentPropsWithRef, type ReactNode, type Ref } from "react";
+import { Fragment, useId, useRef, useState, type ComponentPropsWithRef, type ReactNode, type Ref } from "react";
 import { Button } from "@/components/ui/button";
 import type { ChangeEntityType, ChangeOrigin, NetChange, ProjectChangesResponse } from "@/lib/api/changes";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { ENTITY_TYPE_LABELS, NET_CHANGES } from "./ChangeRow";
 import { ORIGIN_LABELS } from "./OriginBadge";
 
 export const CHANGE_WINDOWS = [1, 7, 30, 90] as const;
+export const DEFAULT_CHANGE_WINDOW = 7;
 
 export function TimeWindow({
   days,
@@ -63,7 +64,7 @@ export function ChangeHelp() {
       <div id={helpId} hidden={!expanded} className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
         <p>Renaming an entity&apos;s IRI shows as one removal plus one addition. Origin and author filters select entities and each result summarizes changes across the full window.</p>
         <p>Windows count back from each request in 24-hour periods in UTC. Times are shown in your local time zone.</p>
-        <p>AI origin tracks class creation only. It reflects a match to a stored suggestion at creation time.</p>
+        <p>AI origin tracks class creation only. It reflects a match to a stored suggestion at creation time. AI-suggested annotations, parents, and edges on existing entities are not tracked.</p>
       </div>
     </div>
   );
@@ -110,6 +111,7 @@ export function ChangeSummary({
   onAllNetChanges: () => void;
 }) {
   const entityCount = summary?.entities_changed;
+  const originCountId = useId();
 
   return (
     <section aria-label="Change summary" className="flex flex-wrap items-end gap-x-8 gap-y-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:p-5">
@@ -130,16 +132,33 @@ export function ChangeSummary({
           })}
         </div>
       </fieldset>
-      <fieldset className="min-w-0">
+      <fieldset aria-label="Origin" className="min-w-0">
         <legend className="mb-2 text-sm font-semibold text-slate-900 dark:text-white">Events by origin</legend>
         <div className="flex flex-wrap gap-2">
-          {(Object.keys(ORIGIN_LABELS) as ChangeOrigin[]).map((origin) => (
-            <FilterChip key={origin} pressed={origins.includes(origin)} onClick={() => onOrigin(origin)}>
-              {summary ? summary.by_origin[origin] ?? 0 : "—"} {ORIGIN_LABELS[origin]}
-            </FilterChip>
-          ))}
+          {(Object.keys(ORIGIN_LABELS) as ChangeOrigin[]).map((origin) => {
+            const count = summary?.by_origin[origin];
+            const countId = `${originCountId}-${origin}`;
+            return (
+              <Fragment key={origin}>
+                <FilterChip
+                  pressed={origins.includes(origin)}
+                  onClick={() => onOrigin(origin)}
+                  aria-describedby={count === undefined ? undefined : countId}
+                >
+                  <span aria-hidden="true">{count ?? "—"}</span>
+                  {ORIGIN_LABELS[origin]}
+                </FilterChip>
+                {count !== undefined && <span id={countId} className="sr-only">{`${count} ${count === 1 ? "event" : "events"}`}</span>}
+              </Fragment>
+            );
+          })}
         </div>
       </fieldset>
+      {netChanges.length > 0 && (
+        <p className="w-full text-sm text-slate-600 dark:text-slate-400">
+          Summary counts cover the full window across all change kinds.
+        </p>
+      )}
     </section>
   );
 }
@@ -191,11 +210,13 @@ export type SelectedChangeFilters = {
 export function ChangeFilters({
   selected,
   authors,
+  hasFilters,
   onToggle,
   onClear,
 }: {
   selected: SelectedChangeFilters;
   authors: { value: string; label: string }[];
+  hasFilters: boolean;
   onToggle: <Key extends keyof ChangeFilterValues>(key: Key, value: ChangeFilterValues[Key]) => void;
   onClear: () => void;
 }) {
@@ -205,7 +226,7 @@ export function ChangeFilters({
     <section aria-labelledby="change-filters-heading" className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900 sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id="change-filters-heading" className="font-semibold text-slate-900 dark:text-white">Filters</h2>
-        {Object.values(selected).some((values) => values.length > 0) && (
+        {hasFilters && (
           <Button
             type="button"
             variant="ghost"

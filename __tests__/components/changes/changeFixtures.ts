@@ -30,6 +30,9 @@ export const lease: EntityChange = {
     event_type: "update",
     user_id: "reviewer",
     user_name: "Reviewer",
+    commit_hash: null,
+    old_values: null,
+    new_values: null,
     changed_fields: ["definitions", "parents"],
     created_at: "2026-11-19T18:30:00Z",
     origin: "human",
@@ -65,7 +68,7 @@ export const legacyTenant: EntityChange = {
 
 export const renewal: EntityChange = {
   entity_iri: "https://example.org/onto#hasRenewal",
-  entity_type: "object_property",
+  entity_type: "property",
   label: "has renewal",
   net_change: "added",
   origins: ["human"],
@@ -77,7 +80,7 @@ export const renewal: EntityChange = {
     ...lease.events[0],
     id: "event-3",
     entity_iri: "https://example.org/onto#hasRenewal",
-    entity_type: "object_property",
+    entity_type: "property",
     event_type: "create",
     changed_fields: ["labels"],
     created_at: "2026-11-17T14:00:00Z",

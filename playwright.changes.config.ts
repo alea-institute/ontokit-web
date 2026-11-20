@@ -36,6 +36,8 @@ export default defineConfig({
     baseURL,
     viewport: { width: 1440, height: 900 },
     colorScheme: "light",
+    locale: "en-US",
+    timezoneId: "America/Los_Angeles",
     reducedMotion: "reduce",
   },
 });
