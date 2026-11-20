@@ -124,7 +124,7 @@ interface BulkExpansionControlsOptions {
 
 export function useBulkExpansionControls({ nodes, ...options }: BulkExpansionControlsOptions) {
   const { announce } = useAnnounce();
-  const { runId, jobs, totals, haltReason, start, stop, retry } = useBulkExpansion({ ...options, announce });
+  const { runId, jobs, totals, haltReason, start, stop, retry, dismiss } = useBulkExpansion({ ...options, announce });
   const targetsByIri = useMemo(() => indexLoadedSubclasses(nodes), [nodes]);
   const { projectId, branch } = options;
   const scope = useMemo(() => ({ projectId, branch }), [projectId, branch]);
@@ -170,6 +170,11 @@ export function useBulkExpansionControls({ nodes, ...options }: BulkExpansionCon
     review: {
       projectId, branch, canUseLLM: options.canUseLLM,
       runId, jobs, totals, haltReason, stop, retry,
+      dismiss: () => {
+        dismiss();
+        // The Close button leaves with the review; hand focus to the tree it came from.
+        document.querySelector<HTMLElement>('[role="tree"]')?.focus();
+      },
     },
   };
 }

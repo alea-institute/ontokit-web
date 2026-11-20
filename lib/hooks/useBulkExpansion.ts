@@ -125,6 +125,12 @@ export function useBulkExpansion({ projectId, branch, canUseLLM, accessToken, by
     announce(bulkExpansionProgress(totalsFor(run.jobs), run.jobs.length));
   };
 
+  const dismiss = () => {
+    if (runRef.current?.running) return;
+    runRef.current = null;
+    setSnapshot(null);
+  };
+
   const retry = async (iri: string) => {
     const run = runRef.current;
     if (!canUseLLM || !accessToken || !run || run.scope !== scope || run.running || run.haltReason) return;
@@ -136,5 +142,5 @@ export function useBulkExpansion({ projectId, branch, canUseLLM, accessToken, by
 
   const current = snapshot?.scope === scope ? snapshot : null;
   const jobs = current?.jobs ?? [];
-  return { runId: current?.id, jobs, totals: totalsFor(jobs), haltReason: current?.haltReason ?? null, start, stop, retry };
+  return { runId: current?.id, jobs, totals: totalsFor(jobs), haltReason: current?.haltReason ?? null, start, stop, retry, dismiss };
 }

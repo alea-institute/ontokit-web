@@ -29,6 +29,8 @@ interface BulkExpansionReviewProps extends ReviewScope {
   canUseLLM: boolean;
   stop: () => void;
   retry: (iri: string) => void;
+  /** Closes a finished review. Suggestions stay in each class's own batch. */
+  dismiss?: () => void;
 }
 
 const statuses = {
@@ -44,7 +46,7 @@ export function BulkExpansionReview({ runId, ...props }: BulkExpansionReviewProp
   return <ReviewRun key={JSON.stringify([props.projectId, props.branch, runId])} {...props} />;
 }
 
-function ReviewRun({ jobs, totals, haltReason, canUseLLM, stop, retry, ...scope }: BulkExpansionReviewProps) {
+function ReviewRun({ jobs, totals, haltReason, canUseLLM, stop, retry, dismiss, ...scope }: BulkExpansionReviewProps) {
   const headingId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const focused = useRef(false);
@@ -71,7 +73,15 @@ function ReviewRun({ jobs, totals, haltReason, canUseLLM, stop, retry, ...scope 
           <p className="text-xs text-slate-600 dark:text-slate-300">
             {bulkExpansionProgress(totals, jobs.length)}
           </p>
+          {dismiss && totals.waiting === 0 && totals.generating === 0 && (
+            <p className="text-xs text-slate-600 dark:text-slate-300">Pending suggestions stay on each class after you close this review.</p>
+          )}
         </div>
+        {dismiss && totals.waiting === 0 && totals.generating === 0 && (
+          <Button type="button" variant="outline" size="sm" onClick={dismiss} className="focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400">
+            Close review
+          </Button>
+        )}
         {totals.waiting > 0 && (
           <Button type="button" variant="outline" size="sm" onClick={() => { stop(); headingRef.current?.focus(); }} className="focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400">
             Stop

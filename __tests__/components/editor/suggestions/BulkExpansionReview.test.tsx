@@ -19,6 +19,24 @@ const suggestions: GeneratedSuggestion[] = ["Eligible", "Duplicate", "Invalid"].
 describe("BulkExpansionReview", () => {
   beforeEach(() => useSuggestionStore.getState().clearAllSuggestions());
 
+  it("offers Close only once nothing is waiting or generating", () => {
+    const dismiss = vi.fn();
+    const renderReview = (running: boolean) => (
+      <ToastProvider>
+        <BulkExpansionReview {...scope} canUseLLM dismiss={dismiss}
+          jobs={[{ ...contract, status: running ? "generating" : "done" }]}
+          totals={{ done: running ? 0 : 1, failed: 0, waiting: 0, generating: running ? 1 : 0, skipped: 0 }}
+          haltReason={null} stop={vi.fn()} retry={vi.fn()} />
+      </ToastProvider>
+    );
+    const { rerender } = render(renderReview(true));
+    expect(screen.queryByRole("button", { name: "Close review" })).toBeNull();
+    rerender(renderReview(false));
+    fireEvent.click(screen.getByRole("button", { name: "Close review" }));
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("Pending suggestions stay on each class after you close this review.")).toBeDefined();
+  });
+
   it("focuses the heading on the first result and confirms eligible accepts only in the opened group", async () => {
     const onAddSuggestedChild = vi.fn().mockResolvedValue(undefined);
     const renderReview = (firstDone: boolean) => (

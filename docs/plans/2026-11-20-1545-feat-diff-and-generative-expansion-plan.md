@@ -322,6 +322,7 @@ Findings that change the design or stay open:
 - The grounding line counted "existing siblings" for a subclass batch; it now says "existing subclasses" (copy change, no failing test first).
 - The tree menu explained a disabled bulk action with "No subclasses loaded."; it now says to expand the class, or that the class has no subclasses.
 - The generative UI spec had broken when bulk expansion added a second menu item matching "Suggest Subclasses"; its lookup is exact now.
+- A finished bulk expansion review held half the editor with no way to close it. "Close review" now appears once nothing is waiting or generating and returns focus to the tree; each class keeps its pending batch. Covered by unit tests; not re-walked in the browser after the stack was stopped.
 - Changes rows wrapped unevenly at phone width; name and change kind now sit on one line and the rest on a second.
 
 **Changes page polish.** The page opens with "Last N days at a glance": two tiles, classes added by AI (accepted as suggested versus edited first) and entities changed by people (added, modified, removed), plus a line for sync or import. The counts come from the light changed-entities feed, cover the whole window whatever the list is filtered to, and each tile filters the list below. A class a person edits after accepting it counts once under AI and once as modified by people; an imported entity a person renames counts as modified, not added.

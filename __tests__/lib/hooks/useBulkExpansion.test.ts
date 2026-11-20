@@ -94,6 +94,19 @@ describe("useBulkExpansion", () => {
     expect(result.current.jobs.map((job) => job.status)).toEqual(["done", "done", "skipped", "skipped"]);
   });
 
+  it("closes a finished review, and never one that is still generating", async () => {
+    generate.mockResolvedValueOnce(response);
+    const finishSecond = pauseRequest();
+    const { result } = mount();
+    let run!: Promise<void>;
+    await act(async () => { run = result.current.start(targets.slice(0, 2), 5); });
+    act(() => result.current.dismiss());
+    expect(result.current.jobs).toHaveLength(2);
+    await act(async () => { finishSecond(); await run; });
+    act(() => result.current.dismiss());
+    expect(result.current.jobs).toEqual([]);
+  });
+
   it.each(["switching branches", "leaving the page"])("aborts and discards late results when %s", async (action) => {
     const finish = pauseRequest();
     const { result, rerender, unmount, announce } = mount();
