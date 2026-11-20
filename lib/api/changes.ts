@@ -2,7 +2,7 @@ import type { ChangeEvent, ChangeEventType } from "./analytics";
 import { api } from "./client";
 
 export type ChangeOrigin = "human" | "ai" | "ai_edited" | "system";
-export type NetChange = "added" | "modified" | "removed";
+export type NetChange = "added" | "modified" | "removed" | "transient";
 export type ChangeEntityType =
   | "class"
   | "object_property"

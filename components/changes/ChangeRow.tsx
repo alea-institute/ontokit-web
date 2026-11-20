@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, ChevronRight, Minus, Pencil, Plus } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronRight, Minus, Pencil, Plus, Timer } from "lucide-react";
 import type { ChangeEventType } from "@/lib/api/analytics";
 import type { ChangeEntityType, EntityChange, FieldChange, NetChange } from "@/lib/api/changes";
 import { buildSelectionQuery } from "@/lib/utils/selectionUrl";
@@ -22,6 +22,7 @@ export const NET_CHANGES = {
   added: { label: "Added", icon: Plus, color: "text-green-700 dark:text-green-400" },
   modified: { label: "Modified", icon: Pencil, color: "text-blue-700 dark:text-blue-400" },
   removed: { label: "Removed", icon: Minus, color: "text-red-700 dark:text-red-400" },
+  transient: { label: "Added, then removed", icon: Timer, color: "text-slate-700 dark:text-slate-300" },
 } satisfies Record<NetChange, { label: string; icon: typeof Plus; color: string }>;
 
 const FIELD_LABELS: Record<FieldChange["field"], string> = {
@@ -37,7 +38,7 @@ const EVENT_LABELS: Record<ChangeEventType, string> = {
   create: "Created",
   update: "Updated",
   delete: "Deleted",
-  rename: "Renamed",
+  rename: "Label changed",
   reparent: "Reparented",
   deprecate: "Deprecated",
 };
@@ -132,6 +133,7 @@ export function ChangeRow({
   const detailsId = useId();
   const label = item.label || getLocalName(item.entity_iri);
   const { icon: ChangeIcon, label: changeLabel, color } = NET_CHANGES[item.net_change];
+  const hasEditorLink = item.net_change === "added" || item.net_change === "modified";
   const DisclosureIcon = expanded ? ChevronDown : ChevronRight;
   const selectionType = item.entity_type === "class" || item.entity_type === "individual"
     ? item.entity_type
@@ -142,20 +144,20 @@ export function ChangeRow({
   return (
     <li className="px-4 py-3 sm:px-5">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className={cn("inline-flex w-24 shrink-0 items-center gap-1.5 text-sm font-medium", color)}>
-          <ChangeIcon aria-hidden="true" className="h-4 w-4" />
+        <span className={cn("inline-flex w-24 shrink-0 items-center gap-1.5 text-sm font-medium sm:w-32", color)}>
+          <ChangeIcon aria-hidden="true" className="h-4 w-4 shrink-0" />
           {changeLabel}
         </span>
         <div className="min-w-0 flex-1 basis-36">
-          {item.net_change === "removed" ? (
-            <span className="wrap-break-word text-sm font-semibold text-slate-900 dark:text-white">{label}</span>
-          ) : (
+          {hasEditorLink ? (
             <Link
               href={editorHref}
               className="wrap-break-word rounded-sm text-sm font-semibold text-primary-700 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary-500 dark:text-primary-400 dark:focus-visible:ring-primary-400"
             >
               {label}
             </Link>
+          ) : (
+            <span className="wrap-break-word text-sm font-semibold text-slate-900 dark:text-white">{label}</span>
           )}
           <p className="text-xs text-slate-500 dark:text-slate-400">{ENTITY_TYPE_LABELS[item.entity_type]}</p>
         </div>

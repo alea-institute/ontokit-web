@@ -1,7 +1,7 @@
 "use client";
 
-import { Check } from "lucide-react";
-import { useRef, type ComponentPropsWithRef, type ReactNode, type Ref } from "react";
+import { Check, HelpCircle } from "lucide-react";
+import { useId, useRef, useState, type ComponentPropsWithRef, type ReactNode, type Ref } from "react";
 import { Button } from "@/components/ui/button";
 import type { ChangeEntityType, ChangeOrigin, NetChange, ProjectChangesResponse } from "@/lib/api/changes";
 import { cn } from "@/lib/utils";
@@ -33,12 +33,39 @@ export function TimeWindow({
               onChange={() => onChange(preset)}
             />
             <span className="block rounded-md px-2.5 py-1.5 text-sm text-slate-700 hover:bg-slate-100 peer-checked:bg-primary-50 peer-checked:font-semibold peer-checked:text-primary-700 peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500 dark:text-slate-300 dark:hover:bg-slate-800 dark:peer-checked:bg-primary-900/30 dark:peer-checked:text-primary-400 dark:peer-focus-visible:ring-primary-400">
-              {preset} {preset === 1 ? "day" : "days"}
+              {preset === 1 ? "Last 24 hours" : `${preset} days`}
             </span>
           </label>
         ))}
       </div>
     </fieldset>
+  );
+}
+
+export function ChangeHelp() {
+  const [expanded, setExpanded] = useState(false);
+  const helpId = useId();
+
+  return (
+    <div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-expanded={expanded}
+        aria-controls={helpId}
+        onClick={() => setExpanded(!expanded)}
+        className="gap-1.5 text-primary-700 focus-visible:ring-primary-500 dark:text-primary-400 dark:focus-visible:ring-primary-400"
+      >
+        <HelpCircle aria-hidden="true" className="h-4 w-4" />
+        How changes are tracked
+      </Button>
+      <div id={helpId} hidden={!expanded} className="mt-2 space-y-2 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+        <p>Renaming an entity&apos;s IRI shows as one removal plus one addition. Origin and author filters select entities and each result summarizes changes across the full window.</p>
+        <p>Windows count back from each request in 24-hour periods in UTC. Times are shown in your local time zone.</p>
+        <p>AI origin tracks class creation only. It reflects a match to a stored suggestion at creation time.</p>
+      </div>
+    </div>
   );
 }
 

@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import {
   CHANGE_WINDOWS,
   ChangeFilters,
+  ChangeHelp,
   ChangeSummary,
   TimeWindow,
   type ChangeFilterValues,
@@ -23,7 +24,7 @@ import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 
 function matchingItems(pages: ProjectChangesResponse[], kinds: readonly NetChange[]) {
   const items = pages.flatMap((page) => page.items);
-  // Applying event_type before grouping can change the entity's net change.
+  // Net change describes the entire window, so filter the grouped rows.
   return kinds.length ? items.filter((item) => kinds.includes(item.net_change)) : items;
 }
 
@@ -53,8 +54,8 @@ export default function ProjectChangesPage() {
     ...filtersWithoutAuthor,
     author: selected.author.length ? selected.author : undefined,
   });
-  // The filtered summary only includes matching authors. Reuse the request
-  // without the author filter so users can still add another author.
+  // The summary only includes authors of qualifying entities. Reuse the
+  // request without the author filter to keep other authors selectable.
   const authorFeed = useProjectChanges(
     id, session?.accessToken, filtersWithoutAuthor, selected.author.length > 0,
   );
@@ -111,7 +112,7 @@ export default function ProjectChangesPage() {
     });
   }
 
-  const windowLabel = days === 1 ? "day" : `${days} days`;
+  const windowLabel = days === 1 ? "24 hours" : `${days} days`;
   const status = feed.isLoading ? "Loading changes."
     : feed.isFetchingNextPage ? "Loading more changes."
     : feed.isFetchNextPageError ? "Failed to load more changes."
@@ -144,6 +145,7 @@ export default function ProjectChangesPage() {
           <TimeWindow days={days} onChange={(preset) => updateUrl((next) => next.set("days", String(preset)))} />
         </div>
 
+        <ChangeHelp />
         <ChangeSummary
           summary={firstPage?.summary}
           origins={selected.origin}
