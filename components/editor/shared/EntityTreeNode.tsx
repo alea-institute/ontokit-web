@@ -2,12 +2,27 @@
 
 import { memo, useCallback } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
-import { ChevronRight, ChevronDown, Circle, Plus, Sparkles } from "lucide-react";
+import { ChevronRight, ChevronDown, Circle, CircleDashed, CircleX, Minus, Pencil, Plus, Sparkles } from "lucide-react";
+import { Tooltip } from "@/components/ui/tooltip";
+import { ORIGIN_LABELS } from "@/components/changes/OriginBadge";
+import { useChangedEntity } from "./ChangedEntitiesContext";
 import { cn } from "@/lib/utils";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { TreeNodeContextMenu, type OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
 import type { EntityTreeNode as EntityTreeNodeType } from "@/lib/ontology/types";
 import type { DragState } from "@/lib/hooks/useTreeDragDrop";
+
+const CHANGE_MARKERS = {
+  added: { label: "Added", Icon: Plus, color: "text-green-600 dark:text-green-400" },
+  modified: { label: "Modified", Icon: Pencil, color: "text-blue-600 dark:text-blue-400" },
+  removed: { label: "Removed", Icon: Minus, color: "text-red-600 dark:text-red-400" },
+  transient: { label: "Added, then removed", Icon: CircleX, color: "text-amber-700 dark:text-amber-400" },
+};
+const UNKNOWN_CHANGE_MARKER = {
+  label: "Changed",
+  Icon: CircleDashed,
+  color: "text-slate-600 dark:text-slate-400",
+};
 
 interface EntityTreeNodeProps {
   node: EntityTreeNodeType;
@@ -79,6 +94,19 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   onDragEnterNode,
   onDragLeaveNode,
 }: EntityTreeNodeProps) {
+  const change = useChangedEntity(node.iri);
+  const netChange = change?.net_change;
+  const knownMarker = change && netChange && Object.hasOwn(CHANGE_MARKERS, netChange)
+    && change.origins.every((origin) => Object.hasOwn(ORIGIN_LABELS, origin))
+    ? CHANGE_MARKERS[netChange] : undefined;
+  const marker = change ? knownMarker ?? UNKNOWN_CHANGE_MARKER : undefined;
+  const aiEdited = !!knownMarker && change?.origins.includes("ai_edited");
+  const aiOrigin = aiEdited || (!!knownMarker && change?.origins.includes("ai"));
+  const aiDetail = netChange === "added"
+    ? (aiEdited ? " by AI and edited by a person" : " by AI")
+    : (aiEdited ? ", AI-edited origin" : ", AI origin");
+  const changeDetail = knownMarker ? `, ${knownMarker.label.toLowerCase()}${aiOrigin ? aiDetail : ""}` : "";
+  const changeLabel = `changed in the last 7 days${changeDetail}`;
   const isSelected = selectedIri === node.iri;
   const isFocused = focusedIri === node.iri;
   const hasChildren = node.hasChildren || node.children.length > 0;
@@ -218,6 +246,7 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
       onDoubleClick={handleDoubleClick}
       onPointerEnter={isOver && isDndEnabled ? () => onDragEnterNode?.(node.iri) : undefined}
       onPointerLeave={isDndEnabled && dragState?.isDragActive ? onDragLeaveNode : undefined}
+      aria-label={marker ? `${node.label}, ${changeLabel}` : undefined}
       aria-selected={isSelected}
       aria-expanded={hasChildren ? node.isExpanded : undefined}
       data-iri={node.iri}
@@ -256,6 +285,17 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
           ? highlightMatch(node.label, searchQuery)
           : node.label}
       </span>
+
+      {marker && (
+        <Tooltip content={changeLabel}>
+          <span className="inline-flex shrink-0 items-center gap-0.5">
+            <marker.Icon role="img" aria-hidden={false} aria-label={marker.label} className={cn("h-3.5 w-3.5", marker.color)} />
+            {aiOrigin && (
+              <Sparkles role="img" aria-hidden={false} aria-label="AI origin" className="h-3.5 w-3.5 text-purple-700 dark:text-purple-300" />
+            )}
+          </span>
+        </Tooltip>
+      )}
 
       {/* Draft indicator */}
       {draftIris?.has(node.iri) && (

@@ -23,8 +23,10 @@ import { IndividualList } from "@/components/editor/standard/IndividualList";
 import { PropertyDetailPanel } from "@/components/editor/PropertyDetailPanel";
 import { IndividualDetailPanel } from "@/components/editor/IndividualDetailPanel";
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
+import { RecentChangesTree } from "@/components/editor/shared/RecentChangesToggle";
 import { TrustExplainer, mintingLockReason, type TrustGate } from "@/components/editor/TrustExplainer";
 import { DraggableTreeWrapper } from "@/components/editor/shared/DraggableTreeWrapper";
+import { useInvalidateChangedEntitiesAfterSave } from "@/lib/hooks/useChangedEntities";
 import { useTreeSearch } from "@/lib/hooks/useTreeSearch";
 import { useFilteredTree } from "@/lib/hooks/useFilteredTree";
 import { useTreeDragDrop, type DragMode } from "@/lib/hooks/useTreeDragDrop";
@@ -228,6 +230,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   // capability gate decides whether it is enabled.
   const canAddEntity = canEdit || isSuggestionMode;
 
+  useInvalidateChangedEntitiesAfterSave(projectId, accessToken);
   const toast = useToast();
   const { announce } = useAnnounce();
   const llmGate = useLLMGate(projectId, userRole);
@@ -565,7 +568,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
         ) : viewMode === "tree" ? (
           <>
             {/* Left Panel - Entity Tree/List with tabs */}
-            <div className="flex-shrink-0 bg-white max-md:w-full! dark:bg-slate-800" style={{ width: treePanelWidth }}>
+            <div className="flex shrink-0 flex-col bg-white max-md:w-full! dark:bg-slate-800" style={{ width: treePanelWidth }}>
               {/* Entity Type Tabs */}
               <EntityTabBar activeTab={activeTab} onTabChange={setActiveTab} />
 
@@ -590,97 +593,104 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 isExpandingAll={activeTab === "classes" ? isExpandingAll : false}
               />
 
-              {/* Trust ladder (R8, AE2): the minting affordance above is disabled;
-                  this is where a contributor learns how to un-disable it. */}
-              {trustGate && mintingLocked && canAddEntity && activeTab === "classes" && (
-                <div className="border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
-                  <TrustExplainer gate={trustGate} />
-                </div>
-              )}
+              <RecentChangesTree
+                projectId={projectId}
+                branch={activeBranch}
+                accessToken={accessToken}
+                visible={activeTab === "classes"}
+              >
+                {/* Trust ladder (R8, AE2): the minting affordance above is disabled;
+                    this is where a contributor learns how to un-disable it. */}
+                {trustGate && mintingLocked && canAddEntity && activeTab === "classes" && (
+                  <div className="border-b border-slate-200 px-3 py-1.5 dark:border-slate-700">
+                    <TrustExplainer gate={trustGate} />
+                  </div>
+                )}
 
-              {/* Tab Content */}
-              <div className="h-[calc(100%-5.5rem)] overflow-y-auto max-md:max-h-64">
-                {activeTab === "classes" && (
-                  <>
-                    {isTreeLoading && nodes.length === 0 ? (
-                      <div className="flex h-32 items-center justify-center">
-                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
-                      </div>
-                    ) : treeError ? (
-                      <div className="p-4">
-                        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center dark:border-red-900/50 dark:bg-red-900/20">
-                          <p className="text-sm text-red-700 dark:text-red-400">{treeError}</p>
+                {/* Tab Content */}
+                <div className="min-h-0 flex-1 overflow-y-auto max-md:max-h-64">
+                  {activeTab === "classes" && (
+                    <>
+                      {isTreeLoading && nodes.length === 0 ? (
+                        <div className="flex h-32 items-center justify-center">
+                          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
                         </div>
-                      </div>
-                    ) : nodes.length === 0 ? (
-                      <div className="p-4 text-center">
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          No classes found in this ontology
-                        </p>
-                      </div>
-                    ) : (
-                      <DraggableTreeWrapper
-                        isDragActive={dragState.isDragActive}
-                        draggedLabel={dragState.draggedLabel}
-                        dragMode={dragState.dragMode}
-                        onDragStart={handleDragStart}
-                        onDragOver={handleDragOver}
-                        onDragEnd={handleDragEnd}
-                        onDragCancel={handleDragCancel}
-                      >
-                        <ClassTree
-                          nodes={nodes}
-                          selectedIri={selectedIri}
-                          onSelect={selectNode}
-                          onSuggest={suggestFromTree}
-                          suggestLockedReason={suggestionLockReason(llmGate)}
-                          onExpand={expandNode}
-                          onCollapse={collapseNode}
-                          onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
-                          addChildLocked={mintingLocked}
-                          addChildLockedReason={mintingLockedReason}
-                          onCopyIri={onCopyIri}
-                          onDelete={canEdit ? onDeleteClass : undefined}
-                          onViewInSource={handleNavigateToSource}
-                          searchResults={showSearch ? searchResults : undefined}
-                          isSearching={isSearching}
-                          onSearchSelect={handleSearchSelect}
-                          searchQuery={searchQuery}
-                          draftIris={draftIris}
-                          suggestedIris={acceptedSuggestionIris}
-                          filteredTree={filteredNodes}
-                          isFilteredTreeBuilding={isFilteredTreeBuilding}
-                          filteredTreeTruncated={filteredTreeTruncated}
-                          dragState={!showSearch && (canEdit || isSuggestionMode) ? dragState : undefined}
-                          onDragEnterNode={handleDragEnterNode}
-                          onDragLeaveNode={handleDragLeaveNode}
-                        />
-                      </DraggableTreeWrapper>
-                    )}
-                  </>
-                )}
+                      ) : treeError ? (
+                        <div className="p-4">
+                          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-center dark:border-red-900/50 dark:bg-red-900/20">
+                            <p className="text-sm text-red-700 dark:text-red-400">{treeError}</p>
+                          </div>
+                        </div>
+                      ) : nodes.length === 0 ? (
+                        <div className="p-4 text-center">
+                          <p className="text-sm text-slate-500 dark:text-slate-400">
+                            No classes found in this ontology
+                          </p>
+                        </div>
+                      ) : (
+                        <DraggableTreeWrapper
+                          isDragActive={dragState.isDragActive}
+                          draggedLabel={dragState.draggedLabel}
+                          dragMode={dragState.dragMode}
+                          onDragStart={handleDragStart}
+                          onDragOver={handleDragOver}
+                          onDragEnd={handleDragEnd}
+                          onDragCancel={handleDragCancel}
+                        >
+                          <ClassTree
+                            nodes={nodes}
+                            selectedIri={selectedIri}
+                            onSelect={selectNode}
+                            onSuggest={suggestFromTree}
+                            suggestLockedReason={suggestionLockReason(llmGate)}
+                            onExpand={expandNode}
+                            onCollapse={collapseNode}
+                            onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+                            addChildLocked={mintingLocked}
+                            addChildLockedReason={mintingLockedReason}
+                            onCopyIri={onCopyIri}
+                            onDelete={canEdit ? onDeleteClass : undefined}
+                            onViewInSource={handleNavigateToSource}
+                            searchResults={showSearch ? searchResults : undefined}
+                            isSearching={isSearching}
+                            onSearchSelect={handleSearchSelect}
+                            searchQuery={searchQuery}
+                            draftIris={draftIris}
+                            suggestedIris={acceptedSuggestionIris}
+                            filteredTree={filteredNodes}
+                            isFilteredTreeBuilding={isFilteredTreeBuilding}
+                            filteredTreeTruncated={filteredTreeTruncated}
+                            dragState={!showSearch && (canEdit || isSuggestionMode) ? dragState : undefined}
+                            onDragEnterNode={handleDragEnterNode}
+                            onDragLeaveNode={handleDragLeaveNode}
+                          />
+                        </DraggableTreeWrapper>
+                      )}
+                    </>
+                  )}
 
-                {activeTab === "properties" && (
-                  <PropertyTree
-                    projectId={projectId}
-                    accessToken={accessToken}
-                    branch={activeBranch}
-                    selectedIri={selectedPropertyIri}
-                    onSelect={setSelectedPropertyIri}
-                    onNodesLoaded={setPropertyNodes}
-                  />
-                )}
+                  {activeTab === "properties" && (
+                    <PropertyTree
+                      projectId={projectId}
+                      accessToken={accessToken}
+                      branch={activeBranch}
+                      selectedIri={selectedPropertyIri}
+                      onSelect={setSelectedPropertyIri}
+                      onNodesLoaded={setPropertyNodes}
+                    />
+                  )}
 
-                {activeTab === "individuals" && (
-                  <IndividualList
-                    projectId={projectId}
-                    accessToken={accessToken}
-                    branch={activeBranch}
-                    selectedIri={selectedIndividualIri}
-                    onSelect={setSelectedIndividualIri}
-                  />
-                )}
-              </div>
+                  {activeTab === "individuals" && (
+                    <IndividualList
+                      projectId={projectId}
+                      accessToken={accessToken}
+                      branch={activeBranch}
+                      selectedIri={selectedIndividualIri}
+                      onSelect={setSelectedIndividualIri}
+                    />
+                  )}
+                </div>
+              </RecentChangesTree>
             </div>
 
             {/* Draggable Divider */}

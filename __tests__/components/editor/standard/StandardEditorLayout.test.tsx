@@ -1,15 +1,23 @@
 import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
-import { act, render, screen, fireEvent } from "@testing-library/react";
+import { act, render as renderWithProviders, screen, fireEvent } from "@testing-library/react";
 import React from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { isMobileDetailEntry, MOBILE_DETAIL_HISTORY_KEY } from "@/lib/editor/mobilePane";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
+
+function render(ui: React.ReactElement) {
+  const client = new QueryClient();
+  return renderWithProviders(ui, {
+    wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+  });
+}
 
 // --- Mocks ---
 
 // PR-5 mounts useLLMGate (session + react-query backed) in the layouts; the
 // gate has its own dedicated tests — here we stub an anonymous/no-access
-// state so the layout renders without Session/QueryClient providers.
+// state so the layout renders without a session provider.
 vi.mock("@/lib/hooks/useLLMGate", () => ({
   useLLMGate: () => ({
     canUseLLM: false,

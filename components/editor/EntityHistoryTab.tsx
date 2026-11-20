@@ -12,6 +12,7 @@ import {
   ArrowUp,
   AlertTriangle,
 } from "lucide-react";
+import { OriginBadge } from "@/components/changes/OriginBadge";
 import { useEntityHistory } from "@/lib/hooks/useEntityHistory";
 import { cn } from "@/lib/utils";
 import type { ChangeEventType } from "@/lib/api/analytics";
@@ -87,8 +88,9 @@ export function EntityHistoryTab({
           <History className="h-4 w-4" />
         </span>
         <button
+          aria-expanded={isExpanded}
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+          className="flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:focus-visible:outline-primary-400"
         >
           {isExpanded ? (
             <ChevronDown className="h-3 w-3" />
@@ -145,6 +147,14 @@ export function EntityHistoryTab({
                     >
                       {formatRelativeTime(event.created_at)}
                     </span>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                      <OriginBadge origin={event.origin ?? "human"} />
+                      {(event.origin === "ai" || event.origin === "ai_edited") && event.origin_model && (
+                        <span className="break-all text-slate-500 dark:text-slate-400">
+                          {event.origin_model}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

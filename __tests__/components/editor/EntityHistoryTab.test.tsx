@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render as renderWithProviders, screen } from "@testing-library/react";
+import { TooltipProvider } from "@radix-ui/react-tooltip";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 
 vi.mock("@/lib/hooks/useEntityHistory", () => ({
@@ -8,6 +10,10 @@ vi.mock("@/lib/hooks/useEntityHistory", () => ({
 
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useEntityHistory } from "@/lib/hooks/useEntityHistory";
+
+function render(ui: ReactElement) {
+  return renderWithProviders(<TooltipProvider>{ui}</TooltipProvider>);
+}
 
 const mockUseEntityHistory = vi.mocked(useEntityHistory);
 
@@ -80,6 +86,35 @@ describe("EntityHistoryTab", () => {
     await userEvent.click(screen.getByText("History (1)"));
     expect(screen.getByText("Alice")).toBeDefined();
     expect(screen.getByText("created")).toBeDefined();
+  });
+
+  it("shows origin on each expanded row and displays models for AI origins", async () => {
+    const event = {
+      event_type: "create",
+      changed_fields: [],
+      created_at: new Date().toISOString(),
+    };
+    mockUseEntityHistory.mockReturnValue({
+      data: {
+        events: [
+          { ...event, id: "legacy" },
+          { ...event, id: "edited", origin: "ai_edited", origin_model: "edited-model" },
+          { ...event, id: "ai", origin: "ai", origin_model: "generated-model" },
+          { ...event, id: "system", origin: "system", origin_model: "unused-model" },
+        ],
+        total: 4,
+      },
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useEntityHistory>);
+
+    render(<EntityHistoryTab projectId="p1" entityIri="https://example.org/onto#Lease" />);
+    expect(screen.queryByText("AI edited")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "History (4)" }));
+    for (const label of ["Human", "AI", "AI edited", "System", "edited-model", "generated-model"]) {
+      expect(screen.getByText(label, { exact: true })).toBeDefined();
+    }
+    expect(screen.queryByText("unused-model")).toBeNull();
   });
 
   it("displays changed fields when present", async () => {

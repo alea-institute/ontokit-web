@@ -3,6 +3,7 @@
  */
 
 import { api } from "./client";
+import type { ChangeOrigin } from "./changes";
 
 export type ChangeEventType =
   | "create"
@@ -22,6 +23,9 @@ export interface ChangeEvent {
   user_id: string;
   user_name?: string;
   commit_hash?: string;
+  origin?: ChangeOrigin;
+  origin_model?: string | null;
+  origin_batch_id?: string | null;
   changed_fields: string[];
   old_values?: Record<string, unknown>;
   new_values?: Record<string, unknown>;
