@@ -27,7 +27,11 @@ function readPreference(key: string) {
 const serverPreference = () => false;
 const subscribeToPreference = () => () => {};
 
-export function RecentChangesTree({ projectId, branch, accessToken, visible, children }: RecentChangesTreeProps) {
+export function RecentChangesTree({ enabled = true, ...props }: RecentChangesTreeProps & { enabled?: boolean }) {
+  return enabled ? <RecentChangesTreeWithMarkers {...props} /> : props.children;
+}
+
+function RecentChangesTreeWithMarkers({ projectId, branch, accessToken, visible, children }: RecentChangesTreeProps) {
   const storageKey = `ontokit:recent-changes:${projectId}`;
   const [preference, setPreference] = useState<{ key: string; enabled: boolean } | null>(null);
   const storedPreference = useSyncExternalStore(subscribeToPreference, () => readPreference(storageKey), serverPreference);

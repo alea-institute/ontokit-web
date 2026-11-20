@@ -23,6 +23,7 @@ import { IndividualList } from "@/components/editor/standard/IndividualList";
 import { PropertyDetailPanel } from "@/components/editor/PropertyDetailPanel";
 import { IndividualDetailPanel } from "@/components/editor/IndividualDetailPanel";
 import { EntityTreeToolbar } from "@/components/editor/shared/EntityTreeToolbar";
+import { ChangedEntitiesProvider } from "@/components/editor/shared/ChangedEntitiesContext";
 import { RecentChangesTree } from "@/components/editor/shared/RecentChangesToggle";
 import { TrustExplainer, mintingLockReason, type TrustGate } from "@/components/editor/TrustExplainer";
 import { DraggableTreeWrapper } from "@/components/editor/shared/DraggableTreeWrapper";
@@ -230,7 +231,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   // capability gate decides whether it is enabled.
   const canAddEntity = canEdit || isSuggestionMode;
 
-  useInvalidateChangedEntitiesAfterSave(projectId, accessToken);
+  // The editor supplies the update action even when a resumed session is read-only.
+  const isEditor = !!onUpdateClass;
+  useInvalidateChangedEntitiesAfterSave(projectId, accessToken, isEditor);
   const toast = useToast();
   const { announce } = useAnnounce();
   const llmGate = useLLMGate(projectId, userRole);
@@ -481,7 +484,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     }
   }, [sourceIriIndex, sourceEditorRef, setPendingScrollIri]);
 
-  return (
+  const layout = (
     <div className="flex h-full min-w-0 flex-col max-md:h-auto">
       {/* LLM Budget Banner — spans full width, below toolbar, above content */}
       {!llmGate.isAnonymous && (
@@ -594,6 +597,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               />
 
               <RecentChangesTree
+                enabled={isEditor}
                 projectId={projectId}
                 branch={activeBranch}
                 accessToken={accessToken}
@@ -611,7 +615,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                 <div className="min-h-0 flex-1 overflow-y-auto max-md:max-h-64">
                   {activeTab === "classes" && (
                     <>
-                      {isTreeLoading && nodes.length === 0 ? (
+                      {(!isEditor && !activeBranch) || (isTreeLoading && nodes.length === 0) ? (
                         <div className="flex h-32 items-center justify-center">
                           <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary-200 border-t-primary-600" />
                         </div>
@@ -859,4 +863,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
       </div>
     </div>
   );
+
+  return isEditor ? <ChangedEntitiesProvider>{layout}</ChangedEntitiesProvider> : layout;
 }

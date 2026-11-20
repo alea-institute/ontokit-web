@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useLayoutEffect, useState, useS
 import type { ChangedEntity } from "@/lib/hooks/useChangedEntities";
 
 type Entries = ReadonlyMap<string, ChangedEntity>;
+const emptyEntries: Entries = new Map();
 
 function createChangedEntitiesStore(entries: Entries) {
   const listeners = new Map<string, Set<() => void>>();
@@ -35,11 +36,15 @@ const ChangedEntitiesContext = createContext<ReturnType<typeof createChangedEnti
 const noServerEntry = () => undefined;
 const noSubscription = () => {};
 
-export function ChangedEntitiesProvider({ entries, children }: { entries: Entries; children: ReactNode }) {
+export function ChangedEntitiesProvider({ entries = emptyEntries, children }: { entries?: Entries; children: ReactNode }) {
   const [store] = useState(() => createChangedEntitiesStore(entries));
   useLayoutEffect(() => store.replace(entries), [store, entries]);
 
   return <ChangedEntitiesContext.Provider value={store}>{children}</ChangedEntitiesContext.Provider>;
+}
+
+export function useHasChangedEntitiesProvider() {
+  return useContext(ChangedEntitiesContext) !== null;
 }
 
 export function useChangedEntity(iri: string) {

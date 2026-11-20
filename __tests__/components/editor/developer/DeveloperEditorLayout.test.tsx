@@ -514,6 +514,16 @@ describe("DeveloperEditorLayout", () => {
 
   // --- Detail Panel ---
 
+  it("waits for the viewer branch before exposing class rows and omits recent changes", () => {
+    const props = defaultProps({ nodes: [makeNode()], activeBranch: undefined });
+    const { rerender } = render(<DeveloperEditorLayout {...props} />);
+    expect(screen.queryByTestId("class-tree")).toBeNull();
+
+    rerender(<DeveloperEditorLayout {...props} activeBranch="main" />);
+    expect(screen.getByTestId("class-tree")).toBeDefined();
+    expect(screen.queryByRole("switch", { name: "Show recent changes" })).toBeNull();
+  });
+
   it("renders ClassDetailPanel with selectedIri in tree view", () => {
     render(
       <DeveloperEditorLayout

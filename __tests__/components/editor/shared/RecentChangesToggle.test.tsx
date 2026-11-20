@@ -4,6 +4,8 @@ import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RecentChangesTree } from "@/components/editor/shared/RecentChangesToggle";
+import { EntityTreeNodeRow } from "@/components/editor/shared/EntityTreeNode";
+import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { useInvalidateChangedEntitiesAfterSave } from "@/lib/hooks/useChangedEntities";
 import { branchQueryKeys } from "@/lib/context/BranchContext";
@@ -77,6 +79,43 @@ afterEach(() => {
 });
 
 describe("Recent changes in the class tree", () => {
+  it("keeps standalone tree rows and history free of change markers, badges, and requests", async () => {
+    const node = nodes[0];
+    fetchChanges.mockResolvedValueOnce(Response.json({
+      total: 1,
+      events: [{
+        id: "event-one",
+        event_type: "create",
+        user_name: "Example author",
+        changed_fields: [],
+        created_at: "2026-11-19T10:00:00Z",
+        origin: "ai",
+        origin_model: "example-model",
+      }],
+    }));
+    const client = new QueryClient();
+    const user = userEvent.setup();
+    render(
+      <QueryClientProvider client={client}>
+        <EntityTreeNodeRow node={node} depth={0} onSelect={select} onExpand={expand} onCollapse={collapse} />
+        <EntityHistoryTab projectId={project} entityIri={node.iri} branch={branch} />
+      </QueryClientProvider>,
+    );
+
+    const row = screen.getByRole("treeitem", { name: node.label });
+    expect(within(row).queryByRole("img")).toBeNull();
+    await user.click(row);
+    expect(select).toHaveBeenCalledWith(node.iri);
+
+    await user.click(await screen.findByRole("button", { name: "History (1)" }));
+    expect(screen.getByText("Example author")).toBeDefined();
+    expect(screen.queryByText("AI", { exact: true })).toBeNull();
+    expect(screen.queryByText("example-model")).toBeNull();
+    expect(fetchChanges.mock.calls.map(([request]) => new URL(String(request)).pathname)).toEqual([
+      `/api/v1/projects/${project}/analytics/entity/${encodeURIComponent(node.iri)}/history`,
+    ]);
+  });
+
   it("fetches once on enable, marks only loaded rows, and preserves unchanged row renders", async () => {
     fetchChanges.mockResolvedValueOnce(Response.json({
       items: [

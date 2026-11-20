@@ -48,9 +48,10 @@ export function useChangedEntities({
   };
 }
 
-export function useInvalidateChangedEntitiesAfterSave(projectId: string, accessToken?: string) {
+export function useInvalidateChangedEntitiesAfterSave(projectId: string, accessToken?: string, enabled = true) {
   const queryClient = useQueryClient();
   useEffect(() => {
+    if (!enabled) return;
     const branchKey = branchQueryKeys.list(projectId, accessToken);
     const cache = queryClient.getQueryCache();
     let previous = queryClient.getQueryData<BranchListResponse>(branchKey);
@@ -71,5 +72,5 @@ export function useInvalidateChangedEntitiesAfterSave(projectId: string, accessT
         }
       }
     });
-  }, [queryClient, projectId, accessToken]);
+  }, [queryClient, projectId, accessToken, enabled]);
 }

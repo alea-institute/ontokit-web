@@ -316,6 +316,16 @@ describe("StandardEditorLayout", () => {
     expect(screen.getByTestId("draggable-wrapper")).toBeDefined();
   });
 
+  it("waits for the viewer branch before exposing class rows and omits recent changes", () => {
+    const props = defaultProps({ nodes: sampleNodes, activeBranch: undefined });
+    const { rerender } = render(<StandardEditorLayout {...props} />);
+    expect(screen.queryByTestId("class-tree")).toBeNull();
+
+    rerender(<StandardEditorLayout {...props} activeBranch="main" />);
+    expect(screen.getByTestId("class-tree")).toBeDefined();
+    expect(screen.queryByRole("switch", { name: "Show recent changes" })).toBeNull();
+  });
+
   // --- Detail panel: class ---
   it("renders ClassDetailPanel when classes tab is active (default)", () => {
     render(<StandardEditorLayout {...defaultProps({ nodes: sampleNodes })} />);

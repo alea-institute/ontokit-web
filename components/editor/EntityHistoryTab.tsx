@@ -13,6 +13,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { OriginBadge } from "@/components/changes/OriginBadge";
+import { useHasChangedEntitiesProvider } from "@/components/editor/shared/ChangedEntitiesContext";
 import { useEntityHistory } from "@/lib/hooks/useEntityHistory";
 import { cn } from "@/lib/utils";
 import type { ChangeEventType } from "@/lib/api/analytics";
@@ -67,6 +68,7 @@ export function EntityHistoryTab({
   branch,
 }: EntityHistoryTabProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const showOrigins = useHasChangedEntitiesProvider();
   const { data, isLoading, error } = useEntityHistory(
     projectId,
     entityIri,
@@ -147,14 +149,16 @@ export function EntityHistoryTab({
                     >
                       {formatRelativeTime(event.created_at)}
                     </span>
-                    <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
-                      <OriginBadge origin={event.origin ?? "human"} />
-                      {(event.origin === "ai" || event.origin === "ai_edited") && event.origin_model && (
-                        <span className="break-all text-slate-500 dark:text-slate-400">
-                          {event.origin_model}
-                        </span>
-                      )}
-                    </div>
+                    {showOrigins && (
+                      <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                        <OriginBadge origin={event.origin ?? "human"} />
+                        {(event.origin === "ai" || event.origin === "ai_edited") && event.origin_model && (
+                          <span className="break-all text-slate-500 dark:text-slate-400">
+                            {event.origin_model}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               );

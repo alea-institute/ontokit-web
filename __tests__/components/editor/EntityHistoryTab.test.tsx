@@ -9,6 +9,7 @@ vi.mock("@/lib/hooks/useEntityHistory", () => ({
 }));
 
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
+import { ChangedEntitiesProvider } from "@/components/editor/shared/ChangedEntitiesContext";
 import { useEntityHistory } from "@/lib/hooks/useEntityHistory";
 
 function render(ui: ReactElement) {
@@ -108,7 +109,11 @@ describe("EntityHistoryTab", () => {
       error: null,
     } as unknown as ReturnType<typeof useEntityHistory>);
 
-    render(<EntityHistoryTab projectId="p1" entityIri="https://example.org/onto#Lease" />);
+    render(
+      <ChangedEntitiesProvider>
+        <EntityHistoryTab projectId="p1" entityIri="https://example.org/onto#Lease" />
+      </ChangedEntitiesProvider>,
+    );
     expect(screen.queryByText("AI edited")).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "History (4)" }));
     for (const label of ["Human", "AI", "AI edited", "System", "edited-model", "generated-model"]) {
