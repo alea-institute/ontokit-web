@@ -9,7 +9,9 @@ import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
 import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
 import { useLLMGate } from "@/lib/hooks/useLLMGate";
 import type { ProjectRole } from "@/lib/api/projects";
-import { suggestionLockReason, type OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
+import { BulkExpansionMenuContext, suggestionLockReason, type OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
+import { BulkExpansionDialog, useBulkExpansionControls } from "@/components/editor/suggestions/BulkExpansionDialog";
+import { BulkExpansionReview } from "@/components/editor/suggestions/BulkExpansionReview";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback, type ClassSuggestionIntent } from "@/components/editor/ClassDetailPanel";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
@@ -213,6 +215,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     s.getPendingCount({ projectId, branch: activeBranch ?? "main" })
   );
   const byoEntry = useByoKeyStore((s) => s.getEntry(projectId));
+  const bulkExpansion = useBulkExpansionControls({
+    nodes, projectId, branch: activeBranch ?? "main", accessToken, byoKey: byoEntry?.key, canUseLLM: llmGate.canUseLLM,
+  });
 
   const scrollToFirstPending = useCallback(() => {
     const firstCard = document.querySelector('[role="listitem"]');
@@ -574,6 +579,9 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
         </div>
       )}
 
+      {bulkExpansion.dialog && <BulkExpansionDialog {...bulkExpansion.dialog} />}
+      <BulkExpansionReview {...bulkExpansion.review} isSuggestionMode={isSuggestionMode} onAddSuggestedChild={onAddSuggestedChild} />
+
       <div className="flex min-h-0 flex-1">
       {/* Left Panel - Entity Tree/List with tabs */}
       <div
@@ -656,32 +664,34 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                     onDragEnd={handleDragEnd}
                     onDragCancel={handleDragCancel}
                   >
-                    <ClassTree
-                      nodes={nodes}
-                      selectedIri={selectedIri}
-                      onSelect={selectClassFromTree}
-                      onSuggest={suggestFromTree}
-                      suggestLockedReason={suggestionLockReason(llmGate)}
-                      onExpand={expandNode}
-                      onCollapse={collapseNode}
-                      onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
-                      addChildLocked={mintingLocked}
-                      addChildLockedReason={mintingLockedReason}
-                      onCopyIri={onCopyIri}
-                      onDelete={canEdit ? onDeleteClass : undefined}
-                      searchResults={showSearch ? searchResults : undefined}
-                      isSearching={isSearching}
-                      onSearchSelect={handleSearchSelect}
-                      searchQuery={searchQuery}
-                      draftIris={draftIris}
-                      suggestedIris={acceptedSuggestionIris}
-                      filteredTree={filteredNodes}
-                      isFilteredTreeBuilding={isFilteredTreeBuilding}
-                      filteredTreeTruncated={filteredTreeTruncated}
-                      dragState={!showSearch && (canEdit || isSuggestionMode) ? dragState : undefined}
-                      onDragEnterNode={handleDragEnterNode}
-                      onDragLeaveNode={handleDragLeaveNode}
-                    />
+                    <BulkExpansionMenuContext.Provider value={bulkExpansion.menu}>
+                      <ClassTree
+                        nodes={nodes}
+                        selectedIri={selectedIri}
+                        onSelect={selectClassFromTree}
+                        onSuggest={suggestFromTree}
+                        suggestLockedReason={suggestionLockReason(llmGate)}
+                        onExpand={expandNode}
+                        onCollapse={collapseNode}
+                        onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+                        addChildLocked={mintingLocked}
+                        addChildLockedReason={mintingLockedReason}
+                        onCopyIri={onCopyIri}
+                        onDelete={canEdit ? onDeleteClass : undefined}
+                        searchResults={showSearch ? searchResults : undefined}
+                        isSearching={isSearching}
+                        onSearchSelect={handleSearchSelect}
+                        searchQuery={searchQuery}
+                        draftIris={draftIris}
+                        suggestedIris={acceptedSuggestionIris}
+                        filteredTree={filteredNodes}
+                        isFilteredTreeBuilding={isFilteredTreeBuilding}
+                        filteredTreeTruncated={filteredTreeTruncated}
+                        dragState={!showSearch && (canEdit || isSuggestionMode) ? dragState : undefined}
+                        onDragEnterNode={handleDragEnterNode}
+                        onDragLeaveNode={handleDragLeaveNode}
+                      />
+                    </BulkExpansionMenuContext.Provider>
                   </DraggableTreeWrapper>
                 )}
               </>
