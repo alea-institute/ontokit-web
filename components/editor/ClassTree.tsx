@@ -6,6 +6,7 @@ import { EntityTree } from "@/components/editor/shared/EntityTree";
 import { classTreeNodesToEntityNodes } from "@/lib/ontology/types";
 import type { ClassTreeNode, EntityTreeNode } from "@/lib/ontology/types";
 import type { EntitySearchResult } from "@/lib/api/client";
+import type { OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
 import type { DragState } from "@/lib/hooks/useTreeDragDrop";
 
 interface ClassTreeProps {
@@ -18,6 +19,8 @@ interface ClassTreeProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  onSuggest?: OnClassSuggest;
+  suggestLockedReason?: string;
   /** Trust ladder (R8): minting is above this contributor's rung. */
   addChildLocked?: boolean;
   /** Plain-language reason shown on the disabled affordance (AE2). */
@@ -54,6 +57,8 @@ export function ClassTree({
   onCopyIri,
   onDelete,
   onViewInSource,
+  onSuggest,
+  suggestLockedReason,
   addChildLocked,
   addChildLockedReason,
   searchResults,
@@ -104,6 +109,8 @@ export function ClassTree({
                   onExpand={onExpand}
                   onCollapse={onCollapse}
                   searchQuery={searchQuery}
+                  onSuggest={onSuggest}
+                  suggestLockedReason={suggestLockedReason}
                   enableKeyboardNav
                 />
                 {filteredTreeTruncated && (
@@ -158,6 +165,8 @@ export function ClassTree({
       onCopyIri={onCopyIri}
       onDelete={onDelete}
       onViewInSource={onViewInSource}
+      onSuggest={onSuggest}
+      suggestLockedReason={suggestLockedReason}
       addChildLocked={addChildLocked}
       addChildLockedReason={addChildLockedReason}
       draftIris={draftIris}

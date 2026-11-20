@@ -5,7 +5,7 @@ import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { ChevronRight, ChevronDown, Circle, Plus, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ContextMenu, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { TreeNodeContextMenu } from "@/components/editor/TreeNodeContextMenu";
+import { TreeNodeContextMenu, type OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
 import type { EntityTreeNode as EntityTreeNodeType } from "@/lib/ontology/types";
 import type { DragState } from "@/lib/hooks/useTreeDragDrop";
 
@@ -22,6 +22,8 @@ interface EntityTreeNodeProps {
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
   onViewInSource?: (iri: string) => void;
+  onSuggest?: OnClassSuggest;
+  suggestLockedReason?: string;
   /** Trust ladder (R8): minting is above this contributor's rung. */
   addChildLocked?: boolean;
   /** Plain-language reason shown on the disabled affordance (AE2). */
@@ -50,6 +52,10 @@ function highlightMatch(text: string, query: string | undefined): React.ReactNod
   );
 }
 
+export function treeItemId(iri: string) {
+  return `tree-item-${iri.replace(/[^a-zA-Z0-9-_]/g, "_")}`;
+}
+
 export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   node,
   depth,
@@ -63,6 +69,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   onCopyIri,
   onDelete,
   onViewInSource,
+  onSuggest,
+  suggestLockedReason,
   addChildLocked = false,
   addChildLockedReason,
   draftIris,
@@ -174,6 +182,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
                 onCopyIri={onCopyIri}
                 onDelete={onDelete}
                 onViewInSource={onViewInSource}
+                onSuggest={onSuggest}
+                suggestLockedReason={suggestLockedReason}
                 addChildLocked={addChildLocked}
                 addChildLockedReason={addChildLockedReason}
                 draftIris={draftIris}
@@ -186,13 +196,12 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
     );
   }
 
-  const hasContextMenu = onCopyIri || onDelete || onViewInSource || onAddChild;
-  const treeItemId = `tree-item-${node.iri.replace(/[^a-zA-Z0-9-_]/g, "_")}`;
+  const hasContextMenu = onCopyIri || onDelete || onViewInSource || onAddChild || onSuggest;
 
   const rowContent = (
     <div
       ref={isDndEnabled ? setRowRef : undefined}
-      id={treeItemId}
+      id={treeItemId(node.iri)}
       className={cn(
         "tree-item group",
         isSelected && "selected",
@@ -294,10 +303,13 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
           <ContextMenuTrigger asChild>{rowContent}</ContextMenuTrigger>
           <TreeNodeContextMenu
             node={node}
+            siblingLockedReason={isRoot ? "This class has no parent, so it has no siblings." : undefined}
             onAddChild={onAddChild}
             onCopyIri={onCopyIri}
             onDelete={onDelete}
             onViewInSource={onViewInSource}
+            onSuggest={onSuggest}
+            suggestLockedReason={suggestLockedReason}
             addChildLocked={addChildLocked}
             addChildLockedReason={addChildLockedReason}
           />
@@ -323,6 +335,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
             onCopyIri={onCopyIri}
             onDelete={onDelete}
             onViewInSource={onViewInSource}
+            onSuggest={onSuggest}
+            suggestLockedReason={suggestLockedReason}
             addChildLocked={addChildLocked}
             addChildLockedReason={addChildLockedReason}
             draftIris={draftIris}

@@ -13,8 +13,9 @@ import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
 import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
 import { useLLMGate } from "@/lib/hooks/useLLMGate";
 import type { ProjectRole } from "@/lib/api/projects";
+import { suggestionLockReason, type OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
 import { ClassTree } from "@/components/editor/ClassTree";
-import { ClassDetailPanel, type TreeNodeFallback } from "@/components/editor/ClassDetailPanel";
+import { ClassDetailPanel, type TreeNodeFallback, type ClassSuggestionIntent } from "@/components/editor/ClassDetailPanel";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
 import { EntityTabBar, type EntityTab } from "@/components/editor/standard/EntityTabBar";
 import { PropertyTree } from "@/components/editor/standard/PropertyTree";
@@ -230,6 +231,10 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   const toast = useToast();
   const { announce } = useAnnounce();
   const llmGate = useLLMGate(projectId, userRole);
+  const [suggestionIntent, setSuggestionIntent] = useState<ClassSuggestionIntent | null>(null);
+  const consumeSuggestionIntent = useCallback((intent: ClassSuggestionIntent) => {
+    setSuggestionIntent((current) => current === intent ? null : current);
+  }, []);
 
   // Suggestion store for pending count badge
   const pendingCount = useSuggestionStore((s) =>
@@ -323,6 +328,11 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
   const [viewMode, setViewMode] = useState<DeveloperView>("tree");
   const [detailTab, setDetailTab] = useState("detail");
+  const suggestFromTree = useCallback<OnClassSuggest>((iri, kind) => {
+    setSuggestionIntent({ iri, kind, projectId, branch: activeBranch });
+    setDetailTab("detail");
+    selectNode(iri);
+  }, [activeBranch, projectId, selectNode]);
   const sourceScopeKey = JSON.stringify([projectId, activeBranch, sourceFilePath]);
   const sourceMatchesScope = !sourceScope || (
     sourceScope.projectId === projectId && sourceScope.branch === activeBranch && sourceScope.filePath === sourceFilePath
@@ -622,6 +632,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                           nodes={nodes}
                           selectedIri={selectedIri}
                           onSelect={selectNode}
+                          onSuggest={suggestFromTree}
+                          suggestLockedReason={suggestionLockReason(llmGate)}
                           onExpand={expandNode}
                           onCollapse={collapseNode}
                           onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
@@ -714,6 +726,8 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   byoKey={byoEntry?.key}
                   onAddSuggestedChild={onAddSuggestedChild}
                   autoSuggestAnnotationsOnMount={isAutoSuggesting}
+                  autoSuggestOnMount={suggestionIntent}
+                  onAutoSuggestConsumed={consumeSuggestionIntent}
                   headerActions={selectedIri ? (
                     <BranchNavigator
                       nodes={nodes}

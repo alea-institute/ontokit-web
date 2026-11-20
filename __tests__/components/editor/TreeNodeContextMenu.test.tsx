@@ -57,6 +57,7 @@ vi.mock("lucide-react", () => ({
   Copy: () => <span data-testid="icon-copy" />,
   Code: () => <span data-testid="icon-code" />,
   Trash2: () => <span data-testid="icon-trash" />,
+  Sparkles: () => <span />,
   Lock: () => <span data-testid="icon-lock" />,
 }));
 
@@ -68,6 +69,29 @@ describe("TreeNodeContextMenu", () => {
   beforeEach(() => {
     capturedItems = [];
     _separatorCount = 0;
+  });
+
+  it("offers generation only when a callback is provided and passes the selected kind", () => {
+    const onSuggest = vi.fn();
+    const { rerender } = render(<TreeNodeContextMenu node={baseNode} />);
+    expect(screen.queryByRole("button", { name: "Suggest Subclasses" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Suggest Siblings" })).toBeNull();
+    rerender(<TreeNodeContextMenu node={baseNode} onSuggest={onSuggest} />);
+    fireEvent.click(screen.getByRole("button", { name: "Suggest Subclasses" }));
+    fireEvent.click(screen.getByRole("button", { name: "Suggest Siblings" }));
+    expect(onSuggest.mock.calls).toEqual([[baseNode.iri, "children"], [baseNode.iri, "siblings"]]);
+  });
+
+  it("locks both generation items and shows the reason", () => {
+    const onSuggest = vi.fn();
+    render(<TreeNodeContextMenu node={baseNode} onSuggest={onSuggest} suggestLockedReason="AI budget exhausted." />);
+    for (const name of ["Suggest Subclasses", "Suggest Siblings"]) {
+      const item = screen.getByRole("button", { name }) as HTMLButtonElement;
+      expect(item.disabled).toBe(true);
+      fireEvent.click(item);
+    }
+    expect(screen.getByText("AI budget exhausted.")).toBeDefined();
+    expect(onSuggest).not.toHaveBeenCalled();
   });
 
   // ── Rendering with all callbacks ─────────────────────────────────

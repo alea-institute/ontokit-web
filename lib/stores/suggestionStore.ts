@@ -25,7 +25,9 @@ export function storeKey(scope: SuggestionScope, entityIri: string, suggestionTy
 
 interface SuggestionStoreState {
   suggestions: Record<string, StoredSuggestion[]>;
-  setSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string, items: GeneratedSuggestion[]) => void;
+  batchIds: Record<string, string | undefined>;
+  setSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string, items: GeneratedSuggestion[], batchId?: string) => void;
+  rejectPendingSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string) => void;
   acceptSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
   rejectSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
   editSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number, value: string) => void;
@@ -44,9 +46,11 @@ interface SuggestionStoreState {
 
 export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => ({
   suggestions: {},
-  setSuggestions: (scope, entityIri, suggestionType, items) => {
+  batchIds: {},
+  setSuggestions: (scope, entityIri, suggestionType, items, batchId) => {
     const key = storeKey(scope, entityIri, suggestionType);
     set((state) => ({
+      batchIds: { ...state.batchIds, [key]: batchId },
       suggestions: {
         ...state.suggestions,
         [key]: items.map((s) => ({ suggestion: s, status: "pending" as const })),
@@ -67,6 +71,19 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
       const arr = [...(state.suggestions[key] || [])];
       if (arr[index]) arr[index] = { ...arr[index], status: "rejected" };
       return { suggestions: { ...state.suggestions, [key]: arr } };
+    });
+  },
+  rejectPendingSuggestions: (scope, entityIri, suggestionType) => {
+    const key = storeKey(scope, entityIri, suggestionType);
+    set((state) => {
+      const items = state.suggestions[key];
+      if (!items?.some((item) => item.status === "pending")) return state;
+      return {
+        suggestions: {
+          ...state.suggestions,
+          [key]: items.map((item) => item.status === "pending" ? { ...item, status: "rejected" } : item),
+        },
+      };
     });
   },
   editSuggestion: (scope, entityIri, suggestionType, index, value) => {
@@ -129,7 +146,7 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
       return { suggestions: { ...state.suggestions, [key]: items } };
     });
   },
-  clearAllSuggestions: () => set({ suggestions: {} }),
+  clearAllSuggestions: () => set({ suggestions: {}, batchIds: {} }),
   getPendingCount: (scope) => {
     const { suggestions } = get();
     const scopePrefix = `${scope.projectId}::${scope.branch}::`;
