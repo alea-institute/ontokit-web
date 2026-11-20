@@ -13,7 +13,9 @@ import { LLMBudgetBanner } from "@/components/editor/LLMBudgetBanner";
 import { LLMRoleBadge } from "@/components/editor/LLMRoleBadge";
 import { useLLMGate } from "@/lib/hooks/useLLMGate";
 import type { ProjectRole } from "@/lib/api/projects";
-import { suggestionLockReason, type OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
+import { BulkExpansionMenuContext, suggestionLockReason, type OnClassSuggest } from "@/components/editor/TreeNodeContextMenu";
+import { BulkExpansionDialog, useBulkExpansionControls } from "@/components/editor/suggestions/BulkExpansionDialog";
+import { BulkExpansionReview } from "@/components/editor/suggestions/BulkExpansionReview";
 import { ClassTree } from "@/components/editor/ClassTree";
 import { ClassDetailPanel, type TreeNodeFallback, type ClassSuggestionIntent } from "@/components/editor/ClassDetailPanel";
 import { ResizablePanelDivider } from "@/components/editor/ResizablePanelDivider";
@@ -244,6 +246,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     s.getPendingCount({ projectId, branch: activeBranch ?? "main" })
   );
   const byoEntry = useByoKeyStore((s) => s.getEntry(projectId));
+  const bulkExpansion = useBulkExpansionControls({
+    nodes, projectId, branch: activeBranch ?? "main", accessToken, byoKey: byoEntry?.key, canUseLLM: llmGate.canUseLLM,
+  });
 
   const scrollToFirstPending = useCallback(() => {
     const firstCard = document.querySelector('[role="listitem"]');
@@ -549,6 +554,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
         />
       </div>
 
+      {bulkExpansion.dialog && <BulkExpansionDialog {...bulkExpansion.dialog} />}
+      <BulkExpansionReview {...bulkExpansion.review} isSuggestionMode={isSuggestionMode} onAddSuggestedChild={onAddSuggestedChild} />
+
       {/* Content Area */}
       <div className="relative flex min-w-0 flex-1 overflow-hidden max-md:flex-col max-md:overflow-visible">
         {viewMode === "graph" ? (
@@ -637,33 +645,35 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                           onDragEnd={handleDragEnd}
                           onDragCancel={handleDragCancel}
                         >
-                          <ClassTree
-                            nodes={nodes}
-                            selectedIri={selectedIri}
-                            onSelect={selectNode}
-                            onSuggest={suggestFromTree}
-                            suggestLockedReason={suggestionLockReason(llmGate)}
-                            onExpand={expandNode}
-                            onCollapse={collapseNode}
-                            onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
-                            addChildLocked={mintingLocked}
-                            addChildLockedReason={mintingLockedReason}
-                            onCopyIri={onCopyIri}
-                            onDelete={canEdit ? onDeleteClass : undefined}
-                            onViewInSource={handleNavigateToSource}
-                            searchResults={showSearch ? searchResults : undefined}
-                            isSearching={isSearching}
-                            onSearchSelect={handleSearchSelect}
-                            searchQuery={searchQuery}
-                            draftIris={draftIris}
-                            suggestedIris={acceptedSuggestionIris}
-                            filteredTree={filteredNodes}
-                            isFilteredTreeBuilding={isFilteredTreeBuilding}
-                            filteredTreeTruncated={filteredTreeTruncated}
-                            dragState={!showSearch && (canEdit || isSuggestionMode) ? dragState : undefined}
-                            onDragEnterNode={handleDragEnterNode}
-                            onDragLeaveNode={handleDragLeaveNode}
-                          />
+                          <BulkExpansionMenuContext.Provider value={bulkExpansion.menu}>
+                            <ClassTree
+                              nodes={nodes}
+                              selectedIri={selectedIri}
+                              onSelect={selectNode}
+                              onSuggest={suggestFromTree}
+                              suggestLockedReason={suggestionLockReason(llmGate)}
+                              onExpand={expandNode}
+                              onCollapse={collapseNode}
+                              onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
+                              addChildLocked={mintingLocked}
+                              addChildLockedReason={mintingLockedReason}
+                              onCopyIri={onCopyIri}
+                              onDelete={canEdit ? onDeleteClass : undefined}
+                              onViewInSource={handleNavigateToSource}
+                              searchResults={showSearch ? searchResults : undefined}
+                              isSearching={isSearching}
+                              onSearchSelect={handleSearchSelect}
+                              searchQuery={searchQuery}
+                              draftIris={draftIris}
+                              suggestedIris={acceptedSuggestionIris}
+                              filteredTree={filteredNodes}
+                              isFilteredTreeBuilding={isFilteredTreeBuilding}
+                              filteredTreeTruncated={filteredTreeTruncated}
+                              dragState={!showSearch && (canEdit || isSuggestionMode) ? dragState : undefined}
+                              onDragEnterNode={handleDragEnterNode}
+                              onDragLeaveNode={handleDragLeaveNode}
+                            />
+                          </BulkExpansionMenuContext.Provider>
                         </DraggableTreeWrapper>
                       )}
                     </>

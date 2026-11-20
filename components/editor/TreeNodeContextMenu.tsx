@@ -1,5 +1,6 @@
 "use client";
 
+import { createContext, useContext, useId } from "react";
 import { Plus, Copy, Code, Trash2, Lock, Sparkles } from "lucide-react";
 import {
   ContextMenuContent,
@@ -8,9 +9,16 @@ import {
   ContextMenuSeparator,
 } from "@/components/ui/context-menu";
 import type { useLLMGate } from "@/lib/hooks/useLLMGate";
+import type { BulkExpansionTarget } from "@/lib/hooks/useBulkExpansion";
 import type { SuggestionType } from "@/lib/api/generation";
 
 export type OnClassSuggest = (iri: string, kind: Extract<SuggestionType, "children" | "siblings">) => void;
+
+export const BulkExpansionMenuContext = createContext<{
+  getTargets: (iri: string) => BulkExpansionTarget[];
+  open: (iri: string, targets: BulkExpansionTarget[]) => void;
+  lockedReason?: string;
+} | null>(null);
 
 export function suggestionLockReason(gate: ReturnType<typeof useLLMGate>): string | undefined {
   if (gate.canUseLLM) return undefined;
@@ -49,6 +57,12 @@ export function TreeNodeContextMenu({
   addChildLockedReason,
 }: TreeNodeContextMenuProps) {
   const label = node.label || node.iri;
+  const bulkExpansion = useContext(BulkExpansionMenuContext);
+  const targets = bulkExpansion?.getTargets(node.iri) ?? [];
+  const suggestionReasonId = useId();
+  const bulkReasonId = useId();
+  const bulkOnlyReason = targets.length === 0 ? "No subclasses loaded." : bulkExpansion?.lockedReason;
+  const bulkLockedReason = suggestLockedReason || bulkOnlyReason;
 
   return (
     <ContextMenuContent>
@@ -84,9 +98,24 @@ export function TreeNodeContextMenu({
             {suggestLockedReason || siblingLockedReason ? <Lock className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
             Suggest Siblings
           </ContextMenuItem>
+          {bulkExpansion && (
+            <ContextMenuItem
+              disabled={!!bulkLockedReason}
+              aria-describedby={suggestLockedReason ? suggestionReasonId : bulkOnlyReason ? bulkReasonId : undefined}
+              onSelect={() => bulkExpansion.open(node.iri, targets)}
+            >
+              {bulkLockedReason ? <Lock className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+              Suggest subclasses for each subclass…
+            </ContextMenuItem>
+          )}
           {(suggestLockedReason || siblingLockedReason) && (
-            <ContextMenuLabel className="max-w-[220px] whitespace-normal font-normal leading-snug">
+            <ContextMenuLabel id={suggestionReasonId} className="max-w-[220px] whitespace-normal font-normal leading-snug">
               {suggestLockedReason || siblingLockedReason}
+            </ContextMenuLabel>
+          )}
+          {bulkExpansion && !suggestLockedReason && bulkOnlyReason && (
+            <ContextMenuLabel id={bulkReasonId} className="max-w-[220px] whitespace-normal font-normal leading-snug">
+              {bulkOnlyReason}
             </ContextMenuLabel>
           )}
           <ContextMenuSeparator />

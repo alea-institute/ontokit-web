@@ -61,7 +61,7 @@ vi.mock("lucide-react", () => ({
   Lock: () => <span data-testid="icon-lock" />,
 }));
 
-import { TreeNodeContextMenu } from "@/components/editor/TreeNodeContextMenu";
+import { BulkExpansionMenuContext, TreeNodeContextMenu } from "@/components/editor/TreeNodeContextMenu";
 
 const baseNode = { iri: "http://example.org/ontology#Person", label: "Person" };
 
@@ -69,6 +69,28 @@ describe("TreeNodeContextMenu", () => {
   beforeEach(() => {
     capturedItems = [];
     _separatorCount = 0;
+  });
+
+  it("gates bulk expansion on AI access and loaded subclasses", () => {
+    const open = vi.fn();
+    const child = { iri: "https://example.org/Child", label: "Child" };
+    const renderMenu = (targets: typeof child[], reason?: string) => (
+      <BulkExpansionMenuContext.Provider value={{ getTargets: () => targets, open }}>
+        <TreeNodeContextMenu node={baseNode} onSuggest={vi.fn()} suggestLockedReason={reason} />
+      </BulkExpansionMenuContext.Provider>
+    );
+    const item = () => screen.getByRole<HTMLButtonElement>("button", { name: "Suggest subclasses for each subclass…" });
+
+    const { rerender } = render(renderMenu([child], "Your project role does not allow AI suggestions."));
+    expect(item().disabled).toBe(true);
+    expect(screen.getByText("Your project role does not allow AI suggestions.")).toBeDefined();
+    rerender(renderMenu([]));
+    expect(item().disabled).toBe(true);
+    expect(screen.getByText("No subclasses loaded.")).toBeDefined();
+    rerender(renderMenu([child]));
+    expect(item().disabled).toBe(false);
+    fireEvent.click(item());
+    expect(open).toHaveBeenCalledExactlyOnceWith(baseNode.iri, [child]);
   });
 
   it("offers generation only when a callback is provided and passes the selected kind", () => {
