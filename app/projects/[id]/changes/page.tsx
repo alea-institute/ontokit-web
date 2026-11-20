@@ -17,10 +17,11 @@ import {
   type ChangeFilterValues,
   type SelectedChangeFilters,
 } from "@/components/changes/ChangeControls";
+import { ChangeDigest } from "@/components/changes/ChangeDigest";
 import { ChangeRow, ENTITY_TYPE_LABELS, NET_CHANGES } from "@/components/changes/ChangeRow";
 import { ORIGIN_LABELS } from "@/components/changes/OriginBadge";
 import type { NetChange, ProjectChangesResponse } from "@/lib/api/changes";
-import { useProjectChanges } from "@/lib/hooks/useProjectChanges";
+import { useChangedEntities, useProjectChanges } from "@/lib/hooks/useProjectChanges";
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 
 function matchingItems(pages: ProjectChangesResponse[], kinds: readonly NetChange[]) {
@@ -55,6 +56,8 @@ export default function ProjectChangesPage() {
   // neither hides valid choices nor sends unknown author IDs to the feed.
   const windowFilters = { days, branch };
   const authorFeed = useProjectChanges(id, session?.accessToken, windowFilters);
+  // Entity-level counts for the whole window, whatever the list is filtered to.
+  const digest = useChangedEntities(id, session?.accessToken, windowFilters);
   const windowAuthors = authorFeed.data?.pages[0]?.summary.authors;
   const waitingForAuthors = requestedAuthors.length > 0 && !windowAuthors;
   const knownAuthors = new Set(windowAuthors?.map(({ user_id }) => user_id));
@@ -165,6 +168,17 @@ export default function ProjectChangesPage() {
           <TimeWindow days={days} onChange={(preset) => updateUrl((next) => next.set("days", String(preset)))} />
         </div>
 
+        <ChangeDigest
+          days={days}
+          items={digest.data?.items}
+          truncated={digest.data?.truncated ?? false}
+          isLoading={digest.isLoading}
+          origins={selected.origin}
+          onShow={(origins) => updateUrl((next) => {
+            next.delete("origin");
+            for (const origin of origins) next.append("origin", origin);
+          })}
+        />
         <ChangeHelp />
         <ChangeSummary
           summary={firstPage?.summary}

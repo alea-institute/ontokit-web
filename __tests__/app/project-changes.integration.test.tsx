@@ -30,6 +30,8 @@ vi.mock("@/components/editor/developer/DeveloperEditorLayout", () => ({ Develope
 let client: QueryClient;
 let requests: URLSearchParams[];
 let respond: (params: URLSearchParams) => Response | Promise<Response>;
+let digestRequests: URLSearchParams[];
+let respondDigest: () => Response;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -54,11 +56,24 @@ beforeEach(() => {
   client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
   requests = [];
   respond = () => json(changes);
+  digestRequests = [];
+  respondDigest = () => json({
+    truncated: false,
+    items: [
+      { entity_iri: "https://example.org/onto#A", net_change: "added", origins: ["ai"], last_changed_at: "2026-11-19T18:30:00Z" },
+      { entity_iri: "https://example.org/onto#B", net_change: "added", origins: ["ai_edited"], last_changed_at: "2026-11-19T18:30:00Z" },
+      { entity_iri: lease.entity_iri, net_change: "modified", origins: ["human"], last_changed_at: lease.last_changed_at },
+    ],
+  });
   vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
     const url = new URL(String(input));
     if (url.pathname.endsWith("/analytics/changes")) {
       requests.push(url.searchParams);
       return respond(url.searchParams);
+    }
+    if (url.pathname.endsWith("/analytics/changed-entities")) {
+      digestRequests.push(url.searchParams);
+      return respondDigest();
     }
     if (url.pathname.endsWith("/projects/project-1")) {
       return json({ id: "project-1", name: "Example ontology", is_public: true });
@@ -203,6 +218,30 @@ describe("project Changes page", () => {
 
     fireEvent.click(filter);
     expect(new URLSearchParams(navigation.search).has("net_change")).toBe(false);
+  });
+
+  it("opens with what AI added and what people changed across the whole window", async () => {
+    navigation.search = "?days=30&branch=review&origin=system";
+    render(page());
+
+    const digest = await screen.findByRole("region", { name: "Last 30 days at a glance" });
+    const ai = await within(digest).findByRole("button", { name: /2 classes added by AI/ });
+    expect(ai.textContent).toContain("1 accepted as suggested, 1 edited before accepting");
+    expect(within(digest).getByRole("button", { name: /1 entity changed by people/ })).toBeDefined();
+    // The digest ignores list filters, so it still answers the question under a filter.
+    expect(digestRequests.at(-1)?.toString()).toBe("days=30&branch=review");
+
+    fireEvent.click(ai);
+    expect(new URLSearchParams(navigation.search).getAll("origin")).toEqual(["ai", "ai_edited"]);
+    expect(new URLSearchParams(navigation.search).get("days")).toBe("30");
+  });
+
+  it("keeps the list usable when the at-a-glance counts fail to load", async () => {
+    respondDigest = () => json({ detail: "unavailable" }, 500);
+    render(page());
+
+    expect(await screen.findByRole("link", { name: "Lease" })).toBeDefined();
+    await waitFor(() => expect(screen.queryByRole("region", { name: /at a glance/ })).toBeNull(), { timeout: 8000 });
   });
 
   it("keeps the full entity history visible under an origin filter", async () => {

@@ -167,6 +167,8 @@ export function ChangeRow({
           )}
           <p className="text-xs text-slate-500 dark:text-slate-400">{ENTITY_TYPE_LABELS[item.entity_type]}</p>
         </div>
+        {/* One meta line under the name on narrow screens, so rows stay even. */}
+        <div className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 sm:w-auto sm:gap-x-4">
         <div className="flex flex-wrap gap-1.5">
           {item.origins.map((origin) => <OriginBadge key={origin} origin={origin} />)}
         </div>
@@ -183,12 +185,13 @@ export function ChangeRow({
           aria-label={`Details for ${label}`}
           aria-expanded={expanded}
           aria-controls={detailsId}
-          className="gap-1.5 text-slate-700 focus-visible:ring-primary-500 dark:text-slate-300 dark:focus-visible:ring-primary-400"
+          className="ml-auto gap-1.5 text-slate-700 focus-visible:ring-primary-500 dark:text-slate-300 dark:focus-visible:ring-primary-400"
           onClick={() => setExpanded(!expanded)}
         >
           <DisclosureIcon aria-hidden="true" className="h-4 w-4" />
-          Details ({item.event_count})
+          <span className="hidden sm:inline">Details</span> ({item.event_count})
         </Button>
+        </div>
       </div>
 
       <div id={detailsId} hidden={!expanded}>
