@@ -684,7 +684,8 @@ export default function EditorPage() {
   ) => {
     const { definition, ...provenance } = suggestion ?? {};
     await persistAcceptedGeneratedEntity({ iri, label, definition, parentIri, entityType: "class", provenance: provenance.model ? provenance : undefined });
-    addOptimisticNode(iri, label, parentIri);
+    // Stay on the class under review so the rest of its batch remains in view.
+    addOptimisticNode(iri, label, parentIri, { select: false });
     setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
   }, [persistAcceptedGeneratedEntity, addOptimisticNode]);
 

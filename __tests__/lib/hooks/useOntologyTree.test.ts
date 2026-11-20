@@ -223,6 +223,69 @@ describe("useOntologyTree", () => {
     expect(result.current.nodes[0].hasChildren).toBe(true);
   });
 
+  it("keeps the current selection when an optimistic node is added without selecting it", async () => {
+    mockedGetRootClasses.mockResolvedValue({
+      nodes: [makeApiNode("urn:A", "A")],
+      total_classes: 1,
+    });
+
+    const { result } = renderHook(() =>
+      useOntologyTree({ projectId: "p1" })
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => {
+      result.current.selectNode("urn:A");
+    });
+    act(() => {
+      result.current.addOptimisticNode("urn:New", "New Child", "urn:A", { select: false });
+    });
+
+    expect(result.current.nodes[0].children.map((node) => node.iri)).toContain("urn:New");
+    expect(result.current.selectedIri).toBe("urn:A");
+  });
+
+  it("loads a collapsed parent's existing children when a node is added under it", async () => {
+    mockedGetRootClasses.mockResolvedValue({
+      nodes: [makeApiNode("urn:A", "A", 1)],
+      total_classes: 2,
+    });
+    mockedGetClassChildren.mockResolvedValue({ nodes: [makeApiNode("urn:A1", "Existing child")] });
+
+    const { result } = renderHook(() =>
+      useOntologyTree({ projectId: "p1" })
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => {
+      result.current.addOptimisticNode("urn:New", "New Child", "urn:A", { select: false });
+    });
+
+    await waitFor(() => expect(result.current.nodes[0].children.map((node) => node.iri)).toEqual(["urn:A1", "urn:New"]));
+    expect(result.current.nodes[0].isExpanded).toBe(true);
+  });
+
+  it("does not duplicate an added node the server already returns", async () => {
+    mockedGetRootClasses.mockResolvedValue({
+      nodes: [makeApiNode("urn:A", "A", 1)],
+      total_classes: 2,
+    });
+    mockedGetClassChildren.mockResolvedValue({
+      nodes: [makeApiNode("urn:A1", "Existing child"), makeApiNode("urn:New", "New Child")],
+    });
+
+    const { result } = renderHook(() =>
+      useOntologyTree({ projectId: "p1" })
+    );
+
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => {
+      result.current.addOptimisticNode("urn:New", "New Child", "urn:A", { select: false });
+    });
+
+    await waitFor(() => expect(result.current.nodes[0].children.map((node) => node.iri)).toEqual(["urn:A1", "urn:New"]));
+  });
+
   it("removes an optimistic node and clears selection if selected", async () => {
     mockedGetRootClasses.mockResolvedValue({
       nodes: [makeApiNode("urn:A", "A"), makeApiNode("urn:B", "B")],

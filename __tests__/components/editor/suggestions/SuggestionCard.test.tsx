@@ -49,6 +49,28 @@ function renderCard(item: StoredSuggestion, props: Partial<Parameters<typeof Sug
 }
 
 describe("SuggestionCard", () => {
+  it("shows an accepted suggestion as accepted, with no review actions left", () => {
+    renderCard(makeItem({ status: "accepted" }));
+    expect(screen.getByText("Accepted")).toBeDefined();
+    expect(screen.queryByRole("button", { name: "Accept suggestion" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reject suggestion" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Edit suggestion before accepting" })).toBeNull();
+  });
+
+  it("ties each review action to the suggestion it acts on", () => {
+    renderCard(makeItem());
+    for (const name of ["Accept suggestion", "Reject suggestion", "Edit suggestion before accepting"]) {
+      const description = screen.getByRole("button", { name }).getAttribute("aria-describedby");
+      expect(document.getElementById(description!)?.textContent).toContain("Child 1");
+    }
+  });
+
+  it("names the label field while a suggestion is edited", async () => {
+    renderCard(makeItem());
+    await userEvent.click(screen.getByRole("button", { name: "Edit suggestion before accepting" }));
+    expect((screen.getByRole("textbox", { name: "Suggested label" }) as HTMLInputElement).value).toBe("Child 1");
+  });
+
   // ── H-3: provenance surfaces model AND prompt_template ──
   it("surfaces both model and prompt_template in the provenance label (H-3)", () => {
     renderCard(makeItem());

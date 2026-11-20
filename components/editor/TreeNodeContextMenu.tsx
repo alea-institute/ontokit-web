@@ -30,7 +30,7 @@ export function suggestionLockReason(gate: ReturnType<typeof useLLMGate>): strin
 }
 
 interface TreeNodeContextMenuProps {
-  node: { iri: string; label: string };
+  node: { iri: string; label: string; hasChildren?: boolean };
   onAddChild?: (parentIri: string) => void;
   onCopyIri?: (iri: string) => void;
   onDelete?: (iri: string, label: string) => void;
@@ -61,7 +61,10 @@ export function TreeNodeContextMenu({
   const targets = bulkExpansion?.getTargets(node.iri) ?? [];
   const suggestionReasonId = useId();
   const bulkReasonId = useId();
-  const bulkOnlyReason = targets.length === 0 ? "No subclasses loaded." : bulkExpansion?.lockedReason;
+  const noTargetsReason = node.hasChildren
+    ? "Expand this class in the tree to choose its subclasses."
+    : "This class has no subclasses.";
+  const bulkOnlyReason = targets.length === 0 ? noTargetsReason : bulkExpansion?.lockedReason;
   const bulkLockedReason = suggestLockedReason || bulkOnlyReason;
 
   return (

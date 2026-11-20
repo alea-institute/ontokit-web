@@ -99,7 +99,7 @@ for (const mode of ["Standard", "Developer"] as const) {
       const bulk = menu.getByRole("menuitem", { name: menuItem });
 
       await root.click({ button: "right" });
-      await expect(menu.getByText("No subclasses loaded.")).toBeVisible();
+      await expect(menu.getByText("Expand this class in the tree to choose its subclasses.")).toBeVisible();
       await expect(bulk).toBeDisabled();
       await page.keyboard.press("Escape");
 

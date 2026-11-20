@@ -36,6 +36,7 @@ export interface UseSuggestionsReturn {
   accept: (index: number) => Promise<void>;
   acceptAll: () => Promise<{ accepted: number; skipped: number }>;
   rejectAll: () => void;
+  restoreRejected: () => void;
   acceptingIndices: ReadonlySet<number>;
   reject: (index: number) => void;
   edit: (index: number, value: string, definition?: string) => void;
@@ -218,6 +219,11 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     setError(null);
   }, [entityIri, isLoading, scope, store, suggestionType]);
 
+  const restoreRejected = useCallback(() => {
+    if (!entityIri || acceptingAllRef.current) return;
+    store.getState().restoreRejectedSuggestions(scope, entityIri, suggestionType);
+  }, [entityIri, scope, store, suggestionType]);
+
   const reject = useCallback((index: number) => {
     if (!entityIri || acceptingAllRef.current || acceptingRef.current.has(index)) return;
     store.getState().rejectSuggestion(scope, entityIri, suggestionType, index);
@@ -252,6 +258,7 @@ export function useSuggestions(opts: UseSuggestionsOptions): UseSuggestionsRetur
     accept,
     acceptAll,
     rejectAll,
+    restoreRejected,
     acceptingIndices,
     reject,
     edit,

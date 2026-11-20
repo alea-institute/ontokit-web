@@ -86,7 +86,14 @@ describe("TreeNodeContextMenu", () => {
     expect(screen.getByText("Your project role does not allow AI suggestions.")).toBeDefined();
     rerender(renderMenu([]));
     expect(item().disabled).toBe(true);
-    expect(screen.getByText("No subclasses loaded.")).toBeDefined();
+    expect(screen.getByText("This class has no subclasses.")).toBeDefined();
+    rerender(
+      <BulkExpansionMenuContext.Provider value={{ getTargets: () => [], open }}>
+        <TreeNodeContextMenu node={{ ...baseNode, hasChildren: true }} onSuggest={vi.fn()} />
+      </BulkExpansionMenuContext.Provider>,
+    );
+    expect(item().disabled).toBe(true);
+    expect(screen.getByText("Expand this class in the tree to choose its subclasses.")).toBeDefined();
     rerender(renderMenu([child]));
     expect(item().disabled).toBe(false);
     fireEvent.click(item());

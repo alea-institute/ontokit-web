@@ -88,7 +88,7 @@ test("reviews a synthetic batch requested from the class tree", async ({ page, b
   const menu = page.getByRole("menu");
   const siblings = menu.getByRole("menuitem", { name: "Suggest Siblings" });
   await expect(siblings).toBeEnabled();
-  await expect(menu.getByRole("menuitem", { name: "Suggest Subclasses" })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Suggest Subclasses", exact: true })).toBeVisible();
   await page.screenshot({ path: join(homedir(), "ok-u5-tree-menu.png"), animations: "disabled" });
   await siblings.focus();
   await page.keyboard.press("Enter");

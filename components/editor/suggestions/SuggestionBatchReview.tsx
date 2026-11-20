@@ -18,13 +18,16 @@ interface SuggestionBatchReviewProps {
   requestVersion?: number;
   returnFocus?: () => void;
   siblingCount: number | (() => Promise<number>);
+  /** What the counted neighbors are to the suggested classes. */
+  existingKind?: "sibling" | "subclass";
   onMarkDistinct?: MarkSuggestionDistinct;
 }
 
 export function SuggestionBatchReview({
   title, parentLabel, review, onRequest, canRequest = true, requestVersion,
-  returnFocus, siblingCount, onMarkDistinct,
+  returnFocus, siblingCount, existingKind = "sibling", onMarkDistinct,
 }: SuggestionBatchReviewProps) {
+  const [one, many] = existingKind === "subclass" ? ["subclass", "subclasses"] : ["sibling", "siblings"];
   const toast = useToast();
   const headingId = useId();
   const groundingId = useId();
@@ -61,7 +64,7 @@ export function SuggestionBatchReview({
 
   const acceptAll = async () => {
     const result = await review.acceptAll();
-    const message = `${result.accepted} accepted, ${result.skipped} skipped. Accepted classes join the current draft and save through the normal workflow.`;
+    const message = `${result.accepted} accepted, ${result.skipped} skipped. Each accepted class is saved as it is accepted.`;
     if (result.skipped > 0) toast.info("Suggestion review updated", message);
     else toast.success("Suggestions accepted", message);
   };
@@ -127,6 +130,11 @@ export function SuggestionBatchReview({
             <Button size="sm" variant="outline" disabled={busy || pending === 0} onClick={() => setConfirmation("reject")}>
               Reject all
             </Button>
+            {rejected > 0 && (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={review.restoreRejected}>
+                Restore rejected ({rejected})
+              </Button>
+            )}
           </div>
           <div>
             <Button
@@ -138,8 +146,8 @@ export function SuggestionBatchReview({
             </Button>
             <p id={groundingId} hidden={!groundingOpen} className="text-xs text-slate-600 dark:text-slate-300" aria-live="polite">
               Based on: label, definition, parents, and {typeof count === "number"
-                ? `${count} existing sibling${count === 1 ? "" : "s"}`
-                : count === "unavailable" ? "existing siblings (count unavailable)" : "existing siblings (loading count…)"}
+                ? `${count} existing ${count === 1 ? one : many}`
+                : count === "unavailable" ? `existing ${many} (count unavailable)` : `existing ${many} (loading count…)`}
             </p>
           </div>
           <SuggestionReviewCards review={review} onMarkDistinct={onMarkDistinct} showDefinition />
@@ -150,7 +158,7 @@ export function SuggestionBatchReview({
         onOpenChange={(open) => { if (!open) setConfirmation(null); }}
         title={confirmation === "accept" ? "Accept all suggestions" : "Reject all suggestions"}
         description={confirmation === "accept"
-          ? `Create ${eligibleCount} classes under ${parentLabel} in the current draft?`
+          ? `Create ${eligibleCount} classes under ${parentLabel}? Each class is saved as it is accepted.`
           : `Reject ${pending} pending suggestion${pending === 1 ? "" : "s"}?`}
         confirmLabel={confirmation === "accept" ? `Accept ${eligibleCount} classes` : `Reject ${pending} suggestions`}
         confirmDisabled={busy || (confirmation === "accept" ? eligibleCount === 0 : pending === 0)}

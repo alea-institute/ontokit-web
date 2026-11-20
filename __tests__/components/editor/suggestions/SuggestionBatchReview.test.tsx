@@ -11,7 +11,7 @@ const scope = { projectId: "project", branch: "main" };
 const entityIri = "https://example.org/Contract";
 const title = "Suggested subclasses for Contract";
 
-function mount(count: number, includeBlocked = false) {
+function mount(count: number, includeBlocked = false, existingKind?: "sibling" | "subclass") {
   const items: GeneratedSuggestion[] = Array.from({ length: count }, (_, index) => ({
     iri: `https://example.org/Class${index}`, label: `Class ${index}`,
     definition: `Definition for class ${index}.`,
@@ -34,7 +34,7 @@ function mount(count: number, includeBlocked = false) {
     return (
       <SuggestionBatchReview
         title={title} parentLabel="Contract" review={review} onRequest={vi.fn()}
-        requestVersion={1} returnFocus={returnFocus} siblingCount={2}
+        requestVersion={1} returnFocus={returnFocus} siblingCount={2} existingKind={existingKind}
       />
     );
   }
@@ -73,7 +73,24 @@ describe("SuggestionBatchReview", () => {
     await waitFor(() => expect(reject.disabled).toBe(false));
     fireEvent.click(reject);
     await waitFor(() => expect(returnFocus).toHaveBeenCalledTimes(1));
-    expect(screen.getByText("3 accepted, 1 skipped. Accepted classes join the current draft and save through the normal workflow.")).toBeDefined();
+    expect(screen.getByText("3 accepted, 1 skipped. Each accepted class is saved as it is accepted.")).toBeDefined();
+  });
+
+  it("restores rejected suggestions for another look", async () => {
+    const { region } = mount(2);
+    expect(within(region).queryByRole("button", { name: /Restore rejected/ })).toBeNull();
+    fireEvent.click(within(region).getAllByRole("button", { name: "Reject suggestion" })[0]);
+    await waitFor(() => expect(within(region).getByText(/1 pending, 0 accepted, 1 rejected/)).toBeDefined());
+    expect(within(region).queryByText("Class 0")).toBeNull();
+    fireEvent.click(within(region).getByRole("button", { name: "Restore rejected (1)" }));
+    await waitFor(() => expect(within(region).getByText(/2 pending, 0 accepted, 0 rejected/)).toBeDefined());
+    expect(within(region).getByText("Class 0")).toBeDefined();
+  });
+
+  it("names existing subclasses in the grounding of a subclass batch", () => {
+    const { region } = mount(1, false, "subclass");
+    fireEvent.click(within(region).getByRole("button", { name: "Grounding" }));
+    expect(within(region).getByText("Based on: label, definition, parents, and 2 existing subclasses")).toBeDefined();
   });
 
   it("confirms four eligible acceptances and names their parent", async () => {

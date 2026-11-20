@@ -1589,6 +1589,7 @@ export function ClassDetailPanel({
                 requestVersion={requestVersions.children}
                 returnFocus={() => returnSuggestionFocus("children")}
                 siblingCount={classDetail.child_count}
+                existingKind="subclass"
                 onMarkDistinct={onMarkDistinct}
               />
               <SuggestionBatchReview

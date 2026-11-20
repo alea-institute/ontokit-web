@@ -27,7 +27,8 @@ interface UseOntologyTreeReturn {
   selectNode: (iri: string) => void;
   navigateToNode: (iri: string) => Promise<void>;
   /** Optimistically insert a new node into the tree (before the save round-trips to the API) */
-  addOptimisticNode: (iri: string, label: string, parentIri?: string) => void;
+  /** Adds a node before the next fetch. Pass `select: false` to leave the selection where it is. */
+  addOptimisticNode: (iri: string, label: string, parentIri?: string, options?: { select?: boolean }) => void;
   /** Optimistically remove a node from the tree by IRI */
   removeOptimisticNode: (iri: string) => void;
   /** Update a node's label in-place without affecting tree expansion state */
@@ -69,6 +70,15 @@ function apiNodeToTreeNode(apiNode: ApiTreeNode): ClassTreeNode {
 /**
  * Update a node in the tree (recursive)
  */
+function findNodeInTree(nodes: ClassTreeNode[], iri: string): ClassTreeNode | undefined {
+  for (const node of nodes) {
+    if (node.iri === iri) return node;
+    const match = findNodeInTree(node.children, iri);
+    if (match) return match;
+  }
+  return undefined;
+}
+
 function updateNodeInTree(
   nodes: ClassTreeNode[],
   iri: string,
@@ -249,7 +259,7 @@ export function useOntologyTree({
    * Otherwise it is appended to the root list.
    */
   const addOptimisticNode = useCallback(
-    (iri: string, label: string, parentIri?: string) => {
+    (iri: string, label: string, parentIri?: string, options?: { select?: boolean }) => {
       const newNode: ClassTreeNode = {
         iri,
         label,
@@ -260,24 +270,44 @@ export function useOntologyTree({
       };
 
       if (parentIri) {
+        const parent = findNodeInTree(nodesRef.current, parentIri);
+        const parentUnloaded = !!parent && parent.hasChildren && parent.children.length === 0;
         // Insert as a child of the parent and expand the parent
         setNodes((prev) =>
           updateNodeInTree(prev, parentIri, (parent) => ({
             ...parent,
-            children: [...parent.children, newNode],
+            children: parent.children.some((child) => child.iri === iri) ? parent.children : [...parent.children, newNode],
             hasChildren: true,
             isExpanded: true,
           }))
         );
+        // Expanding a parent whose children were never fetched would show the
+        // new node alone, so fetch the rest and keep nodes the server lacks.
+        if (parentUnloaded) {
+          const scope = scopeRef.current;
+          void projectOntologyApi.getClassChildren(projectId, parentIri, accessToken, branchKey).then((response) => {
+            if (scope !== scopeRef.current) return;
+            const fetched = response.nodes.map(apiNodeToTreeNode);
+            const fetchedIris = new Set(fetched.map((child) => child.iri));
+            setNodes((prev) =>
+              updateNodeInTree(prev, parentIri, (parent) => ({
+                ...parent,
+                children: [...fetched, ...parent.children.filter((child) => !fetchedIris.has(child.iri))],
+              }))
+            );
+          }).catch((err) => {
+            console.error("Failed to load existing children:", err);
+          });
+        }
       } else {
         // Append to root list
         setNodes((prev) => [...prev, newNode]);
       }
 
       setTotalClasses((prev) => prev + 1);
-      setSelectedIri(iri);
+      if (options?.select !== false) setSelectedIri(iri);
     },
-    []
+    [projectId, accessToken, branchKey]
   );
 
   /**
