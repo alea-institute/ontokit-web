@@ -55,6 +55,8 @@ const initialEditorMode = useEditorModeStore.getState();
 const initialSendBeacon = Object.getOwnPropertyDescriptor(navigator, "sendBeacon");
 let llmConfigured: boolean;
 let generationBodies: unknown[];
+let generatedDefinition: string | undefined;
+let generatedModel: string | undefined;
 let extraTreeNodes: object[];
 let nestPerson: boolean;
 let classParents: string[];
@@ -140,7 +142,7 @@ async function saveAnonymousProposal() {
 
 async function requestGeneratedChild() {
   llmConfigured = true; mount(); fireEvent.click(await screen.findByText("Person"));
-  fireEvent.click(within(await screen.findByTitle("Suggest child classes")).getByRole("button", { name: "Get LLM suggestions for this section" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Suggest subclasses" }));
   const accept = await screen.findByRole("button", { name: "Accept suggestion" });
   return accept.closest('[role="listitem"]') as HTMLElement;
 }
@@ -165,6 +167,7 @@ beforeEach(() => {
   boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; lintIssues = []; extraBranches = [];
   sessionStorage.removeItem("ontokit:branch:route-project");
   llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
+  generatedDefinition = undefined; generatedModel = "fixture-model";
   useSuggestionStore.getState().clearAllSuggestions();
   useAnonymousTokenStore.setState({ tokens: {} });
   useAnonymousCreditStore.getState().clearCredit();
@@ -238,8 +241,9 @@ beforeEach(() => {
     if (path.endsWith("/branch-preference") || path.endsWith("/suggestion-session/discard")) return new Response(null, { status: 204 });
     if (path.endsWith("/lint/status")) return json(lintStatus);
     if (path.endsWith("/llm/generate-suggestions")) {
-      generationBodies.push(JSON.parse(String(init?.body)));
-      return json({ suggestions: [{ iri: "https://example.test/Generated", label: "Generated child", suggestion_type: "children", provenance: "llm-proposed", model: "fixture-model", prompt_template: "children", validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }], input_tokens: 10, output_tokens: 20 });
+      const body = JSON.parse(String(init?.body));
+      generationBodies.push(body);
+      return json({ suggestions: [{ iri: "https://example.test/Generated", label: "Generated child", definition: generatedDefinition, suggestion_type: body.suggestion_type, provenance: "llm-proposed", model: generatedModel, prompt_template: body.suggestion_type, validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }], input_tokens: 10, output_tokens: 20 });
     }
     if (path.endsWith("/llm/status")) return json({ configured: llmConfigured });
     if (path === "/api/v1/pr-party/me") return json({ is_reviewer: false });
@@ -292,7 +296,7 @@ describe("disabled-mode editor refuses direct writes", () => {
     mount(); fireEvent.click(await screen.findByText("Person"));
     expect(await screen.findByRole("button", { name: "Propose Edit" })).toBeTruthy();
     expect(screen.queryByPlaceholderText("Label text")).toBeNull();
-    expect(screen.queryByTitle("Suggest child classes")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Suggest subclasses" })).toBeNull();
     fireEvent.keyDown(document, { key: "n", ctrlKey: true });
     expect(screen.queryByRole("dialog")).toBeNull();
     fireEvent.contextMenu(screen.getByRole("treeitem", { name: /Person/ }));
@@ -738,9 +742,9 @@ describe('editor route real tree actions and keyboard orchestration', () => {
 
   it.each([200, 403, 409])("persists a generated child through generation, acceptance and revision-guarded source (HTTP %i)", async status => {
     llmConfigured = true; saveStatus = status;
+    generatedDefinition = 'A person described as "eligible".\nUsed for review.';
     mount(); fireEvent.click(await screen.findByText("Person"));
-    const section = await screen.findByTitle("Suggest child classes");
-    fireEvent.click(within(section).getByRole("button", { name: "Get LLM suggestions for this section" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Suggest subclasses" }));
     fireEvent.click(await screen.findByRole("button", { name: "Accept suggestion" }));
     await waitFor(() => expect(savedBodies).toHaveLength(1));
     expect(generationBodies).toEqual([{ class_iri: iri, branch: "main", suggestion_type: "children", batch_size: 5 }]);
@@ -748,6 +752,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     expect(savedBodies[0]).toMatchObject({ base_revision: "base-commit", commit_message: 'Add generated class "Generated child"' });
     const triples = parseBlockTriples(payload.content, "https://example.test/Generated");
     expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: iri } });
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2004/02/skos/core#definition", object: { type: "literal", value: generatedDefinition, lang: "en" } });
     expect(triples?.some(t => t.predicate === "http://www.w3.org/ns/prov#wasGeneratedBy")).toBe(true);
     expect(parseBlockTriples(payload.content, iri)).toEqual(parseBlockTriples(originalSource, iri));
     const key = storeKey({ projectId: "route-project", branch: "main" }, iri, "children");
@@ -758,6 +763,25 @@ describe('editor route real tree actions and keyboard orchestration', () => {
       else await screen.findByText(/Save refused/);
       expect(screen.queryByRole("treeitem", { name: /Generated child/ })).toBeNull();
     }
+  });
+
+  it("persists an edited sibling definition when the generation response omits the model", async () => {
+    llmConfigured = true;
+    generatedDefinition = "Original definition.";
+    generatedModel = undefined;
+    const parent = "https://example.org/Agent";
+    classParents = [parent];
+    mount(); fireEvent.click(await screen.findByText("Person"));
+    fireEvent.click(await screen.findByRole("button", { name: "Suggest siblings" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Edit suggestion before accepting" }));
+    const definition = await screen.findByRole("textbox", { name: "Suggested definition" });
+    fireEvent.change(definition, { target: { value: "Edited definition." } });
+    fireEvent.click(screen.getByRole("button", { name: /^Accept$/ }));
+    await waitFor(() => expect(savedBodies).toHaveLength(1));
+    const triples = parseBlockTriples((savedBodies[0] as { content: string }).content, "https://example.test/Generated");
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#subClassOf", object: { type: "iri", value: parent } });
+    expect(triples).toContainEqual({ predicate: "http://www.w3.org/2004/02/skos/core#definition", object: { type: "literal", value: "Edited definition.", lang: "en" } });
+    expect(triples?.some(t => t.predicate === "http://www.w3.org/ns/prov#wasGeneratedBy")).toBe(false);
   });
 
   it.each([
@@ -805,7 +829,7 @@ describe('editor route real tree actions and keyboard orchestration', () => {
     if (outcome === "empty") sourceContent = "   ";
     else sourceStatus = 403;
     mount(); fireEvent.click(await screen.findByText("Person"));
-    fireEvent.click(within(await screen.findByTitle("Suggest child classes")).getByRole("button", { name: "Get LLM suggestions for this section" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Suggest subclasses" }));
     fireEvent.click(await screen.findByRole("button", { name: "Accept suggestion" }));
     await screen.findByText(outcome === "empty" ? /ontology source is empty/ : /Could not accept this suggestion.*Source unavailable/);
     expect(savedBodies).toEqual([]);
@@ -987,7 +1011,9 @@ describe('editor route real tree actions and keyboard orchestration', () => {
       expect(savedBodies).toEqual([]); expect(screen.queryByRole("button", { name: "Accept suggestion" })).toBeNull();
     } else {
       expect(savedBodies).toHaveLength(1);
-      expect(parseBlockTriples((savedBodies[0] as { content: string }).content, "https://example.test/Generated")).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: key === "e" ? "Keyboard child" : "Generated child", lang: "en" } });
+      const triples = parseBlockTriples((savedBodies[0] as { content: string }).content, "https://example.test/Generated");
+      expect(triples).toContainEqual({ predicate: "http://www.w3.org/2000/01/rdf-schema#label", object: { type: "literal", value: key === "e" ? "Keyboard child" : "Generated child", lang: "en" } });
+      expect(triples?.some(t => t.predicate === "http://www.w3.org/2004/02/skos/core#definition")).toBe(false);
     }
   });
 

@@ -142,7 +142,7 @@ export function SuggestionBatchReview({
                 : count === "unavailable" ? "existing siblings (count unavailable)" : "existing siblings (loading count…)"}
             </p>
           </div>
-          <SuggestionReviewCards review={review} onMarkDistinct={onMarkDistinct} />
+          <SuggestionReviewCards review={review} onMarkDistinct={onMarkDistinct} showDefinition />
         </>
       )}
       <ConfirmDialog

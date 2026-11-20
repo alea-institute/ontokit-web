@@ -37,6 +37,8 @@ import {
   createGeneratedEntityPersistenceQueue,
   GeneratedEntitySaveError,
   persistGeneratedEntity,
+  type AcceptedClassSuggestion,
+  type GeneratedEntityInput,
   type GeneratedEntityPersistenceMode,
 } from "@/lib/editor/generatedEntityPersistence";
 import { saveSuggestionUpdate } from "@/lib/editor/suggestionSessionPersistence";
@@ -46,7 +48,6 @@ import { updatePropertyInTurtle, type TurtlePropertyUpdateData } from "@/lib/ont
 import { updateIndividualInTurtle, type TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import {
   detectPatternFromIriIndex,
-  type EntityType,
   type IriSuffixPattern,
 } from "@/lib/ontology/iriGeneration";
 import { commonPrefixes } from "@/lib/editor/languages/turtle";
@@ -562,13 +563,7 @@ export default function EditorPage() {
 
   const generatedEntityAccessToken = session?.accessToken;
   const persistAcceptedGeneratedEntity = useCallback(async (
-    entity: {
-      iri: string;
-      label: string;
-      parentIri: string;
-      entityType: EntityType;
-      provenance?: AcceptedSuggestionProvenance;
-    },
+    entity: GeneratedEntityInput,
   ) => {
     const mode: GeneratedEntityPersistenceMode = isAnonymousProposalMode
       ? "anonymous-suggestion"
@@ -685,11 +680,10 @@ export default function EditorPage() {
     iri: string,
     label: string,
     parentIri: string,
-    provenance?: AcceptedSuggestionProvenance,
+    suggestion?: AcceptedClassSuggestion,
   ) => {
-    // The persistence helper spreads the entity into the snippet after reading
-    // authoritative source. Let the snippet bind PROV-O at the appended block.
-    await persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType: "class", provenance });
+    const { definition, ...provenance } = suggestion ?? {};
+    await persistAcceptedGeneratedEntity({ iri, label, definition, parentIri, entityType: "class", provenance: provenance.model ? provenance : undefined });
     addOptimisticNode(iri, label, parentIri);
     setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
   }, [persistAcceptedGeneratedEntity, addOptimisticNode]);

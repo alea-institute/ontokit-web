@@ -10,9 +10,10 @@ export type MarkSuggestionDistinct = (
   reason: string,
 ) => Promise<void>;
 
-export function SuggestionReviewCards({ review, onMarkDistinct }: {
+export function SuggestionReviewCards({ review, onMarkDistinct, showDefinition }: {
   review: UseSuggestionsReturn;
   onMarkDistinct?: MarkSuggestionDistinct;
+  showDefinition?: boolean;
 }) {
   if (!review.items.some((item) => item.status !== "rejected")) return null;
 
@@ -24,7 +25,8 @@ export function SuggestionReviewCards({ review, onMarkDistinct }: {
           item={item}
           onAccept={() => { void review.accept(index); }}
           onReject={() => review.reject(index)}
-          onEdit={(value) => { review.edit(index, value); void review.accept(index); }}
+          onEdit={(value, definition) => { review.edit(index, value, definition); void review.accept(index); }}
+          showDefinition={showDefinition}
           busy={review.isAcceptingAll || review.isLoading || review.acceptingIndices.has(index)}
           onMarkDistinct={onMarkDistinct && !review.isAcceptingAll && !review.isLoading ? async (candidate, reason) => {
             await onMarkDistinct(item.suggestion, candidate, reason);

@@ -20,7 +20,8 @@ export interface SuggestionCardProps {
   item: StoredSuggestion;
   onAccept: () => void;
   onReject: () => void;
-  onEdit: (editedValue: string) => void;
+  onEdit: (editedValue: string, editedDefinition?: string) => void;
+  showDefinition?: boolean;
   onMarkDistinct?: (candidate: DuplicateCandidate, reason: string) => Promise<void>;
   disabled?: boolean;
   busy?: boolean;
@@ -41,12 +42,14 @@ export function SuggestionCard({
   onAccept,
   onReject,
   onEdit,
+  showDefinition,
   onMarkDistinct,
   disabled,
   busy,
 }: SuggestionCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
+  const [editDefinition, setEditDefinition] = useState("");
   const [distinctCandidate, setDistinctCandidate] = useState<DuplicateCandidate | null>(null);
   const [distinctReason, setDistinctReason] = useState("");
   const [distinctError, setDistinctError] = useState<string | null>(null);
@@ -79,11 +82,14 @@ export function SuggestionCard({
   const displayText = suggestion.property_iri
     ? (suggestion.value ?? suggestion.label)
     : suggestion.label;
+  const hasDefinition = showDefinition && !!suggestion.definition;
+  const displayedDefinition = item.editedDefinition ?? suggestion.definition;
 
   const handleEditClick = useCallback(() => {
     setEditValue(item.editedValue ?? displayText);
+    setEditDefinition(displayedDefinition ?? "");
     setIsEditing(true);
-  }, [item.editedValue, displayText]);
+  }, [item.editedValue, displayText, displayedDefinition]);
 
   const handleAcceptEdit = useCallback(() => {
     if (isInvalid) {
@@ -99,9 +105,10 @@ export function SuggestionCard({
       setIsEditing(false);
       return;
     }
-    onEdit(editValue);
+    if (hasDefinition) onEdit(editValue, editDefinition);
+    else onEdit(editValue);
     setIsEditing(false);
-  }, [editValue, onEdit, isBlocked, isInvalid, displayText]);
+  }, [editValue, editDefinition, hasDefinition, onEdit, isBlocked, isInvalid, displayText]);
 
   const handleDiscardEdit = useCallback(() => {
     setIsEditing(false);
@@ -176,6 +183,21 @@ export function SuggestionCard({
             )}
           </span>
         )}
+
+        {hasDefinition && (isEditing ? (
+          <textarea
+            aria-label="Suggested definition"
+            value={editDefinition}
+            onChange={(event) => setEditDefinition(event.target.value)}
+            onKeyDown={(event) => { if (event.key === "Escape") handleDiscardEdit(); }}
+            rows={2}
+            className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
+          />
+        ) : displayedDefinition && (
+          <p className="mt-0.5 break-words text-xs text-slate-600 dark:text-slate-300">
+            {displayedDefinition}
+          </p>
+        ))}
 
         {/* Duplicate warning and explicit false-positive action */}
         {(isBlocked || isWarned) && !isEditing && (

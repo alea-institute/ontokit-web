@@ -97,6 +97,9 @@ test("reviews a synthetic batch requested from the class tree", async ({ page, b
   await expect(region.getByRole("heading")).toBeFocused();
   await expect(region.getByText("4 pending, 0 accepted, 0 rejected, 1 blocked as duplicate")).toBeVisible();
   await expect(region.getByText("fixture-model", { exact: true })).toBeVisible();
+  for (const { definition } of proposals) {
+    await expect(region.getByText(definition!, { exact: true })).toBeVisible();
+  }
   await expect(region.getByRole("button", { name: "Accept all (4)" })).toBeEnabled();
   await expect(region.getByRole("button", { name: "Grounding" })).toHaveAttribute("aria-expanded", "false");
   expect(requests).toEqual([{ class_iri: selected, branch: "main", suggestion_type: "siblings", batch_size: 5 }]);

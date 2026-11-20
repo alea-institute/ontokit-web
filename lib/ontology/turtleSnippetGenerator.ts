@@ -6,7 +6,8 @@
  */
 
 import type { EntityType } from "./iriGeneration";
-import { assertSafeTurtleIri } from "./turtleUtils";
+import { DEFINITION_IRI } from "./annotationProperties";
+import { assertSafeTurtleIri, literal } from "./turtleUtils";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -25,8 +26,8 @@ import { assertSafeTurtleIri } from "./turtleUtils";
  * pre-existing entity would assert something false.
  */
 export interface SnippetProvenance {
-  /** Model id that generated the suggestion (e.g., "openai/gpt-4o") */
-  model: string;
+  /** Model id that generated the suggestion, when reported */
+  model?: string;
   /** Prompt-template dispatch key (e.g., "children-v1") — persisted as a prov:Plan */
   promptTemplate?: string;
   /**
@@ -43,6 +44,8 @@ export interface TurtleSnippetOptions {
   iri: string;
   /** Human-readable label */
   label: string;
+  /** Definition in the same language as the label */
+  definition?: string | null;
   /** The kind of OWL entity to create */
   entityType: EntityType;
   /** If provided, adds a parent relationship (subClassOf / subPropertyOf / rdf:type) */
@@ -137,17 +140,16 @@ function toPrefixedOrFull(
  * Returned WITHOUT leading indentation on the first line (the caller
  * indents predicate lines uniformly).
  */
-function provenanceBlock(provenance: SnippetProvenance): string {
-  const model = escapeTurtleString(provenance.model);
+function provenanceBlock(model: string, promptTemplate?: string): string {
   const inner: string[] = [
     "        a prov:Activity ;",
     "        prov:wasAssociatedWith [",
     "            a prov:SoftwareAgent ;",
-    `            rdfs:label "${model}"`,
+    `            rdfs:label "${escapeTurtleString(model)}"`,
     "        ]",
   ];
-  if (provenance.promptTemplate) {
-    const plan = escapeTurtleString(provenance.promptTemplate);
+  if (promptTemplate) {
+    const plan = escapeTurtleString(promptTemplate);
     inner[inner.length - 1] += " ;";
     inner.push(
       "        prov:used [",
@@ -175,6 +177,7 @@ export function generateTurtleSnippet(options: TurtleSnippetOptions): string {
   const {
     iri,
     label,
+    definition,
     entityType,
     parentIri,
     ontologyPrefix,
@@ -184,10 +187,14 @@ export function generateTurtleSnippet(options: TurtleSnippetOptions): string {
 
   const subject = toPrefixedOrFull(iri, ontologyPrefix, ontologyNamespace);
   const owlType = OWL_TYPE[entityType];
-  const escapedLabel = escapeTurtleString(label);
+  const language = "en";
 
   // Predicate list (joined with ";", terminated with ".")
-  const predicates: string[] = [`rdfs:label "${escapedLabel}"@en`];
+  const predicates: string[] = [`rdfs:label ${literal(label, language)}`];
+  // The appended snippet must work with any binding (or absence) of skos:.
+  if (definition?.trim()) {
+    predicates.push(`<${DEFINITION_IRI}> ${literal(definition, language)}`);
+  }
 
   if (parentIri) {
     const predicate = PARENT_PREDICATE[entityType];
@@ -195,13 +202,13 @@ export function generateTurtleSnippet(options: TurtleSnippetOptions): string {
     predicates.push(`${predicate} ${parentRef}`);
   }
 
-  if (provenance) {
-    predicates.push(provenanceBlock(provenance));
+  if (provenance?.model) {
+    predicates.push(provenanceBlock(provenance.model, provenance.promptTemplate));
   }
 
   const lines: string[] = [];
 
-  if (provenance && provenance.declarePrefix !== false) {
+  if (provenance?.model && provenance.declarePrefix !== false) {
     lines.push(PROV_PREFIX_DIRECTIVE);
   }
 

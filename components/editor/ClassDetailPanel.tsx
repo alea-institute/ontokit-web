@@ -56,7 +56,8 @@ import { SuggestionSkeleton, SuggestImprovementsButton } from "@/components/edit
 import { SuggestionBatchReview } from "@/components/editor/suggestions/SuggestionBatchReview";
 import { SuggestionReviewCards, type MarkSuggestionDistinct } from "@/components/editor/suggestions/SuggestionReviewCards";
 import type { DuplicateCandidate, GeneratedSuggestion } from "@/lib/api/generation";
-import { provenanceFromSuggestion, type AcceptedSuggestionProvenance } from "@/lib/ontology/suggestionProvenance";
+import { provenanceFromSuggestion } from "@/lib/ontology/suggestionProvenance";
+import type { AcceptedClassSuggestion } from "@/lib/editor/generatedEntityPersistence";
 import { distinctDecisionsApi } from "@/lib/api/duplicateCheck";
 import { treeItemId } from "@/components/editor/shared/EntityTreeNode";
 import type { ProjectRole } from "@/lib/api/projects";
@@ -67,6 +68,11 @@ export function ensureTrailingEmpty(arr: LocalizedString[]): LocalizedString[] {
     return [...arr, { value: "", lang: "en" }];
   }
   return arr;
+}
+
+function acceptedClassSuggestion(suggestion: GeneratedSuggestion): AcceptedClassSuggestion | undefined {
+  const provenance = provenanceFromSuggestion(suggestion);
+  return suggestion.definition == null ? provenance : { ...provenance, definition: suggestion.definition };
 }
 
 /** Minimal data from the tree node, used as fallback when the API has no data yet */
@@ -117,7 +123,7 @@ interface ClassDetailPanelProps {
   canUseLLM?: boolean;
   byoKey?: string;
   userRole?: ProjectRole;
-  onAddSuggestedChild?: (iri: string, label: string, parentIri: string, provenance?: AcceptedSuggestionProvenance) => Promise<void>;
+  onAddSuggestedChild?: (iri: string, label: string, parentIri: string, suggestion?: AcceptedClassSuggestion) => Promise<void>;
   /** When true, auto-fire annotation suggestions when classIri changes (D-09) */
   autoSuggestAnnotationsOnMount?: boolean;
   autoSuggestOnMount?: ClassSuggestionIntent | null;
@@ -632,7 +638,7 @@ export function ClassDetailPanel({
       // D-07: Create entity directly in tree WITHOUT opening AddEntityDialog
       // New entities retain the accepted suggestion's AI origin (PROV-O).
       if (!onAddSuggestedChild) throw new Error("Generated entity persistence is unavailable.");
-      await onAddSuggestedChild(suggestion.iri, editedValue ?? suggestion.label, classIri!, provenanceFromSuggestion(suggestion));
+      await onAddSuggestedChild(suggestion.iri, editedValue ?? suggestion.label, classIri!, acceptedClassSuggestion(suggestion));
     },
     [onAddSuggestedChild, classIri],
   );
@@ -653,7 +659,7 @@ export function ClassDetailPanel({
       const parentIri = classDetail?.parent_iris[0];
       if (!parentIri) throw new Error("Choose a parent before accepting this sibling suggestion.");
       if (!onAddSuggestedChild) throw new Error("Generated entity persistence is unavailable.");
-      await onAddSuggestedChild(suggestion.iri, editedValue ?? suggestion.label, parentIri, provenanceFromSuggestion(suggestion));
+      await onAddSuggestedChild(suggestion.iri, editedValue ?? suggestion.label, parentIri, acceptedClassSuggestion(suggestion));
     },
     [classDetail?.parent_iris, onAddSuggestedChild],
   );

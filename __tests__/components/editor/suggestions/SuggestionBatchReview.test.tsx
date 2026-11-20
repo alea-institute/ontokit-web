@@ -14,6 +14,7 @@ const title = "Suggested subclasses for Contract";
 function mount(count: number, includeBlocked = false) {
   const items: GeneratedSuggestion[] = Array.from({ length: count }, (_, index) => ({
     iri: `https://example.org/Class${index}`, label: `Class ${index}`,
+    definition: `Definition for class ${index}.`,
     suggestion_type: "children", provenance: "llm-proposed", model: "fixture-model",
     validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [],
   }));
@@ -45,6 +46,14 @@ function mount(count: number, includeBlocked = false) {
 describe("SuggestionBatchReview", () => {
   beforeEach(() => useSuggestionStore.getState().clearAllSuggestions());
 
+  it("shows each generated definition on its suggestion card before acceptance", () => {
+    const { region } = mount(2);
+    for (const [index, card] of within(region).getAllByRole("listitem").entries()) {
+      expect(within(card).getByText(`Class ${index}`)).toBeDefined();
+      expect(within(card).getByText(`Definition for class ${index}.`)).toBeDefined();
+    }
+  });
+
   it("announces progress and excludes blocked cards from the count and confirmation threshold", async () => {
     const { region, onAccepted, returnFocus } = mount(3, true);
     const heading = within(region).getByRole("heading", { name: title });
@@ -60,7 +69,9 @@ describe("SuggestionBatchReview", () => {
     expect(within(region).getByText("Blocked class")).toBeDefined();
     expect(returnFocus).not.toHaveBeenCalled();
     const blockedCard = within(region).getAllByRole("listitem").find((item) => item.textContent?.includes("Blocked class"))!;
-    fireEvent.click(within(blockedCard).getByRole("button", { name: "Reject suggestion" }));
+    const reject = within(blockedCard).getByRole<HTMLButtonElement>("button", { name: "Reject suggestion" });
+    await waitFor(() => expect(reject.disabled).toBe(false));
+    fireEvent.click(reject);
     await waitFor(() => expect(returnFocus).toHaveBeenCalledTimes(1));
     expect(screen.getByText("3 accepted, 1 skipped. Accepted classes join the current draft and save through the normal workflow.")).toBeDefined();
   });
