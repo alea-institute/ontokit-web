@@ -268,6 +268,31 @@ Parallelism: U1 and U2 run together in one API worktree on disjoint files. U4 an
 - **Test scenarios:** sequential calls; cap at 10; halt on refusal with partial results kept; Stop cancels the rest; per-group accept; announcements.
 - **Waits on:** U5 merged (U6 first, since both edit tree files).
 
+## Build status (2026-11-20, end of the first build session)
+
+Branches: API `drain/1120-diff-generative`; web `drain/1120-diff-generative` (Changes page), `drain/1120-generative-ui` (suggestions), `drain/1120-integration` (both, plus tree markers), `drain/1120-bulk-expansion` (bulk expansion, from integration). Nothing is merged into `dev`; no pull request is open.
+
+| Unit | State |
+|---|---|
+| U1, U2 | Built, corrected for A1, A2, A4, reviewed, and committed. |
+| U3 | Built and committed in the same session (not a later wave), then reviewed and hardened. |
+| U4 | Built and committed, with `transient`, "Last 24 hours", and the tracking-limits help text. |
+| U5 | Built and committed. A follow-up shows each suggestion's definition in the batch review and persists it on accept. |
+| U6 | Built and committed on the integration branch. It broke four project-viewer tests; a fix was in progress when the session ended. |
+| U7 | In progress on its own branch when the session ended. |
+
+Findings that change the design or stay open:
+
+- **Accepted suggestions dropped their definition.** The web accept path saved label and provenance only, so every accepted class would have read `ai_edited`. Fixed in the web; the Risks entry on label drift stands.
+- **The ledger row is written after the response** (own session, background task) so a ledger failure cannot delay or fail generation. An acceptance that lands before that write commits reads `human`. Not closed.
+- **Pull-request merge attribution has a 30-second grace**, not a lock: a merge transaction slower than that can still be attributed to `system`. The durable fix holds the target branch's advisory lock from the ref move through the pull request commit.
+- **Work branches can miss a first landing**: the first-run baseline skips an existing work-branch head and the daily sweep covers default branches only.
+- **Equal event times order by random id** (wrong net change for same-second commits), **blank-node ids fabricate `other` changes**, and **an IRI over 2,000 characters blocks later commits**: a fix was in progress when the session ended.
+- **Feed consistency during backfill**: page, payload, and summary run as separate queries and can disagree while the reconciler writes; a heavily edited entity loads its whole window of events despite the 20-event cap.
+- **`field_changes` never contains `other`**: the contract both allows it with null values and says to omit equal before and after. Choose one.
+- **Not verified anywhere:** migrations up and down on a real PostgreSQL, the integration tests, cross-process locking, the web client against real API responses, and the end-to-end check in the Verification Contract.
+- **Packet lesson:** web units verified only their own test folders and twice broke tests elsewhere (`__tests__/app/`). Every web packet now runs the whole Vitest suite.
+
 ## Verification Contract
 
 - API: `pytest --no-cov -q tests/unit` green against the 4115-passed baseline, `ruff check` and `ruff format --check` clean, and the migration upgrades and downgrades on a scratch database before the PR merges.
