@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "@radix-ui/react-tooltip";
@@ -60,6 +61,9 @@ let generatedModel: string | undefined;
 let extraTreeNodes: object[];
 let nestPerson: boolean;
 let classParents: string[];
+let classDetailReady: Promise<void> | undefined;
+let sourceSaveReady: Promise<void> | undefined;
+let generatedLabel: string;
 let ancestorStatus: number;
 let revisionStatus: number;
 let lintStatus: object | null;
@@ -91,6 +95,12 @@ let anonymousSubmissions: unknown[];
 let savedBodies: unknown[];
 let unexpected: string[];
 const requests: { path: string; method: string; search: string; authorization: string | null; anonymousToken: string | null }[] = [];
+function deferred() {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => { resolve = done; });
+  return { promise, resolve };
+}
+
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 function mount() {
@@ -167,7 +177,8 @@ beforeEach(() => {
   boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; lintIssues = []; extraBranches = [];
   sessionStorage.removeItem("ontokit:branch:route-project");
   llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
-  generatedDefinition = undefined; generatedModel = "fixture-model";
+  generatedDefinition = undefined; generatedModel = "fixture-model"; generatedLabel = "Generated child";
+  classDetailReady = undefined; sourceSaveReady = undefined;
   useSuggestionStore.getState().clearAllSuggestions();
   useAnonymousTokenStore.setState({ tokens: {} });
   useAnonymousCreditStore.getState().clearCredit();
@@ -225,8 +236,10 @@ beforeEach(() => {
     if (path.endsWith('/ontology/classes/' + encodeURIComponent(iri))) {
       // The API serves no project-scoped class write (alea#56); any non-GET here is a regression.
       if (init?.method && init.method !== 'GET') { unexpected.push(init.method + ' ' + path); return json({ detail: 'Method Not Allowed' }, 405); }
+      if (classDetailReady) await classDetailReady;
       return json({ iri, labels: [{ value: 'Person', lang: 'en' }], comments: [], parent_iris: classParents, parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     }
+    if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/OldParent"))) return json({ parent_iris: [] });
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Sibling"))) return json({ iri: "https://example.test/Sibling", labels: [{ value: "Sibling", lang: "en" }], comments: [], parent_iris: [], parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Generated"))) return json({ iri: "https://example.test/Generated", labels: [{ value: "Generated child", lang: "en" }], comments: [], parent_iris: [iri], parent_labels: { [iri]: "Person" }, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Child"))) return json({ detail: "Not persisted yet" }, 404);
@@ -243,7 +256,7 @@ beforeEach(() => {
     if (path.endsWith("/llm/generate-suggestions")) {
       const body = JSON.parse(String(init?.body));
       generationBodies.push(body);
-      return json({ suggestions: [{ iri: "https://example.test/Generated", label: "Generated child", definition: generatedDefinition, suggestion_type: body.suggestion_type, provenance: "llm-proposed", model: generatedModel, prompt_template: body.suggestion_type, validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }], input_tokens: 10, output_tokens: 20 });
+      return json({ suggestions: [{ iri: "https://example.test/Generated", label: generatedLabel, definition: generatedDefinition, suggestion_type: body.suggestion_type, provenance: "llm-proposed", model: generatedModel, prompt_template: body.suggestion_type, validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }], input_tokens: 10, output_tokens: 20 });
     }
     if (path.endsWith("/llm/status")) return json({ configured: llmConfigured });
     if (path === "/api/v1/pr-party/me") return json({ is_reviewer: false });
@@ -253,6 +266,7 @@ beforeEach(() => {
     if (path.endsWith("/revisions/file")) return sourceStatus === 200 ? json({ content: sourceContent, revision: sourceRevision, filename: "ontology.ttl" }) : json({ detail: "Source unavailable" }, sourceStatus);
     if (path.endsWith("/source")) {
       savedBodies.push(JSON.parse(String(init?.body)));
+      if (sourceSaveReady) await sourceSaveReady;
       if (saveStatus === 403) return json({ detail: "Save refused" }, 403);
       if (saveStatus === 200) { sourceContent = (savedBodies.at(-1) as { content: string }).content; sourceRevision = "saved-commit"; deleted ||= !/^ex:Person\s/m.test(sourceContent); }
       return saveStatus === 409
@@ -284,6 +298,240 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.unstubAllEnvs();
   expect(unexpected, JSON.stringify(unexpected)).toEqual([]);
+});
+
+async function openBulkReview() {
+  const parent = await screen.findByRole("treeitem", { name: /Old parent/ });
+  fireEvent.doubleClick(parent);
+  await screen.findByRole("treeitem", { name: /^Person$/ });
+  fireEvent.contextMenu(parent);
+  fireEvent.click(await screen.findByRole("menuitem", { name: "Suggest subclasses for each subclass…" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Generate for 1 class" }));
+  const review = await screen.findByRole("region", { name: "Bulk expansion review" });
+  fireEvent.click(await within(review).findByRole("button", { name: /Person.*Done/ }));
+  return review;
+}
+
+describe("editor review actions", () => {
+  it.each([false, true])("keeps a Source draft and a class committed from bulk review (left Source: %s)", async leaveSource => {
+    llmConfigured = true;
+    nestPerson = true;
+    mount();
+    const review = await openBulkReview();
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    const input = await screen.findByRole("textbox", { name: "Turtle source boundary" });
+    const draft = originalSource + "\n# unsaved comment";
+    fireEvent.change(input, { target: { value: draft } });
+    if (leaveSource) fireEvent.click(screen.getByRole("button", { name: "Tree" }));
+    fireEvent.click(within(review).getByRole("button", { name: "Accept suggestion" }));
+    await within(review).findByText("Accepted");
+    if (leaveSource) fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    expect((await screen.findByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement).value).toBe(draft);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    const dialog = screen.queryByRole("dialog", { name: "Save Changes" });
+    if (dialog) {
+      fireEvent.change(within(dialog).getByPlaceholderText("Describe your changes..."), { target: { value: "Save comment" } });
+      fireEvent.click(within(dialog).getByRole("button", { name: "Save & Commit" }));
+    }
+    await screen.findByText("A newer source revision is available.");
+    expect(savedBodies).toHaveLength(1);
+    expect(sourceContent).toContain("Generated");
+    expect((screen.getByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement).value).toBe(draft);
+  });
+
+  it("blocks a stale commit if bulk acceptance finishes while the Source commit dialog is open", async () => {
+    llmConfigured = true;
+    nestPerson = true;
+    const pending = deferred();
+    sourceSaveReady = pending.promise;
+    mount();
+    const bulk = await openBulkReview();
+    fireEvent.click(screen.getByRole("button", { name: "Source" }));
+    const input = await screen.findByRole("textbox", { name: "Turtle source boundary" }) as HTMLTextAreaElement;
+    const draft = originalSource + "\n# keep my edit";
+    fireEvent.change(input, { target: { value: draft } });
+    fireEvent.click(within(bulk).getByRole("button", { name: "Accept suggestion" }));
+
+    let dialog: HTMLElement;
+    try {
+      await waitFor(() => expect(savedBodies).toHaveLength(1));
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      dialog = await screen.findByRole("dialog", { name: "Save Changes" });
+    } finally {
+      await act(async () => pending.resolve());
+    }
+    expect(within(bulk).getByText("Accepted")).toBeDefined();
+    fireEvent.change(within(dialog).getByPlaceholderText("Describe your changes..."), { target: { value: "Save comment" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Save & Commit" }));
+    await screen.findByText("A newer source revision is available.");
+    expect(input.value).toBe(draft);
+    expect(savedBodies).toHaveLength(1);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Source Editor" })));
+  });
+
+  describe.each(["standard", "developer"] as const)("%s layout", mode => {
+    beforeEach(() => {
+      useEditorModeStore.getState().setEditorMode(mode);
+      llmConfigured = true;
+    });
+
+    it.each(["untrusted", "failed resume", "writable"] as const)("gates bulk and detail class acceptance for a %s suggester", async state => {
+      projectResponse = { ...projectResponse, user_role: "suggester" };
+      nestPerson = true;
+      if (state === "untrusted") {
+        trustCapabilities = { tier: "contributor", can_mint_entities: false, accepted_count: 0, promotion_threshold: 3 };
+      } else if (state === "failed resume") {
+        boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft" });
+        extraBranches = [{ name: "suggestion/draft", is_current: false }];
+      }
+      mount();
+      if (state === "failed resume") await screen.findByText(/The editor is read-only/);
+      const bulk = await openBulkReview();
+      fireEvent.click(within(screen.getByRole("treeitem", { name: /^Person$/ })).getByText("Person"));
+      const detail = await screen.findByRole("region", { name: "Suggested subclasses for Person" });
+
+      for (const region of [bulk, detail]) {
+        const buttons = [
+          within(region).getByRole("button", { name: "Accept suggestion" }),
+          within(region).getByRole("button", { name: "Edit suggestion before accepting" }),
+          within(region).getByRole("button", { name: /^Accept all/ }),
+        ] as HTMLButtonElement[];
+        buttons.forEach(button => expect(button.disabled).toBe(state !== "writable"));
+        if (state !== "writable") {
+          expect(within(region).getByText(state === "untrusted" ? /requires trusted status/ : /read-only/i)).toBeDefined();
+          buttons.forEach(button => fireEvent.click(button));
+        }
+      }
+      if (state === "writable") {
+        fireEvent.click(within(detail).getByRole("button", { name: "Accept suggestion" }));
+        await within(detail).findByText("Accepted");
+        expect(suggestionBodies).toHaveLength(1);
+      } else {
+        expect(suggestionBodies).toEqual([]);
+        expect(requests.some(request => request.path.endsWith("/suggestions/sessions") && request.method === "POST")).toBe(false);
+      }
+    });
+
+    it("drops a pending tree request when leaving and revisiting the class", async () => {
+      const pending = deferred();
+      classDetailReady = pending.promise;
+      extraTreeNodes = [{ iri: "https://example.test/Sibling", label: "Sibling", child_count: 0 }];
+      mount();
+      const person = await screen.findByText("Person");
+      fireEvent.contextMenu(person);
+      fireEvent.click(await screen.findByRole("menuitem", { name: "Suggest Subclasses" }));
+      fireEvent.click(screen.getByText("Sibling"));
+      await screen.findByRole("button", { name: "Suggest subclasses" });
+      fireEvent.click(screen.getByText("Person"));
+      await act(async () => pending.resolve());
+      await screen.findByRole("button", { name: "Suggest subclasses" });
+      expect(generationBodies).toEqual([]);
+    });
+
+    it("explains why the tree cannot regenerate while a subclass acceptance is saving", async () => {
+      const pending = deferred();
+      sourceSaveReady = pending.promise;
+      const card = await requestGeneratedChild();
+      fireEvent.click(within(card).getByRole("button", { name: "Accept suggestion" }));
+      await waitFor(() => expect(savedBodies).toHaveLength(1));
+
+      fireEvent.contextMenu(screen.getByRole("treeitem", { name: /^Person$/ }));
+      try {
+        const menu = await screen.findByRole("menu");
+        const request = within(menu).getByRole("menuitem", { name: "Suggest Subclasses" });
+        expect(request.getAttribute("aria-disabled")).toBe("true");
+        expect(within(menu).getByText(/wait .*suggestion.* finish/i)).toBeDefined();
+        fireEvent.click(request);
+        expect(generationBodies).toHaveLength(1);
+        expect(document.activeElement).not.toBe(screen.getByText("Suggested subclasses for Person"));
+      } finally {
+        await act(async () => pending.resolve());
+      }
+      await within(card).findByText("Accepted");
+    });
+
+    it.each([["multiple parents", ["https://example.test/First", "https://example.test/Second"]],
+      ["owl:Thing", ["http://www.w3.org/2002/07/owl#Thing"]]] as const)(
+      "uses asserted parents for sibling eligibility in the tree and details (%s)", async (parentKind, parents) => {
+        classParents = [...parents];
+        mount();
+        fireEvent.click(await screen.findByText("Person"));
+        const detail = await screen.findByRole("button", { name: "Suggest siblings" });
+        const allowed = parentKind === "owl:Thing";
+        if (!allowed) fireEvent.click(detail);
+        expect(generationBodies).toEqual([]);
+        expect(detail.getAttribute("aria-disabled")).toBe(allowed ? null : "true");
+        fireEvent.contextMenu(screen.getByRole("treeitem", { name: /^Person$/ }));
+        const menu = await screen.findByRole("menuitem", { name: "Suggest Siblings" });
+        if (allowed) {
+          await waitFor(() => expect(menu.getAttribute("aria-disabled")).toBeNull());
+          fireEvent.click(menu);
+          await waitFor(() => expect(generationBodies).toEqual([expect.objectContaining({ suggestion_type: "siblings", class_iri: iri })]));
+        } else {
+          await waitFor(() => expect(screen.getAllByText(/multiple parents/).length).toBeGreaterThan(1));
+          expect(menu.getAttribute("aria-disabled")).toBe("true");
+          fireEvent.click(menu);
+          expect(generationBodies).toEqual([]);
+        }
+      },
+    );
+
+    it("returns focus to a visible control when bulk review closes outside the tree", async () => {
+      nestPerson = true;
+      if (mode === "standard") {
+        vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(width < 48rem)", addEventListener() {}, removeEventListener() {} }));
+        vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+      }
+      mount();
+      const review = await openBulkReview();
+      let target: HTMLElement;
+      if (mode === "developer") {
+        target = screen.getByRole("button", { name: "Source" });
+        fireEvent.click(target);
+        await screen.findByRole("textbox", { name: "Turtle source boundary" });
+      } else {
+        fireEvent.click(within(screen.getByRole("treeitem", { name: /^Person$/ })).getByText("Person"));
+        target = screen.getByTestId("mobile-back-to-tree");
+      }
+      const close = within(review).getByRole("button", { name: "Close review" });
+      await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+      close.focus();
+      await userEvent.keyboard("{Enter}");
+      expect(screen.queryByRole("region", { name: "Bulk expansion review" })).toBeNull();
+      await waitFor(() => expect(document.activeElement).toBe(target));
+    });
+  });
+
+  it("keeps the bulk batch while acceptance is saving and identifies later replacements", async () => {
+    llmConfigured = true;
+    nestPerson = true;
+    const pending = deferred();
+    sourceSaveReady = pending.promise;
+    mount();
+    const bulk = await openBulkReview();
+    fireEvent.click(within(screen.getByRole("treeitem", { name: /^Person$/ })).getByText("Person"));
+    const trigger = await screen.findByRole("button", { name: "Suggest subclasses" });
+    fireEvent.click(within(bulk).getByRole("button", { name: "Accept suggestion" }));
+    await waitFor(() => expect(savedBodies).toHaveLength(1));
+
+    generatedLabel = "Replacement child";
+    try {
+      await act(async () => { fireEvent.click(trigger); });
+      expect(generationBodies).toHaveLength(1);
+    } finally {
+      await act(async () => pending.resolve());
+    }
+    await within(bulk).findByText("Accepted");
+    expect(savedBodies).toHaveLength(1);
+    expect(within(bulk).queryByText(/list changed/)).toBeNull();
+
+    await waitFor(() => expect(trigger.getAttribute("aria-disabled")).toBeNull());
+    fireEvent.click(trigger);
+    const detail = await screen.findByRole("region", { name: "Suggested subclasses for Person" });
+    await within(detail).findByText("Replacement child");
+    expect(within(bulk).queryByText("Replacement child")).toBeNull();
+    expect(within(bulk).getByText(/newer batch.*class/i)).toBeDefined();
+  });
 });
 
 // Disabled mode permits public proposals, never direct edits without a bearer.

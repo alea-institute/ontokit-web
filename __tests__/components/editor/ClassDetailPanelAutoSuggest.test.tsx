@@ -127,7 +127,7 @@ describe("ClassDetailPanel auto-suggest on navigate (M-1)", () => {
     const button = await screen.findByRole("button", { name: "Suggest siblings" });
     fireEvent.change(screen.getByLabelText("Batch size"), { target: { value: "10" } });
     fireEvent.click(button);
-    expect(requestFns.siblings).toHaveBeenCalledExactlyOnceWith(10);
+    expect(requestFns.siblings).toHaveBeenCalledExactlyOnceWith(10, expect.any(Function));
   });
 
   it("explains why sibling suggestions are disabled for a root", async () => {

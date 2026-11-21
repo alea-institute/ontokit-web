@@ -59,15 +59,35 @@ export function useSourceRevisionGuard({
     ? storedConflict.state
     : null;
 
-  const captureConflict = useCallback((error: unknown, draftContent: string): Error | null => {
-    const detail = getSourceRevisionConflict(error);
-    if (!detail) return null;
+  const recordConflict = useCallback((detail: SourceRevisionConflictDetail, draftContent: string) => {
     const state = { detail, draftContent };
     if (scopeRef.current.epoch === scopeEpoch) {
       setStoredConflict({ scopeEpoch, state });
     }
     return new SourceRevisionConflictError(state);
   }, [scopeEpoch]);
+
+  const captureConflict = useCallback((error: unknown, draftContent: string) => {
+    const detail = getSourceRevisionConflict(error);
+    return detail ? recordConflict(detail, draftContent) : null;
+  }, [recordConflict]);
+
+  const checkDraftRevision = useCallback((content: string, baseRevision: string | null | undefined) => {
+    if (conflict) throw new SourceRevisionConflictError(conflict);
+    if (!baseRevision) {
+      throw new Error("The source revision is unavailable. Load the latest source before saving.");
+    }
+    if (sourceRevision && activeBranch && baseRevision !== sourceRevision) {
+      throw recordConflict({
+        code: "SOURCE_REVISION_CONFLICT",
+        message: "Source changed since you started editing.",
+        base_revision: baseRevision,
+        current_revision: sourceRevision,
+        branch: activeBranch,
+      }, content);
+    }
+    return baseRevision;
+  }, [activeBranch, conflict, recordConflict, sourceRevision]);
 
   const saveSource = useCallback(async (
     content: string,
@@ -144,5 +164,6 @@ export function useSourceRevisionGuard({
     saveSource,
     loadLatest,
     captureConflict,
+    checkDraftRevision,
   };
 }

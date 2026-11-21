@@ -25,6 +25,7 @@ export interface SuggestionCardProps {
   onMarkDistinct?: (candidate: DuplicateCandidate, reason: string) => Promise<void>;
   batchIris?: ReadonlySet<string>;
   disabled?: boolean;
+  acceptanceLocked?: boolean;
   busy?: boolean;
 }
 
@@ -51,6 +52,7 @@ export function SuggestionCard({
   onMarkDistinct,
   batchIris,
   disabled,
+  acceptanceLocked,
   busy,
 }: SuggestionCardProps) {
   const [isEditing, setIsEditing] = useState(false);
@@ -108,6 +110,7 @@ export function SuggestionCard({
   }, [item.editedValue, displayText, displayedDefinition]);
 
   const handleAcceptEdit = useCallback(() => {
+    if (busy || acceptanceLocked) return;
     if (isInvalid) {
       setIsEditing(false);
       return;
@@ -122,7 +125,7 @@ export function SuggestionCard({
     if (hasDefinition) onEdit(editValue, editDefinition);
     else onEdit(editValue);
     setIsEditing(false);
-  }, [editValue, editDefinition, hasDefinition, onEdit, isBlocked, isInvalid, displayText, exactDuplicate]);
+  }, [editValue, editDefinition, hasDefinition, onEdit, isBlocked, isInvalid, displayText, exactDuplicate, busy, acceptanceLocked]);
 
   const handleDiscardEdit = useCallback(() => {
     setIsEditing(false);
@@ -320,6 +323,7 @@ export function SuggestionCard({
             <button
               type="button"
               onClick={handleAcceptEdit}
+              disabled={busy || acceptanceLocked}
               className="rounded-sm px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20"
             >
               Accept
@@ -337,7 +341,7 @@ export function SuggestionCard({
             <button
               type="button"
               onClick={onAccept}
-              disabled={disabled || busy || isBlocked || isInvalid}
+              disabled={disabled || busy || acceptanceLocked || isBlocked || isInvalid}
               aria-label="Accept suggestion"
               aria-describedby={labelId}
               className="rounded-sm p-1.5 text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -357,7 +361,7 @@ export function SuggestionCard({
             <button
               type="button"
               onClick={handleEditClick}
-              disabled={busy || isInvalid}
+              disabled={busy || acceptanceLocked || isInvalid}
               aria-label="Edit suggestion before accepting"
               aria-describedby={labelId}
               className="rounded-sm p-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:hover:bg-slate-700"

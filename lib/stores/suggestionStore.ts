@@ -24,10 +24,22 @@ export function storeKey(scope: SuggestionScope, entityIri: string, suggestionTy
   return `${scope.projectId}::${scope.branch}::${entityIri}::${suggestionType}`;
 }
 
+type BatchOperation = "generating" | "accepting";
+
+export function suggestionBatchBusyReason(operation: BatchOperation | undefined): string | undefined {
+  if (operation === "accepting") return "Wait for suggestion acceptance to finish.";
+  if (operation === "generating") return "Wait for suggestion generation to finish.";
+}
+
+let nextBatchVersion = 0;
+
 interface SuggestionStoreState {
   suggestions: Record<string, StoredSuggestion[]>;
   batchIds: Record<string, string | undefined>;
-  setSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string, items: GeneratedSuggestion[], batchId?: string) => void;
+  batchVersions: Partial<Record<string, number>>;
+  batchOperations: Partial<Record<string, BatchOperation>>;
+  beginBatchOperation: (key: string, operation: BatchOperation) => (() => void) | undefined;
+  setSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string, items: GeneratedSuggestion[], batchId?: string) => number;
   rejectPendingSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string) => void;
   restoreRejectedSuggestions: (scope: SuggestionScope, entityIri: string, suggestionType: string) => void;
   acceptSuggestion: (scope: SuggestionScope, entityIri: string, suggestionType: string, index: number) => void;
@@ -49,15 +61,34 @@ interface SuggestionStoreState {
 export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => ({
   suggestions: {},
   batchIds: {},
+  batchVersions: {},
+  batchOperations: {},
+  beginBatchOperation: (key, operation) => {
+    if (get().batchOperations[key]) return;
+    set((state) => ({ batchOperations: { ...state.batchOperations, [key]: operation } }));
+    let active = true;
+    return () => {
+      if (!active) return;
+      active = false;
+      set((state) => {
+        const batchOperations = { ...state.batchOperations };
+        delete batchOperations[key];
+        return { batchOperations };
+      });
+    };
+  },
   setSuggestions: (scope, entityIri, suggestionType, items, batchId) => {
     const key = storeKey(scope, entityIri, suggestionType);
+    const version = ++nextBatchVersion;
     set((state) => ({
+      batchVersions: { ...state.batchVersions, [key]: version },
       batchIds: { ...state.batchIds, [key]: batchId },
       suggestions: {
         ...state.suggestions,
         [key]: items.map((s) => ({ suggestion: s, status: "pending" as const })),
       },
     }));
+    return version;
   },
   acceptSuggestion: (scope, entityIri, suggestionType, index) => {
     const key = storeKey(scope, entityIri, suggestionType);
@@ -160,7 +191,7 @@ export const useSuggestionStore = create<SuggestionStoreState>()((set, get) => (
       return { suggestions: { ...state.suggestions, [key]: items } };
     });
   },
-  clearAllSuggestions: () => set({ suggestions: {}, batchIds: {} }),
+  clearAllSuggestions: () => set({ suggestions: {}, batchIds: {}, batchVersions: {} }),
   getPendingCount: (scope) => {
     const { suggestions } = get();
     const scopePrefix = `${scope.projectId}::${scope.branch}::`;

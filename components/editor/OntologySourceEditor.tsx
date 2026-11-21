@@ -9,17 +9,26 @@ import { lintApi, type LintIssue } from "@/lib/api/lint";
 import type { IndexWorkerResult, IriPosition } from "@/lib/editor/indexWorker";
 import { getLocalName } from "@/lib/utils";
 
+export interface SourceDraft {
+  content: string;
+  baseContent: string;
+  baseRevision: string | null;
+}
+
 export interface OntologySourceEditorProps {
   /** Project ID for lint integration */
   projectId: string;
   /** Initial Turtle content */
   initialValue: string;
+  sourceRevision?: string | null;
+  draft?: SourceDraft;
+  onDraftChange?: (draft: SourceDraft | undefined) => void;
   /** Access token for API calls */
   accessToken?: string;
   /** Whether the editor is read-only */
   readOnly?: boolean;
   /** Callback when content is saved */
-  onSave?: (value: string) => Promise<void>;
+  onSave?: (value: string, baseRevision?: string | null) => Promise<void>;
   /** Callback when navigating to a class IRI */
   onNavigateToClass?: (iri: string) => void;
   /** Height of the editor */
@@ -42,6 +51,7 @@ export interface OntologySourceEditorRef {
   getValue: () => string;
   /** Replace the draft and saved baseline after an explicit reconciliation. */
   replaceValue: (content: string) => void;
+  focus?: () => void;
 }
 
 /**
@@ -52,6 +62,9 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
     {
       projectId,
       initialValue,
+      sourceRevision = null,
+      draft,
+      onDraftChange,
       accessToken,
       readOnly = false,
       onSave,
@@ -63,13 +76,21 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
     },
     ref
   ) {
-  const [value, setValue] = useState(initialValue);
-  const [originalValue, setOriginalValue] = useState(initialValue);
+  const [localValue, setValue] = useState(initialValue);
+  const [localBaseline, setOriginalValue] = useState(initialValue);
+  const value = onDraftChange ? draft?.content ?? initialValue : localValue;
+  const originalValue = onDraftChange ? draft?.baseContent ?? initialValue : localBaseline;
+  const baseRevision = draft ? draft.baseRevision : sourceRevision;
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lintIssues, setLintIssues] = useState<LintIssue[]>([]);
   const [isLoadingLint, setIsLoadingLint] = useState(false);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const focus = useCallback(() => {
+    if (editorRef.current) editorRef.current.focus();
+    else headingRef.current?.focus();
+  }, []);
 
   const hasChanges = value !== originalValue;
 
@@ -83,6 +104,15 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
   const workerRef = useRef<Worker | null>(null);
   const pendingScrollIriRef = useRef<string | null>(null);
   const [editorReady, setEditorReady] = useState(false);
+
+  const handleChange = useCallback((content: string) => {
+    if (onDraftChange) {
+      onDraftChange(content === originalValue ? undefined : { content, baseContent: originalValue, baseRevision });
+    } else {
+      setValue(content);
+    }
+    setSaveError(null);
+  }, [onDraftChange, originalValue, baseRevision]);
 
   // Handle editor ready
   const handleEditorReady = useCallback((editorInstance: editor.IStandaloneCodeEditor) => {
@@ -179,14 +209,14 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
 
     // Sync internal state so hasChanges detection works
     const newValue = model.getValue();
-    setValue(newValue);
+    handleChange(newValue);
 
     // Scroll to the new content
     const newLastLine = model.getLineCount();
     ed.revealLineInCenter(newLastLine);
     ed.setPosition({ lineNumber: newLastLine, column: 1 });
     ed.focus();
-  }, []);
+  }, [handleChange]);
 
   // Get current editor content — read from Monaco directly for same-tick accuracy
   const getValue = useCallback(() => {
@@ -206,7 +236,8 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
     insertAtEnd,
     getValue,
     replaceValue,
-  }), [scrollToIri, insertAtEnd, getValue, replaceValue]);
+    focus,
+  }), [scrollToIri, insertAtEnd, getValue, replaceValue, focus]);
 
   // Handle pendingScrollIri prop when component mounts with prebuilt index
   useEffect(() => {
@@ -366,12 +397,6 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
     }
   }, [issuePositions, scrollToLine]);
 
-  // Handle content changes
-  const handleChange = useCallback((newValue: string) => {
-    setValue(newValue);
-    setSaveError(null);
-  }, []);
-
   // Handle save
   const handleSave = useCallback(async () => {
     if (!onSave || !hasChanges) return;
@@ -380,20 +405,23 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
     setSaveError(null);
 
     try {
-      await onSave(value);
-      setOriginalValue(value);
+      if (onDraftChange) {
+        await onSave(value, baseRevision);
+      } else {
+        await onSave(value);
+        setOriginalValue(value);
+      }
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Failed to save");
     } finally {
       setIsSaving(false);
     }
-  }, [onSave, value, hasChanges]);
+  }, [onSave, value, hasChanges, onDraftChange, baseRevision]);
 
   // Handle revert
   const handleRevert = useCallback(() => {
-    setValue(originalValue);
-    setSaveError(null);
-  }, [originalValue]);
+    handleChange(originalValue);
+  }, [handleChange, originalValue]);
 
   // Handle diagnostic click
   const handleDiagnosticClick = useCallback(
@@ -419,7 +447,7 @@ export const OntologySourceEditor = forwardRef<OntologySourceEditorRef, Ontology
       {/* Toolbar */}
       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-800">
         <div className="flex items-center gap-4">
-          <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+          <h3 ref={headingRef} tabIndex={-1} className="text-sm font-medium text-slate-700 dark:text-slate-300">
             Source Editor
           </h3>
 

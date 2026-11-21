@@ -65,9 +65,9 @@ import { CreditModal } from "@/components/suggestions/CreditModal";
 import { ProposalSubmittedDialog } from "@/components/editor/ProposalSubmittedDialog";
 import { useTrustCapabilities } from "@/lib/hooks/useTrustCapabilities";
 import { isClientAuthDisabled, shouldShowAuthUI } from "@/lib/auth-mode";
-import type { TrustGate } from "@/components/editor/TrustExplainer";
+import { mintingLockReason, type TrustGate } from "@/components/editor/TrustExplainer";
 
-import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+import type { OntologySourceEditorRef, SourceDraft } from "@/components/editor/OntologySourceEditor";
 import {
   SourceRevisionConflictError,
   useSourceRevisionGuard,
@@ -272,7 +272,21 @@ export default function EditorPage() {
 
   // Commit dialog
   const [commitDialogOpen, setCommitDialogOpen] = useState(false);
-  const [pendingSaveContent, setPendingSaveContent] = useState<string | null>(null);
+  const [pendingSave, setPendingSave] = useState<{ content: string; baseRevision: string; scope: string } | null>(null);
+
+  // The shared snapshot follows branch commits. A raw draft keeps the revision it was edited from.
+  const sourceDraftScope = JSON.stringify(viewer.sourceScope);
+  const [sourceDrafts, setSourceDrafts] = useState(() => new Map<string, SourceDraft>());
+  const sourceDraft = sourceDrafts.get(sourceDraftScope);
+  const setSourceDraft = useCallback((draft: SourceDraft | undefined) => {
+    setSourceDrafts((current) => {
+      if (!draft && !current.has(sourceDraftScope)) return current;
+      const next = new Map(current);
+      if (draft) next.set(sourceDraftScope, draft);
+      else next.delete(sourceDraftScope);
+      return next;
+    });
+  }, [sourceDraftScope]);
 
   // Add entity dialog
   const [addEntityDialogOpen, setAddEntityDialogOpen] = useState(false);
@@ -301,11 +315,12 @@ export default function EditorPage() {
   const [pendingScrollIri, setPendingScrollIri] = useState<string | null>(null);
 
   const handleLoadLatestSource = useCallback((content: string) => {
+    setSourceDraft(undefined);
     sourceEditorRef.current?.replaceValue(content);
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     setDetailRefreshKey((key) => key + 1);
-  }, [setSourceIriIndex]);
+  }, [setSourceDraft, setSourceIriIndex]);
 
   const {
     conflict: sourceRevisionConflict,
@@ -313,6 +328,7 @@ export default function EditorPage() {
     saveSource: saveDirectSource,
     loadLatest,
     captureConflict: captureSourceConflict,
+    checkDraftRevision,
   } = useSourceRevisionGuard({
     projectId,
     accessToken: session?.accessToken,
@@ -371,6 +387,13 @@ export default function EditorPage() {
   const isResumeReadOnly = isSuggestionMode && !!resumeSessionParam
     && (suggestionSession.sessionId !== resumeSessionParam || (!suggestionSession.isActive && suggestionSession.status !== "submitting"));
   const canEditSuggestion = isSuggestionMode && !isResumeReadOnly;
+  const resumeAcceptanceLockedReason = isResumeReadOnly
+    ? suggestionSession.error
+      ? "This suggestion session is read-only. Return to My Suggestions to try again."
+      : "This suggestion session is read-only while it is being verified."
+    : undefined;
+  const classAcceptanceLockedReasonRef = useRef<string | undefined>(undefined);
+  classAcceptanceLockedReasonRef.current = resumeAcceptanceLockedReason || mintingLockReason(trustGate);
 
   // Adopt each verified snapshot once, without undoing later branch navigation.
   const adoptedSuggestionRef = useRef<string | null>(null);
@@ -402,25 +425,35 @@ export default function EditorPage() {
   const pendingSaveResolveRef = useRef<(() => void) | null>(null);
   const pendingSaveRejectRef = useRef<((error: Error) => void) | null>(null);
 
-  const handleSaveSource = useCallback(async (newContent: string) => {
+  const handleSaveSource = useCallback(async (newContent: string, baseRevision?: string | null) => {
     if (!projectId || !canWrite) {
       throw new Error("Not authenticated");
     }
-    setPendingSaveContent(newContent);
+    setPendingSave({ content: newContent, baseRevision: checkDraftRevision(newContent, baseRevision), scope: sourceDraftScope });
     setCommitDialogOpen(true);
     return new Promise<void>((resolve, reject) => {
       pendingSaveResolveRef.current = resolve;
       pendingSaveRejectRef.current = reject;
     });
-  }, [projectId, canWrite]);
+  }, [projectId, canWrite, checkDraftRevision, sourceDraftScope]);
 
   const handleCommitConfirm = useCallback(async (commitMessage: string) => {
-    if (!projectId || !canWrite || !pendingSaveContent) {
+    if (!projectId || !canWrite || !pendingSave || pendingSave.scope !== sourceDraftScope) {
       throw new Error("Not authenticated or no content to save");
     }
 
     try {
-      await saveDirectSource(pendingSaveContent, commitMessage);
+      const { content, baseRevision, scope } = pendingSave;
+      checkDraftRevision(content, baseRevision);
+      const response = await saveDirectSource(content, commitMessage, baseRevision);
+      setSourceDrafts((current) => {
+        const draft = current.get(scope);
+        if (!draft) return current;
+        const next = new Map(current);
+        if (draft.content === content) next.delete(scope);
+        else next.set(scope, { ...draft, baseContent: content, baseRevision: response.commit_hash });
+        return next;
+      });
     } catch (error) {
       if (error instanceof SourceRevisionConflictError) {
         // A stale raw save is terminal for this commit attempt. Reject the
@@ -429,7 +462,7 @@ export default function EditorPage() {
         pendingSaveRejectRef.current?.(error);
         pendingSaveResolveRef.current = null;
         pendingSaveRejectRef.current = null;
-        setPendingSaveContent(null);
+        setPendingSave(null);
         setCommitDialogOpen(false);
       }
       throw error;
@@ -442,18 +475,18 @@ export default function EditorPage() {
     pendingSaveResolveRef.current?.();
     pendingSaveResolveRef.current = null;
     pendingSaveRejectRef.current = null;
-    setPendingSaveContent(null);
-  }, [projectId, session, canWrite, pendingSaveContent, loadRootClasses, queryClient, setSourceIriIndex, saveDirectSource]);
+    setPendingSave(null);
+  }, [projectId, session, canWrite, pendingSave, loadRootClasses, queryClient, setSourceIriIndex, saveDirectSource, checkDraftRevision, sourceDraftScope]);
 
   const handleCommitDialogClose = useCallback((open: boolean) => {
     setCommitDialogOpen(open);
-    if (!open && pendingSaveContent) {
+    if (!open && pendingSave) {
       pendingSaveRejectRef.current?.(new Error("Save cancelled"));
       pendingSaveResolveRef.current = null;
       pendingSaveRejectRef.current = null;
-      setPendingSaveContent(null);
+      setPendingSave(null);
     }
-  }, [pendingSaveContent]);
+  }, [pendingSave]);
 
   // Detect IRI pattern
   useEffect(() => {
@@ -532,9 +565,10 @@ export default function EditorPage() {
         ontologyNamespace,
       });
 
-      if (sourceEditorRef.current) {
+      if (canEdit && sourceEditorRef.current) {
         sourceEditorRef.current.insertAtEnd(snippet);
-        setSourceContent(sourceEditorRef.current.getValue());
+      } else if (canEdit && sourceDraft) {
+        setSourceDraft({ ...sourceDraft, content: sourceDraft.content + snippet });
       } else if (sourceContent) {
         setSourceContent((prev) => prev + snippet);
       } else {
@@ -558,7 +592,7 @@ export default function EditorPage() {
         addOptimisticNode(entity.iri, entity.label, entity.parentIri);
       }
     },
-    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, projectId, session, canWrite, activeBranch, project, toast, setSourceContent, setSourceSnapshot],
+    [canSuggest, trustGate.locked, ontologyPrefix, ontologyNamespace, addOptimisticNode, sourceContent, sourceDraft, projectId, session, canEdit, canWrite, activeBranch, project, toast, setSourceContent, setSourceSnapshot, setSourceDraft],
   );
 
   const generatedEntityAccessToken = session?.accessToken;
@@ -682,6 +716,7 @@ export default function EditorPage() {
     parentIri: string,
     suggestion?: AcceptedClassSuggestion,
   ) => {
+    if (classAcceptanceLockedReasonRef.current) throw new Error(classAcceptanceLockedReasonRef.current);
     const { definition, ...provenance } = suggestion ?? {};
     await persistAcceptedGeneratedEntity({ iri, label, definition, parentIri, entityType: "class", provenance: provenance.model ? provenance : undefined });
     // Stay on the class under review so the rest of its batch remains in view.
@@ -1645,6 +1680,9 @@ export default function EditorPage() {
                   pendingScrollIri={pendingScrollIri}
                   setPendingScrollIri={setPendingScrollIri}
                   sourceEditorRef={sourceEditorRef}
+                  sourceRevision={sourceRevision}
+                  sourceDraft={sourceDraft}
+                  onSourceDraftChange={setSourceDraft}
                   onSaveSource={handleSaveSource}
                   onAddEntity={handleAddEntity}
                   onDeleteClass={handleDeleteClass}
@@ -1682,6 +1720,7 @@ export default function EditorPage() {
                   isProposeEditStarting={anonymousSuggestion.isStarting}
                   isAnonymousProposalMode={isAnonymousProposalMode}
                   onAddSuggestedChild={handleAddSuggestedChild}
+                  classAcceptanceLockedReason={resumeAcceptanceLockedReason}
                   onAddSuggestedProperty={handleAddSuggestedProperty}
                   acceptedSuggestionIris={acceptedSuggestionIris}
                 />
@@ -1749,6 +1788,7 @@ export default function EditorPage() {
                 isProposeEditStarting={anonymousSuggestion.isStarting}
                 isAnonymousProposalMode={isAnonymousProposalMode}
                 onAddSuggestedChild={handleAddSuggestedChild}
+                classAcceptanceLockedReason={resumeAcceptanceLockedReason}
                 onAddSuggestedProperty={handleAddSuggestedProperty}
                 acceptedSuggestionIris={acceptedSuggestionIris}
               />
@@ -1791,6 +1831,7 @@ export default function EditorPage() {
         open={commitDialogOpen}
         onOpenChange={handleCommitDialogClose}
         onConfirm={handleCommitConfirm}
+        returnFocus={() => sourceEditorRef.current?.focus?.()}
         defaultMessage="Update ontology"
       />
 

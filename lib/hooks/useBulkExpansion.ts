@@ -3,7 +3,7 @@ import { ApiError } from "@/lib/api/client";
 import { generationApi } from "@/lib/api/generation";
 import { LLM_STATUS_INVALIDATION_EVENT } from "@/lib/api/llm";
 import { generationErrorMessage } from "@/lib/hooks/useSuggestions";
-import { useSuggestionStore, type SuggestionScope } from "@/lib/stores/suggestionStore";
+import { storeKey, suggestionBatchBusyReason, useSuggestionStore, type SuggestionScope } from "@/lib/stores/suggestionStore";
 
 export const MAX_BULK_EXPANSION_CLASSES = 10;
 export type BulkExpansionBatchSize = 3 | 5 | 10;
@@ -16,6 +16,7 @@ type JobStatus = "waiting" | "generating" | "done" | "failed" | "skipped";
 export interface BulkExpansionJob extends BulkExpansionTarget {
   status: JobStatus;
   error?: string;
+  batchVersion?: number;
 }
 
 export type BulkExpansionTotals = Record<JobStatus, number>;
@@ -63,8 +64,8 @@ export function useBulkExpansion({ projectId, branch, canUseLLM, accessToken, by
     runRef.current = null;
   }, [scope]);
 
-  const updateJob = (run: Run, index: number, status: JobStatus, error?: string) => {
-    run.jobs = run.jobs.map((job, i) => i === index ? { ...job, status, error } : job);
+  const updateJob = (run: Run, index: number, update: Partial<BulkExpansionJob>) => {
+    run.jobs = run.jobs.map((job, i) => i === index ? { ...job, ...update } : job);
     setSnapshot({ ...run });
   };
 
@@ -75,17 +76,22 @@ export function useBulkExpansion({ projectId, branch, canUseLLM, accessToken, by
       const job = run.jobs[index];
       if (signal.aborted || job.status !== "waiting") break;
 
-      updateJob(run, index, "generating");
+      const key = storeKey(scope, job.iri, "children");
+      const store = useSuggestionStore.getState();
+      const release = store.beginBatchOperation(key, "generating");
       let reason: string | undefined;
       try {
+        if (!release) throw new Error(suggestionBatchBusyReason(store.batchOperations[key]));
+        signal.addEventListener("abort", release, { once: true });
+        updateJob(run, index, { status: "generating", error: undefined });
         const response = await generationApi.generateSuggestions(
           projectId,
           { class_iri: job.iri, branch, suggestion_type: "children", batch_size: run.batchSize },
           token, byoKey, signal,
         );
         if (signal.aborted) return;
-        useSuggestionStore.getState().setSuggestions(scope, job.iri, "children", response.suggestions, response.batch_id);
-        updateJob(run, index, "done");
+        const batchVersion = store.setSuggestions(scope, job.iri, "children", response.suggestions, response.batch_id);
+        updateJob(run, index, { status: "done", batchVersion });
       } catch (error) {
         if (signal.aborted) return;
         const isRefusal = error instanceof ApiError && (error.status === 402 || error.status === 429);
@@ -95,7 +101,12 @@ export function useBulkExpansion({ projectId, branch, canUseLLM, accessToken, by
           run.jobs = skipWaiting(run.jobs);
           window.dispatchEvent(new CustomEvent(LLM_STATUS_INVALIDATION_EVENT, { detail: { projectId } }));
         }
-        updateJob(run, index, "failed", reason);
+        updateJob(run, index, { status: "failed", error: reason });
+      } finally {
+        if (release) {
+          signal.removeEventListener("abort", release);
+          release();
+        }
       }
 
       const progress = bulkExpansionProgress(totalsFor(run.jobs), run.jobs.length);
@@ -136,7 +147,7 @@ export function useBulkExpansion({ projectId, branch, canUseLLM, accessToken, by
     if (!canUseLLM || !accessToken || !run || run.scope !== scope || run.running || run.haltReason) return;
     const index = run.jobs.findIndex((job) => job.iri === iri && job.status === "failed");
     if (index === -1) return;
-    updateJob(run, index, "waiting");
+    updateJob(run, index, { status: "waiting", error: undefined });
     await execute(run, [index], accessToken);
   };
 
