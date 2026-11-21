@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { choosePreview, entity, filePath, installFixtures, projectId, source } from "./ow4-fixtures";
+import { expectClassIriHover, recordMonacoAssets } from "../fixtures/source-hover";
 
 // Browser evidence at the merge gate's desktop and mobile viewports. Synthetic API/session fixtures only; no write reaches the API.
 const evidenceDir = process.env.OW4_UI_EVIDENCE_DIR || "docs/plans/evidence/ow-12";
@@ -42,6 +43,7 @@ for (const viewport of viewports) {
 }
 
 test("project viewer source preview evidence (desktop 1440x900) and read-only full source", async ({ page, context }) => {
+  const recordAssets = recordMonacoAssets(page, true);
   const { writes, unexpected } = await installFixtures(context);
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -73,6 +75,10 @@ test("project viewer source preview evidence (desktop 1440x900) and read-only fu
   const editor = page.locator(".monaco-editor .view-lines");
   await expect(editor).toBeVisible();
   await expect(editor).toContainText(":hasGuide a owl:ObjectProperty");
+  await expectClassIriHover(page);
+  await page.screenshot({ path: `${evidenceDir}/project-viewer-full-source-iri-hover.png`, animations: "disabled" });
+  await recordAssets(test.info());
+  await page.keyboard.press("Escape");
   await editor.click();
   await page.keyboard.press("a");
   await expect(page.getByRole("paragraph").filter({ hasText: /^Cannot edit in read-only editor$/ })).toBeVisible();

@@ -8,6 +8,7 @@ import { saveExistingLabel, openTriage } from "../fixtures/suggestions";
 import { projectsPath, readSource } from "../fixtures/projects";
 import type { RehearsalRunConfig, RehearsalTarget } from "../fixtures/run";
 import { expectAccessible, captureRehearsalState } from "../fixtures/accessibility";
+import { expectClassIriHover, recordMonacoAssets } from "../fixtures/source-hover";
 
 const sessionsPath = (id: string) => `${projectsPath}/${id}/suggestions/sessions`;
 // Saving a label rewrites the whole real ontology; budget minutes per step.
@@ -120,6 +121,7 @@ test("contributor signs in through the provider and browses the FOLIO class tree
   const context = await browser.newContext();
   try {
     const page = await context.newPage();
+    const recordAssets = recordMonacoAssets(page, false);
     await page.setViewportSize({width: 1440, height: 1000});
     await signIn(page, run, "suggester");
     const target = run.rehearsal.targets.folio;
@@ -138,6 +140,13 @@ test("contributor signs in through the provider and browses the FOLIO class tree
     await expectAccessible(page);
     await captureRehearsalState(page.getByRole("main"), test.info(), "folio-editor-search-label");
     await page.keyboard.press("Escape");
+    await page.getByRole("group", {name: "Editor mode", exact: true}).getByRole("button", {name: "Developer", exact: true}).click();
+    await page.locator('button[aria-label="Source"]').click();
+    await expectClassIriHover(page);
+    await captureRehearsalState(page.locator(".monaco-editor"), test.info(), "folio-source-iri-hover");
+    await recordAssets(test.info());
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", {name: "Tree", exact: true}).click();
   } finally { await context.close(); }
 });
 
