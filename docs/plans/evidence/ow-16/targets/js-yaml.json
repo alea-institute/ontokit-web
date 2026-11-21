@@ -1,0 +1,48 @@
+{
+  "target": "js-yaml",
+  "lockSha256": "4e7e1236fb2530801a03390fd6f4c94fc262e379acfa705cba59b38ce4881435",
+  "changes": [
+    {
+      "path": "node_modules/js-yaml",
+      "from": "4.3.1",
+      "to": "4.3.2"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "js-yaml",
+      "path": "node_modules/js-yaml",
+      "advisory": "https://github.com/advisories/GHSA-2883-xcg3-v3hh",
+      "range": ">=4.0.0 <4.3.2"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 6,
+    "critical": 0,
+    "total": 13
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 5,
+    "critical": 0,
+    "total": 12
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:38:18.742206+00:00",
+      "end": "2026-11-21T13:38:36.777282+00:00"
+    }
+  ]
+}
