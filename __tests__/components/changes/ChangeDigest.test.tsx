@@ -53,19 +53,19 @@ describe("ChangeDigest", () => {
     return { onShow, region: screen.getByRole("region", { name: /at a glance$/ }) };
   }
 
-  it("answers what AI added and what people changed, in words and numbers", () => {
+  it("summarizes classes from AI suggestions and changes by people", () => {
     const { region } = mount();
-    const ai = within(region).getByRole("button", { name: /4 classes added by AI/ });
+    const ai = within(region).getByRole("button", { name: /4 classes from AI suggestions/ });
     expect(ai.textContent).toContain("3 accepted as suggested, 1 edited before accepting");
-    expect(ai.textContent).toContain("1 more added by AI, then removed");
+    expect(ai.textContent).toContain("1 more from AI suggestions, then removed");
     const people = within(region).getByRole("button", { name: /5 entities changed by people/ });
     expect(people.textContent).toContain("1 added, 2 modified, 2 removed");
     expect(within(region).getByText(/1 entity changed by sync or import/)).toBeDefined();
   });
 
   it("filters the list from a tile and shows which tile is active", () => {
-    const { onShow, region } = mount({ origins: ["human"] });
-    const ai = within(region).getByRole("button", { name: /added by AI/ });
+    const { onShow, region } = mount({ items: [entity("added", "ai"), entity("modified", "human")], origins: ["human"] });
+    const ai = within(region).getByRole("button", { name: /1 class from AI suggestions/ });
     const people = within(region).getByRole("button", { name: /changed by people/ });
     expect(ai.getAttribute("aria-pressed")).toBe("false");
     expect(people.getAttribute("aria-pressed")).toBe("true");
@@ -75,11 +75,17 @@ describe("ChangeDigest", () => {
     expect(onShow).toHaveBeenLastCalledWith([]);
   });
 
-  it("says so plainly when AI added nothing, and offers no empty filter", () => {
+  it("shows zero classes when no suggestions were accepted and offers no empty filter", () => {
     const { region } = mount({ items: [entity("modified", "human")] });
+    expect(within(region).getByText("0 classes from AI suggestions")).toBeDefined();
     expect(within(region).getByText("No AI suggestions were accepted in this window.")).toBeDefined();
-    expect(within(region).queryByRole("button", { name: /added by AI/ })).toBeNull();
+    expect(within(region).queryByRole("button", { name: /from AI suggestions/ })).toBeNull();
     expect(within(region).getByRole("button", { name: /1 entity changed by people/ })).toBeDefined();
+  });
+
+  it("describes removals when no classes from AI suggestions remain", () => {
+    const { region } = mount({ items: [entity("transient", "ai")] });
+    expect(within(region).getByText("1 from AI suggestions, then removed.")).toBeDefined();
   });
 
   it("names the 24-hour window and flags counts cut off at the feed's cap", () => {

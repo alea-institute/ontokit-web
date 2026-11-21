@@ -220,12 +220,12 @@ describe("project Changes page", () => {
     expect(new URLSearchParams(navigation.search).has("net_change")).toBe(false);
   });
 
-  it("opens with what AI added and what people changed across the whole window", async () => {
+  it("summarizes classes from AI suggestions and changes by people across the whole window", async () => {
     navigation.search = "?days=30&branch=review&origin=system";
     render(page());
 
     const digest = await screen.findByRole("region", { name: "Last 30 days at a glance" });
-    const ai = await within(digest).findByRole("button", { name: /2 classes added by AI/ });
+    const ai = await within(digest).findByRole("button", { name: /2 classes from AI suggestions/ });
     expect(ai.textContent).toContain("1 accepted as suggested, 1 edited before accepting");
     expect(within(digest).getByRole("button", { name: /1 entity changed by people/ })).toBeDefined();
     // The digest ignores list filters, so it still answers the question under a filter.

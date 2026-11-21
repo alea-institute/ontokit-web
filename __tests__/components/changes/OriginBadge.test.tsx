@@ -17,10 +17,15 @@ describe("OriginBadge", () => {
     expect(screen.getByText(label)).toBeDefined();
   });
 
-  it("explains which suggestion edits count toward AI edited origin", async () => {
+  it.each([
+    ["human", "Human", "Saved by a person; not matched to an AI suggestion."],
+    ["ai", "AI", "Created from an AI suggestion accepted with its original label and definition."],
+    ["ai_edited", "AI edited", "Created from an AI suggestion with edits to the suggested label or definition."],
+    ["system", "System", "Recorded by an import, sync, normalization, or history backfill."],
+  ])("explains %s origin", async (origin, label, description) => {
     vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
-    render(<TooltipProvider><OriginBadge origin="ai_edited" /></TooltipProvider>);
-    fireEvent.focus(screen.getByText("AI edited"));
-    expect((await screen.findByRole("tooltip")).textContent).toMatch(/suggested label or definition/i);
+    render(<TooltipProvider><OriginBadge origin={origin} /></TooltipProvider>);
+    fireEvent.focus(screen.getByText(label));
+    expect((await screen.findByRole("tooltip")).textContent).toBe(description);
   });
 });

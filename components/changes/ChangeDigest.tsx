@@ -12,8 +12,9 @@ const PEOPLE_ORIGINS: readonly ChangeOrigin[] = ["human"];
 
 /**
  * Counts entities, not events. AI origin attaches to a class's creation, so a
- * class a person edits after accepting it counts once as added by AI and once
- * as modified by people. An entity only a sync or import touched counts as system.
+ * class a person edits after accepting it counts once as created from an AI
+ * suggestion and once as modified by people. An entity only a sync or import
+ * touched counts as system.
  */
 export function summarizeChangedEntities(items: readonly ChangedEntity[]) {
   const ai = { added: 0, asSuggested: 0, edited: 0, removedSince: 0 };
@@ -34,8 +35,8 @@ export function summarizeChangedEntities(items: readonly ChangedEntity[]) {
     }
     if (fromPeople) {
       people.total += 1;
-      // Someone else created it (AI, a sync, or an import): the person's part
-      // is the edit or the removal, not the addition.
+      // For a class from an AI suggestion or an entity from a sync or import,
+      // count the person's edit or removal.
       const shared = origins.some((origin) => origin !== "human");
       const part = !shared ? net_change : net_change === "added" ? "modified" : net_change === "transient" ? "removed" : net_change;
       people[part] += 1;
@@ -142,10 +143,10 @@ export function ChangeDigest({
                 icon={<Sparkles aria-hidden="true" className="h-4 w-4" />}
                 tone="bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
                 count={ai.added}
-                label={`${plural(ai.added, "class", "classes")} added by AI`}
+                label={`${plural(ai.added, "class", "classes")} from AI suggestions`}
                 detail={<>
                   {ai.asSuggested} accepted as suggested, {ai.edited} edited before accepting
-                  {ai.removedSince > 0 && <>. {ai.removedSince} more added by AI, then removed</>}
+                  {ai.removedSince > 0 && <>. {ai.removedSince} more from AI suggestions, then removed</>}
                 </>}
                 pressed={aiPressed}
                 onClick={() => onShow(aiPressed ? [] : [...AI_ORIGINS])}
@@ -154,11 +155,11 @@ export function ChangeDigest({
               <div className={emptyTile}>
                 <p className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
                   <Sparkles aria-hidden="true" className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                  0 classes added by AI
+                  0 classes from AI suggestions
                 </p>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
                   {ai.removedSince > 0
-                    ? `${ai.removedSince} added by AI, then removed.`
+                    ? `${ai.removedSince} from AI suggestions, then removed.`
                     : "No AI suggestions were accepted in this window."}
                 </p>
               </div>

@@ -15,12 +15,12 @@ export const ORIGIN_LABELS: Record<ChangeOrigin, string> = {
 const originDetails = {
   human: {
     icon: User,
-    description: "Authored by a person.",
+    description: "Saved by a person; not matched to an AI suggestion.",
     color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   },
   ai: {
     icon: Sparkles,
-    description: "Proposed by AI and accepted with the original label and definition.",
+    description: "Created from an AI suggestion accepted with its original label and definition.",
     color: "bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300",
   },
   ai_edited: {
@@ -30,7 +30,7 @@ const originDetails = {
   },
   system: {
     icon: Cog,
-    description: "Created by a sync, normalization, or history backfill without a known author.",
+    description: "Recorded by an import, sync, normalization, or history backfill.",
     color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   },
 };
