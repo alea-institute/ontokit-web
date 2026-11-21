@@ -1,0 +1,126 @@
+{
+  "target": "vue",
+  "lockSha256": "77e72d15e5f0b919788b811153167d6974bc424079f2c0b7d58e82fa99b09d5e",
+  "changes": [
+    {
+      "path": "node_modules/@babel/helper-string-parser",
+      "from": "7.29.7",
+      "to": "7.29.15"
+    },
+    {
+      "path": "node_modules/@babel/parser",
+      "from": "7.29.8",
+      "to": "7.29.15"
+    },
+    {
+      "path": "node_modules/@babel/types",
+      "from": "7.29.8",
+      "to": "7.29.15"
+    },
+    {
+      "path": "node_modules/@scalar/workspace-store/node_modules/@scalar/typebox",
+      "from": "0.1.3",
+      "to": null
+    },
+    {
+      "path": "node_modules/@vue/compiler-core",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    },
+    {
+      "path": "node_modules/@vue/compiler-dom",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    },
+    {
+      "path": "node_modules/@vue/compiler-sfc",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    },
+    {
+      "path": "node_modules/@vue/compiler-ssr",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    },
+    {
+      "path": "node_modules/@vue/reactivity",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    },
+    {
+      "path": "node_modules/@vue/runtime-core",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    },
+    {
+      "path": "node_modules/@vue/runtime-dom",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    },
+    {
+      "path": "node_modules/@vue/server-renderer",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    },
+    {
+      "path": "node_modules/@vue/shared",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    },
+    {
+      "path": "node_modules/csstype",
+      "from": "3.2.3",
+      "to": "3.2.4"
+    },
+    {
+      "path": "node_modules/postcss",
+      "from": "8.5.26",
+      "to": "8.5.33"
+    },
+    {
+      "path": "node_modules/vue",
+      "from": "3.5.41",
+      "to": "3.5.46"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "@vue/server-renderer",
+      "path": "node_modules/@vue/server-renderer",
+      "advisory": "https://github.com/advisories/GHSA-g2v6-rqmx-r4w6",
+      "range": "<3.5.42"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 1,
+    "moderate": 8,
+    "high": 11,
+    "critical": 0,
+    "total": 20
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 1,
+    "moderate": 8,
+    "high": 9,
+    "critical": 0,
+    "total": 18
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "--run",
+        "__tests__/lib/vue-ssr-attributes.test.ts",
+        "__tests__/app/api-docs.integration.test.tsx"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:35:00.721013+00:00",
+      "end": "2026-11-21T13:35:01.825371+00:00"
+    }
+  ]
+}
