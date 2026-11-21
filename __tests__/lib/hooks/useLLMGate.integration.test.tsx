@@ -36,7 +36,7 @@ describe('LLM quota events through real generation and status clients', () => {
     await waitFor(() => expect(fetcher.mock.calls.filter(([input]) => String(input).endsWith('/status'))).toHaveLength(2));
     await waitFor(() => expect(result.current.gate.budgetExhausted).toBe(status === 402));
     expect(result.current.gate.canUseLLM).toBe(status !== 402);
-    expect(result.current.suggestions.error).toContain(status === 402 ? 'budget has been exhausted' : 'request limit');
+    expect(result.current.suggestions.error).toContain(status === 402 ? 'monthly AI budget is used up' : 'AI request limit for your role');
   });
 
   it('ignores invalidation events for other projects and events with no detail', async () => {

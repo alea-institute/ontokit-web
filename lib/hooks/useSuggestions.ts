@@ -59,11 +59,13 @@ export function generationErrorMessage(error: unknown): string {
     case 400:
       return "No generation model is configured. Choose a model in project AI settings.";
     case 402:
-      return "This project's AI budget has been exhausted. Ask a project admin to review the budget.";
+      return error.detail === "Daily spending cap reached for this project."
+        ? "This project's daily AI spending cap has been reached. Try again tomorrow, or ask a project admin to raise the cap."
+        : "This project's monthly AI budget is used up. Ask a project admin to review the budget.";
     case 403:
       return "Your project role does not allow AI suggestions.";
     case 429:
-      return "The AI request limit has been reached. Wait before trying again.";
+      return "You've reached today's AI request limit for your role. Try again tomorrow.";
     case 500:
       return "The AI service encountered an unexpected error. Try again, and contact support if the problem continues.";
     case 502:

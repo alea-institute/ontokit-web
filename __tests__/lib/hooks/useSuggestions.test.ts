@@ -164,9 +164,9 @@ describe("useSuggestions", () => {
 
   it.each([
     [400, "No generation model is configured"],
-    [402, "AI budget has been exhausted"],
+    [402, "This project's monthly AI budget is used up. Ask a project admin to review the budget."],
     [403, "role does not allow"],
-    [429, "request limit has been reached"],
+    [429, "You've reached today's AI request limit for your role. Try again tomorrow."],
     [500, "unexpected error"],
     [502, "AI provider is unavailable"],
     [503, "registry model or a local provider"],

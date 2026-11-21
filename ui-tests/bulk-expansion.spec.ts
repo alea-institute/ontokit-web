@@ -21,7 +21,7 @@ const proposals: GeneratedSuggestion[] = [
   model: "fixture-model", suggestion_type: "children", validation_errors: [],
   duplicate_verdict: "pass", duplicate_candidates: [],
 }));
-const reason = "Daily AI request limit reached. Try again tomorrow.";
+const reason = "You've reached today's AI request limit for your role. Try again tomorrow.";
 const menuItem = "Suggest subclasses for each subclass…";
 
 for (const mode of ["Standard", "Developer"] as const) {
@@ -71,7 +71,7 @@ for (const mode of ["Standard", "Developer"] as const) {
           json: { batch_id: "fixture-batch", suggestions: proposals, input_tokens: 40, output_tokens: 80 },
         });
         await refusalReady;
-        return route.fulfill({ status: 429, json: { detail: { message: reason } } });
+        return route.fulfill({ status: 429, json: { detail: { message: "Daily LLM call limit reached for your role (editor). Try again tomorrow." } } });
       }
       if (pathname === `${prefix}/revisions/file`) {
         return route.fulfill({ json: { content: source, revision, filename: "ontology.ttl" } });

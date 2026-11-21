@@ -95,7 +95,7 @@ export function useBulkExpansion({ projectId, branch, canUseLLM, accessToken, by
       } catch (error) {
         if (signal.aborted) return;
         const isRefusal = error instanceof ApiError && (error.status === 402 || error.status === 429);
-        reason = isRefusal ? error.userMessage : generationErrorMessage(error);
+        reason = generationErrorMessage(error);
         if (isRefusal) {
           run.haltReason = reason;
           run.jobs = skipWaiting(run.jobs);

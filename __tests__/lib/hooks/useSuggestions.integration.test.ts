@@ -57,8 +57,8 @@ describe("suggestion request and acceptance integration", () => {
   });
 
   it.each([
-    [400, "No generation model"], [401, "Could not generate suggestions."], [402, "budget has been exhausted"], [403, "role does not allow"],
-    [429, "request limit"], [500, "unexpected error"], [502, "provider is unavailable"], [503, "pricing is unavailable"],
+    [400, "No generation model"], [401, "Could not generate suggestions."], [402, "monthly AI budget is used up"], [403, "role does not allow"],
+    [429, "AI request limit for your role"], [500, "unexpected error"], [502, "provider is unavailable"], [503, "pricing is unavailable"],
   ])("surfaces HTTP %s and invalidates budgets only for quota errors", async (status, message) => {
     const fetch = vi.fn().mockResolvedValue(json({ detail: "backend detail" }, status));
     vi.stubGlobal("fetch", fetch);
@@ -74,6 +74,25 @@ describe("suggestion request and acceptance integration", () => {
       expect(fetch).toHaveBeenCalledTimes(1);
       expect(events).toEqual(status === 402 || status === 429 ? [{ projectId: scope.projectId }] : []);
     } finally { window.removeEventListener(LLM_STATUS_INVALIDATION_EVENT, listener); }
+  });
+
+  it.each([
+    [429, "Daily LLM call limit reached for your role (suggester). Try again tomorrow.",
+      "You've reached today's AI request limit for your role. Try again tomorrow."],
+    [402, "Daily spending cap reached for this project.",
+      "This project's daily AI spending cap has been reached. Try again tomorrow, or ask a project admin to raise the cap."],
+    [402, "Monthly LLM budget exhausted for this project.",
+      "This project's monthly AI budget is used up. Ask a project admin to review the budget."],
+  ])("keeps the pending batch after HTTP %s with detail %s", async (status, detail, message) => {
+    useSuggestionStore.getState().setSuggestions(scope, entityIri, "children", [suggestion()], "pending-batch");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(json({ detail }, status)));
+    const { result } = renderHook(() => useSuggestions(options));
+
+    await act(async () => { await result.current.request(); });
+
+    expect(result.current.requestError).toBe(message);
+    expect(result.current.batchId).toBe("pending-batch");
+    expect(result.current.items).toEqual([expect.objectContaining({ suggestion: suggestion(), status: "pending" })]);
   });
 
   it("does not replace suggestions after an aborted entity request resolves late", async () => {

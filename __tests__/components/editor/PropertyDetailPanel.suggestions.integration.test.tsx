@@ -196,9 +196,9 @@ describe("property suggestion persistence", () => {
     mount({ byoKey: "test-byo" });
     const section = screen.getByText("Sub-Properties").parentElement!.parentElement!;
     fireEvent.click(within(section).getByRole("button", { name: "Get LLM suggestions for this section" }));
-    await screen.findByText(/AI budget has been exhausted/);
+    await screen.findByText(/monthly AI budget is used up/);
     fireEvent.click(within(section).getByRole("button", { name: "Retry" }));
-    await waitFor(() => expect(within(section).queryByText(/AI budget has been exhausted/)).toBeNull());
+    await waitFor(() => expect(within(section).queryByText(/monthly AI budget is used up/)).toBeNull());
     expect(within(section).getByText(/Click.*Suggest improvements/)).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, options] = fetchMock.mock.calls[1];

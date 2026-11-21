@@ -50,15 +50,20 @@ describe("useBulkExpansion", () => {
   });
 
   it.each([
-    [429, { message: "Daily allowance reached. Try tomorrow." }, "Daily allowance reached. Try tomorrow."],
-    [402, "Monthly project budget reached.", "Monthly project budget reached."],
-  ])("halts at a %s refusal, keeps finished groups and reports the reason without retrying", async (status, detail, reason) => {
+    [429, "Daily LLM call limit reached for your role (suggester). Try again tomorrow.",
+      "You've reached today's AI request limit for your role. Try again tomorrow."],
+    [402, "Daily spending cap reached for this project.",
+      "This project's daily AI spending cap has been reached. Try again tomorrow, or ask a project admin to raise the cap."],
+    [402, "Monthly LLM budget exhausted for this project.",
+      "This project's monthly AI budget is used up. Ask a project admin to review the budget."],
+  ])("halts at HTTP %s with detail %s, keeps finished groups and reports the reason without retrying", async (status, detail, reason) => {
     generate.mockResolvedValueOnce(response).mockResolvedValueOnce(response)
       .mockRejectedValueOnce(new ApiError(status, "Refused", JSON.stringify({ detail })));
     const { result, announce } = mount();
     await act(async () => { await result.current.start(targets.slice(0, 5), 10); });
     expect(result.current.jobs.map((job) => job.status)).toEqual(["done", "done", "failed", "skipped", "skipped"]);
     expect(result.current.haltReason).toBe(reason);
+    expect(result.current.jobs[2].error).toBe(reason);
     expect(generate).toHaveBeenCalledTimes(3);
     expect(announce).toHaveBeenCalledTimes(3);
     expect(announce.mock.lastCall?.[0]).toContain(reason);
