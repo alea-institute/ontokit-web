@@ -2,7 +2,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { changesApi, type ChangedEntitiesFilters, type ProjectChangesFilters } from "@/lib/api/changes";
 import { ApiError } from "@/lib/api/client";
 
-export function isInvalidChangeFilterError(error: unknown) {
+export function isChangesValidationError(error: unknown) {
   return error instanceof ApiError && error.status === 422;
 }
 
@@ -16,9 +16,10 @@ export function useProjectChanges(
 ) {
   const queryClient = useQueryClient();
   const retry = queryClient.getDefaultOptions().queries?.retry ?? 3;
+  const queryKey = [...projectChangesKey(projectId), filters.branch, "list", !!accessToken, filters] as const;
 
-  return useInfiniteQuery({
-    queryKey: [...projectChangesKey(projectId), filters.branch, "list", !!accessToken, filters],
+  const query = useInfiniteQuery({
+    queryKey,
     queryFn: ({ pageParam }) =>
       changesApi.list(projectId, accessToken, { ...filters, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
@@ -26,11 +27,18 @@ export function useProjectChanges(
     enabled: !!projectId && enabled,
     staleTime: 60_000,
     retry: (failureCount, error) => {
-      if (isInvalidChangeFilterError(error)) return false;
+      if (isChangesValidationError(error)) return false;
       if (typeof retry === "function") return retry(failureCount, error);
       return typeof retry === "number" ? failureCount < retry : retry;
     },
   });
+
+  async function restartFromFirstPage() {
+    await queryClient.resetQueries({ queryKey, exact: true });
+    return queryClient.getQueryData<typeof query.data>(queryKey);
+  }
+
+  return { ...query, restartFromFirstPage };
 }
 
 export function useChangedEntities(

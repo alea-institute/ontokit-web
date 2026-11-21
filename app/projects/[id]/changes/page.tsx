@@ -27,7 +27,7 @@ import {
   type NetChange,
   type ProjectChangesResponse,
 } from "@/lib/api/changes";
-import { isInvalidChangeFilterError, useChangedEntities, useProjectChanges } from "@/lib/hooks/useProjectChanges";
+import { isChangesValidationError, useChangedEntities, useProjectChanges } from "@/lib/hooks/useProjectChanges";
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 
 function matchingItems(pages: ProjectChangesResponse[], kinds: readonly NetChange[]) {
@@ -100,11 +100,12 @@ export default function ProjectChangesPage() {
   const [paginationNotice, setPaginationNotice] = useState<{
     pages: ProjectChangesResponse[];
     kinds: string;
-    count: number;
+    message: string;
+    reloaded?: true;
   }>();
   const kinds = selected.net_change.join(",");
-  const lastAdded = paginationNotice?.pages === pages && paginationNotice?.kinds === kinds
-    ? paginationNotice.count
+  const currentNotice = paginationNotice?.pages === pages && paginationNotice?.kinds === kinds
+    ? paginationNotice
     : undefined;
 
   function updateUrl(update: (next: URLSearchParams) => void) {
@@ -128,35 +129,45 @@ export default function ProjectChangesPage() {
       for (const key of Object.keys(selected)) next.delete(key);
       next.delete("days");
     });
-    if (feed.isFetchNextPageError && isInvalidChangeFilterError(feed.error) && !hasFeedFilters && days === DEFAULT_CHANGE_WINDOW) {
-      // The query key stays the same, so refresh from the first page to drop the rejected cursor.
-      void feed.refetch();
-    }
   }
 
-  async function loadMore() {
-    if (feed.isFetching) return;
-    const result = await feed.fetchNextPage();
-    if (result.isFetchNextPageError || !result.data) return;
-    setPaginationNotice({
-      pages: result.data.pages,
-      kinds,
-      count: matchingItems(result.data.pages, selected.net_change).length - items.length,
-    });
+  async function loadMore(button: HTMLButtonElement) {
+    if (feed.isFetching || !hasMoreMatches) return;
+    try {
+      const { data } = await feed.fetchNextPage({ throwOnError: true });
+      if (!data) return;
+      const added = matchingItems(data.pages, selected.net_change).length - items.length;
+      setPaginationNotice({
+        pages: data.pages,
+        kinds,
+        message: `${added} more ${added === 1 ? "change" : "changes"} loaded.`,
+      });
+    } catch (error) {
+      if (!isChangesValidationError(error)) return;
+      if (document.activeElement === button) resultsHeading.current?.focus();
+      const data = await feed.restartFromFirstPage();
+      if (!data) return;
+      setPaginationNotice({
+        pages: data.pages,
+        kinds,
+        message: "The list changed while you were reading. Reloaded from the top.",
+        reloaded: true,
+      });
+    }
   }
 
   const windowLabel = days === 1 ? "24 hours" : `${days} days`;
   const activeFeed = waitingForAuthors ? authorFeed : feed;
   const isLoading = activeFeed.isLoading;
-  const invalidFilters = isInvalidChangeFilterError(activeFeed.error);
+  const invalidFilters = !activeFeed.isFetchNextPageError && isChangesValidationError(activeFeed.error);
   const isError = invalidFilters || (activeFeed.isError && !pages);
+  const loadMoreFailed = feed.isFetchNextPageError && !isChangesValidationError(feed.error);
   const status = invalidFilters ? ""
     : isLoading ? "Loading changes."
     : feed.isFetchingNextPage ? "Loading more changes."
-    : feed.isFetchNextPageError ? "Failed to load more changes."
+    : loadMoreFailed ? "Failed to load more changes."
     : isError ? "Failed to load changes."
-    : lastAdded !== undefined ? `${lastAdded} more ${lastAdded === 1 ? "change" : "changes"} loaded.`
-    : `${countLabel(items.length)} loaded.`;
+    : currentNotice?.message ?? `${countLabel(items.length)} loaded.`;
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950">
@@ -215,6 +226,10 @@ export default function ProjectChangesPage() {
             Only the first {MAX_CHANGE_FILTER_VALUES} authors in this link apply.
           </p>
         )}
+
+        <p role="status" aria-live="polite" className={currentNotice?.reloaded ? "text-sm text-slate-600 dark:text-slate-400" : "sr-only"}>
+          {status}
+        </p>
 
         <section aria-labelledby="changed-entities-heading" aria-busy={isLoading || feed.isFetchingNextPage} className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
           <h2
@@ -283,7 +298,7 @@ export default function ProjectChangesPage() {
               )}
               {hasMoreMatches && (
                 <div className="flex flex-wrap items-center justify-center gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
-                  {feed.isFetchNextPageError && (
+                  {loadMoreFailed && (
                     <p className="flex items-center gap-2 text-sm text-red-700 dark:text-red-400">
                       <AlertTriangle aria-hidden="true" className="h-4 w-4" />
                       Failed to load more changes
@@ -295,17 +310,16 @@ export default function ProjectChangesPage() {
                     variant="outline"
                     size="sm"
                     aria-disabled={feed.isFetching}
-                    onClick={() => void loadMore()}
+                    onClick={(event) => void loadMore(event.currentTarget)}
                     className="text-slate-700 focus-visible:ring-primary-500 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 dark:text-slate-200 dark:focus-visible:ring-primary-400"
                   >
-                    {feed.isFetchNextPageError ? "Retry" : feed.isFetchingNextPage ? "Loading more…" : "Load more"}
+                    {loadMoreFailed ? "Retry" : feed.isFetchingNextPage ? "Loading more…" : "Load more"}
                   </Button>
                 </div>
               )}
             </>
           )}
         </section>
-        <p role="status" aria-live="polite" className="sr-only">{status}</p>
       </main>
     </div>
   );

@@ -622,6 +622,67 @@ describe("project Changes page", () => {
     expect(requests.map((params) => params.get("cursor"))).toEqual([null, "next", "next"]);
   });
 
+  it("restarts from the first page after a stale cursor and keeps the active filters", async () => {
+    const user = userEvent.setup();
+    navigation.search = "?days=30&branch=review&origin=human&entity_type=class&author=reviewer";
+    const sublease = { ...lease, entity_iri: "https://example.org/onto#Sublease", label: "Sublease" };
+    let release: ((response: Response) => void) | undefined;
+    respond = (params) => {
+      if (!params.has("origin")) return json(changes);
+      const cursor = params.get("cursor");
+      if (cursor === "stale") return json({ detail: "Invalid cursor" }, 422);
+      if (cursor === "next") return json({ ...changes, items: [sublease], next_cursor: "stale" });
+      if (requests.some((request) => request.get("cursor") === "stale")) {
+        return new Promise<Response>((resolve) => { release = resolve; });
+      }
+      return json({ ...changes, items: [lease], next_cursor: "next" });
+    };
+    render(page());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+    expect(await screen.findByRole("link", { name: "Sublease" })).toBeDefined();
+    screen.getByRole("button", { name: "Load more" }).focus();
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(release).toBeTypeOf("function"));
+    expect(screen.queryByText("These filters are not valid")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Changed entities" }));
+    release!(json({ ...changes, items: [{ ...lease, label: "Updated Lease" }], next_cursor: "fresh" }));
+
+    expect(await screen.findByRole("link", { name: "Updated Lease" })).toBeDefined();
+    expect(screen.queryByRole("link", { name: "Sublease" })).toBeNull();
+    expect(screen.queryByText("These filters are not valid")).toBeNull();
+    expect(screen.getByRole("status").textContent).toBe("The list changed while you were reading. Reloaded from the top.");
+    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Changed entities" }));
+    expect(navigation.push).not.toHaveBeenCalled();
+    const filteredRequests = requests.filter((params) => params.has("origin"));
+    expect(filteredRequests.map((params) => params.get("cursor"))).toEqual([null, "next", "stale", null]);
+    expect([...filteredRequests.at(-1)!]).toEqual([
+      ["days", "30"], ["branch", "review"], ["origin", "human"], ["author", "reviewer"], ["entity_type", "class"],
+    ]);
+    expect([...filteredRequests.at(-1)!]).toEqual([...filteredRequests[0]]);
+    expect(requests.filter((params) => !params.has("origin"))).toHaveLength(1);
+  });
+
+  it.each([
+    [422, "These filters are not valid", "Clear filters"],
+    [408, "Failed to load changes", "Retry"],
+  ])("shows the first-page error when a stale-cursor restart returns %i", async (status, heading, action) => {
+    respond = (params) => {
+      if (params.has("cursor")) return json({ detail: "Invalid cursor" }, 422);
+      if (requests.length > 1) return json({ detail: heading }, status);
+      return json({ ...changes, items: [lease], next_cursor: "stale" });
+    };
+    render(page());
+    fireEvent.click(await screen.findByRole("button", { name: "Load more" }));
+
+    const results = screen.getByRole("region", { name: "Changed entities" });
+    expect(await within(results).findByText(heading)).toBeDefined();
+    expect(within(results).getByRole("button", { name: action })).toBeDefined();
+    expect(screen.queryByText(/reloaded from the top/i)).toBeNull();
+    expect(requests.map((params) => params.get("cursor"))).toEqual([null, "stale", null]);
+  });
+
   it("names system work and who ran it without crediting a person as author", async () => {
     const imported = {
       ...lease, net_change: "added" as const, origins: ["system" as const], field_changes: [], event_count: 2,
@@ -666,12 +727,14 @@ describe("project Changes page", () => {
 
   it("explains a rejected filter and offers to clear it", async () => {
     navigation.search = "?entity_type=class";
-    respond = () => json({ detail: "Too many filter values" }, 422);
+    respond = (params) => params.has("entity_type") ? json({ detail: "Too many filter values" }, 422) : json(changes);
     render(page());
 
     expect(await screen.findByText("These filters are not valid")).toBeDefined();
     const results = screen.getByRole("region", { name: "Changed entities" });
     expect(within(results).queryByRole("button", { name: "Retry" })).toBeNull();
+    expect(screen.queryByText(/reloaded from the top/i)).toBeNull();
+    expect(requests.filter((params) => params.has("entity_type")).map((params) => params.get("cursor"))).toEqual([null]);
     fireEvent.click(within(results).getByRole("button", { name: "Clear filters" }));
     expect(navigation.search).toBe("");
   });
