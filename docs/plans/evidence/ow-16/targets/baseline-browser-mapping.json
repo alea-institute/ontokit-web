@@ -1,0 +1,48 @@
+{
+  "target": "baseline-browser-mapping",
+  "lockSha256": "78b7d9786601b4cc2ea92fa2e5d31c1dc25205bfab7ef9c9a555a01360e150ff",
+  "changes": [
+    {
+      "path": "node_modules/baseline-browser-mapping",
+      "from": "2.10.14",
+      "to": "2.11.39"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "baseline-browser-mapping",
+      "path": "node_modules/baseline-browser-mapping",
+      "advisory": "https://github.com/advisories/GHSA-w5vr-8v7q-w6rv",
+      "range": ">=2.0.0 <2.11.0"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 8,
+    "moderate": 10,
+    "high": 11,
+    "critical": 0,
+    "total": 29
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 8,
+    "moderate": 9,
+    "high": 11,
+    "critical": 0,
+    "total": 28
+  },
+  "verification": [
+    {
+      "command": [
+        "node",
+        "-e",
+        "const assert=require(\"node:assert/strict\");const m=require(\"baseline-browser-mapping\");const result=m.getAllVersions();assert(result.length>0);assert(result.some(v=>v.browser===\"chrome\"));console.log(\"Browser compatibility mapping loads and returns Chrome records\")"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:28:49.858132+00:00",
+      "end": "2026-11-21T13:28:49.888756+00:00"
+    }
+  ]
+}
