@@ -139,6 +139,25 @@ describe("ClassDetailPanel auto-suggest on navigate (M-1)", () => {
     expect(requestFns.siblings).not.toHaveBeenCalled();
   });
 
+  it("drops a tree request when the reader leaves before the class loads", async () => {
+    const intent = { kind: "children" as const, iri: BASE_PROPS.classIri, projectId: "proj-1", branch: "main" };
+    const consumed = vi.fn();
+    let resolveDetail: (detail: ReturnType<typeof makeClassDetail>) => void = () => {};
+    mockGetClassDetail.mockImplementationOnce(() => new Promise((resolve) => { resolveDetail = resolve; }));
+    const props = { ...BASE_PROPS, canUseLLM: true, autoSuggestOnMount: intent, onAutoSuggestConsumed: consumed };
+    const view = render(<ClassDetailPanel {...props} />);
+    await waitFor(() => expect(mockGetClassDetail).toHaveBeenCalledTimes(1));
+
+    view.rerender(<ClassDetailPanel {...props} classIri="http://example.org/ontology#Other" />);
+    await waitFor(() => expect(consumed).toHaveBeenCalledExactlyOnceWith(intent));
+    resolveDetail(makeClassDetail());
+
+    // The layout would clear the request; a late return must not spend a call either way.
+    view.rerender(<ClassDetailPanel {...props} />);
+    await screen.findByRole("button", { name: "Suggest subclasses" });
+    expect(requestFns.children).not.toHaveBeenCalled();
+  });
+
   it("fires the annotation request exactly once on mount when flagged", async () => {
     render(
       <ClassDetailPanel

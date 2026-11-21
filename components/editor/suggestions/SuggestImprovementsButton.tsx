@@ -34,7 +34,7 @@ export function SuggestImprovementsButton({
       aria-label={label ?? "Get LLM suggestions for this section"}
       aria-describedby={reason ? reasonId : undefined}
       className={cn(
-        "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium",
+        "flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium",
         "text-primary-600 hover:bg-primary-50 focus-visible:outline-2 focus-visible:outline-primary-600",
         "dark:text-primary-400 dark:hover:bg-primary-900/20 dark:focus-visible:outline-primary-400",
         (disabled || isLoading) && "opacity-50 cursor-not-allowed"

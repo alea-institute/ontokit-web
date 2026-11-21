@@ -95,10 +95,12 @@ export function SuggestionBatchReview({
         </div>
       </header>
 
-      <p className="text-xs text-slate-600 dark:text-slate-300" aria-live="polite" aria-atomic="true">
-        {isLoading ? "Generating suggestions…" :
-          `${pending - blocked} pending, ${accepted} accepted, ${rejected} rejected, ${blocked} blocked as duplicate`}
-      </p>
+      {(isLoading || review.hasBatch) && (
+        <p className="text-xs text-slate-600 dark:text-slate-300" aria-live="polite" aria-atomic="true">
+          {isLoading ? "Generating suggestions…" :
+            `${pending - blocked} pending, ${accepted} accepted, ${rejected} rejected, ${blocked} blocked as duplicate`}
+        </p>
+      )}
       {isLoading && (
         <div aria-hidden="true" className="space-y-2">
           <SuggestionSkeleton />
@@ -160,7 +162,7 @@ export function SuggestionBatchReview({
         description={confirmation === "accept"
           ? `Create ${eligibleCount} classes under ${parentLabel}? Each class is saved as it is accepted.`
           : `Reject ${pending} pending suggestion${pending === 1 ? "" : "s"}?`}
-        confirmLabel={confirmation === "accept" ? `Accept ${eligibleCount} classes` : `Reject ${pending} suggestions`}
+        confirmLabel={confirmation === "accept" ? `Accept ${eligibleCount} classes` : `Reject ${pending} suggestion${pending === 1 ? "" : "s"}`}
         confirmDisabled={busy || (confirmation === "accept" ? eligibleCount === 0 : pending === 0)}
         onConfirm={confirmation === "accept" ? acceptAll : review.rejectAll}
         variant={confirmation === "reject" ? "danger" : "default"}

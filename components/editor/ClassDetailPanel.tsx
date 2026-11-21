@@ -778,10 +778,21 @@ export function ClassDetailPanel({
   }, [batchSize, childrenSuggestions.request, siblingsSuggestions.request]);
 
   const consumedIntent = useRef<ClassSuggestionIntent>(null);
+  const shownIntent = useRef<ClassSuggestionIntent>(null);
   useEffect(() => {
-    if (!autoSuggestOnMount || consumedIntent.current === autoSuggestOnMount ||
-      autoSuggestOnMount.iri !== classIri || autoSuggestOnMount.projectId !== projectId ||
-      autoSuggestOnMount.branch !== branch || !classDetail || !canUseLLM || !accessToken) return;
+    if (!autoSuggestOnMount || consumedIntent.current === autoSuggestOnMount) return;
+    if (autoSuggestOnMount.iri !== classIri || autoSuggestOnMount.projectId !== projectId ||
+      autoSuggestOnMount.branch !== branch) {
+      // The reader left before the class loaded. Drop the request so a later
+      // visit to that class never spends a generation call nobody asked for.
+      if (shownIntent.current === autoSuggestOnMount) {
+        consumedIntent.current = autoSuggestOnMount;
+        onAutoSuggestConsumed?.(autoSuggestOnMount);
+      }
+      return;
+    }
+    shownIntent.current = autoSuggestOnMount;
+    if (!classDetail || !canUseLLM || !accessToken) return;
 
     consumedIntent.current = autoSuggestOnMount;
     onAutoSuggestConsumed?.(autoSuggestOnMount);
@@ -1195,7 +1206,7 @@ export function ClassDetailPanel({
                   tooltip="skos:definition"
                   icon={<BookOpen className="h-4 w-4" />}
                   headerActions={canUseLLM ? (
-                    <span className="flex items-center gap-1">
+                    <span className="flex flex-wrap items-center gap-1 max-md:justify-end">
                       {fieldTranslationAction("skos:definition", "Definition", defAnnotation?.values.some((value) => value.value.trim()) ?? false)}
                       <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
                     </span>
@@ -1232,7 +1243,7 @@ export function ClassDetailPanel({
                   tooltip="skos:definition"
                   icon={<BookOpen className="h-4 w-4" />}
                   headerActions={canUseLLM ? (
-                    <span className="flex items-center gap-1">
+                    <span className="flex flex-wrap items-center gap-1 max-md:justify-end">
                       {fieldTranslationAction("skos:definition", "Definition", defAnnotation.values.some((value) => value.value.trim()))}
                       <SuggestImprovementsButton onRequest={annotationsSuggestions.request} isLoading={annotationsSuggestions.isLoading} disabled={!classIri} />
                     </span>
@@ -1731,13 +1742,18 @@ interface SectionProps {
 function Section({ title, tooltip, icon, children, headerActions }: SectionProps) {
   return (
     <div className="flex gap-4 max-md:flex-col max-md:gap-1">
+      {/* The label column is 10rem wide: actions take their own line under the
+          title there, and sit beside the title once the section stacks. */}
       <div
-        className="w-40 shrink-0 flex items-start gap-1.5 pt-1 max-md:w-full"
+        data-section-label=""
+        className="flex w-40 shrink-0 flex-wrap content-start items-center gap-x-1.5 gap-y-0.5 pt-1 max-md:w-full"
         title={tooltip}
       >
         {icon && <span className="text-slate-400 dark:text-slate-500">{icon}</span>}
         <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{title}</span>
-        {headerActions && <span className="ml-auto">{headerActions}</span>}
+        {headerActions && (
+          <span className="flex min-w-0 max-md:ml-auto md:-ml-2.5 md:basis-full">{headerActions}</span>
+        )}
       </div>
       <div className="min-w-0 flex-1">
         {children}

@@ -116,4 +116,26 @@ describe("SuggestionBatchReview", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Reject 2 suggestions" }));
     await waitFor(() => expect(within(region).getByText(/0 pending, 0 accepted, 2 rejected/)).toBeDefined());
   });
+  it("names a single pending suggestion in the singular when rejecting all", () => {
+    const { region } = mount(1);
+    fireEvent.click(within(region).getByRole("button", { name: "Reject all" }));
+    const dialog = screen.getByRole("dialog", { name: "Reject all suggestions" });
+    expect(within(dialog).getByRole("button", { name: "Reject 1 suggestion" })).toBeDefined();
+  });
+
+  it("shows a refused request without an empty progress count", () => {
+    const refusal = "Today's AI request limit for your role has been reached.";
+    const review = {
+      items: [], hasBatch: false, isLoading: false, isAcceptingAll: false, eligibleCount: 0,
+      error: refusal, requestError: refusal, acceptingIndices: new Set<number>(),
+    } as unknown as ReturnType<typeof useSuggestions>;
+    render(
+      <ToastProvider>
+        <SuggestionBatchReview title={title} review={review} onRequest={vi.fn()} siblingCount={0} />
+      </ToastProvider>,
+    );
+    const region = screen.getByRole("region", { name: title });
+    expect(within(region).getByText(refusal)).toBeDefined();
+    expect(within(region).queryByText(/0 pending/)).toBeNull();
+  });
 });
