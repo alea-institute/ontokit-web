@@ -2,9 +2,8 @@ import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { choosePreview, entity, filePath, installFixtures, projectId, source } from "./ow4-fixtures";
 
-// Committed browser evidence for ow-12 at the merge gate's desktop and mobile
-// viewports. Synthetic API/session fixtures only; no write reaches the API.
-const evidenceDir = "docs/plans/evidence/ow-12";
+// Browser evidence at the merge gate's desktop and mobile viewports. Synthetic API/session fixtures only; no write reaches the API.
+const evidenceDir = process.env.OW4_UI_EVIDENCE_DIR || "docs/plans/evidence/ow-12";
 const viewports = [
   { name: "desktop", width: 1440, height: 900 },
   { name: "mobile", width: 390, height: 844 },

@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { choosePreview, entity, filePath, installFixtures, projectId } from "./ow4-fixtures";
 
+const evidenceDir = process.env.OW4_UI_EVIDENCE_DIR || "docs/plans/evidence/ow-12";
+
 test("entity preview follows selections, preserves source edits and captures light/dark page evidence", async ({ page, context }) => {
   const { writes, unexpected } = await installFixtures(context);
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -28,11 +30,11 @@ test("entity preview follows selections, preserves source edits and captures lig
   await expect(excerpts).toContainText(":alice a owl:NamedIndividual, :Person");
   await expect(excerpts).not.toContainText(":hasGuide a owl:ObjectProperty");
   await expect(entity(page, "alice")).toBeVisible();
-  await mkdir("docs/plans/evidence/ow-12", { recursive: true });
-  await page.screenshot({ path: "docs/plans/evidence/ow-12/editor-entity-source-preview-acceptance.png", fullPage: true, animations: "disabled" });
+  await mkdir(evidenceDir, { recursive: true });
+  await page.screenshot({ path: `${evidenceDir}/editor-entity-source-preview-acceptance.png`, fullPage: true, animations: "disabled" });
   await page.getByRole("group", { name: "Theme", exact: true }).getByRole("button", { name: "Dark", exact: true }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await page.screenshot({ path: "docs/plans/evidence/ow-12/editor-entity-source-preview-acceptance-dark.png", fullPage: true, animations: "disabled" });
+  await page.screenshot({ path: `${evidenceDir}/editor-entity-source-preview-acceptance-dark.png`, fullPage: true, animations: "disabled" });
 
   await page.getByRole("button", { name: "Open full source", exact: true }).click();
   const editor = page.locator(".monaco-editor textarea").first();
