@@ -11,6 +11,8 @@ kind: expansion
 
 # Integrate ow-14 demo polish on dev - Plan
 
+> Historical plan, superseded by [ow-15](2026-11-20-2043-fix-ow15-review-repair-plan.md). The ow-10/ow-13 artifacts named below were removed from the current tree only after byte-for-byte verification against ancestor `caaa1570`; their paths and Git blobs are retained in the [cleanup inventory](evidence/ow-15/removed-artifacts.tsv). Use the ow-15 receipt for current verification and capture commands.
+
 ## Goal Capsule
 
 - **Objective:** Visitors can reach editor shortcut help on phones and desktops while the existing demo workflows remain usable.

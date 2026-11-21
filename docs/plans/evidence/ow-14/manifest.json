@@ -21,7 +21,7 @@
   "current_screenshots": [],
   "inherited_screenshots": {
     "source_commit": "43b541a53f682290bdd281ad0ab50ead11387355",
-    "status": "historical-only; unchanged from required PR head; not ow-14 acceptance",
+    "status": "historical-only; paths archived in ancestor after verified cleanup; not current acceptance",
     "images": [
       {
         "path": "docs/plans/evidence/ow-13/editor-desktop.png",
@@ -77,7 +77,8 @@
         "height": 954,
         "sha256": "32846213510509abef5dd9c13923b3a941b3ff606b7156233edcbc2c604f23b8"
       }
-    ]
+    ],
+    "archived_at_commit": "caaa157060ccc457dacce7a6bf2dad8530577bd6"
   },
   "preserved_evidence_trees": [
     "docs/plans/evidence/ow-5",

@@ -1,5 +1,7 @@
 # ow-14 integration verification
 
+> Historical receipt, superseded by [ow-15](../ow-15/README.md). Results below describe the original ow-14 source only. Ow-13 image paths now refer to ancestor `caaa1570`, with verified blobs in the [cleanup inventory](../ow-15/removed-artifacts.tsv). The duplicate opener is withdrawn and current browser acceptance remains open.
+
 Date: 2026-11-13. Plan: [PR #88 integration](../../2026-11-11-0723-fix-ow14-pr88-integration-plan.md).
 
 The PR #88 source and tests are integrated onto supplied dev baseline
@@ -103,78 +105,17 @@ inherited captures are:
 - `docs/plans/evidence/ow-13/editor-shortcuts.png`
 - `docs/plans/evidence/ow-13/editor-shortcuts-mobile.png`
 
-Fresh counterparts must land under `docs/plans/evidence/ow-14/`. Retain all other
-fresh demo-polish and source-preview captures, inspect them visually, and update
-the manifest with route, viewport, source revision and image hashes.
+The original ow-14 capture request is superseded. Fresh counterparts must land
+under a new run directory in `docs/plans/evidence/ow-15/`, after both full suites
+pass against final source. Do not overwrite any historical evidence path.
 
-## Controller host continuation
+## Controller host continuation (superseded)
 
-Use Node 24 and a clean, credential-free checkout of this branch on a host where
-Chromium is permitted. The following commands have **not** run browser tests in
-this lane. Do not count `--list` or historical images as acceptance.
+Use the [ow-15 receipt](../ow-15/README.md) for current commands and acceptance.
+The former overwrite-and-restore recipe has been retired: both source-preview
+specs now accept `OW4_UI_EVIDENCE_DIR`, so every attempt can write to a fresh
+ignored directory. The original commands remain recoverable in `caaa1570`.
 
-In a dedicated terminal, start the repository's ownership-checking server wrapper:
-
-```sh
-node e2e/ui/server.mjs 3105
-```
-
-It probes the port and delegates to `ontokit-web.sh` with a TTY, refusing an
-existing PID or conflicting port rather than killing an unrelated process.
-Use the same verified unused port in all commands if 3105 is unavailable. Wait
-for the local server to be ready, then run:
-
-```sh
-DEMO_POLISH_BASE_URL=http://localhost:3105 DEMO_POLISH_EVIDENCE_DIR=docs/plans/evidence/ow-14 npm run test:ui:demo-polish
-```
-
-The source-preview suite writes fixed historical ow-12 paths. Back up and verify
-those bytes before running it, then copy fresh captures into ow-14 and restore
-the historical files even if the suite fails:
-
-```python
-import hashlib
-import os
-from pathlib import Path
-import shutil
-import subprocess
-import tempfile
-
-historical = Path("docs/plans/evidence/ow-12")
-destination = Path("docs/plans/evidence/ow-14")
-backup = Path(tempfile.mkdtemp(prefix="ow14-source-preview-backup-"))
-images = sorted(historical.glob("*.png"))
-assert images, "Expected committed historical screenshots"
-for path in images:
-    saved = backup / path.name
-    shutil.copy2(path, saved)
-    assert saved.read_bytes() == path.read_bytes()
-
-try:
-    env = dict(os.environ, OW4_UI_BASE_URL="http://localhost:3105")
-    result = subprocess.run([
-        "npx", "--no-install", "playwright", "test", "--config", "playwright.ui.config.ts"
-    ], env=env)
-    if result.returncode == 0:
-        destination.mkdir(parents=True, exist_ok=True)
-        for path in images:
-            shutil.copy2(path, destination / path.name)
-finally:
-    for path in images:
-        shutil.copy2(backup / path.name, path)
-        assert hashlib.sha256(path.read_bytes()).digest() == hashlib.sha256(
-            (backup / path.name).read_bytes()
-        ).digest()
-result.check_returncode()
-```
-
-Stop the wrapper with Ctrl+C after both suites; close every opened browser,
-context and page. Commit inspected final-source screenshots and their updated
-manifest before marking R5/U2 complete. The backup above is retained for recovery.
-
-The controller also reconciles the unavailable chief campaign Goal Capsule and
-cited R-IDs, checks actual current `dev`, runs required CI/Semgrep/Docker and
-independent Astra/Fable reviews, then publishes the superseding PR. No schema,
-data, package release, outside service, spend or Damien-only decision is needed.
-Hosted DEV rehearsal, persona UAT and all other roadmap dispositions remain open
-as recorded in their own lanes.
+Current DEV comparison, chief campaign excerpts, required CI/security checks and
+independent Astra/Fable reviews remain controller duties. Hosted DEV rehearsal,
+persona UAT and other roadmap dispositions stay with their existing lanes.
