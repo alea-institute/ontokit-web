@@ -419,6 +419,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   const mobileBackRef = useRef<HTMLButtonElement>(null);
   const bulkExpansion = useBulkExpansionControls({
     nodes, projectId, branch: activeBranch ?? "main", accessToken, byoKey: byoEntry?.key, canUseLLM: llmGate.canUseLLM,
+    classAcceptanceLockedReason,
     returnReviewFocus: () => {
       const pane = treePaneRef.current;
       const tree = pane?.querySelector<HTMLElement>('[role="tree"][tabindex="0"]');
@@ -686,7 +687,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
                         selectedIri={selectedIri}
                         onSelect={selectClassFromTree}
                         onSuggest={suggestFromTree}
-                        suggestLockedReason={suggestionLockReason(llmGate)}
+                        suggestLockedReason={classAcceptanceLockedReason || suggestionLockReason(llmGate)}
                         onExpand={expandNode}
                         onCollapse={collapseNode}
                         onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}

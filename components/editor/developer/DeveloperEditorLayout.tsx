@@ -348,6 +348,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const bulkExpansion = useBulkExpansionControls({
     nodes, projectId, branch: activeBranch ?? "main", accessToken, byoKey: byoEntry?.key, canUseLLM: llmGate.canUseLLM,
+    classAcceptanceLockedReason,
     returnReviewFocus: () => {
       const tree = viewMode === "tree" ? contentRef.current?.querySelector<HTMLElement>('[role="tree"][tabindex="0"]') : null;
       const activeView = toolbarRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
@@ -680,7 +681,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                               selectedIri={selectedIri}
                               onSelect={selectNode}
                               onSuggest={suggestFromTree}
-                              suggestLockedReason={suggestionLockReason(llmGate)}
+                              suggestLockedReason={classAcceptanceLockedReason || suggestionLockReason(llmGate)}
                               onExpand={expandNode}
                               onCollapse={collapseNode}
                               onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}

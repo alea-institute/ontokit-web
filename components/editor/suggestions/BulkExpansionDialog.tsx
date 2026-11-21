@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -18,15 +18,17 @@ interface BulkExpansionDialogProps {
   onCancel: () => void;
   returnFocus: () => void;
   onGenerate: (targets: BulkExpansionTarget[], size: BulkExpansionBatchSize) => void;
+  classAcceptanceLockedReason?: string;
 }
 
 const batchSizes: BulkExpansionBatchSize[] = [3, 5, 10];
 const fieldFocus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:focus-visible:outline-primary-400";
 
-export function BulkExpansionDialog({ targets, onCancel, returnFocus, onGenerate }: BulkExpansionDialogProps) {
+export function BulkExpansionDialog({ targets, onCancel, returnFocus, onGenerate, classAcceptanceLockedReason }: BulkExpansionDialogProps) {
   const [checked, setChecked] = useState(() => new Set(targets.slice(0, MAX_BULK_EXPANSION_CLASSES).map((target) => target.iri)));
   const [size, setSize] = useState<BulkExpansionBatchSize>(5);
   const submitted = useRef(false);
+  const requestReasonId = useId();
   const count = checked.size;
 
   const toggle = (iri: string, selected: boolean) => {
@@ -87,9 +89,13 @@ export function BulkExpansionDialog({ targets, onCancel, returnFocus, onGenerate
             {batchSizes.map((choice) => <option key={choice}>{choice}</option>)}
           </select>
         </label>
+        {classAcceptanceLockedReason && (
+          <p id={requestReasonId} className="text-sm text-slate-600 dark:text-slate-300">{classAcceptanceLockedReason}</p>
+        )}
         <DialogFooter>
           <Button variant="outline" type="button" onClick={onCancel}>Cancel</Button>
-          <Button type="button" disabled={count === 0} onClick={() => {
+          <Button type="button" disabled={count === 0 || !!classAcceptanceLockedReason}
+            aria-describedby={classAcceptanceLockedReason ? requestReasonId : undefined} onClick={() => {
             submitted.current = true;
             onGenerate(targets.filter((target) => checked.has(target.iri)), size);
           }}>
@@ -120,12 +126,15 @@ interface BulkExpansionControlsOptions {
   accessToken?: string;
   byoKey?: string;
   canUseLLM: boolean;
+  classAcceptanceLockedReason?: string;
   returnReviewFocus: () => void;
 }
 
-export function useBulkExpansionControls({ nodes, returnReviewFocus, ...options }: BulkExpansionControlsOptions) {
+export function useBulkExpansionControls({ nodes, returnReviewFocus, classAcceptanceLockedReason, ...options }: BulkExpansionControlsOptions) {
   const { announce } = useAnnounce();
-  const { runId, jobs, totals, haltReason, start, stop, retry, dismiss } = useBulkExpansion({ ...options, announce });
+  const { runId, jobs, totals, haltReason, start, stop, retry, dismiss } = useBulkExpansion({
+    ...options, canUseLLM: options.canUseLLM && !classAcceptanceLockedReason, announce,
+  });
   const targetsByIri = useMemo(() => indexLoadedSubclasses(nodes), [nodes]);
   const { projectId, branch, accessToken } = options;
   const scope = useMemo(() => ({ projectId, branch, accessToken }), [projectId, branch, accessToken]);
@@ -162,6 +171,7 @@ export function useBulkExpansionControls({ nodes, returnReviewFocus, ...options 
     menu,
     dialog: preflight?.scope === scope && {
       targets: preflight.targets,
+      classAcceptanceLockedReason,
       returnFocus: preflight.returnFocus,
       onCancel: close,
       onGenerate: (targets: BulkExpansionTarget[], size: BulkExpansionBatchSize) => {

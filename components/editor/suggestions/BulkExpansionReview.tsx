@@ -111,6 +111,8 @@ function ReviewGroup({ job, retry, ...scope }: ReviewScope & {
 }) {
   const [expanded, setExpanded] = useState(false);
   const contentId = useId();
+  const requestReasonId = useId();
+  const { classAcceptanceLockedReason } = scope;
   const { label, Icon } = statuses[job.status];
   const Chevron = expanded ? ChevronDown : ChevronRight;
 
@@ -136,9 +138,14 @@ function ReviewGroup({ job, retry, ...scope }: ReviewScope & {
           <>
             <p>{job.error}</p>
             {retry && (
-              <Button type="button" variant="outline" size="sm" onClick={retry} className="focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400">
-                Retry
-              </Button>
+              <>
+                <Button type="button" variant="outline" size="sm" onClick={retry} disabled={!!classAcceptanceLockedReason}
+                  aria-describedby={classAcceptanceLockedReason ? requestReasonId : undefined}
+                  className="focus-visible:ring-primary-500 dark:focus-visible:ring-primary-400">
+                  Retry
+                </Button>
+                {classAcceptanceLockedReason && <p id={requestReasonId}>{classAcceptanceLockedReason}</p>}
+              </>
             )}
           </>
         )}

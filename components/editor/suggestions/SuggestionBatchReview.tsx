@@ -15,6 +15,7 @@ interface SuggestionBatchReviewProps {
   review: UseSuggestionsReturn;
   onRequest: () => void;
   canRequest?: boolean;
+  requestLockedReason?: string;
   acceptanceLockedReason?: string;
   requestVersion?: number;
   returnFocus?: () => void;
@@ -26,12 +27,13 @@ interface SuggestionBatchReviewProps {
 
 export function SuggestionBatchReview({
   title, parentLabel, review, onRequest, canRequest = true, requestVersion,
-  returnFocus, siblingCount, existingKind = "sibling", onMarkDistinct, acceptanceLockedReason,
+  returnFocus, siblingCount, existingKind = "sibling", onMarkDistinct, acceptanceLockedReason, requestLockedReason,
 }: SuggestionBatchReviewProps) {
   const [one, many] = existingKind === "subclass" ? ["subclass", "subclasses"] : ["sibling", "siblings"];
   const toast = useToast();
   const headingId = useId();
   const groundingId = useId();
+  const requestReasonId = useId();
   const headingRef = useRef<HTMLHeadingElement>(null);
   const focusedVersion = useRef(0);
   const restoreFocus = useRef(false);
@@ -114,8 +116,10 @@ export function SuggestionBatchReview({
           <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span role="status">{review.error}</span>
           {review.requestError && (
-            <Button variant="outline" size="sm" onClick={onRequest} disabled={!canRequest || busy}>Retry</Button>
+            <Button variant="outline" size="sm" onClick={onRequest} disabled={!canRequest || busy || !!requestLockedReason}
+              aria-describedby={requestLockedReason ? requestReasonId : undefined}>Retry</Button>
           )}
+          {review.requestError && requestLockedReason && <p id={requestReasonId} className="basis-full">{requestLockedReason}</p>}
         </div>
       )}
       {!isLoading && !review.error && items.length === 0 && (

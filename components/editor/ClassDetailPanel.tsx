@@ -650,6 +650,7 @@ export function ClassDetailPanel({
     (onAddSuggestedChild ? undefined : "Generated entity persistence is unavailable.");
   const siblingParentReason = siblingSuggestionLockReason(classDetail?.parent_iris ?? []);
   const siblingAcceptanceReason = subclassAcceptanceReason || siblingParentReason;
+  const canRequestClasses = !!canUseLLM && !classAcceptanceLockedReason;
 
   const handleAcceptSiblingSuggestion = useCallback(
     async (suggestion: GeneratedSuggestion, editedValue?: string) => {
@@ -722,6 +723,7 @@ export function ClassDetailPanel({
 
   const childrenSuggestions = useSuggestions({
     ...suggestionOpts,
+    canUseLLM: canRequestClasses,
     suggestionType: "children",
     onAccepted: handleAcceptChildSuggestion,
     getAcceptanceError: () => subclassAcceptanceReason ?? null,
@@ -729,10 +731,14 @@ export function ClassDetailPanel({
 
   const siblingsSuggestions = useSuggestions({
     ...suggestionOpts,
+    canUseLLM: canRequestClasses,
     suggestionType: "siblings",
     onAccepted: handleAcceptSiblingSuggestion,
     getAcceptanceError: () => siblingAcceptanceReason ?? null,
   });
+
+  const subclassRequestReason = classAcceptanceLockedReason || childrenSuggestions.busyReason;
+  const siblingRequestReason = classAcceptanceLockedReason || siblingParentReason || siblingsSuggestions.busyReason;
 
   const annotationsSuggestions = useSuggestions({
     ...suggestionOpts,
@@ -1564,16 +1570,16 @@ export function ClassDetailPanel({
                   label="Suggest subclasses"
                   onRequest={() => { void requestClassSuggestions("children"); }}
                   isLoading={childrenSuggestions.isLoading}
-                  disabled={!canUseLLM || !!childrenSuggestions.busyReason}
-                  disabledReason={childrenSuggestions.busyReason}
+                  disabled={!canUseLLM || !!subclassRequestReason}
+                  disabledReason={subclassRequestReason}
                 />
                 <SuggestImprovementsButton
                   ref={siblingTrigger}
                   label="Suggest siblings"
                   onRequest={() => { void requestClassSuggestions("siblings"); }}
                   isLoading={siblingsSuggestions.isLoading}
-                  disabled={!canUseLLM || !!siblingParentReason || !!siblingsSuggestions.busyReason}
-                  disabledReason={siblingParentReason || siblingsSuggestions.busyReason}
+                  disabled={!canUseLLM || !!siblingRequestReason}
+                  disabledReason={siblingRequestReason}
                 />
                 <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                   Batch size
@@ -1596,6 +1602,7 @@ export function ClassDetailPanel({
                 parentLabel={displayLabel}
                 review={childrenSuggestions}
                 acceptanceLockedReason={subclassAcceptanceReason}
+                requestLockedReason={classAcceptanceLockedReason}
                 onRequest={() => { void requestClassSuggestions("children"); }}
                 canRequest={canUseLLM ?? false}
                 requestVersion={requestVersions.children}
@@ -1609,6 +1616,7 @@ export function ClassDetailPanel({
                 parentLabel={classDetail.parent_iris.map((iri) => classDetail.parent_labels?.[iri] || getLocalName(iri)).join(", ")}
                 review={siblingsSuggestions}
                 acceptanceLockedReason={siblingAcceptanceReason}
+                requestLockedReason={classAcceptanceLockedReason}
                 onRequest={() => { void requestClassSuggestions("siblings"); }}
                 canRequest={!!canUseLLM && !siblingParentReason}
                 requestVersion={requestVersions.siblings}

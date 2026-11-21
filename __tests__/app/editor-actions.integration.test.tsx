@@ -55,12 +55,14 @@ const iri = "https://example.test/Person";
 const initialEditorMode = useEditorModeStore.getState();
 const initialSendBeacon = Object.getOwnPropertyDescriptor(navigator, "sendBeacon");
 let llmConfigured: boolean;
+let generationStatus: number;
 let generationBodies: unknown[];
 let generatedDefinition: string | undefined;
 let generatedModel: string | undefined;
 let extraTreeNodes: object[];
 let nestPerson: boolean;
 let classParents: string[];
+let classAnnotations: object[];
 let classDetailReady: Promise<void> | undefined;
 let sourceSaveReady: Promise<void> | undefined;
 let generatedLabel: string;
@@ -177,6 +179,8 @@ beforeEach(() => {
   boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; lintIssues = []; extraBranches = [];
   sessionStorage.removeItem("ontokit:branch:route-project");
   llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
+  generationStatus = 200;
+  classAnnotations = [];
   generatedDefinition = undefined; generatedModel = "fixture-model"; generatedLabel = "Generated child";
   classDetailReady = undefined; sourceSaveReady = undefined;
   useSuggestionStore.getState().clearAllSuggestions();
@@ -237,7 +241,7 @@ beforeEach(() => {
       // The API serves no project-scoped class write (alea#56); any non-GET here is a regression.
       if (init?.method && init.method !== 'GET') { unexpected.push(init.method + ' ' + path); return json({ detail: 'Method Not Allowed' }, 405); }
       if (classDetailReady) await classDetailReady;
-      return json({ iri, labels: [{ value: 'Person', lang: 'en' }], comments: [], parent_iris: classParents, parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
+      return json({ iri, labels: [{ value: 'Person', lang: 'en' }], comments: [], parent_iris: classParents, parent_labels: {}, annotations: classAnnotations, deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
     }
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/OldParent"))) return json({ parent_iris: [] });
     if (path.endsWith("/ontology/classes/" + encodeURIComponent("https://example.test/Sibling"))) return json({ iri: "https://example.test/Sibling", labels: [{ value: "Sibling", lang: "en" }], comments: [], parent_iris: [], parent_labels: {}, annotations: [], deprecated: false, equivalent_iris: [], disjoint_iris: [], child_count: 0, instance_count: 0, is_defined: true });
@@ -256,6 +260,7 @@ beforeEach(() => {
     if (path.endsWith("/llm/generate-suggestions")) {
       const body = JSON.parse(String(init?.body));
       generationBodies.push(body);
+      if (generationStatus !== 200) return json({ detail: "Generation failed" }, generationStatus);
       return json({ suggestions: [{ iri: "https://example.test/Generated", label: generatedLabel, definition: generatedDefinition, suggestion_type: body.suggestion_type, provenance: "llm-proposed", model: generatedModel, prompt_template: body.suggestion_type, validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }], input_tokens: 10, output_tokens: 20 });
     }
     if (path.endsWith("/llm/status")) return json({ configured: llmConfigured });
@@ -300,13 +305,17 @@ afterEach(() => {
   expect(unexpected, JSON.stringify(unexpected)).toEqual([]);
 });
 
-async function openBulkReview() {
+async function openBulkPreflight() {
   const parent = await screen.findByRole("treeitem", { name: /Old parent/ });
-  fireEvent.doubleClick(parent);
+  if (parent.getAttribute("aria-expanded") !== "true") fireEvent.doubleClick(parent);
   await screen.findByRole("treeitem", { name: /^Person$/ });
   fireEvent.contextMenu(parent);
   fireEvent.click(await screen.findByRole("menuitem", { name: "Suggest subclasses for each subclass…" }));
-  fireEvent.click(await screen.findByRole("button", { name: "Generate for 1 class" }));
+  return screen.findByRole("button", { name: "Generate for 1 class" });
+}
+
+async function openBulkReview() {
+  fireEvent.click(await openBulkPreflight());
   const review = await screen.findByRole("region", { name: "Bulk expansion review" });
   fireEvent.click(await within(review).findByRole("button", { name: /Person.*Done/ }));
   return review;
@@ -375,20 +384,31 @@ describe("editor review actions", () => {
       llmConfigured = true;
     });
 
-    it.each(["untrusted", "failed resume", "writable"] as const)("gates bulk and detail class acceptance for a %s suggester", async state => {
+    it.each(["untrusted", "failed resume", "writable"] as const)("gates class generation and acceptance for a %s suggester", async state => {
       projectResponse = { ...projectResponse, user_role: "suggester" };
+      trustCapabilities = { ...trustCapabilities, tier: "trusted" };
       nestPerson = true;
+      classParents = ["https://example.test/OldParent"];
+      classAnnotations = [
+        { property_iri: "http://www.w3.org/2004/02/skos/core#definition", values: [{ value: "A person", lang: "en" }] },
+        { property_iri: "http://www.w3.org/2000/01/rdf-schema#seeAlso", values: [{ value: "https://example.test/Generated" }] },
+      ];
+      const { rerender } = mount();
+      const bulk = await openBulkReview();
       if (state === "untrusted") {
         trustCapabilities = { tier: "contributor", can_mint_entities: false, accepted_count: 0, promotion_threshold: 3 };
+        await act(async () => { await client.invalidateQueries({ queryKey: ["trust-capabilities"] }); });
       } else if (state === "failed resume") {
-        boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "suggestion/draft" });
-        extraBranches = [{ name: "suggestion/draft", is_current: false }];
+        boundary.search = new URLSearchParams({ resumeSession: "suggestion-session", branch: "main" });
+        rerender(<EditorPage />);
+        await screen.findByText(/The editor is read-only/);
       }
-      mount();
-      if (state === "failed resume") await screen.findByText(/The editor is read-only/);
-      const bulk = await openBulkReview();
-      fireEvent.click(within(screen.getByRole("treeitem", { name: /^Person$/ })).getByText("Person"));
+      const person = screen.getByRole("treeitem", { name: /^Person$/ });
+      fireEvent.click(within(person).getByText("Person"));
       const detail = await screen.findByRole("region", { name: "Suggested subclasses for Person" });
+      const reason = state === "untrusted"
+        ? "Creating new entries requires trusted status — 3 more accepted suggestions to go (3 in total)."
+        : "This suggestion session is read-only. Return to My Suggestions to try again.";
 
       for (const region of [bulk, detail]) {
         const buttons = [
@@ -398,10 +418,18 @@ describe("editor review actions", () => {
         ] as HTMLButtonElement[];
         buttons.forEach(button => expect(button.disabled).toBe(state !== "writable"));
         if (state !== "writable") {
-          expect(within(region).getByText(state === "untrusted" ? /requires trusted status/ : /read-only/i)).toBeDefined();
+          expect(within(region).getByText(reason)).toBeDefined();
           buttons.forEach(button => fireEvent.click(button));
         }
       }
+
+      for (const label of ["Suggest subclasses", "Suggest siblings"]) {
+        const button = screen.getByRole("button", { name: label }) as HTMLButtonElement;
+        expect.soft(button.getAttribute("aria-disabled"), label).toBe(state === "writable" ? null : "true");
+        if (state === "writable") expect(button.disabled).toBe(false);
+      }
+      expect(generationBodies).toHaveLength(1);
+
       if (state === "writable") {
         fireEvent.click(within(detail).getByRole("button", { name: "Accept suggestion" }));
         await within(detail).findByText("Accepted");
@@ -409,7 +437,68 @@ describe("editor review actions", () => {
       } else {
         expect(suggestionBodies).toEqual([]);
         expect(requests.some(request => request.path.endsWith("/suggestions/sessions") && request.method === "POST")).toBe(false);
+        const parent = screen.getByRole("treeitem", { name: /Old parent/ });
+        fireEvent.contextMenu(parent);
+        const menu = await screen.findByRole("menu");
+        for (const label of ["Suggest Subclasses", "Suggest Siblings", "Suggest subclasses for each subclass…"]) {
+          const item = within(menu).getByRole("menuitem", { name: label });
+          expect.soft(item.getAttribute("aria-disabled"), label).toBe("true");
+          expect.soft(document.getElementById(item.getAttribute("aria-describedby") ?? "")?.textContent, label).toBe(reason);
+          if (item.getAttribute("aria-disabled") === "true") fireEvent.click(item);
+        }
+        expect(generationBodies).toHaveLength(1);
+        fireEvent.keyDown(menu, { key: "Escape" });
+        await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+
+        for (const label of ["Suggest subclasses", "Suggest siblings"]) {
+          const button = screen.getByRole("button", { name: label, description: reason });
+          fireEvent.click(button);
+        }
+        expect(generationBodies).toHaveLength(1);
+
+        for (const [section, suggestionType] of [
+          ["Definition", "annotations"], ["Parent(s)", "parents"], ["Relationship(s)", "edges"],
+        ]) {
+          const header = screen.getByText(section).closest("[data-section-label]") as HTMLElement;
+          const button = within(header).getByRole("button", { name: "Get LLM suggestions for this section" }) as HTMLButtonElement;
+          expect(button.disabled).toBe(false);
+          expect(button.getAttribute("aria-disabled")).toBeNull();
+          fireEvent.click(button);
+          await waitFor(() => expect(generationBodies).toContainEqual(expect.objectContaining({ suggestion_type: suggestionType })));
+        }
       }
+    });
+
+    it("disables open bulk confirmation and existing retries if class creation becomes locked", async () => {
+      projectResponse = { ...projectResponse, user_role: "suggester" };
+      nestPerson = true;
+      generationStatus = 500;
+      mount();
+      fireEvent.click(await openBulkPreflight());
+      const bulk = await screen.findByRole("region", { name: "Bulk expansion review" });
+      fireEvent.click(await within(bulk).findByRole("button", { name: /Person.*Failed/ }));
+      fireEvent.click(within(screen.getByRole("treeitem", { name: /^Person$/ })).getByText("Person"));
+      fireEvent.click(await screen.findByRole("button", { name: "Suggest subclasses" }));
+      const detail = await screen.findByRole("region", { name: "Suggested subclasses for Person" });
+      for (const region of [bulk, detail]) {
+        expect(within(region).getByRole("button", { name: "Retry" }).hasAttribute("disabled")).toBe(false);
+      }
+      expect((await openBulkPreflight()).hasAttribute("disabled")).toBe(false);
+
+      trustCapabilities = { tier: "contributor", can_mint_entities: false, accepted_count: 0, promotion_threshold: 3 };
+      await act(async () => { await client.invalidateQueries({ queryKey: ["trust-capabilities"] }); });
+      const reason = "Creating new entries requires trusted status — 3 more accepted suggestions to go (3 in total).";
+      const dialog = within(screen.getByRole("dialog", { name: "Suggest subclasses for each subclass" }));
+      const generate = await dialog.findByRole("button", { name: "Generate for 1 class", description: reason });
+      expect(generate.hasAttribute("disabled")).toBe(true);
+      fireEvent.click(generate);
+      fireEvent.click(dialog.getByRole("button", { name: "Cancel" }));
+      for (const region of [bulk, detail]) {
+        const retry = await within(region).findByRole("button", { name: "Retry", description: reason });
+        expect(retry.hasAttribute("disabled")).toBe(true);
+        fireEvent.click(retry);
+      }
+      expect(generationBodies).toHaveLength(2);
     });
 
     it("drops a pending tree request when leaving and revisiting the class", async () => {
