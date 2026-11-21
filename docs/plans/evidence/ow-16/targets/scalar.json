@@ -1,0 +1,380 @@
+{
+  "target": "@scalar/api-reference-react",
+  "lockSha256": "f138fe35953a08d9e9ad156f96b33d7c4fbbecb84e3484d59b68806203e87464",
+  "changes": [
+    {
+      "path": "node_modules/@ai-sdk/gateway",
+      "from": "3.0.13",
+      "to": "3.0.139"
+    },
+    {
+      "path": "node_modules/@ai-sdk/provider",
+      "from": "3.0.2",
+      "to": "3.0.12"
+    },
+    {
+      "path": "node_modules/@ai-sdk/provider-utils",
+      "from": "4.0.5",
+      "to": "4.0.33"
+    },
+    {
+      "path": "node_modules/@ai-sdk/vue",
+      "from": "3.0.33",
+      "to": "3.0.214"
+    },
+    {
+      "path": "node_modules/@scalar/agent-chat",
+      "from": "0.12.26",
+      "to": "0.12.45"
+    },
+    {
+      "path": "node_modules/@scalar/api-client",
+      "from": "3.16.1",
+      "to": "3.23.2"
+    },
+    {
+      "path": "node_modules/@scalar/api-reference",
+      "from": "1.65.1",
+      "to": "1.75.1"
+    },
+    {
+      "path": "node_modules/@scalar/api-reference-react",
+      "from": "0.9.63",
+      "to": "0.9.82"
+    },
+    {
+      "path": "node_modules/@scalar/asyncapi-upgrader",
+      "from": "0.1.5",
+      "to": "0.1.18"
+    },
+    {
+      "path": "node_modules/@scalar/blocks",
+      "from": "0.1.12",
+      "to": "0.5.4"
+    },
+    {
+      "path": "node_modules/@scalar/code-highlight",
+      "from": "0.4.3",
+      "to": "0.4.10"
+    },
+    {
+      "path": "node_modules/@scalar/components",
+      "from": "0.27.11",
+      "to": "0.32.1"
+    },
+    {
+      "path": "node_modules/@scalar/helpers",
+      "from": "0.10.0",
+      "to": "0.16.4"
+    },
+    {
+      "path": "node_modules/@scalar/icons",
+      "from": "0.7.5",
+      "to": "0.7.7"
+    },
+    {
+      "path": "node_modules/@scalar/icons/node_modules/@types/node",
+      "from": "24.13.3",
+      "to": "24.19.2"
+    },
+    {
+      "path": "node_modules/@scalar/icons/node_modules/undici-types",
+      "from": "7.18.2",
+      "to": "7.24.6"
+    },
+    {
+      "path": "node_modules/@scalar/json-magic",
+      "from": "0.13.0",
+      "to": "0.16.1"
+    },
+    {
+      "path": "node_modules/@scalar/json-magic/node_modules/undici",
+      "from": null,
+      "to": "7.30.1"
+    },
+    {
+      "path": "node_modules/@scalar/localization",
+      "from": null,
+      "to": "0.2.8"
+    },
+    {
+      "path": "node_modules/@scalar/oas-utils",
+      "from": "0.19.12",
+      "to": "0.20.14"
+    },
+    {
+      "path": "node_modules/@scalar/openapi-to-markdown",
+      "from": null,
+      "to": "1.6.1"
+    },
+    {
+      "path": "node_modules/@scalar/openapi-types",
+      "from": "0.9.4",
+      "to": "0.9.8"
+    },
+    {
+      "path": "node_modules/@scalar/openapi-upgrader",
+      "from": "0.2.13",
+      "to": "0.4.5"
+    },
+    {
+      "path": "node_modules/@scalar/schemas",
+      "from": "0.8.1",
+      "to": "0.14.0"
+    },
+    {
+      "path": "node_modules/@scalar/sidebar",
+      "from": "0.9.37",
+      "to": "0.12.2"
+    },
+    {
+      "path": "node_modules/@scalar/snippetz",
+      "from": "0.9.26",
+      "to": "0.10.10"
+    },
+    {
+      "path": "node_modules/@scalar/themes",
+      "from": "0.17.2",
+      "to": "0.19.2"
+    },
+    {
+      "path": "node_modules/@scalar/types",
+      "from": "0.18.0",
+      "to": "0.24.0"
+    },
+    {
+      "path": "node_modules/@scalar/use-codemirror",
+      "from": "0.14.14",
+      "to": "0.14.15"
+    },
+    {
+      "path": "node_modules/@scalar/use-hooks",
+      "from": "0.4.9",
+      "to": "0.4.21"
+    },
+    {
+      "path": "node_modules/@scalar/use-toasts",
+      "from": "0.10.4",
+      "to": "0.10.5"
+    },
+    {
+      "path": "node_modules/@scalar/validation",
+      "from": "0.6.2",
+      "to": "0.6.7"
+    },
+    {
+      "path": "node_modules/@scalar/workspace-store",
+      "from": "0.57.1",
+      "to": "0.68.5"
+    },
+    {
+      "path": "node_modules/@scalar/workspace-store/node_modules/@scalar/typebox",
+      "from": null,
+      "to": "0.1.3"
+    },
+    {
+      "path": "node_modules/@tanstack/virtual-core",
+      "from": "3.17.7",
+      "to": "3.19.11"
+    },
+    {
+      "path": "node_modules/@tanstack/vue-virtual",
+      "from": "3.13.35",
+      "to": "3.13.52"
+    },
+    {
+      "path": "node_modules/@vercel/oidc",
+      "from": "3.1.0",
+      "to": "3.2.0"
+    },
+    {
+      "path": "node_modules/ai",
+      "from": "6.0.33",
+      "to": "6.0.214"
+    },
+    {
+      "path": "node_modules/collapse-white-space",
+      "from": null,
+      "to": "2.1.0"
+    },
+    {
+      "path": "node_modules/convert-hrtime",
+      "from": "5.0.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/function-timeout",
+      "from": "1.0.2",
+      "to": null
+    },
+    {
+      "path": "node_modules/get-own-enumerable-keys",
+      "from": "1.0.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/hast-util-to-mdast",
+      "from": null,
+      "to": "10.1.4"
+    },
+    {
+      "path": "node_modules/hast-util-to-text",
+      "from": "4.0.2",
+      "to": "4.0.5"
+    },
+    {
+      "path": "node_modules/identifier-regex",
+      "from": "1.1.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/is-identifier",
+      "from": "1.1.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/is-obj",
+      "from": "3.0.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/is-regexp",
+      "from": "3.1.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/make-asynchronous",
+      "from": "1.1.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/make-asynchronous/node_modules/type-fest",
+      "from": "4.41.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/p-event",
+      "from": "6.0.1",
+      "to": null
+    },
+    {
+      "path": "node_modules/p-timeout",
+      "from": "6.1.4",
+      "to": null
+    },
+    {
+      "path": "node_modules/rehype-minify-whitespace",
+      "from": null,
+      "to": "6.0.2"
+    },
+    {
+      "path": "node_modules/rehype-remark",
+      "from": null,
+      "to": "10.0.1"
+    },
+    {
+      "path": "node_modules/reserved-identifiers",
+      "from": "1.2.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/stringify-object",
+      "from": "6.0.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/super-regex",
+      "from": "1.1.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/time-span",
+      "from": "5.1.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/trim-trailing-lines",
+      "from": null,
+      "to": "2.1.0"
+    },
+    {
+      "path": "node_modules/unist-util-find-after",
+      "from": "5.0.0",
+      "to": null
+    },
+    {
+      "path": "node_modules/unist-util-visit",
+      "from": "5.1.0",
+      "to": "5.2.0"
+    },
+    {
+      "path": "node_modules/unist-util-visit-parents",
+      "from": "6.0.2",
+      "to": "6.1.0"
+    },
+    {
+      "path": "node_modules/web-worker",
+      "from": "1.5.0",
+      "to": null
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "@ai-sdk/provider-utils",
+      "path": "node_modules/@ai-sdk/provider-utils",
+      "advisory": "https://github.com/advisories/GHSA-866g-f22w-33x8",
+      "range": ">=4.0.0-beta.10 <4.0.33"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 8,
+    "moderate": 8,
+    "high": 11,
+    "critical": 0,
+    "total": 27
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 1,
+    "moderate": 8,
+    "high": 11,
+    "critical": 0,
+    "total": 20
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "--run",
+        "__tests__/app/api-docs.integration.test.tsx"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:34:00.054558+00:00",
+      "end": "2026-11-21T13:34:01.764568+00:00"
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "type-check"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:34:00.050986+00:00",
+      "end": "2026-11-21T13:34:06.815509+00:00"
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:34:00.053281+00:00",
+      "end": "2026-11-21T13:34:21.037813+00:00"
+    }
+  ]
+}
