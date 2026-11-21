@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { useState, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { projectOntologyApi, type OWLClassTreeNode as ApiTreeNode } from "@/lib/api/client";
 import type { ClassTreeNode } from "@/lib/ontology/types";
 
@@ -118,6 +118,14 @@ export function useOntologyTree({
   const rootRequestRef = useRef(0);
   const navigationRef = useRef(0);
   const [isExpandingAll, setIsExpandingAll] = useState(false);
+
+  // Save handlers may keep a tree callback across a branch switch.
+  const treeScope = useMemo(() => ({ projectId, accessToken, branchKey }), [projectId, accessToken, branchKey]);
+  const activeTreeScope = useRef<typeof treeScope | null>(null);
+  useLayoutEffect(() => {
+    activeTreeScope.current = treeScope;
+    return () => { activeTreeScope.current = null; };
+  }, [treeScope]);
 
   // Reset tree state when branch changes
   useEffect(() => {
@@ -260,6 +268,7 @@ export function useOntologyTree({
    */
   const addOptimisticNode = useCallback(
     (iri: string, label: string, parentIri?: string, options?: { select?: boolean }) => {
+      if (activeTreeScope.current !== treeScope) return;
       const newNode: ClassTreeNode = {
         iri,
         label,
@@ -284,9 +293,8 @@ export function useOntologyTree({
         // Expanding a parent whose children were never fetched would show the
         // new node alone, so fetch the rest and keep nodes the server lacks.
         if (parentUnloaded) {
-          const scope = scopeRef.current;
-          void projectOntologyApi.getClassChildren(projectId, parentIri, accessToken, branchKey).then((response) => {
-            if (scope !== scopeRef.current) return;
+          void projectOntologyApi.getClassChildren(treeScope.projectId, parentIri, treeScope.accessToken, treeScope.branchKey).then((response) => {
+            if (activeTreeScope.current !== treeScope) return;
             const fetched = response.nodes.map(apiNodeToTreeNode);
             const fetchedIris = new Set(fetched.map((child) => child.iri));
             setNodes((prev) =>
@@ -307,7 +315,7 @@ export function useOntologyTree({
       setTotalClasses((prev) => prev + 1);
       if (options?.select !== false) setSelectedIri(iri);
     },
-    [projectId, accessToken, branchKey]
+    [treeScope]
   );
 
   /**

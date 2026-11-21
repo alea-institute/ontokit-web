@@ -201,7 +201,7 @@ export function EntityTree({
   );
 
   const activeIri = focusedIri || (onSuggest ? selectedIri : null);
-  const activeDescendantId = activeIri ? treeItemId(activeIri) : undefined;
+  const activeDescendantId = activeIri && visibleIris.includes(activeIri) ? treeItemId(activeIri) : undefined;
 
   return (
     <div

@@ -6,7 +6,7 @@ if (typeof CSS === "undefined") {
 }
 Element.prototype.scrollIntoView = Element.prototype.scrollIntoView || (() => {});
 
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // Mock dnd-kit
@@ -130,7 +130,8 @@ describe("EntityTree", () => {
     const tree = screen.getByRole("tree");
     fireEvent.keyDown(tree, { key: "ArrowDown" });
     // Should set focus to Beta (next node)
-    expect(tree.getAttribute("aria-activedescendant")).toContain("ex_org_B");
+    expect(document.getElementById(tree.getAttribute("aria-activedescendant")!))
+      .toBe(screen.getByRole("treeitem", { name: "Beta" }));
   });
 
   it("handles ArrowUp keyboard navigation", () => {
@@ -148,7 +149,41 @@ describe("EntityTree", () => {
     );
     const tree = screen.getByRole("tree");
     fireEvent.keyDown(tree, { key: "ArrowUp" });
-    expect(tree.getAttribute("aria-activedescendant")).toContain("ex_org_A");
+    expect(document.getElementById(tree.getAttribute("aria-activedescendant")!))
+      .toBe(screen.getByRole("treeitem", { name: "Alpha" }));
+  });
+
+  it("opens the keyboard context menu for the active row when two IRIs differ by punctuation", async () => {
+    const onSuggest = vi.fn();
+    const secondIri = "https://example.org/a#b";
+    const user = userEvent.setup();
+    render(
+      <EntityTree
+        {...defaultProps}
+        nodes={[
+          makeNode({ iri: "https://example.org/a/b", label: "First class" }),
+          makeNode({ iri: secondIri, label: "Second class" }),
+        ]}
+        onSuggest={onSuggest}
+        enableKeyboardNav
+      />,
+    );
+
+    const tree = screen.getByRole("tree");
+    const first = screen.getByRole("treeitem", { name: "First class" });
+    const second = screen.getByRole("treeitem", { name: "Second class" });
+    await user.tab();
+    expect(document.activeElement).toBe(tree);
+    await user.keyboard("{ArrowDown}{ArrowDown}");
+    expect.soft(first.id).not.toBe(second.id);
+    expect.soft(document.getElementById(tree.getAttribute("aria-activedescendant")!)).toBe(second);
+
+    await user.keyboard("{Shift>}{F10}{/Shift}");
+    const action = screen.getByRole("menuitem", { name: "Suggest Subclasses" });
+    await waitFor(() => expect(document.activeElement).toBe(action));
+    await user.keyboard("{Enter}");
+    expect.soft(onSuggest).toHaveBeenCalledExactlyOnceWith(secondIri, "children");
+    await waitFor(() => expect(document.activeElement).toBe(tree));
   });
 
   it("handles Enter key to select focused node", () => {
@@ -238,7 +273,8 @@ describe("EntityTree", () => {
     const tree = screen.getByRole("tree");
     fireEvent.keyDown(tree, { key: "ArrowRight" });
     // Should focus child Beta
-    expect(tree.getAttribute("aria-activedescendant")).toContain("ex_org_B");
+    expect(document.getElementById(tree.getAttribute("aria-activedescendant")!))
+      .toBe(screen.getByRole("treeitem", { name: "Beta" }));
   });
 
   it("handles ArrowLeft to navigate to parent when node is collapsed", () => {
@@ -264,7 +300,8 @@ describe("EntityTree", () => {
     const tree = screen.getByRole("tree");
     fireEvent.keyDown(tree, { key: "ArrowLeft" });
     // Beta is not expanded, so should navigate to parent Alpha
-    expect(tree.getAttribute("aria-activedescendant")).toContain("ex_org_A");
+    expect(document.getElementById(tree.getAttribute("aria-activedescendant")!))
+      .toBe(screen.getByRole("treeitem", { name: "Alpha" }));
   });
 
   it("handles Space key to select focused node", () => {
@@ -300,7 +337,8 @@ describe("EntityTree", () => {
     const tree = screen.getByRole("tree");
     // First ArrowDown to set focusedIri
     fireEvent.keyDown(tree, { key: "ArrowDown" });
-    expect(tree.getAttribute("aria-activedescendant")).toContain("ex_org_B");
+    expect(document.getElementById(tree.getAttribute("aria-activedescendant")!))
+      .toBe(screen.getByRole("treeitem", { name: "Beta" }));
     // Now blur to clear
     fireEvent.blur(tree);
     expect(tree.getAttribute("aria-activedescendant")).toBeNull();
@@ -392,7 +430,8 @@ describe("EntityTree", () => {
     const tree = screen.getByRole("tree");
     // ArrowDown with no selection should still move focus
     fireEvent.keyDown(tree, { key: "ArrowDown" });
-    expect(tree.getAttribute("aria-activedescendant")).toContain("ex_org_A");
+    expect(document.getElementById(tree.getAttribute("aria-activedescendant")!))
+      .toBe(screen.getByRole("treeitem", { name: "Alpha" }));
   });
 
   it("passes draftIris, searchQuery, and dragState props to child nodes", () => {

@@ -102,7 +102,7 @@ test("marks changed classes in both editor layouts and shows history provenance"
   await expect(tree.getByRole("treeitem", { name: "Amendment, changed in the last 7 days, added" }).getByRole("img", { name: "Added" })).toBeVisible();
   const leaseRow = tree.getByRole("treeitem", { name: "Lease, changed in the last 7 days, modified" });
   await expect(leaseRow.getByRole("img", { name: "Modified" })).toBeVisible();
-  const aiMark = tree.getByRole("treeitem", { name: "Renewal, changed in the last 7 days, added by AI" }).getByRole("img", { name: "AI origin" });
+  const aiMark = tree.getByRole("treeitem", { name: "Renewal, changed in the last 7 days, added from an AI suggestion" }).getByRole("img", { name: "added from an AI suggestion" });
   await expect(aiMark).toBeVisible();
   expect(requests.map((request) => Object.fromEntries(request))).toEqual([{ days: "7", branch }]);
 
@@ -119,7 +119,7 @@ test("marks changed classes in both editor layouts and shows history provenance"
   await expect(page.locator("html")).toHaveClass(/\bdark\b/);
   await screenshot("ok-u6-tree-markers-dark.png");
   await aiMark.hover();
-  await expect(page.getByRole("tooltip")).toHaveText("changed in the last 7 days, added by AI");
+  await expect(page.getByRole("tooltip")).toHaveText("changed in the last 7 days, added from an AI suggestion");
 
   await leaseRow.click();
   const history = page.getByRole("button", { name: "History (2)" });

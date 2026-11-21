@@ -6,6 +6,8 @@ export function isInvalidChangeFilterError(error: unknown) {
   return error instanceof ApiError && error.status === 422;
 }
 
+export const projectChangesKey = (projectId: string) => ["projectChanges", projectId] as const;
+
 export function useProjectChanges(
   projectId: string,
   accessToken?: string,
@@ -16,7 +18,7 @@ export function useProjectChanges(
   const retry = queryClient.getDefaultOptions().queries?.retry ?? 3;
 
   return useInfiniteQuery({
-    queryKey: ["projectChanges", projectId, !!accessToken, filters],
+    queryKey: [...projectChangesKey(projectId), filters.branch, "list", !!accessToken, filters],
     queryFn: ({ pageParam }) =>
       changesApi.list(projectId, accessToken, { ...filters, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
@@ -37,7 +39,7 @@ export function useChangedEntities(
   filters: ChangedEntitiesFilters = {},
 ) {
   return useQuery({
-    queryKey: ["changedEntities", projectId, !!accessToken, filters],
+    queryKey: [...projectChangesKey(projectId), filters.branch, "digest", !!accessToken, filters],
     queryFn: () => changesApi.listChangedEntities(projectId, accessToken, filters),
     enabled: !!projectId,
     staleTime: 60_000,

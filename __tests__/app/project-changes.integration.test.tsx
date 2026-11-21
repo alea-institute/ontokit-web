@@ -1,12 +1,14 @@
 import { TooltipProvider } from "@radix-ui/react-tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ProjectChangesPage from "@/app/projects/[id]/changes/page";
 import ProjectViewerPage from "@/app/projects/[id]/page";
 import { changes, changesWithTransient, lease, legacyTenant, renewal, temporaryClause } from "@/__tests__/components/changes/changeFixtures";
 import type { ProjectChangesResponse } from "@/lib/api/changes";
+import { branchQueryKeys } from "@/lib/context/BranchContext";
+import { useChangedEntities, useInvalidateChangedEntitiesAfterSave } from "@/lib/hooks/useChangedEntities";
 
 const navigation = vi.hoisted(() => ({
   path: "/projects/project-1/changes",
@@ -31,7 +33,7 @@ let client: QueryClient;
 let requests: URLSearchParams[];
 let respond: (params: URLSearchParams) => Response | Promise<Response>;
 let digestRequests: URLSearchParams[];
-let respondDigest: () => Response;
+let respondDigest: (params: URLSearchParams) => Response;
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -73,7 +75,7 @@ beforeEach(() => {
     }
     if (url.pathname.endsWith("/analytics/changed-entities")) {
       digestRequests.push(url.searchParams);
-      return respondDigest();
+      return respondDigest(url.searchParams);
     }
     if (url.pathname.endsWith("/projects/project-1")) {
       return json({ id: "project-1", name: "Example ontology", is_public: true });
@@ -123,6 +125,81 @@ describe("project Changes page", () => {
     expect(screen.getByText("A rental agreement.").closest("del")).toBeTruthy();
     expect(screen.getByText("A contract granting use of property for a set period.").closest("ins")).toBeTruthy();
     expect(screen.getByText("Contract").closest("[title]")?.getAttribute("title")).toBe("https://example.org/onto#Contract");
+  });
+
+  it.each([
+    { selection: "an explicit branch", branch: "review" },
+    { selection: "the default branch with no branch parameter", branch: null },
+  ])("refreshes the cached list and digest for $selection when the editor sees a new branch head", async ({ branch }) => {
+    const defaultBranch = changes.window.branch;
+    const savedBranch = branch ?? defaultBranch;
+    client.setDefaultOptions({ queries: { retry: false } });
+    navigation.search = "?branch=other&days=7";
+    const otherBranch = render(page());
+    await screen.findByRole("link", { name: "Lease" });
+    await screen.findByRole("button", { name: /^2 classes added by AI/ });
+    otherBranch.unmount();
+
+    navigation.search = branch ? `?branch=${branch}&days=7` : "";
+    const changesPage = render(page());
+    await screen.findByRole("link", { name: "Lease" });
+    await screen.findByRole("button", { name: /^2 classes added by AI/ });
+    expect(screen.getByText(`Branch: ${savedBranch}`)).toBeDefined();
+    expect(requests.at(-1)?.get("branch")).toBe(branch);
+    expect(digestRequests.at(-1)?.get("branch")).toBe(branch);
+    changesPage.unmount();
+    const branchKey = branchQueryKeys.list("project-1");
+    const branchList = (head: string) => ({
+      default_branch: defaultBranch,
+      items: [
+        { name: savedBranch, commit_hash: head },
+        { name: "other", commit_hash: "other-head" },
+      ],
+    });
+    client.setQueryData(branchKey, branchList("before-save"));
+
+    function EditorMarkers() {
+      useInvalidateChangedEntitiesAfterSave("project-1");
+      const { entries } = useChangedEntities({ projectId: "project-1", branch: savedBranch, days: 7, enabled: true });
+      return <output aria-label="Marker count">{entries.size}</output>;
+    }
+    const editor = render(<QueryClientProvider client={client}><EditorMarkers /></QueryClientProvider>);
+    await waitFor(() => expect(screen.getByLabelText("Marker count").textContent).toBe("3"));
+
+    const accepted = {
+      ...lease,
+      entity_iri: "https://example.org/onto#AcceptedClass",
+      label: "Accepted class",
+      net_change: "added",
+      origins: ["ai"],
+    } as const;
+    const oldDigest = await respondDigest(new URLSearchParams()).json();
+    respondDigest = (params) => json((params.get("branch") ?? defaultBranch) === savedBranch
+      ? { ...oldDigest, items: [...oldDigest.items, accepted] }
+      : oldDigest);
+    respond = (params) => json((params.get("branch") ?? defaultBranch) === savedBranch
+      ? { ...changes, items: [...changes.items, accepted] }
+      : changes);
+    await act(async () => { client.setQueryData(branchKey, branchList("after-save")); });
+    await waitFor(() => expect(screen.getByLabelText("Marker count").textContent).toBe("4"));
+    editor.unmount();
+
+    const refreshed = render(page());
+    await waitFor(() => {
+      expect({
+        list: !!screen.queryByRole("link", { name: "Accepted class" }),
+        digest: !!screen.queryByRole("button", { name: /^3 classes added by AI/ }),
+      }).toEqual({ list: true, digest: true });
+    });
+    refreshed.unmount();
+    navigation.search = "?branch=other&days=7";
+    render(page());
+    await screen.findByRole("link", { name: "Lease" });
+    await screen.findByRole("button", { name: /^2 classes added by AI/ });
+    await waitFor(() => {
+      expect(requests.filter((params) => params.get("branch") === "other")).toHaveLength(2);
+      expect(digestRequests.filter((params) => params.get("branch") === "other")).toHaveLength(2);
+    });
   });
 
   it("round-trips the entity type the feed stores for properties", async () => {

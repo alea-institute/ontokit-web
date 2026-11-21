@@ -286,6 +286,36 @@ describe("useOntologyTree", () => {
     await waitFor(() => expect(result.current.nodes[0].children.map((node) => node.iri)).toEqual(["urn:A1", "urn:New"]));
   });
 
+  it("ignores a saved child from a previous branch without fetching that branch's children", async () => {
+    mockedGetRootClasses
+      .mockResolvedValueOnce({ nodes: [makeApiNode("urn:Parent", "Parent on A", 1)], total_classes: 2 })
+      .mockResolvedValueOnce({ nodes: [makeApiNode("urn:Parent", "Parent on B", 1)], total_classes: 5 });
+    mockedGetClassChildren.mockResolvedValue({ nodes: [makeApiNode("urn:OldChild", "Child on A")] });
+    const { result, rerender } = renderHook(
+      ({ branchKey }) => useOntologyTree({ projectId: "p1", branchKey }),
+      { initialProps: { branchKey: "branch-a" } },
+    );
+    await waitFor(() => expect(result.current.nodes[0]?.label).toBe("Parent on A"));
+
+    let finishSave!: () => void;
+    const save = new Promise<void>((resolve) => { finishSave = resolve; });
+    const addSavedChild = result.current.addOptimisticNode;
+    const acceptance = save.then(() => addSavedChild("urn:New", "Accepted child", "urn:Parent", { select: false }));
+
+    rerender({ branchKey: "branch-b" });
+    await waitFor(() => expect(result.current.nodes[0]?.label).toBe("Parent on B"));
+    const branchBNodes = result.current.nodes;
+
+    await act(async () => {
+      finishSave();
+      await acceptance;
+    });
+
+    expect.soft(result.current.nodes).toEqual(branchBNodes);
+    expect.soft(result.current.totalClasses).toBe(5);
+    expect(mockedGetClassChildren).not.toHaveBeenCalled();
+  });
+
   it("removes an optimistic node and clears selection if selected", async () => {
     mockedGetRootClasses.mockResolvedValue({
       nodes: [makeApiNode("urn:A", "A"), makeApiNode("urn:B", "B")],

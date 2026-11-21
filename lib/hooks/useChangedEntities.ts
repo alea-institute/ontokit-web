@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { changesApi, type ChangedEntitiesResponse } from "@/lib/api/changes";
 import type { BranchListResponse } from "@/lib/api/revisions";
 import { branchQueryKeys } from "@/lib/context/BranchContext";
+import { projectChangesKey } from "./useProjectChanges";
 
 export type ChangedEntity = ChangedEntitiesResponse["items"][number];
 
@@ -56,20 +57,27 @@ export function useInvalidateChangedEntitiesAfterSave(projectId: string, accessT
     const cache = queryClient.getQueryCache();
     let previous = queryClient.getQueryData<BranchListResponse>(branchKey);
     // Source and entity saves already invalidate the branch list. Keep
-    // watching when the source view hides the tree so cached markers go stale.
+    // watching when the source view hides the tree so cached changes go stale.
     return cache.subscribe((event) => {
       if (event.type !== "updated" || event.action.type !== "success" ||
           event.query !== cache.find({ queryKey: branchKey, exact: true })) return;
       const current = queryClient.getQueryData<BranchListResponse>(branchKey);
       const previousHeads = new Map(previous?.items.map((item) => [item.name, item.commit_hash]));
       previous = current;
+      const markerKeys = [];
       for (const item of current?.items ?? []) {
         const lastHead = previousHeads.get(item.name);
         if (lastHead && item.commit_hash && lastHead !== item.commit_hash) {
-          const filters = { queryKey: changedEntitiesKey(projectId, item.name) };
-          // The first read may have started before the commit.
-          void queryClient.cancelQueries(filters).then(() => queryClient.invalidateQueries(filters));
+          markerKeys.push(changedEntitiesKey(projectId, item.name));
         }
+      }
+      if (markerKeys.length === 0) return;
+
+      // Changes requests can omit the branch and let the API resolve the default.
+      for (const queryKey of [...markerKeys, projectChangesKey(projectId)]) {
+        const filters = { queryKey };
+        // The first read may have started before the commit.
+        void queryClient.cancelQueries(filters).then(() => queryClient.invalidateQueries(filters));
       }
     });
   }, [queryClient, projectId, accessToken, enabled]);

@@ -26,6 +26,7 @@ interface StandardEditorLayoutProps {
     deprecated: boolean;
   }) => Promise<void>;
   onAddSuggestedChild: (iri: string, label: string, parentIri: string) => Promise<void>;
+  acceptedSuggestionIris: Set<string>;
 }
 
 interface DeleteConfirmProps {
@@ -579,5 +580,32 @@ describe("anonymous proposal submission lifecycle", () => {
     expect(lifecycle.persistGeneratedEntity).not.toHaveBeenCalled();
     expect(lifecycle.getFileAtVersion).not.toHaveBeenCalled();
     expect(lifecycle.setSourceSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("keeps a late accepted class save from updating the new branch's editor state", async () => {
+    configureDirectEditor("main source", "main-revision");
+    const addOptimisticNode = vi.fn();
+    const setSourceIriIndex = vi.fn();
+    Object.assign(lifecycle.viewerOverrides, { addOptimisticNode, setSourceIriIndex });
+    let finishSave!: (result: { content: string; revision: string }) => void;
+    lifecycle.persistGeneratedEntity.mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve; }));
+    renderWithQueryClient(<EditorPage />);
+    selectMainBranch();
+
+    const iri = "https://example.org/Generated";
+    const acceptance = lifecycle.standardEditorLayoutProps!.onAddSuggestedChild(iri, "Generated", "https://example.org/Parent");
+    await act(async () => {});
+    expect(lifecycle.persistGeneratedEntity).toHaveBeenCalledWith(expect.objectContaining({ branch: "main" }));
+    act(() => lifecycle.branchOnChange?.("review"));
+
+    await act(async () => {
+      finishSave({ content: "saved main source", revision: "saved-main-revision" });
+      await acceptance;
+    });
+
+    expect.soft(addOptimisticNode).not.toHaveBeenCalled();
+    expect.soft(lifecycle.standardEditorLayoutProps!.acceptedSuggestionIris.has(iri)).toBe(false);
+    expect.soft(lifecycle.setSourceSnapshot).not.toHaveBeenCalled();
+    expect(setSourceIriIndex).not.toHaveBeenCalled();
   });
 });
