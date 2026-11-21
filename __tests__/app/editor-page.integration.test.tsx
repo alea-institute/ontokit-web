@@ -235,11 +235,12 @@ describe("Editor page real access and empty-state chains", () => {
     }
   });
 
-  it.each(["optional", "disabled"])("opens compact mobile help with anonymous shortcuts in %s mode", async (mode) => {
+  it.each(["optional", "disabled"])("opens one help dialog with anonymous shortcuts in %s mode", async (mode) => {
     vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", mode);
     projectResponse = { ...projectResponse, user_role: null, is_public: true, source_file_path: "ontology.ttl" };
     mount();
-    const opener = await screen.findByRole("button", { name: "Keyboard shortcuts for mobile viewers" });
+    const opener = await screen.findByRole("button", { name: "Keyboard shortcuts" });
+    expect(screen.getAllByRole("button", { name: /Keyboard shortcuts/ })).toHaveLength(1);
     opener.focus();
     fireEvent.click(opener);
     const dialog = screen.getByRole("dialog", { name: "Keyboard Shortcuts" });
@@ -250,12 +251,12 @@ describe("Editor page real access and empty-state chains", () => {
     await waitFor(() => expect(document.activeElement).toBe(opener));
   });
 
-  it("does not duplicate compact help for an authorized editor", async () => {
+  it("keeps one help opener for an authorized editor", async () => {
     authenticate();
     projectResponse = { ...projectResponse, source_file_path: "ontology.ttl" };
     mount();
     await screen.findByRole("button", { name: "Keyboard shortcuts" });
-    expect(screen.queryByRole("button", { name: "Keyboard shortcuts for mobile viewers" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /Keyboard shortcuts/ })).toHaveLength(1);
   });
 
   it("lists the add-entity shortcut for an authorized editor", async () => {

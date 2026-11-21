@@ -55,7 +55,7 @@ test("projects announce loading and recover from no matches with keyboard focus"
   await expectNoPageOverflow(page);
 });
 
-test("editor help opens with physical Shift+Slash and restores opener focus", async ({ page }) => {
+test("anonymous desktop and phone visitors reach editor help and regain opener focus", async ({ page }) => {
   await page.goto(`/projects/${project.id}/editor`);
   const trigger = page.getByRole("button", { name: /Keyboard shortcuts/ });
   await expect(trigger).toHaveCount(1);
@@ -84,7 +84,8 @@ test("editor help opens with physical Shift+Slash and restores opener focus", as
   await page.keyboard.press("Escape");
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(trigger).toHaveCount(1);
-  await expect(trigger).toHaveAccessibleName("Keyboard shortcuts for mobile viewers");
+  await expect(trigger).toHaveAccessibleName("Keyboard shortcuts");
+  await expect(trigger).toBeInViewport({ ratio: 1 });
   await expectNoPageOverflow(page);
   await capture(page, "editor-mobile");
   await trigger.click();
@@ -98,9 +99,8 @@ test("editor help opens with physical Shift+Slash and restores opener focus", as
   for (const width of [767, 768, 767, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(trigger).toHaveCount(1);
-    await expect(trigger).toHaveAccessibleName(
-      width < 768 ? "Keyboard shortcuts for mobile viewers" : "Keyboard shortcuts",
-    );
+    await expect(trigger).toHaveAccessibleName("Keyboard shortcuts");
+    await expect(trigger).toBeInViewport({ ratio: 1 });
     await expectNoPageOverflow(page);
     await trigger.click();
     await expect(dialog).toBeVisible();
