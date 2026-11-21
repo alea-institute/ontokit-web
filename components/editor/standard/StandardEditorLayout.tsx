@@ -135,6 +135,7 @@ export interface StandardEditorLayoutProps {
   isAnonymousProposalMode?: boolean;
 
   // LLM suggestion support
+  classAcceptanceLockedReason?: string;
   onAddSuggestedChild?: (iri: string, label: string, parentIri: string, provenance?: AcceptedSuggestionProvenance) => Promise<void>;
   /** Create a new PROPERTY entity from an accepted sub-property suggestion (B-1). */
   onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation", provenance?: AcceptedSuggestionProvenance) => Promise<void>;
@@ -194,6 +195,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   // can never tell a contributor three different stories.
   const mintingLocked = trustGate?.locked === true;
   const mintingLockedReason = mintingLockReason(trustGate);
+  const classAcceptanceLockedReason = props.classAcceptanceLockedReason || mintingLockedReason || undefined;
   // Trusted suggesters mint through the suggestion branch rather than the
   // direct-edit path. Keep that affordance visible in suggestion mode; the
   // capability gate decides whether it is enabled.
@@ -215,9 +217,6 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
     s.getPendingCount({ projectId, branch: activeBranch ?? "main" })
   );
   const byoEntry = useByoKeyStore((s) => s.getEntry(projectId));
-  const bulkExpansion = useBulkExpansionControls({
-    nodes, projectId, branch: activeBranch ?? "main", accessToken, byoKey: byoEntry?.key, canUseLLM: llmGate.canUseLLM,
-  });
 
   const scrollToFirstPending = useCallback(() => {
     const firstCard = document.querySelector('[role="listitem"]');
@@ -418,6 +417,22 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
   const paneVisibility = mobilePaneVisibility(mobilePane);
   const treePaneRef = useRef<HTMLDivElement>(null);
   const mobileBackRef = useRef<HTMLButtonElement>(null);
+  const bulkExpansion = useBulkExpansionControls({
+    nodes, projectId, branch: activeBranch ?? "main", accessToken, byoKey: byoEntry?.key, canUseLLM: llmGate.canUseLLM,
+    returnReviewFocus: () => {
+      const pane = treePaneRef.current;
+      const tree = pane?.querySelector<HTMLElement>('[role="tree"][tabindex="0"]');
+      const target = isSinglePaneViewport() && mobilePane === "detail" ? mobileBackRef.current : tree ?? pane;
+      target?.focus({ preventScroll: true });
+    },
+  });
+
+  useEffect(() => {
+    setSuggestionIntent((intent) => intent && (
+      intent.iri !== selectedIri || intent.projectId !== projectId || intent.branch !== activeBranch ||
+      activeTab !== "classes" || showGraph || (mobilePane === "tree" && isSinglePaneViewport())
+    ) ? null : intent);
+  }, [selectedIri, projectId, activeBranch, activeTab, showGraph, mobilePane]);
   const revealMobileTree = useCallback(() => {
     setShowGraph(false);
     setMobileDismissedKey(mobileKey);
@@ -580,7 +595,8 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
       )}
 
       {bulkExpansion.dialog && <BulkExpansionDialog {...bulkExpansion.dialog} />}
-      <BulkExpansionReview {...bulkExpansion.review} isSuggestionMode={isSuggestionMode} onAddSuggestedChild={onAddSuggestedChild} />
+      <BulkExpansionReview {...bulkExpansion.review} isSuggestionMode={isSuggestionMode} onAddSuggestedChild={onAddSuggestedChild}
+        classAcceptanceLockedReason={classAcceptanceLockedReason} />
 
       <div className="flex min-h-0 flex-1">
       {/* Left Panel - Entity Tree/List with tabs */}
@@ -806,6 +822,7 @@ export function StandardEditorLayout(props: StandardEditorLayoutProps) {
             canUseLLM={llmGate.canUseLLM}
             byoKey={byoEntry?.key}
             onAddSuggestedChild={onAddSuggestedChild}
+            classAcceptanceLockedReason={classAcceptanceLockedReason}
             autoSuggestAnnotationsOnMount={isAutoSuggesting}
             autoSuggestOnMount={suggestionIntent}
             onAutoSuggestConsumed={consumeSuggestionIntent}

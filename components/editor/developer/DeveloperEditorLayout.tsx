@@ -43,7 +43,7 @@ import type { ClassUpdatePayload } from "@/lib/api/client";
 import type { TurtlePropertyUpdateData } from "@/lib/ontology/turtlePropertyUpdater";
 import type { TurtleIndividualUpdateData } from "@/lib/ontology/turtleIndividualUpdater";
 import type { ClassTreeNode } from "@/lib/ontology/types";
-import type { OntologySourceEditorRef } from "@/components/editor/OntologySourceEditor";
+import type { OntologySourceEditorRef, SourceDraft } from "@/components/editor/OntologySourceEditor";
 import type { IriPosition } from "@/lib/editor/indexWorker";
 import { useDraftStore } from "@/lib/stores/draftStore";
 import { useSelectionStore } from "@/lib/stores/selectionStore";
@@ -121,7 +121,10 @@ export interface DeveloperEditorLayoutProps {
   sourceEditorRef: React.RefObject<OntologySourceEditorRef | null>;
 
   // Actions
-  onSaveSource: (content: string) => Promise<void>;
+  sourceRevision?: string | null;
+  sourceDraft?: SourceDraft;
+  onSourceDraftChange?: (draft: SourceDraft | undefined) => void;
+  onSaveSource: (content: string, baseRevision?: string | null) => Promise<void>;
   onAddEntity: (parentIri?: string) => void;
   onDeleteClass?: (iri: string, label: string) => void;
   onCopyIri?: (iri: string) => void;
@@ -156,6 +159,7 @@ export interface DeveloperEditorLayoutProps {
   isAnonymousProposalMode?: boolean;
 
   // LLM suggestion support
+  classAcceptanceLockedReason?: string;
   onAddSuggestedChild?: (iri: string, label: string, parentIri: string, provenance?: AcceptedSuggestionProvenance) => Promise<void>;
   /** Create a new PROPERTY entity from an accepted sub-property suggestion (B-1). */
   onAddSuggestedProperty?: (iri: string, label: string, parentIri: string, propertyType: "object" | "data" | "annotation", provenance?: AcceptedSuggestionProvenance) => Promise<void>;
@@ -200,6 +204,9 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     pendingScrollIri,
     setPendingScrollIri,
     sourceEditorRef,
+    sourceRevision,
+    sourceDraft,
+    onSourceDraftChange,
     onSaveSource,
     onAddEntity,
     onDeleteClass,
@@ -228,6 +235,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   // can never tell a contributor three different stories.
   const mintingLocked = trustGate?.locked === true;
   const mintingLockedReason = mintingLockReason(trustGate);
+  const classAcceptanceLockedReason = props.classAcceptanceLockedReason || mintingLockedReason || undefined;
   // Trusted suggesters mint through the suggestion branch rather than the
   // direct-edit path. Keep that affordance visible in suggestion mode; the
   // capability gate decides whether it is enabled.
@@ -249,9 +257,6 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
     s.getPendingCount({ projectId, branch: activeBranch ?? "main" })
   );
   const byoEntry = useByoKeyStore((s) => s.getEntry(projectId));
-  const bulkExpansion = useBulkExpansionControls({
-    nodes, projectId, branch: activeBranch ?? "main", accessToken, byoKey: byoEntry?.key, canUseLLM: llmGate.canUseLLM,
-  });
 
   const scrollToFirstPending = useCallback(() => {
     const firstCard = document.querySelector('[role="listitem"]');
@@ -339,6 +344,16 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
   const [viewMode, setViewMode] = useState<DeveloperView>("tree");
   const [detailTab, setDetailTab] = useState("detail");
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const bulkExpansion = useBulkExpansionControls({
+    nodes, projectId, branch: activeBranch ?? "main", accessToken, byoKey: byoEntry?.key, canUseLLM: llmGate.canUseLLM,
+    returnReviewFocus: () => {
+      const tree = viewMode === "tree" ? contentRef.current?.querySelector<HTMLElement>('[role="tree"][tabindex="0"]') : null;
+      const activeView = toolbarRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
+      (tree ?? activeView)?.focus({ preventScroll: true });
+    },
+  });
   const suggestFromTree = useCallback<OnClassSuggest>((iri, kind) => {
     setSuggestionIntent({ iri, kind, projectId, branch: activeBranch });
     setDetailTab("detail");
@@ -361,6 +376,12 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
   // Entity tab state
   const [activeTab, setActiveTab] = useState<EntityTab>("classes");
+  useEffect(() => {
+    setSuggestionIntent((intent) => intent && (
+      intent.iri !== selectedIri || intent.projectId !== projectId || intent.branch !== activeBranch ||
+      viewMode !== "tree" || activeTab !== "classes" || detailTab !== "detail"
+    ) ? null : intent);
+  }, [selectedIri, projectId, activeBranch, viewMode, activeTab, detailTab]);
 
   // Track selected entity per tab (properties/individuals have their own selection)
   const [selectedPropertyIri, setSelectedPropertyIri] = useState<string | null>(null);
@@ -373,7 +394,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
     const handler = (iri: string, type?: string) => {
       if (type !== "other") {
-        if (viewMode === "source" && sourceEditorRef.current) {
+        if (!onSourceDraftChange && viewMode === "source" && sourceEditorRef.current) {
           setSourceContent(sourceEditorRef.current.getValue());
         }
         setViewMode("tree");
@@ -400,7 +421,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
         entityNavigationRef.current = null;
       }
     };
-  }, [entityNavigationRef, navToNode, setScrollIri, viewMode, sourceEditorRef, setSourceContent]);
+  }, [entityNavigationRef, navToNode, setScrollIri, viewMode, sourceEditorRef, setSourceContent, onSourceDraftChange]);
 
   // Mirror the active-tab selection into the shared store so cross-page chrome
   // (e.g. the Viewer/Editor switcher, the side-page Back-to-project link via
@@ -475,11 +496,11 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   }, [viewMode, detailTab, isSourceReady, sourceError, isLoadingSource, isPreloading, sourceScopeKey, loadSourceContent]);
 
   const handleViewModeChange = useCallback((mode: DeveloperView) => {
-    if (viewMode === "source" && mode !== "source" && sourceEditorRef.current) {
+    if (!onSourceDraftChange && viewMode === "source" && mode !== "source" && sourceEditorRef.current) {
       setSourceContent(sourceEditorRef.current.getValue());
     }
     setViewMode(mode);
-  }, [viewMode, sourceEditorRef, setSourceContent]);
+  }, [viewMode, sourceEditorRef, setSourceContent, onSourceDraftChange]);
 
   const handleNavigateToSource = useCallback((iri: string) => {
     setViewMode("source");
@@ -502,9 +523,10 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
 
       {/* Developer Sub-Header: View Mode Tabs */}
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-800">
-        <div className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-900">
+        <div ref={toolbarRef} className="flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-slate-700 dark:bg-slate-900">
           <button
             aria-label="Tree"
+            aria-pressed={viewMode === "tree"}
             onClick={() => handleViewModeChange("tree")}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
@@ -518,6 +540,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
           </button>
           <button
             aria-label="Source"
+            aria-pressed={viewMode === "source"}
             onClick={() => handleViewModeChange("source")}
             onMouseEnter={handleSourceTabHover}
             className={cn(
@@ -535,6 +558,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
           </button>
           <button
             aria-label="Graph"
+            aria-pressed={viewMode === "graph"}
             onClick={() => handleViewModeChange("graph")}
             className={cn(
               "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
@@ -558,10 +582,11 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
       </div>
 
       {bulkExpansion.dialog && <BulkExpansionDialog {...bulkExpansion.dialog} />}
-      <BulkExpansionReview {...bulkExpansion.review} isSuggestionMode={isSuggestionMode} onAddSuggestedChild={onAddSuggestedChild} />
+      <BulkExpansionReview {...bulkExpansion.review} isSuggestionMode={isSuggestionMode} onAddSuggestedChild={onAddSuggestedChild}
+        classAcceptanceLockedReason={classAcceptanceLockedReason} />
 
       {/* Content Area */}
-      <div className="relative flex min-w-0 flex-1 overflow-hidden max-md:flex-col max-md:overflow-visible">
+      <div ref={contentRef} className="relative flex min-w-0 flex-1 overflow-hidden max-md:flex-col max-md:overflow-visible">
         {viewMode === "graph" ? (
           <div className="min-w-0 flex-1 bg-white max-md:h-[70dvh] max-md:flex-none dark:bg-slate-800">
             <OntologyGraph
@@ -749,6 +774,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   canUseLLM={llmGate.canUseLLM}
                   byoKey={byoEntry?.key}
                   onAddSuggestedChild={onAddSuggestedChild}
+                  classAcceptanceLockedReason={classAcceptanceLockedReason}
                   autoSuggestAnnotationsOnMount={isAutoSuggesting}
                   autoSuggestOnMount={suggestionIntent}
                   onAutoSuggestConsumed={consumeSuggestionIntent}
@@ -848,9 +874,13 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
               </div>
             ) : (
               <OntologySourceEditor
+                key={sourceScopeKey}
                 ref={sourceEditorRef}
                 projectId={projectId}
                 initialValue={sourceContent}
+                sourceRevision={sourceRevision}
+                draft={sourceDraft}
+                onDraftChange={onSourceDraftChange}
                 accessToken={accessToken}
                 readOnly={!canEdit}
                 onSave={onSaveSource}
@@ -863,7 +893,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   }
                 }}
                 height="100%"
-                prebuiltIriIndex={sourceIriIndex}
+                prebuiltIriIndex={sourceDraft ? undefined : sourceIriIndex}
                 pendingScrollIri={pendingScrollIri}
                 onScrollComplete={() => setPendingScrollIri(null)}
               />

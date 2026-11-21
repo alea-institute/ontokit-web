@@ -15,6 +15,7 @@ interface SuggestionBatchReviewProps {
   review: UseSuggestionsReturn;
   onRequest: () => void;
   canRequest?: boolean;
+  acceptanceLockedReason?: string;
   requestVersion?: number;
   returnFocus?: () => void;
   siblingCount: number | (() => Promise<number>);
@@ -25,7 +26,7 @@ interface SuggestionBatchReviewProps {
 
 export function SuggestionBatchReview({
   title, parentLabel, review, onRequest, canRequest = true, requestVersion,
-  returnFocus, siblingCount, existingKind = "sibling", onMarkDistinct,
+  returnFocus, siblingCount, existingKind = "sibling", onMarkDistinct, acceptanceLockedReason,
 }: SuggestionBatchReviewProps) {
   const [one, many] = existingKind === "subclass" ? ["subclass", "subclasses"] : ["sibling", "siblings"];
   const toast = useToast();
@@ -42,7 +43,7 @@ export function SuggestionBatchReview({
   const accepted = items.filter((item) => item.status === "accepted").length;
   const rejected = items.filter((item) => item.status === "rejected").length;
   const blocked = items.filter((item) => item.status === "pending" && item.suggestion.duplicate_verdict === "block").length;
-  const busy = isLoading || isAcceptingAll || review.acceptingIndices.size > 0;
+  const busy = !!review.busyReason || isLoading || isAcceptingAll || review.acceptingIndices.size > 0;
   const count = typeof siblingCount === "number" ? siblingCount : loadedSiblingCount;
 
   useEffect(() => {
@@ -152,7 +153,7 @@ export function SuggestionBatchReview({
                 : count === "unavailable" ? `existing ${many} (count unavailable)` : `existing ${many} (loading count…)`}
             </p>
           </div>
-          <SuggestionReviewCards review={review} onMarkDistinct={onMarkDistinct} showDefinition />
+          <SuggestionReviewCards review={review} onMarkDistinct={onMarkDistinct} acceptanceLockedReason={acceptanceLockedReason} showDefinition />
         </>
       )}
       <ConfirmDialog

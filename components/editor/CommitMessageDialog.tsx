@@ -18,6 +18,7 @@ interface CommitMessageDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: (message: string) => Promise<void>;
   defaultMessage?: string;
+  returnFocus?: () => void;
 }
 
 export function CommitMessageDialog({
@@ -25,6 +26,7 @@ export function CommitMessageDialog({
   onOpenChange,
   onConfirm,
   defaultMessage = "Update ontology",
+  returnFocus,
 }: CommitMessageDialogProps) {
   const [message, setMessage] = useState(defaultMessage);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,7 +79,12 @@ export function CommitMessageDialog({
 
   return (
     <Dialog open={open} onOpenChange={(nextOpen) => { if (!submittingRef.current) onOpenChange(nextOpen); }}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md"
+        onCloseAutoFocus={returnFocus && ((event) => {
+          event.preventDefault();
+          returnFocus();
+        })}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">

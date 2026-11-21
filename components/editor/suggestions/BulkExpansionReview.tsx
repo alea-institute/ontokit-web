@@ -19,6 +19,7 @@ interface ReviewScope {
   branch: string;
   onAddSuggestedChild?: (iri: string, label: string, parentIri: string, suggestion?: AcceptedClassSuggestion) => Promise<void>;
   isSuggestionMode?: boolean;
+  classAcceptanceLockedReason?: string;
 }
 
 interface BulkExpansionReviewProps extends ReviewScope {
@@ -147,7 +148,7 @@ function ReviewGroup({ job, retry, ...scope }: ReviewScope & {
   );
 }
 
-function GroupCards({ target, projectId, branch, onAddSuggestedChild, isSuggestionMode }: ReviewScope & { target: BulkExpansionJob }) {
+function GroupCards({ target, projectId, branch, onAddSuggestedChild, isSuggestionMode, classAcceptanceLockedReason }: ReviewScope & { target: BulkExpansionJob }) {
   const toast = useToast();
   const [confirmationOpen, setConfirmationOpen] = useState(false);
   const mounted = useRef(false);
@@ -156,9 +157,11 @@ function GroupCards({ target, projectId, branch, onAddSuggestedChild, isSuggesti
     return () => { mounted.current = false; };
   }, []);
 
+  const acceptanceLockedReason = classAcceptanceLockedReason ||
+    (onAddSuggestedChild ? undefined : "Generated entity persistence is unavailable.");
   const review = useSuggestions({
     projectId, branch, entityIri: target.iri, suggestionType: "children", canUseLLM: false,
-    getAcceptanceError: onAddSuggestedChild ? undefined : () => "Generated entity persistence is unavailable.",
+    getAcceptanceError: () => acceptanceLockedReason ?? null,
     onAccepted: async (suggestion, editedValue) => {
       if (!mounted.current) throw new Error("Open the review on this branch before accepting more suggestions.");
       if (!onAddSuggestedChild) throw new Error("Generated entity persistence is unavailable.");
@@ -179,10 +182,13 @@ function GroupCards({ target, projectId, branch, onAddSuggestedChild, isSuggesti
     else toast.info("Suggestion review updated", accepted > 0 ? `${counts} ${location}` : counts);
   };
 
-  const busy = review.isAcceptingAll || review.acceptingIndices.size > 0;
+  const busy = !!review.busyReason;
   const count = review.eligibleCount;
   const classes = count === 1 ? "class" : "classes";
 
+  if (target.batchVersion !== undefined && target.batchVersion !== review.batchVersion) {
+    return <p>A newer batch is available on this class. Open the class to review it.</p>;
+  }
   if (!review.items.length) return <p>No suggestions returned.</p>;
 
   return (
@@ -197,7 +203,7 @@ function GroupCards({ target, projectId, branch, onAddSuggestedChild, isSuggesti
           {review.error}
         </p>
       )}
-      <SuggestionReviewCards review={review} showDefinition />
+      <SuggestionReviewCards review={review} acceptanceLockedReason={acceptanceLockedReason} showDefinition />
       <ConfirmDialog
         open={confirmationOpen}
         onOpenChange={setConfirmationOpen}

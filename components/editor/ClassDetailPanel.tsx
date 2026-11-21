@@ -45,6 +45,7 @@ import { CrossReferencesPanel } from "@/components/editor/CrossReferencesPanel";
 import { SimilarConceptsPanel } from "@/components/editor/SimilarConceptsPanel";
 import { EntityHistoryTab } from "@/components/editor/EntityHistoryTab";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
+import { siblingSuggestionLockReason } from "@/components/editor/TreeNodeContextMenu";
 import { useToast } from "@/lib/context/ToastContext";
 import { AUTO_SAVE_TEACHING_TOAST } from "@/lib/editor/autoSave";
 import { useSuggestions } from "@/lib/hooks/useSuggestions";
@@ -123,6 +124,7 @@ interface ClassDetailPanelProps {
   canUseLLM?: boolean;
   byoKey?: string;
   userRole?: ProjectRole;
+  classAcceptanceLockedReason?: string;
   onAddSuggestedChild?: (iri: string, label: string, parentIri: string, suggestion?: AcceptedClassSuggestion) => Promise<void>;
   /** When true, auto-fire annotation suggestions when classIri changes (D-09) */
   autoSuggestAnnotationsOnMount?: boolean;
@@ -154,6 +156,7 @@ export function ClassDetailPanel({
   byoKey,
   userRole: _userRole,
   onAddSuggestedChild,
+  classAcceptanceLockedReason,
   autoSuggestAnnotationsOnMount,
   autoSuggestOnMount,
   onAutoSuggestConsumed,
@@ -643,16 +646,10 @@ export function ClassDetailPanel({
     [onAddSuggestedChild, classIri],
   );
 
-  const getSiblingAcceptanceError = useCallback(() => {
-    const parentCount = classDetail?.parent_iris.length ?? 0;
-    if (parentCount === 0) {
-      return "Cannot accept this sibling suggestion because the selected class has no parent. Add or choose a parent first.";
-    }
-    if (parentCount > 1) {
-      return "Cannot accept this sibling suggestion because the selected class has multiple parents. Choose which parent should receive the sibling first.";
-    }
-    return onAddSuggestedChild ? null : "Generated entity persistence is unavailable.";
-  }, [classDetail?.parent_iris, onAddSuggestedChild]);
+  const subclassAcceptanceReason = classAcceptanceLockedReason ||
+    (onAddSuggestedChild ? undefined : "Generated entity persistence is unavailable.");
+  const siblingParentReason = siblingSuggestionLockReason(classDetail?.parent_iris ?? []);
+  const siblingAcceptanceReason = subclassAcceptanceReason || siblingParentReason;
 
   const handleAcceptSiblingSuggestion = useCallback(
     async (suggestion: GeneratedSuggestion, editedValue?: string) => {
@@ -727,14 +724,14 @@ export function ClassDetailPanel({
     ...suggestionOpts,
     suggestionType: "children",
     onAccepted: handleAcceptChildSuggestion,
-    getAcceptanceError: onAddSuggestedChild ? undefined : () => "Generated entity persistence is unavailable.",
+    getAcceptanceError: () => subclassAcceptanceReason ?? null,
   });
 
   const siblingsSuggestions = useSuggestions({
     ...suggestionOpts,
     suggestionType: "siblings",
     onAccepted: handleAcceptSiblingSuggestion,
-    getAcceptanceError: getSiblingAcceptanceError,
+    getAcceptanceError: () => siblingAcceptanceReason ?? null,
   });
 
   const annotationsSuggestions = useSuggestions({
@@ -770,12 +767,14 @@ export function ClassDetailPanel({
     }
   }, [classIri, autoSuggestAnnotationsOnMount, canUseLLM]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const requestClassSuggestions = useCallback(async (kind: ClassSuggestionKind, fromTree = false) => {
+  const requestClassSuggestions = useCallback((kind: ClassSuggestionKind, fromTree = false) => {
+    if (kind === "siblings" && siblingParentReason) return;
     const request = kind === "children" ? childrenSuggestions.request : siblingsSuggestions.request;
-    treeRequests.current[kind] = fromTree;
-    await request(batchSize);
-    setRequestVersions((previous) => ({ ...previous, [kind]: previous[kind] + 1 }));
-  }, [batchSize, childrenSuggestions.request, siblingsSuggestions.request]);
+    void request(batchSize, () => {
+      treeRequests.current[kind] = fromTree;
+      setRequestVersions((previous) => ({ ...previous, [kind]: previous[kind] + 1 }));
+    });
+  }, [batchSize, childrenSuggestions.request, siblingParentReason, siblingsSuggestions.request]);
 
   const consumedIntent = useRef<ClassSuggestionIntent>(null);
   const shownIntent = useRef<ClassSuggestionIntent>(null);
@@ -796,12 +795,12 @@ export function ClassDetailPanel({
 
     consumedIntent.current = autoSuggestOnMount;
     onAutoSuggestConsumed?.(autoSuggestOnMount);
-    if (autoSuggestOnMount.kind === "siblings" && classDetail.parent_iris.length === 0) {
+    if (autoSuggestOnMount.kind === "siblings" && siblingParentReason) {
       siblingTrigger.current?.focus();
       return;
     }
     void requestClassSuggestions(autoSuggestOnMount.kind, true);
-  }, [accessToken, autoSuggestOnMount, branch, canUseLLM, classDetail, classIri, onAutoSuggestConsumed, projectId, requestClassSuggestions]);
+  }, [accessToken, autoSuggestOnMount, branch, canUseLLM, classDetail, classIri, onAutoSuggestConsumed, projectId, requestClassSuggestions, siblingParentReason]);
 
   const returnSuggestionFocus = (kind: ClassSuggestionKind) => {
     if (treeRequests.current[kind] && classIri) {
@@ -1565,15 +1564,16 @@ export function ClassDetailPanel({
                   label="Suggest subclasses"
                   onRequest={() => { void requestClassSuggestions("children"); }}
                   isLoading={childrenSuggestions.isLoading}
-                  disabled={!canUseLLM || childrenSuggestions.isAcceptingAll || childrenSuggestions.acceptingIndices.size > 0}
+                  disabled={!canUseLLM || !!childrenSuggestions.busyReason}
+                  disabledReason={childrenSuggestions.busyReason}
                 />
                 <SuggestImprovementsButton
                   ref={siblingTrigger}
                   label="Suggest siblings"
                   onRequest={() => { void requestClassSuggestions("siblings"); }}
                   isLoading={siblingsSuggestions.isLoading}
-                  disabled={!canUseLLM || classDetail.parent_iris.length === 0 || siblingsSuggestions.isAcceptingAll || siblingsSuggestions.acceptingIndices.size > 0}
-                  disabledReason={classDetail.parent_iris.length === 0 ? "This class has no parent, so it has no siblings." : undefined}
+                  disabled={!canUseLLM || !!siblingParentReason || !!siblingsSuggestions.busyReason}
+                  disabledReason={siblingParentReason || siblingsSuggestions.busyReason}
                 />
                 <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
                   Batch size
@@ -1595,6 +1595,7 @@ export function ClassDetailPanel({
                 title={`Suggested subclasses for ${displayLabel}`}
                 parentLabel={displayLabel}
                 review={childrenSuggestions}
+                acceptanceLockedReason={subclassAcceptanceReason}
                 onRequest={() => { void requestClassSuggestions("children"); }}
                 canRequest={canUseLLM ?? false}
                 requestVersion={requestVersions.children}
@@ -1607,8 +1608,9 @@ export function ClassDetailPanel({
                 title={`Suggested siblings of ${displayLabel}`}
                 parentLabel={classDetail.parent_iris.map((iri) => classDetail.parent_labels?.[iri] || getLocalName(iri)).join(", ")}
                 review={siblingsSuggestions}
+                acceptanceLockedReason={siblingAcceptanceReason}
                 onRequest={() => { void requestClassSuggestions("siblings"); }}
-                canRequest={!!canUseLLM && classDetail.parent_iris.length > 0}
+                canRequest={!!canUseLLM && !siblingParentReason}
                 requestVersion={requestVersions.siblings}
                 returnFocus={() => returnSuggestionFocus("siblings")}
                 siblingCount={getExistingSiblingCount}

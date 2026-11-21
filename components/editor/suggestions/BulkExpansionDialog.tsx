@@ -120,14 +120,15 @@ interface BulkExpansionControlsOptions {
   accessToken?: string;
   byoKey?: string;
   canUseLLM: boolean;
+  returnReviewFocus: () => void;
 }
 
-export function useBulkExpansionControls({ nodes, ...options }: BulkExpansionControlsOptions) {
+export function useBulkExpansionControls({ nodes, returnReviewFocus, ...options }: BulkExpansionControlsOptions) {
   const { announce } = useAnnounce();
   const { runId, jobs, totals, haltReason, start, stop, retry, dismiss } = useBulkExpansion({ ...options, announce });
   const targetsByIri = useMemo(() => indexLoadedSubclasses(nodes), [nodes]);
-  const { projectId, branch } = options;
-  const scope = useMemo(() => ({ projectId, branch }), [projectId, branch]);
+  const { projectId, branch, accessToken } = options;
+  const scope = useMemo(() => ({ projectId, branch, accessToken }), [projectId, branch, accessToken]);
   const [preflight, setPreflight] = useState<{
     scope: typeof scope;
     targets: BulkExpansionTarget[];
@@ -137,6 +138,7 @@ export function useBulkExpansionControls({ nodes, ...options }: BulkExpansionCon
 
   const busy = totals.generating > 0;
   const menu = useMemo(() => ({
+    scope,
     getTargets: (iri: string) => targetsByIri.get(iri) ?? [],
     open: (iri: string, targets: BulkExpansionTarget[]) => {
       const row = document.getElementById(treeItemId(iri));
@@ -172,8 +174,7 @@ export function useBulkExpansionControls({ nodes, ...options }: BulkExpansionCon
       runId, jobs, totals, haltReason, stop, retry,
       dismiss: () => {
         dismiss();
-        // The Close button leaves with the review; hand focus to the tree it came from.
-        document.querySelector<HTMLElement>('[role="tree"]')?.focus();
+        returnReviewFocus();
       },
     },
   };
