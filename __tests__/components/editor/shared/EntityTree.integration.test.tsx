@@ -122,7 +122,8 @@ describe('entity tree keyboard interactions through lazy ontology state and HTTP
 
   it('clears transient keyboard focus on blur and respects disabled keyboard navigation', async () => {
     const view = render(<Harness />); await screen.findByText('Root'); key('ArrowDown');
-    expect(screen.getByRole('tree').getAttribute('aria-activedescendant')).toContain('Root');
+    expect(document.getElementById(screen.getByRole('tree').getAttribute('aria-activedescendant')!))
+      .toBe(screen.getByRole('treeitem', { name: 'Root' }));
     fireEvent.blur(screen.getByRole('tree')); expect(screen.getByRole('tree').hasAttribute('aria-activedescendant')).toBe(false);
     view.rerender(<Harness keyboard={false} />); key('ArrowDown'); key('ArrowRight'); key('Enter');
     expect(selected()).toBe('None'); expect(calls).toHaveLength(1);

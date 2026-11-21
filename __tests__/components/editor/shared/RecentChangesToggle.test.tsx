@@ -151,11 +151,11 @@ describe("Recent changes in the class tree", () => {
     expect(link.getAttribute("href")).toBe("/projects/project-one/changes?branch=feature%2Freview");
 
     const tree = within(screen.getByRole("tree"));
-    for (const [name, suffix, mark] of [
+    for (const [name, suffix, mark, provenance] of [
       ["Added", ", added", "Added"],
       ["Modified", ", modified", "Modified"],
-      ["Generated", ", added by AI", "Added"],
-      ["Edited", ", added by AI and edited by a person", "Added"],
+      ["Generated", ", added from an AI suggestion", "Added", "added from an AI suggestion"],
+      ["Edited", ", added from an AI suggestion and edited before accepting", "Added", "added from an AI suggestion and edited before accepting"],
       ["New kind", "", "Changed"],
       ["New origin", "", "Changed"],
       ["Transient", ", added, then removed", "Added, then removed"],
@@ -163,7 +163,8 @@ describe("Recent changes in the class tree", () => {
     ]) {
       const row = await tree.findByRole("treeitem", { name: `${name}, changed in the last 7 days${suffix}` });
       expect(within(row).getByRole("img", { name: mark })).toBeDefined();
-      expect(Boolean(within(row).queryByRole("img", { name: "AI origin" }))).toBe(["Generated", "Edited"].includes(name));
+      expect(within(row).getAllByRole("img").map((icon) => icon.getAttribute("aria-label")))
+        .toEqual(provenance ? [mark, provenance] : [mark]);
     }
     expect(screen.getByText("Showing the 5,000 most recent changes. View all changes for the full list.")).toBeDefined();
     expect(screen.getByText("Marks appear on loaded classes. View all changes for the complete list.")).toBeDefined();
@@ -184,6 +185,23 @@ describe("Recent changes in the class tree", () => {
     mount(client, "project-two");
     expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("false");
     expect(fetchChanges).toHaveBeenCalledTimes(1);
+  });
+
+  it("attributes a modified class's AI provenance to its creation in the marker and tooltip", async () => {
+    vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+    fetchChanges.mockResolvedValueOnce(Response.json({
+      items: [change("Modified", "modified", ["ai", "human"])],
+      truncated: false,
+    }));
+    const user = userEvent.setup();
+    mount();
+
+    await user.click(screen.getByRole("switch"));
+    const detail = "changed in the last 7 days, modified, created from an AI suggestion";
+    const row = await screen.findByRole("treeitem", { name: `Modified, ${detail}` });
+    expect(within(row).getByRole("img", { name: "Modified" })).toBeDefined();
+    await user.hover(within(row).getByRole("img", { name: "created from an AI suggestion" }));
+    expect((await screen.findByRole("tooltip")).textContent).toBe(detail);
   });
 
   it("remains operable when localStorage reads and writes throw", async () => {

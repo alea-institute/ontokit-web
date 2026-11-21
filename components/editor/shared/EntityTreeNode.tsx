@@ -68,7 +68,7 @@ function highlightMatch(text: string, query: string | undefined): React.ReactNod
 }
 
 export function treeItemId(iri: string) {
-  return `tree-item-${iri.replace(/[^a-zA-Z0-9-_]/g, "_")}`;
+  return `tree-item-${encodeURIComponent(iri)}`;
 }
 
 export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
@@ -102,11 +102,12 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
   const marker = change ? knownMarker ?? UNKNOWN_CHANGE_MARKER : undefined;
   const aiEdited = !!knownMarker && change?.origins.includes("ai_edited");
   const aiOrigin = aiEdited || (!!knownMarker && change?.origins.includes("ai"));
-  const aiDetail = netChange === "added"
-    ? (aiEdited ? " by AI and edited by a person" : " by AI")
-    : (aiEdited ? ", AI-edited origin" : ", AI origin");
-  const changeDetail = knownMarker ? `, ${knownMarker.label.toLowerCase()}${aiOrigin ? aiDetail : ""}` : "";
-  const changeLabel = `changed in the last 7 days${changeDetail}`;
+  const aiDetail = !aiOrigin ? null : netChange === "added"
+    ? `added from an AI suggestion${aiEdited ? " and edited before accepting" : ""}`
+    : "created from an AI suggestion";
+  const changeDetail = aiDetail && netChange === "added" ? aiDetail : knownMarker?.label.toLowerCase();
+  const changeLabel = ["changed in the last 7 days", changeDetail, netChange !== "added" && aiDetail]
+    .filter(Boolean).join(", ");
   const isSelected = selectedIri === node.iri;
   const isFocused = focusedIri === node.iri;
   const hasChildren = node.hasChildren || node.children.length > 0;
@@ -179,6 +180,7 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
           onClick={handleToggle}
           className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700/50"
           role="treeitem"
+          id={treeItemId(node.iri)}
           aria-selected={false}
           aria-expanded={node.isExpanded}
           data-iri={node.iri}
@@ -290,8 +292,8 @@ export const EntityTreeNodeRow = memo(function EntityTreeNodeRow({
         <Tooltip content={changeLabel}>
           <span className="inline-flex shrink-0 items-center gap-0.5">
             <marker.Icon role="img" aria-hidden={false} aria-label={marker.label} className={cn("h-3.5 w-3.5", marker.color)} />
-            {aiOrigin && (
-              <Sparkles role="img" aria-hidden={false} aria-label="AI origin" className="h-3.5 w-3.5 text-purple-700 dark:text-purple-300" />
+            {aiDetail && (
+              <Sparkles role="img" aria-hidden={false} aria-label={aiDetail} className="h-3.5 w-3.5 text-purple-700 dark:text-purple-300" />
             )}
           </span>
         </Tooltip>

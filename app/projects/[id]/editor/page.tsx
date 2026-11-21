@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { useParams, useSearchParams, useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
@@ -562,6 +562,13 @@ export default function EditorPage() {
   );
 
   const generatedEntityAccessToken = session?.accessToken;
+  const generatedSaveScope = useMemo(() => ({ projectId, activeBranch }), [projectId, activeBranch]);
+  const activeGeneratedSaveScope = useRef<typeof generatedSaveScope | null>(null);
+  useLayoutEffect(() => {
+    activeGeneratedSaveScope.current = generatedSaveScope;
+    return () => { activeGeneratedSaveScope.current = null; };
+  }, [generatedSaveScope]);
+
   const persistAcceptedGeneratedEntity = useCallback(async (
     entity: GeneratedEntityInput,
   ) => {
@@ -614,8 +621,14 @@ export default function EditorPage() {
       throw error;
     }
 
-    // Only update client state after the authoritative branch confirms the
-    // entity. A rejected save leaves the card pending and these values intact.
+    if (mode === "direct") {
+      void queryClient.invalidateQueries({
+        queryKey: branchQueryKeys.list(projectId, generatedEntityAccessToken),
+      });
+    }
+    // The completed save still advances its branch head. Apply editor updates
+    // only while that save's branch is open.
+    if (activeGeneratedSaveScope.current !== generatedSaveScope) return;
     if (mode === "direct" && result.revision) {
       setSourceSnapshot(result.content, result.revision);
     } else {
@@ -624,11 +637,11 @@ export default function EditorPage() {
     setSourceIriIndex(new Map());
     iriPatternDetectedRef.current = false;
     setDetailRefreshKey((key) => key + 1);
-    if (mode === "direct") {
-      queryClient.invalidateQueries({
-        queryKey: branchQueryKeys.list(projectId, generatedEntityAccessToken),
-      });
+    if (entity.entityType === "class") {
+      // Stay on the class under review so the rest of its batch remains in view.
+      addOptimisticNode(entity.iri, entity.label, entity.parentIri, { select: false });
     }
+    setAcceptedSuggestionIris((prev) => new Set(prev).add(entity.iri));
   }, [
     isAnonymousProposalMode,
     isSuggestionMode,
@@ -648,6 +661,8 @@ export default function EditorPage() {
     setSourceIriIndex,
     queryClient,
     captureSourceConflict,
+    generatedSaveScope,
+    addOptimisticNode,
   ]);
 
   const getDirectSourceSnapshot = useCallback(async () => {
@@ -684,10 +699,7 @@ export default function EditorPage() {
   ) => {
     const { definition, ...provenance } = suggestion ?? {};
     await persistAcceptedGeneratedEntity({ iri, label, definition, parentIri, entityType: "class", provenance: provenance.model ? provenance : undefined });
-    // Stay on the class under review so the rest of its batch remains in view.
-    addOptimisticNode(iri, label, parentIri, { select: false });
-    setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
-  }, [persistAcceptedGeneratedEntity, addOptimisticNode]);
+  }, [persistAcceptedGeneratedEntity]);
 
   // Handle accepted sub-PROPERTY suggestion (B-1). Distinct from
   // handleAddSuggestedChild (classes): emits the correct OWL property rdf:type
@@ -707,10 +719,7 @@ export default function EditorPage() {
           ? "annotationProperty"
           : "objectProperty";
 
-    return persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType, provenance })
-      .then(() => {
-        setAcceptedSuggestionIris((prev) => new Set(prev).add(iri));
-      });
+    return persistAcceptedGeneratedEntity({ iri, label, parentIri, entityType, provenance });
   }, [persistAcceptedGeneratedEntity]);
 
   // Handle copy IRI

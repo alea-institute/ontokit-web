@@ -1,6 +1,8 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { changesApi, type ChangedEntitiesFilters, type ProjectChangesFilters } from "@/lib/api/changes";
 
+export const projectChangesKey = (projectId: string) => ["projectChanges", projectId] as const;
+
 export function useProjectChanges(
   projectId: string,
   accessToken?: string,
@@ -8,7 +10,7 @@ export function useProjectChanges(
   enabled = true,
 ) {
   return useInfiniteQuery({
-    queryKey: ["projectChanges", projectId, !!accessToken, filters],
+    queryKey: [...projectChangesKey(projectId), filters.branch, "list", !!accessToken, filters],
     queryFn: ({ pageParam }) =>
       changesApi.list(projectId, accessToken, { ...filters, cursor: pageParam }),
     initialPageParam: undefined as string | undefined,
@@ -24,7 +26,7 @@ export function useChangedEntities(
   filters: ChangedEntitiesFilters = {},
 ) {
   return useQuery({
-    queryKey: ["changedEntities", projectId, !!accessToken, filters],
+    queryKey: [...projectChangesKey(projectId), filters.branch, "digest", !!accessToken, filters],
     queryFn: () => changesApi.listChangedEntities(projectId, accessToken, filters),
     enabled: !!projectId,
     staleTime: 60_000,
