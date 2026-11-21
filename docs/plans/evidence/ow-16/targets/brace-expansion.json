@@ -1,0 +1,198 @@
+{
+  "target": "brace-expansion",
+  "lockSha256": "abc600a3a9f37e634f79c3c2688d2ceeab7bde173210fd14e4f558b55cd4d17d",
+  "changes": [
+    {
+      "path": "node_modules/@eslint/config-array/node_modules/brace-expansion",
+      "from": "1.1.18",
+      "to": "1.1.22"
+    },
+    {
+      "path": "node_modules/@eslint/eslintrc/node_modules/brace-expansion",
+      "from": "1.1.18",
+      "to": "1.1.22"
+    },
+    {
+      "path": "node_modules/brace-expansion",
+      "from": "5.0.9",
+      "to": "5.0.13"
+    },
+    {
+      "path": "node_modules/eslint-plugin-import/node_modules/brace-expansion",
+      "from": "1.1.18",
+      "to": "1.1.22"
+    },
+    {
+      "path": "node_modules/eslint-plugin-jsx-a11y/node_modules/brace-expansion",
+      "from": "1.1.18",
+      "to": "1.1.22"
+    },
+    {
+      "path": "node_modules/eslint-plugin-react/node_modules/brace-expansion",
+      "from": "1.1.18",
+      "to": "1.1.22"
+    },
+    {
+      "path": "node_modules/eslint/node_modules/brace-expansion",
+      "from": "1.1.18",
+      "to": "1.1.22"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/@eslint/config-array/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "range": "<1.1.19"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/@eslint/config-array/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "range": "<1.1.21"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/@eslint/config-array/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "range": "<1.1.20"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/@eslint/eslintrc/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "range": "<1.1.19"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/@eslint/eslintrc/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "range": "<1.1.21"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/@eslint/eslintrc/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "range": "<1.1.20"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "range": ">=4.0.0 <5.0.10"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "range": ">=4.0.0 <5.0.12"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "range": ">=4.0.0 <5.0.11"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint-plugin-import/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "range": "<1.1.19"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint-plugin-import/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "range": "<1.1.21"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint-plugin-import/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "range": "<1.1.20"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint-plugin-jsx-a11y/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "range": "<1.1.19"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint-plugin-jsx-a11y/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "range": "<1.1.21"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint-plugin-jsx-a11y/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "range": "<1.1.20"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint-plugin-react/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "range": "<1.1.19"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint-plugin-react/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "range": "<1.1.21"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint-plugin-react/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "range": "<1.1.20"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-6j4f-fj2g-mc7p",
+      "range": "<1.1.19"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-q2hr-2g5m-vwhr",
+      "range": "<1.1.21"
+    },
+    {
+      "package": "brace-expansion",
+      "path": "node_modules/eslint/node_modules/brace-expansion",
+      "advisory": "https://github.com/advisories/GHSA-qhr7-859c-m2p7",
+      "range": "<1.1.20"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 9,
+    "critical": 0,
+    "total": 16
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 8,
+    "critical": 0,
+    "total": 15
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:37:07.964421+00:00",
+      "end": "2026-11-21T13:37:26.146172+00:00"
+    }
+  ]
+}
