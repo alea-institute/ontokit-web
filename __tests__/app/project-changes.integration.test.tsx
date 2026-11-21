@@ -137,13 +137,13 @@ describe("project Changes page", () => {
     navigation.search = "?branch=other&days=7";
     const otherBranch = render(page());
     await screen.findByRole("link", { name: "Lease" });
-    await screen.findByRole("button", { name: /^2 classes added by AI/ });
+    await screen.findByRole("button", { name: /^2 classes from AI suggestions/ });
     otherBranch.unmount();
 
     navigation.search = branch ? `?branch=${branch}&days=7` : "";
     const changesPage = render(page());
     await screen.findByRole("link", { name: "Lease" });
-    await screen.findByRole("button", { name: /^2 classes added by AI/ });
+    await screen.findByRole("button", { name: /^2 classes from AI suggestions/ });
     expect(screen.getByText(`Branch: ${savedBranch}`)).toBeDefined();
     expect(requests.at(-1)?.get("branch")).toBe(branch);
     expect(digestRequests.at(-1)?.get("branch")).toBe(branch);
@@ -188,14 +188,14 @@ describe("project Changes page", () => {
     await waitFor(() => {
       expect({
         list: !!screen.queryByRole("link", { name: "Accepted class" }),
-        digest: !!screen.queryByRole("button", { name: /^3 classes added by AI/ }),
+        digest: !!screen.queryByRole("button", { name: /^3 classes from AI suggestions/ }),
       }).toEqual({ list: true, digest: true });
     });
     refreshed.unmount();
     navigation.search = "?branch=other&days=7";
     render(page());
     await screen.findByRole("link", { name: "Lease" });
-    await screen.findByRole("button", { name: /^2 classes added by AI/ });
+    await screen.findByRole("button", { name: /^2 classes from AI suggestions/ });
     await waitFor(() => {
       expect(requests.filter((params) => params.get("branch") === "other")).toHaveLength(2);
       expect(digestRequests.filter((params) => params.get("branch") === "other")).toHaveLength(2);
