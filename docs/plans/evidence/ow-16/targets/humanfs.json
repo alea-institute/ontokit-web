@@ -1,0 +1,58 @@
+{
+  "target": "@humanfs/node",
+  "lockSha256": "5c8d75adc4d383420e70b005693453604594895e95d874f71791bce33c5d8507",
+  "changes": [
+    {
+      "path": "node_modules/@humanfs/core",
+      "from": "0.19.1",
+      "to": "0.19.2"
+    },
+    {
+      "path": "node_modules/@humanfs/node",
+      "from": "0.16.7",
+      "to": "0.16.8"
+    },
+    {
+      "path": "node_modules/@humanfs/types",
+      "from": null,
+      "to": "0.15.0"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "@humanfs/node",
+      "path": "node_modules/@humanfs/node",
+      "advisory": "https://github.com/advisories/GHSA-p498-v437-472g",
+      "range": "<0.16.8"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 0,
+    "moderate": 8,
+    "high": 9,
+    "critical": 0,
+    "total": 17
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 9,
+    "critical": 0,
+    "total": 16
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:36:26.034446+00:00",
+      "end": "2026-11-21T13:36:42.866757+00:00"
+    }
+  ]
+}
