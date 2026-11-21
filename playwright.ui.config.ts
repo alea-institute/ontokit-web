@@ -21,7 +21,7 @@ if (!["127.0.0.1", "localhost"].includes(new URL(baseURL).hostname)) {
 
 export default defineConfig({
   testDir: "./e2e/ui",
-  testMatch: ["entity-source-preview.spec.ts", "entity-source-preview-evidence.spec.ts"],
+  testMatch: ["entity-source-preview.spec.ts", "entity-source-preview-evidence.spec.ts", "keyboard-shortcuts.spec.ts"],
   outputDir: "test-results/ow4-ui",
   forbidOnly: true,
   fullyParallel: false,
