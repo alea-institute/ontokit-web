@@ -1,0 +1,102 @@
+{
+  "target": "fast-uri",
+  "lockSha256": "cd75f971fd7017fa590f83afa77fb4b97ad6f88e2764d6019d390e6447f9b9ff",
+  "changes": [
+    {
+      "path": "node_modules/fast-uri",
+      "from": "3.1.5",
+      "to": "3.1.9"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-333x-w4r6-6crp",
+      "range": ">=3.0.0 <3.1.9"
+    },
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-5jgf-p345-68v8",
+      "range": ">=3.1.3 <3.1.6"
+    },
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-f65p-4m7j-42xc",
+      "range": ">=3.0.0 <3.1.6"
+    },
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-fph4-wmhf-6fwf",
+      "range": ">=3.1.2 <3.1.6"
+    },
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-hrr3-gc8f-f4qj",
+      "range": ">=3.0.0 <3.1.8"
+    },
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-jqff-g426-hqxp",
+      "range": ">=3.0.0 <3.1.6"
+    },
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-qw65-cvwx-89v3",
+      "range": ">=3.0.0 <3.1.7"
+    },
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-w74x-v6f9-j3xg",
+      "range": ">=3.0.0 <3.1.9"
+    },
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-wjr9-j795-jxcr",
+      "range": ">=3.1.3 <3.1.9"
+    },
+    {
+      "package": "fast-uri",
+      "path": "node_modules/fast-uri",
+      "advisory": "https://github.com/advisories/GHSA-xhq7-xmqj-769h",
+      "range": ">=3.0.0 <3.1.9"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 7,
+    "critical": 0,
+    "total": 14
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 6,
+    "critical": 0,
+    "total": 13
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:37:58.304601+00:00",
+      "end": "2026-11-21T13:38:16.030153+00:00"
+    }
+  ]
+}
