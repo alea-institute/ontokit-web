@@ -1,0 +1,11 @@
+{
+  "command": "npm audit --package-lock-only --json --omit=dev",
+  "exit": 1,
+  "at": "2026-11-21T13:18:13.744631+00:00",
+  "source": "dde11d3f49f44161b06711fab4d5715b4eceb80a",
+  "lockSha256": "995f91ee6b71f9df76e2dafe2133f021f2c66b4f8da44d911079cc1fdc7d2842",
+  "node": "24.22.3",
+  "npm": "11.19.1",
+  "registry": "https://registry.npmjs.org/",
+  "valid": true
+}
