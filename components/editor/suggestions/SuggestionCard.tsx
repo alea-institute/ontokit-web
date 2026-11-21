@@ -23,6 +23,7 @@ export interface SuggestionCardProps {
   onEdit: (editedValue: string, editedDefinition?: string) => void;
   showDefinition?: boolean;
   onMarkDistinct?: (candidate: DuplicateCandidate, reason: string) => Promise<void>;
+  batchIris?: ReadonlySet<string>;
   disabled?: boolean;
   busy?: boolean;
 }
@@ -37,6 +38,10 @@ function confidenceBadgeClass(confidence: number): string {
   return "text-red-700 bg-red-100 dark:text-red-400 dark:bg-red-900/20";
 }
 
+function normalizeLabel(label: string) {
+  return label.trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 export function SuggestionCard({
   item,
   onAccept,
@@ -44,22 +49,30 @@ export function SuggestionCard({
   onEdit,
   showDefinition,
   onMarkDistinct,
+  batchIris,
   disabled,
   busy,
 }: SuggestionCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [editDefinition, setEditDefinition] = useState("");
+  const [duplicateEditError, setDuplicateEditError] = useState(false);
   const [distinctCandidate, setDistinctCandidate] = useState<DuplicateCandidate | null>(null);
   const [distinctReason, setDistinctReason] = useState("");
   const [distinctError, setDistinctError] = useState<string | null>(null);
   const [isMarkingDistinct, setIsMarkingDistinct] = useState(false);
   const distinctReasonId = useId();
   const labelId = useId();
+  const editErrorId = useId();
 
   const suggestion = item.suggestion;
   const isBlocked = suggestion.duplicate_verdict === "block";
   const isWarned = suggestion.duplicate_verdict === "warn";
+  const leadCandidate = suggestion.duplicate_candidates[0];
+  const exactDuplicate = isBlocked && leadCandidate?.score === 1 &&
+    (suggestion.suggestion_type === "children" || suggestion.suggestion_type === "siblings")
+    ? leadCandidate : undefined;
+  const repeatsBatch = exactDuplicate && batchIris?.has(exactDuplicate.iri);
   const confidence = suggestion.confidence;
   const isUserEdited = suggestion.provenance === "user-edited-from-llm";
   const isAccepted = item.status === "accepted";
@@ -90,6 +103,7 @@ export function SuggestionCard({
   const handleEditClick = useCallback(() => {
     setEditValue(item.editedValue ?? displayText);
     setEditDefinition(displayedDefinition ?? "");
+    setDuplicateEditError(false);
     setIsEditing(true);
   }, [item.editedValue, displayText, displayedDefinition]);
 
@@ -98,19 +112,17 @@ export function SuggestionCard({
       setIsEditing(false);
       return;
     }
-    // M-5: the edit flow (onEdit) bypasses the plain Accept button's
-    // `disabled || isBlocked` guard. If this suggestion is a blocked duplicate
-    // and the text was NOT changed, committing would silently accept the
-    // duplicate — so refuse. If the text changed, the duplicate was resolved
-    // by editing and we allow the commit (the store re-flags provenance).
-    if (isBlocked && editValue === displayText) {
-      setIsEditing(false);
+    const editedLabel = exactDuplicate ? normalizeLabel(editValue) : editValue;
+    const originalLabel = exactDuplicate ? normalizeLabel(displayText) : displayText;
+    const matchesCandidate = exactDuplicate && editedLabel === normalizeLabel(exactDuplicate.label);
+    if (isBlocked && (editedLabel === originalLabel || matchesCandidate || (exactDuplicate && !editedLabel))) {
+      setDuplicateEditError(true);
       return;
     }
     if (hasDefinition) onEdit(editValue, editDefinition);
     else onEdit(editValue);
     setIsEditing(false);
-  }, [editValue, editDefinition, hasDefinition, onEdit, isBlocked, isInvalid, displayText]);
+  }, [editValue, editDefinition, hasDefinition, onEdit, isBlocked, isInvalid, displayText, exactDuplicate]);
 
   const handleDiscardEdit = useCallback(() => {
     setIsEditing(false);
@@ -169,8 +181,13 @@ export function SuggestionCard({
           <input
             type="text"
             aria-label="Suggested label"
+            aria-invalid={duplicateEditError || undefined}
+            aria-describedby={duplicateEditError ? editErrorId : undefined}
             value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
+            onChange={(e) => {
+              setEditValue(e.target.value);
+              setDuplicateEditError(false);
+            }}
             autoFocus
             className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm focus:border-primary-500 focus:outline-hidden focus:ring-1 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-700 dark:text-white"
             onKeyDown={(e) => {
@@ -189,6 +206,12 @@ export function SuggestionCard({
           </span>
         )}
 
+        {isEditing && duplicateEditError && (
+          <p id={editErrorId} role="alert" className="mt-1 text-xs text-red-600 dark:text-red-400">
+            Change the label before accepting this suggestion.
+          </p>
+        )}
+
         {hasDefinition && (isEditing ? (
           <textarea
             aria-label="Suggested definition"
@@ -205,11 +228,20 @@ export function SuggestionCard({
         ))}
 
         {/* Duplicate warning and explicit false-positive action */}
-        {(isBlocked || isWarned) && !isEditing && (
+        {(isBlocked || isWarned) && !isEditing && !isAccepted && (
           <div className="mt-1.5 space-y-1.5">
             <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-              {isBlocked ? "Likely duplicate" : "Similar entity may already exist"}
+              {exactDuplicate
+                ? repeatsBatch
+                  ? `Duplicate of another suggestion in this batch, “${exactDuplicate.label}”`
+                  : `Duplicate of existing class “${exactDuplicate.label}”`
+                : isBlocked ? "Likely duplicate" : "Similar entity may already exist"}
             </span>
+            {exactDuplicate && (
+              <p className="text-xs text-slate-600 dark:text-slate-300">
+                Edit the label to make it distinct, or reject this suggestion.
+              </p>
+            )}
             {suggestion.duplicate_candidates.slice(0, 3).map((c) => (
               <div
                 key={`${c.iri}::${c.branch ?? ""}`}
@@ -218,7 +250,7 @@ export function SuggestionCard({
                 <span className="min-w-0 truncate text-xs text-slate-600 dark:text-slate-300" title={c.iri}>
                   {c.label} ({Math.round(c.score * 100)}%)
                 </span>
-                {onMarkDistinct && (
+                {onMarkDistinct && !repeatsBatch && (
                   <button
                     type="button"
                     onClick={() => {

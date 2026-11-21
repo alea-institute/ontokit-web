@@ -18,10 +18,16 @@ import {
   type SelectedChangeFilters,
 } from "@/components/changes/ChangeControls";
 import { ChangeDigest } from "@/components/changes/ChangeDigest";
-import { ChangeRow, ENTITY_TYPE_LABELS, NET_CHANGES } from "@/components/changes/ChangeRow";
-import { ORIGIN_LABELS } from "@/components/changes/OriginBadge";
-import type { NetChange, ProjectChangesResponse } from "@/lib/api/changes";
-import { useChangedEntities, useProjectChanges } from "@/lib/hooks/useProjectChanges";
+import { ChangeRow, changeAuthorLabel, ENTITY_TYPE_LABELS, NET_CHANGES } from "@/components/changes/ChangeRow";
+import {
+  MAX_CHANGE_FILTER_VALUES,
+  distinctChangeFilterValues,
+  isChangeOrigin,
+  sanitizeChangeFilterText,
+  type NetChange,
+  type ProjectChangesResponse,
+} from "@/lib/api/changes";
+import { isInvalidChangeFilterError, useChangedEntities, useProjectChanges } from "@/lib/hooks/useProjectChanges";
 import { useProjectHomeHref } from "@/lib/hooks/useProjectHomeHref";
 
 function matchingItems(pages: ProjectChangesResponse[], kinds: readonly NetChange[]) {
@@ -50,8 +56,10 @@ export default function ProjectChangesPage() {
   }, []);
 
   const days = CHANGE_WINDOWS.find((preset) => String(preset) === searchParams.get("days")) ?? DEFAULT_CHANGE_WINDOW;
-  const branch = searchParams.get("branch") || undefined;
-  const requestedAuthors = searchParams.getAll("author").filter(Boolean);
+  const branch = sanitizeChangeFilterText(searchParams.get("branch") || undefined);
+  const linkedAuthors = distinctChangeFilterValues(searchParams.getAll("author"));
+  const authorLimitExceeded = linkedAuthors.length > MAX_CHANGE_FILTER_VALUES;
+  const requestedAuthors = linkedAuthors.slice(0, MAX_CHANGE_FILTER_VALUES);
   // Resolve URL author IDs against the whole window so combining filters
   // neither hides valid choices nor sends unknown author IDs to the feed.
   const windowFilters = { days, branch };
@@ -62,9 +70,9 @@ export default function ProjectChangesPage() {
   const waitingForAuthors = requestedAuthors.length > 0 && !windowAuthors;
   const knownAuthors = new Set(windowAuthors?.map(({ user_id }) => user_id));
   const selected: SelectedChangeFilters = {
-    origin: searchParams.getAll("origin").filter((value): value is ChangeFilterValues["origin"] => Object.hasOwn(ORIGIN_LABELS, value)),
+    origin: [...new Set(searchParams.getAll("origin"))].filter(isChangeOrigin),
     author: requestedAuthors.filter((author) => knownAuthors.has(author)),
-    entity_type: searchParams.getAll("entity_type").filter((value): value is ChangeFilterValues["entity_type"] => Object.hasOwn(ENTITY_TYPE_LABELS, value)),
+    entity_type: distinctChangeFilterValues(searchParams.getAll("entity_type")).filter((value): value is ChangeFilterValues["entity_type"] => Object.hasOwn(ENTITY_TYPE_LABELS, value)),
     net_change: Array.from(new Set(searchParams.getAll("net_change"))).filter((value): value is NetChange => Object.hasOwn(NET_CHANGES, value)),
   };
 
@@ -83,9 +91,10 @@ export default function ProjectChangesPage() {
     ? selected.net_change.reduce((sum, kind) => sum + firstPage.summary.by_net_change[kind], 0)
     : undefined;
   const hasMoreMatches = feed.hasNextPage && (matchingCount === undefined || items.length < matchingCount);
-  const hasEntityFilters = Object.values(selected).some((values) => values.length > 0);
-  const authors = (windowAuthors ?? firstPage?.summary.authors ?? []).map(({ user_id, user_name }) => ({
-    value: user_id, label: user_name || user_id,
+  const hasFeedFilters = selected.origin.length > 0 || selected.entity_type.length > 0 || selected.author.length > 0;
+  const hasEntityFilters = hasFeedFilters || selected.net_change.length > 0;
+  const authors = (windowAuthors ?? firstPage?.summary.authors ?? []).map((author) => ({
+    value: author.user_id, label: changeAuthorLabel(author),
   }));
 
   const [paginationNotice, setPaginationNotice] = useState<{
@@ -119,6 +128,10 @@ export default function ProjectChangesPage() {
       for (const key of Object.keys(selected)) next.delete(key);
       next.delete("days");
     });
+    if (feed.isFetchNextPageError && isInvalidChangeFilterError(feed.error) && !hasFeedFilters && days === DEFAULT_CHANGE_WINDOW) {
+      // The query key stays the same, so refresh from the first page to drop the rejected cursor.
+      void feed.refetch();
+    }
   }
 
   async function loadMore() {
@@ -133,10 +146,12 @@ export default function ProjectChangesPage() {
   }
 
   const windowLabel = days === 1 ? "24 hours" : `${days} days`;
-  const isLoading = waitingForAuthors ? authorFeed.isLoading : feed.isLoading;
-  const isError = waitingForAuthors ? authorFeed.isError : feed.isError && !pages;
-  const retry = waitingForAuthors ? authorFeed.refetch : feed.refetch;
-  const status = isLoading ? "Loading changes."
+  const activeFeed = waitingForAuthors ? authorFeed : feed;
+  const isLoading = activeFeed.isLoading;
+  const invalidFilters = isInvalidChangeFilterError(activeFeed.error);
+  const isError = invalidFilters || (activeFeed.isError && !pages);
+  const status = invalidFilters ? ""
+    : isLoading ? "Loading changes."
     : feed.isFetchingNextPage ? "Loading more changes."
     : feed.isFetchNextPageError ? "Failed to load more changes."
     : isError ? "Failed to load changes."
@@ -195,6 +210,11 @@ export default function ProjectChangesPage() {
           onToggle={toggleFilter}
           onClear={clearFilters}
         />
+        {authorLimitExceeded && (
+          <p role="status" className="text-sm text-slate-600 dark:text-slate-400">
+            Only the first {MAX_CHANGE_FILTER_VALUES} authors in this link apply.
+          </p>
+        )}
 
         <section aria-labelledby="changed-entities-heading" aria-busy={isLoading || feed.isFetchingNextPage} className="rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
           <h2
@@ -224,11 +244,13 @@ export default function ProjectChangesPage() {
             </div>
           ) : isError ? (
             <div className="space-y-3 p-8 text-center">
-              <p className="flex items-center justify-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
+              <p role={invalidFilters ? "alert" : undefined} className="flex items-center justify-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
                 <AlertTriangle aria-hidden="true" className="h-4 w-4" />
-                Failed to load changes
+                {invalidFilters ? "These filters are not valid" : "Failed to load changes"}
               </p>
-              <Button ref={keepResultsFocus} type="button" size="sm" onClick={() => void retry()}>Retry</Button>
+              <Button ref={keepResultsFocus} type="button" size="sm" onClick={invalidFilters ? clearFilters : () => void activeFeed.refetch()}>
+                {invalidFilters ? "Clear filters" : "Retry"}
+              </Button>
             </div>
           ) : (
             <>

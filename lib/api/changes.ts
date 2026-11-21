@@ -1,9 +1,14 @@
 import type { ChangeEvent, ChangeEventType } from "./analytics";
 import { api } from "./client";
 
-export type ChangeOrigin = "human" | "ai" | "ai_edited" | "system";
+const CHANGE_ORIGINS = ["human", "ai", "ai_edited", "system"] as const;
+export type ChangeOrigin = (typeof CHANGE_ORIGINS)[number];
 export type NetChange = "added" | "modified" | "removed" | "transient";
 export type ChangeEntityType = "class" | "property" | "individual";
+
+export const MAX_CHANGE_FILTER_VALUES = 50;
+const MAX_FILTER_LENGTH = 255;
+const MAX_CURSOR_LENGTH = 4096;
 
 interface ChangeAuthor {
   user_id: string;
@@ -73,7 +78,41 @@ export interface ProjectChangesFilters extends ChangedEntitiesFilters {
   limit?: number;
 }
 
-function serializeFilters(filters: ProjectChangesFilters & { cursor?: string }) {
+function boundedText(value: string | undefined, maxLength: number) {
+  if (value === undefined || value.length <= maxLength) return value;
+  return value.length <= maxLength * 2 && Array.from(value).length <= maxLength ? value : undefined;
+}
+
+export function sanitizeChangeFilterText(value: string | undefined) {
+  const text = boundedText(value, MAX_FILTER_LENGTH);
+  return text?.includes("\0") ? undefined : text;
+}
+
+export function distinctChangeFilterValues<T extends string>(values: readonly T[]) {
+  return [...new Set(values)].filter((value) => sanitizeChangeFilterText(value));
+}
+
+function sanitizeChangeCursor(cursor: string | null | undefined) {
+  return boundedText(cursor || undefined, MAX_CURSOR_LENGTH);
+}
+
+export function isChangeOrigin(value: string): value is ChangeOrigin {
+  return CHANGE_ORIGINS.some((origin) => origin === value);
+}
+
+function serializeFilters({
+  branch, origin, author, entity_type, event_type, cursor, days, limit,
+}: ProjectChangesFilters & { cursor?: string }) {
+  const filters = {
+    days,
+    branch: sanitizeChangeFilterText(branch),
+    origin: origin && [...new Set(origin)].filter(isChangeOrigin),
+    author: author && distinctChangeFilterValues(author).slice(0, MAX_CHANGE_FILTER_VALUES),
+    entity_type: entity_type && distinctChangeFilterValues(entity_type).slice(0, MAX_CHANGE_FILTER_VALUES),
+    event_type: event_type && distinctChangeFilterValues(event_type).slice(0, MAX_CHANGE_FILTER_VALUES),
+    limit,
+    cursor: sanitizeChangeCursor(cursor),
+  };
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) {
     if (value === undefined) continue;
@@ -98,7 +137,10 @@ export const changesApi = {
         days, branch, origin, author, entity_type, event_type, limit, cursor,
       })}`,
       { headers: token ? { Authorization: `Bearer ${token}` } : undefined },
-    ),
+    ).then((response) => {
+      const nextCursor = sanitizeChangeCursor(response.next_cursor) ?? null;
+      return nextCursor === response.next_cursor ? response : { ...response, next_cursor: nextCursor };
+    }),
 
   listChangedEntities: (projectId: string, token?: string, { days, branch, origin }: ChangedEntitiesFilters = {}) =>
     api.get<ChangedEntitiesResponse>(

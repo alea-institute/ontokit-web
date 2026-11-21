@@ -16,6 +16,7 @@ export function SuggestionReviewCards({ review, onMarkDistinct, showDefinition }
   showDefinition?: boolean;
 }) {
   if (!review.items.some((item) => item.status !== "rejected")) return null;
+  const batchIris = new Set(review.items.map(({ suggestion }) => suggestion.iri));
 
   return (
     <div role="list" className="mt-2 space-y-2">
@@ -23,6 +24,7 @@ export function SuggestionReviewCards({ review, onMarkDistinct, showDefinition }
         <SuggestionCard
           key={item.suggestion.iri ?? index}
           item={item}
+          batchIris={batchIris}
           onAccept={() => { void review.accept(index); }}
           onReject={() => review.reject(index)}
           onEdit={(value, definition) => { review.edit(index, value, definition); void review.accept(index); }}

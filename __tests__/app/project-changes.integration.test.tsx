@@ -503,7 +503,7 @@ describe("project Changes page", () => {
       items: [],
     };
     await waitFor(() => expect(release).toBeTypeOf("function"));
-    release(json({ detail: "Unavailable" }, 422));
+    release(json({ detail: "Request timed out" }, 408));
     expect(await screen.findByText("Failed to load changes")).toBeDefined();
     respond = () => json(empty);
     screen.getByRole("button", { name: "Retry" }).focus();
@@ -521,7 +521,7 @@ describe("project Changes page", () => {
     let fail = true;
     respond = (params) => {
       if (!params.has("cursor")) return json({ ...changes, items: [lease], next_cursor: "next" });
-      if (fail) return json({ detail: "Unavailable" }, 422);
+      if (fail) return json({ detail: "Request timed out" }, 408);
       return new Promise<Response>((resolve) => { release = resolve; });
     };
     render(page());
@@ -543,5 +543,72 @@ describe("project Changes page", () => {
     expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Changed entities" }));
     expect(requests.map((params) => params.get("cursor"))).toEqual([null, "next", "next"]);
+  });
+
+  it("names system work and who ran it without crediting a person as author", async () => {
+    const imported = {
+      ...lease, net_change: "added" as const, origins: ["system" as const], field_changes: [], event_count: 2,
+      authors: [{ user_id: "ada", user_name: "Ada" }, { user_id: "system", user_name: null }],
+      events: [
+        { ...lease.events[0], id: "import", event_type: "create" as const, user_id: "ada", user_name: "Ada", origin: "system" as const },
+        { ...lease.events[0], id: "sync", user_id: "system", user_name: null, origin: "system" as const },
+      ],
+    };
+    respond = () => json({
+      ...changes,
+      summary: { ...changes.summary, authors: [
+        { user_id: "ada", user_name: "Ada", event_count: 1 },
+        { user_id: "system", user_name: null, event_count: 1 },
+      ] },
+      items: [imported],
+    });
+    render(page());
+
+    const row = (await screen.findByRole("link", { name: "Lease" })).closest("li")!;
+    expect(within(row).getByText("Run by Ada, System")).toBeDefined();
+    const authors = screen.getByRole("group", { name: "Author" });
+    expect(within(authors).getByRole("button", { name: "System" })).toBeDefined();
+    expect(within(authors).queryByRole("button", { name: "system" })).toBeNull();
+
+    fireEvent.click(within(row).getByRole("button", { name: "Details for Lease" }));
+    expect(within(row).getByText("Run by Ada")).toBeDefined();
+    expect(within(row).getAllByText("System").length).toBeGreaterThan(0);
+  });
+
+  it("explains a change outside the tracked fields", async () => {
+    respond = () => json({
+      ...changes,
+      items: [{ ...lease, field_changes: [{ field: "other", before: null, after: null }] }],
+    });
+    render(page());
+
+    fireEvent.click(await screen.findByRole("button", { name: "Details for Lease" }));
+    expect(screen.getByRole("heading", { name: "Other statements" })).toBeDefined();
+    expect(screen.getByText(/outside the tracked fields/)).toBeDefined();
+  });
+
+  it("explains a rejected filter and offers to clear it", async () => {
+    navigation.search = "?entity_type=class";
+    respond = () => json({ detail: "Too many filter values" }, 422);
+    render(page());
+
+    expect(await screen.findByText("These filters are not valid")).toBeDefined();
+    const results = screen.getByRole("region", { name: "Changed entities" });
+    expect(within(results).queryByRole("button", { name: "Retry" })).toBeNull();
+    fireEvent.click(within(results).getByRole("button", { name: "Clear filters" }));
+    expect(navigation.search).toBe("");
+  });
+
+  it("applies at most 50 authors from a link and says so", async () => {
+    const ids = Array.from({ length: 60 }, (_, index) => `member-${index}`);
+    navigation.search = `?${ids.map((id) => `author=${id}`).join("&")}`;
+    respond = () => json({
+      ...changes,
+      summary: { ...changes.summary, authors: ids.map((user_id) => ({ user_id, user_name: null, event_count: 1 })) },
+    });
+    render(page());
+
+    expect(await screen.findByText("Only the first 50 authors in this link apply.")).toBeDefined();
+    await waitFor(() => expect(requests.at(-1)?.getAll("author")).toEqual(ids.slice(0, 50)));
   });
 });

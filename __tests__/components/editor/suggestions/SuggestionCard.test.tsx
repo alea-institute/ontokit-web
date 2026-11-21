@@ -212,4 +212,42 @@ describe("SuggestionCard", () => {
 
     expect(screen.queryByRole("button", { name: /distinct entity/i })).toBeNull();
   });
+
+  it("names the existing class an exact duplicate repeats and says how to proceed", async () => {
+    const onEdit = vi.fn();
+    render(
+      <SuggestionCard
+        item={makeItem({ suggestion: makeSuggestion({
+          duplicate_verdict: "block",
+          duplicate_candidates: [{ iri: "http://example.org/Existing", label: "Child 1", score: 1 }],
+        }) })}
+        onAccept={vi.fn()} onReject={vi.fn()} onEdit={onEdit} onMarkDistinct={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Duplicate of existing class “Child 1”")).toBeDefined();
+    const accept = screen.getByRole("button", { name: "Accept suggestion" });
+    expect((accept as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Edit the label to make it distinct, or reject this suggestion.")).toBeDefined();
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit suggestion before accepting" }));
+    await userEvent.click(screen.getByRole("button", { name: "Accept" }));
+    expect(onEdit).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert").textContent).toMatch(/Change the label/);
+    expect(screen.getByRole("textbox", { name: "Suggested label" })).toBeDefined();
+  });
+
+  it("says when a suggestion repeats another one in the same batch", () => {
+    render(
+      <SuggestionCard
+        item={makeItem({ suggestion: makeSuggestion({
+          duplicate_verdict: "block",
+          duplicate_candidates: [{ iri: "http://example.org/Child0", label: "Child 1", score: 1 }],
+        }) })}
+        batchIris={new Set(["http://example.org/Child0", "http://example.org/Child1"])}
+        onAccept={vi.fn()} onReject={vi.fn()} onEdit={vi.fn()} onMarkDistinct={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Duplicate of another suggestion in this batch, “Child 1”")).toBeDefined();
+    expect(screen.queryByRole("button", { name: /distinct entity/ })).toBeNull();
+  });
 });

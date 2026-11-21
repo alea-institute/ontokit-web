@@ -66,4 +66,20 @@ describe("changesApi", () => {
     expect([...urls[0]]).toEqual([["days", "7"], ["author", "user-1"]]);
     expect([...urls[1]]).toEqual([["days", "7"]]);
   });
+
+  it("keeps every filter within the feed's limits before sending", async () => {
+    mockOk({ items: [], next_cursor: null });
+    const authors = Array.from({ length: 60 }, (_, index) => `user-${index}`);
+
+    await changesApi.list("project-1", undefined, {
+      origin: ["ai", "ai", "human", "system", "ai_edited"],
+      author: ["x".repeat(256), "user-0", ...authors],
+      cursor: "c".repeat(4097),
+    });
+
+    const { searchParams } = new URL(mockFetch.mock.calls[0][0]);
+    expect(searchParams.getAll("origin")).toEqual(["ai", "human", "system", "ai_edited"]);
+    expect(searchParams.getAll("author")).toEqual(authors.slice(0, 50));
+    expect(searchParams.has("cursor")).toBe(false);
+  });
 });

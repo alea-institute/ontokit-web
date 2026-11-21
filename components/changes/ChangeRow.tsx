@@ -30,7 +30,7 @@ const FIELD_LABELS: Record<FieldChange["field"], string> = {
   parents: "Parents",
   deprecated: "Deprecated",
   comments: "Comments",
-  other: "Other",
+  other: "Other statements",
 };
 
 const EVENT_LABELS: Record<ChangeEventType, string> = {
@@ -41,6 +41,10 @@ const EVENT_LABELS: Record<ChangeEventType, string> = {
   reparent: "Reparented",
   deprecate: "Deprecated",
 };
+
+export function changeAuthorLabel({ user_id, user_name }: EntityChange["authors"][number]) {
+  return user_id === "system" ? "System" : user_name || user_id || "Unknown author";
+}
 
 function ChangeTime({ timestamp, referenceTime }: { timestamp: string; referenceTime: number }) {
   const date = new Date(timestamp);
@@ -141,6 +145,10 @@ export function ChangeRow({
   const [expanded, setExpanded] = useState(false);
   const detailsId = useId();
   const label = item.label || getLocalName(item.entity_iri);
+  const authorNames = item.authors.map(changeAuthorLabel).join(", ");
+  const attribution = item.origins.includes("system")
+    ? item.origins.length === 1 ? `Run by ${authorNames}` : `Participants: ${authorNames}`
+    : authorNames;
   const { icon: ChangeIcon, label: changeLabel, color } = NET_CHANGES[item.net_change];
   const hasEditorLink = item.net_change === "added" || item.net_change === "modified";
   const DisclosureIcon = expanded ? ChevronDown : ChevronRight;
@@ -173,9 +181,7 @@ export function ChangeRow({
           {item.origins.map((origin) => <OriginBadge key={origin} origin={origin} />)}
         </div>
         <div className="flex min-w-0 flex-wrap gap-x-2 text-xs text-slate-600 dark:text-slate-400">
-          {item.authors.length > 0 && (
-            <span className="wrap-break-word">{item.authors.map((author) => author.user_name || author.user_id).join(", ")}</span>
-          )}
+          {authorNames && <span className="wrap-break-word">{attribution}</span>}
           <ChangeTime timestamp={item.last_changed_at} referenceTime={referenceTime} />
         </div>
         <Button
@@ -203,7 +209,7 @@ export function ChangeRow({
                   <li key={field} className="space-y-1">
                     <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{FIELD_LABELS[field]}</h3>
                     {field === "other" ? (
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Values unavailable for this field.</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">Statements changed outside the tracked fields.</p>
                     ) : (
                       <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
                         <FieldValues values={fieldValues(before)} otherValues={fieldValues(after)} field={field} side="before" />
@@ -228,7 +234,9 @@ export function ChangeRow({
                     <span className="font-medium text-slate-800 dark:text-slate-200">
                       {EVENT_LABELS[event.event_type] || event.event_type}
                     </span>
-                    <span className="wrap-break-word">{event.user_name || event.user_id || "Unknown author"}</span>
+                    <span className="wrap-break-word">
+                      {event.origin === "system" && event.user_id !== "system" ? "Run by " : ""}{changeAuthorLabel(event)}
+                    </span>
                     <ChangeTime timestamp={event.created_at} referenceTime={referenceTime} />
                     <OriginBadge origin={event.origin} />
                     {event.origin_model && <span className="wrap-break-word">{event.origin_model}</span>}

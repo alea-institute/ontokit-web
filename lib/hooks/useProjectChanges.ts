@@ -1,5 +1,10 @@
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { changesApi, type ChangedEntitiesFilters, type ProjectChangesFilters } from "@/lib/api/changes";
+import { ApiError } from "@/lib/api/client";
+
+export function isInvalidChangeFilterError(error: unknown) {
+  return error instanceof ApiError && error.status === 422;
+}
 
 export function useProjectChanges(
   projectId: string,
@@ -7,6 +12,9 @@ export function useProjectChanges(
   filters: ProjectChangesFilters = {},
   enabled = true,
 ) {
+  const queryClient = useQueryClient();
+  const retry = queryClient.getDefaultOptions().queries?.retry ?? 3;
+
   return useInfiniteQuery({
     queryKey: ["projectChanges", projectId, !!accessToken, filters],
     queryFn: ({ pageParam }) =>
@@ -15,6 +23,11 @@ export function useProjectChanges(
     getNextPageParam: (lastPage) => lastPage.next_cursor ?? undefined,
     enabled: !!projectId && enabled,
     staleTime: 60_000,
+    retry: (failureCount, error) => {
+      if (isInvalidChangeFilterError(error)) return false;
+      if (typeof retry === "function") return retry(failureCount, error);
+      return typeof retry === "number" ? failureCount < retry : retry;
+    },
   });
 }
 
