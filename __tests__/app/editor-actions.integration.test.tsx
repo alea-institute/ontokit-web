@@ -55,6 +55,7 @@ const iri = "https://example.test/Person";
 const initialEditorMode = useEditorModeStore.getState();
 const initialSendBeacon = Object.getOwnPropertyDescriptor(navigator, "sendBeacon");
 let llmConfigured: boolean;
+let llmBudgetExhausted: boolean;
 let generationStatus: number;
 let generationBodies: unknown[];
 let generatedDefinition: string | undefined;
@@ -178,7 +179,7 @@ beforeEach(() => {
   boundary.syncMonacoValue = null;
   boundary.search = new URLSearchParams(); ancestorStatus = 200; revisionStatus = 200; lintStatus = null; lintIssues = []; extraBranches = [];
   sessionStorage.removeItem("ontokit:branch:route-project");
-  llmConfigured = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
+  llmConfigured = false; llmBudgetExhausted = false; generationBodies = []; extraTreeNodes = []; nestPerson = false; classParents = [];
   generationStatus = 200;
   classAnnotations = [];
   generatedDefinition = undefined; generatedModel = "fixture-model"; generatedLabel = "Generated child";
@@ -263,7 +264,7 @@ beforeEach(() => {
       if (generationStatus !== 200) return json({ detail: "Generation failed" }, generationStatus);
       return json({ suggestions: [{ iri: "https://example.test/Generated", label: generatedLabel, definition: generatedDefinition, suggestion_type: body.suggestion_type, provenance: "llm-proposed", model: generatedModel, prompt_template: body.suggestion_type, validation_errors: [], duplicate_verdict: "pass", duplicate_candidates: [] }], input_tokens: 10, output_tokens: 20 });
     }
-    if (path.endsWith("/llm/status")) return json({ configured: llmConfigured });
+    if (path.endsWith("/llm/status")) return json({ configured: llmConfigured, budget_exhausted: llmBudgetExhausted });
     if (path === "/api/v1/pr-party/me") return json({ is_reviewer: false });
     if (path.endsWith("/suggestions/pending")) return json({ items: [] });
     if (path.endsWith("/branches")) return json({ items: [{ name: "main", is_current: true }, ...extraBranches], current_branch: "main", default_branch: "main" });
@@ -382,6 +383,54 @@ describe("editor review actions", () => {
     beforeEach(() => {
       useEditorModeStore.getState().setEditorMode(mode);
       llmConfigured = true;
+    });
+
+    it("explains a signed-in viewer's AI access lock before the class creation lock in the tree menu", async () => {
+      vi.stubEnv("NEXT_PUBLIC_AUTH_MODE", "optional");
+      projectResponse = { ...projectResponse, user_role: "viewer", is_public: true };
+      trustCapabilities = { tier: "contributor", can_mint_entities: false, accepted_count: 0, promotion_threshold: 3 };
+      mount();
+      const person = await screen.findByRole("treeitem", { name: /^Person$/ });
+      await waitFor(() => {
+        expect(client.getQueryData(["trust-capabilities", "route-project", "reader@example.test"])).toEqual(trustCapabilities);
+        expect(client.getQueryData(["llm-status", "route-project", "reader@example.test"])).toMatchObject({ configured: true });
+      });
+      fireEvent.contextMenu(person);
+
+      const menu = await screen.findByRole("menu");
+      const reason = "Your project role does not allow AI suggestions.";
+      expect.soft(within(menu).queryByText(reason)).not.toBeNull();
+      for (const label of ["Suggest Subclasses", "Suggest Siblings", "Suggest subclasses for each subclass…"]) {
+        const item = within(menu).getByRole("menuitem", { name: label });
+        expect.soft(item.getAttribute("aria-disabled"), label).toBe("true");
+        expect.soft(document.getElementById(item.getAttribute("aria-describedby") ?? "")?.textContent, label)
+          .toBe(reason);
+      }
+    });
+
+    it("explains an exhausted AI budget before the class creation lock on existing class suggestion controls", async () => {
+      generationStatus = 500;
+      mount();
+      fireEvent.click(await screen.findByText("Person"));
+      fireEvent.click(await screen.findByRole("button", { name: "Suggest subclasses" }));
+      await screen.findByRole("button", { name: "Retry" });
+
+      trustCapabilities = { tier: "contributor", can_mint_entities: false, accepted_count: 0, promotion_threshold: 3 };
+      await act(async () => { await client.invalidateQueries({ queryKey: ["trust-capabilities"] }); });
+      await screen.findByRole("button", {
+        name: "Retry",
+        description: "Creating new entries requires trusted status — 3 more accepted suggestions to go (3 in total).",
+      });
+      llmBudgetExhausted = true;
+      await act(async () => { await client.invalidateQueries({ queryKey: ["llm-status"] }); });
+      await screen.findByText(/AI budget exhausted for this month/);
+
+      for (const label of ["Suggest subclasses", "Suggest siblings", "Retry"]) {
+        const button = screen.getByRole("button", { name: label });
+        expect.soft(button.hasAttribute("disabled") || button.getAttribute("aria-disabled") === "true", label).toBe(true);
+        expect.soft(document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent, label)
+          .toBe("This project's AI budget has been exhausted.");
+      }
     });
 
     it.each(["untrusted", "failed resume", "writable"] as const)("gates class generation and acceptance for a %s suggester", async state => {

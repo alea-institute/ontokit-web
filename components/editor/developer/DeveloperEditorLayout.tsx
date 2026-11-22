@@ -247,6 +247,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
   const toast = useToast();
   const { announce } = useAnnounce();
   const llmGate = useLLMGate(projectId, userRole);
+  const llmSuggestionLockedReason = suggestionLockReason(llmGate);
   const [suggestionIntent, setSuggestionIntent] = useState<ClassSuggestionIntent | null>(null);
   const consumeSuggestionIntent = useCallback((intent: ClassSuggestionIntent) => {
     setSuggestionIntent((current) => current === intent ? null : current);
@@ -681,7 +682,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                               selectedIri={selectedIri}
                               onSelect={selectNode}
                               onSuggest={suggestFromTree}
-                              suggestLockedReason={classAcceptanceLockedReason || suggestionLockReason(llmGate)}
+                              suggestLockedReason={llmSuggestionLockedReason || classAcceptanceLockedReason}
                               onExpand={expandNode}
                               onCollapse={collapseNode}
                               onAddChild={canAddEntity ? (parentIri: string) => onAddEntity(parentIri) : undefined}
@@ -773,6 +774,7 @@ export function DeveloperEditorLayout(props: DeveloperEditorLayoutProps) {
                   isProposeEditStarting={isProposeEditStarting}
                   isAnonymousProposalMode={isAnonymousProposalMode}
                   canUseLLM={llmGate.canUseLLM}
+                  llmSuggestionLockedReason={llmSuggestionLockedReason}
                   byoKey={byoEntry?.key}
                   onAddSuggestedChild={onAddSuggestedChild}
                   classAcceptanceLockedReason={classAcceptanceLockedReason}

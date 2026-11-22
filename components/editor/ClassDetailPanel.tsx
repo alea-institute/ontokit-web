@@ -122,6 +122,7 @@ interface ClassDetailPanelProps {
 
   // LLM suggestion support
   canUseLLM?: boolean;
+  llmSuggestionLockedReason?: string;
   byoKey?: string;
   userRole?: ProjectRole;
   classAcceptanceLockedReason?: string;
@@ -153,6 +154,7 @@ export function ClassDetailPanel({
   isProposeEditStarting,
   isAnonymousProposalMode: _isAnonymousProposalMode,
   canUseLLM,
+  llmSuggestionLockedReason,
   byoKey,
   userRole: _userRole,
   onAddSuggestedChild,
@@ -650,7 +652,8 @@ export function ClassDetailPanel({
     (onAddSuggestedChild ? undefined : "Generated entity persistence is unavailable.");
   const siblingParentReason = siblingSuggestionLockReason(classDetail?.parent_iris ?? []);
   const siblingAcceptanceReason = subclassAcceptanceReason || siblingParentReason;
-  const canRequestClasses = !!canUseLLM && !classAcceptanceLockedReason;
+  const classRequestLockedReason = llmSuggestionLockedReason || classAcceptanceLockedReason;
+  const canRequestClasses = !!canUseLLM && !classRequestLockedReason;
 
   const handleAcceptSiblingSuggestion = useCallback(
     async (suggestion: GeneratedSuggestion, editedValue?: string) => {
@@ -737,8 +740,8 @@ export function ClassDetailPanel({
     getAcceptanceError: () => siblingAcceptanceReason ?? null,
   });
 
-  const subclassRequestReason = classAcceptanceLockedReason || childrenSuggestions.busyReason;
-  const siblingRequestReason = classAcceptanceLockedReason || siblingParentReason || siblingsSuggestions.busyReason;
+  const subclassRequestReason = classRequestLockedReason || childrenSuggestions.busyReason;
+  const siblingRequestReason = classRequestLockedReason || siblingParentReason || siblingsSuggestions.busyReason;
 
   const annotationsSuggestions = useSuggestions({
     ...suggestionOpts,
@@ -1602,7 +1605,7 @@ export function ClassDetailPanel({
                 parentLabel={displayLabel}
                 review={childrenSuggestions}
                 acceptanceLockedReason={subclassAcceptanceReason}
-                requestLockedReason={classAcceptanceLockedReason}
+                requestLockedReason={classRequestLockedReason}
                 onRequest={() => { void requestClassSuggestions("children"); }}
                 canRequest={canUseLLM ?? false}
                 requestVersion={requestVersions.children}
@@ -1616,7 +1619,7 @@ export function ClassDetailPanel({
                 parentLabel={classDetail.parent_iris.map((iri) => classDetail.parent_labels?.[iri] || getLocalName(iri)).join(", ")}
                 review={siblingsSuggestions}
                 acceptanceLockedReason={siblingAcceptanceReason}
-                requestLockedReason={classAcceptanceLockedReason}
+                requestLockedReason={classRequestLockedReason}
                 onRequest={() => { void requestClassSuggestions("siblings"); }}
                 canRequest={!!canUseLLM && !siblingParentReason}
                 requestVersion={requestVersions.siblings}
