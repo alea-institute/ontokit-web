@@ -27,7 +27,9 @@ export function suggestionLockReason(gate: ReturnType<typeof useLLMGate>): strin
   if (gate.canUseLLM) return undefined;
   if (gate.isAnonymous) return "Sign in to use AI suggestions.";
   if (!gate.hasRoleAccess) return "Your project role does not allow AI suggestions.";
-  if (gate.budgetExhausted) return "This project's AI budget has been exhausted.";
+  if (gate.budgetExhausted) {
+    return "This project's AI spending limit has been reached. Ask a project admin to review it.";
+  }
   if (gate.notConfigured) return "Choose a generation model in project AI settings.";
   return "AI suggestions are currently unavailable.";
 }

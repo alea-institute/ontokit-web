@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useAnnounce } from "@/components/ui/ScreenReaderAnnouncer";
 
+const spendingLimitNotice =
+  "This project's AI spending limit has been reached. Ask a project admin to review it. LLM features are disabled.";
+
 interface LLMBudgetBannerProps {
   budgetExhausted: boolean;
   monthlySpentUsd: number;
@@ -26,10 +29,7 @@ export function LLMBudgetBanner({
   // Assertive announcement when transitioning to exhausted state
   useEffect(() => {
     if (budgetExhausted && !dismissed) {
-      announce(
-        "AI budget exhausted for this month. LLM features are disabled.",
-        "assertive"
-      );
+      announce(spendingLimitNotice, "assertive");
     }
   }, [budgetExhausted, dismissed, announce]);
 
@@ -55,7 +55,7 @@ export function LLMBudgetBanner({
         role="alert"
       >
         <span>
-          AI budget exhausted for this month. LLM features are disabled. Manual suggestions continue to work.
+          {spendingLimitNotice} Manual suggestions continue to work.
         </span>
         <button
           type="button"

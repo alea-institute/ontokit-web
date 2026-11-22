@@ -408,7 +408,7 @@ describe("editor review actions", () => {
       }
     });
 
-    it("explains an exhausted AI budget before the class creation lock on existing class suggestion controls", async () => {
+    it("explains a reached AI spending limit before the class creation lock on existing class suggestion controls", async () => {
       generationStatus = 500;
       mount();
       fireEvent.click(await screen.findByText("Person"));
@@ -423,14 +423,20 @@ describe("editor review actions", () => {
       });
       llmBudgetExhausted = true;
       await act(async () => { await client.invalidateQueries({ queryKey: ["llm-status"] }); });
-      await screen.findByText(/AI budget exhausted for this month/);
+      const reason = "This project's AI spending limit has been reached. Ask a project admin to review it.";
+      const banner = await screen.findByText(/Manual suggestions continue to work/);
+      expect.soft(banner.textContent).toContain(reason);
 
       for (const label of ["Suggest subclasses", "Suggest siblings", "Retry"]) {
         const button = screen.getByRole("button", { name: label });
         expect.soft(button.hasAttribute("disabled") || button.getAttribute("aria-disabled") === "true", label).toBe(true);
         expect.soft(document.getElementById(button.getAttribute("aria-describedby") ?? "")?.textContent, label)
-          .toBe("This project's AI budget has been exhausted.");
+          .toBe(reason);
       }
+
+      fireEvent.contextMenu(screen.getByRole("treeitem", { name: /^Person$/ }));
+      const menu = await screen.findByRole("menu");
+      expect(within(menu).queryByText(reason)).not.toBeNull();
     });
 
     it.each(["untrusted", "failed resume", "writable"] as const)("gates class generation and acceptance for a %s suggester", async state => {

@@ -68,16 +68,18 @@ describe("LLMBudgetBanner", () => {
     expect(status.textContent).toMatch(/\$0\.00 remaining/);
   });
 
-  it("shows the exhausted alert when budgetExhausted is true", () => {
+  it("shows the spending limit alert even when the monthly budget has room", () => {
     render(
       <LLMBudgetBanner
         budgetExhausted={true}
-        monthlySpentUsd={100}
+        monthlySpentUsd={50}
         monthlyBudgetUsd={100}
       />
     );
     const alert = screen.getByRole("alert");
-    expect(alert.textContent).toMatch(/AI budget exhausted for this month/);
+    expect(alert.textContent).toContain(
+      "This project's AI spending limit has been reached. Ask a project admin to review it."
+    );
     expect(alert.textContent).toMatch(/Manual suggestions continue to work/);
   });
 
@@ -90,7 +92,7 @@ describe("LLMBudgetBanner", () => {
       />
     );
     expect(announceMock).toHaveBeenCalledWith(
-      "AI budget exhausted for this month. LLM features are disabled.",
+      "This project's AI spending limit has been reached. Ask a project admin to review it. LLM features are disabled.",
       "assertive"
     );
   });
