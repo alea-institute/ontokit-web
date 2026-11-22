@@ -334,6 +334,52 @@ Findings that change the design or stay open:
 
 **Not covered:** suggester-role and anonymous flows, rate-limit and budget refusals from the real limiter, migration downgrade, pull-request merge attribution, remote sync, and a 5,000-plus-entity feed. A pre-existing layout fault remains outside these features: the "Suggest improvements" buttons overlap the field labels in the class panel at 1440 px.
 
+## Second pass (2026-11-21): review, fixes, and real-stack acceptance
+
+Branch `drain/1120-integration`; API at `drain/1120-diff-generative` `11868392`. Nothing merged into `dev`; no pull request; nothing deployed.
+
+**Line-by-line review.** A strict reading of the two editor layouts, `ClassDetailPanel`, and every changed editor file or hook the evening record did not mention found eleven defects. Each got a test that failed first, then a fix:
+
+- A Source save could erase a class just accepted from bulk review, and leaving Source discarded or overwrote its unsaved buffer. A raw draft now keeps the revision it was edited from, and a save against a moved branch head is refused before it commits, with the edited text intact.
+- The review offered class acceptance to suggesters below the trusted rung and in a read-only session resume; the API refuses both. Acceptance now shows the reason instead.
+- A tree request for a class the reader left before it loaded could fire on a later visit, and a request made while the same batch was saving vanished silently. Both now drop or wait explicitly.
+- Bulk and detail reviews overwrote one shared batch, so a save in one could invalidate the other's acceptance. They now coordinate on the batch.
+- A save finishing after a branch switch added its class, and fetched its parent's children, into the new branch's tree. Late saves now stay on their own branch.
+- The Changes list and digest kept 60-second-old data after the editor saved. A branch-head change now refreshes them, including views with no branch in the URL.
+- Two IRIs that sanitized alike shared a tree row id, so Shift+F10 could open the menu for the wrong class. Ids now encode the full IRI.
+- Sibling suggestions could spend a call for a class with two parents (unusable) and disagreed between tree and panel for a class under `owl:Thing`. Eligibility is now checked once, before the call.
+- Closing a finished bulk review from Source view, or with the tree hidden on a phone, dropped focus to the page. Focus now returns to a visible control.
+- A tree marker read "modified, AI origin", as if AI made the modification. AI wording now attaches to creation only.
+
+**API evening contract, adopted.** `other` field changes read "Other statements: statements changed outside the tracked fields"; system work shows "System" and "Run by <member>" instead of crediting the member as author; filters stay within the feed's limits, with "Only the first 50 authors in this link apply." for longer links; a rejected filter offers "Clear filters" instead of Retry; an exact-label duplicate names the existing class or the earlier proposal and blocks an unchanged edit-accept.
+
+**Layout.** "Suggest improvements" no longer overlaps field labels: actions sit on their own line under the 10rem label column, and beside the title once the section stacks. Checked by geometry (no overlap with the label, the field, or the column edge; no clipped text; no sideways scroll) and by eye at 1280, 1440, 1920, and 390 px on the real stack.
+
+**Real-stack acceptance.** Three fresh stacks, the last on web `7b1b44e7`. The repo's isolated harness (`scripts/e2e`, suggestions profile) on a production web build of this branch, the API at `11868392`, real OIDC personas, and an OpenAI-compatible stub inside the API container:
+
+| Check | Saw |
+|---|---|
+| Finish a bulk review over three subclasses, press "Close review" | Review closed; focus landed on the class tree. |
+| Bulk action on a leaf and on a collapsed parent | Disabled with "This class has no subclasses." and "Expand this class in the tree to choose its subclasses." |
+| Grounding line on a subclass batch | "Based on: label, definition, parents, and 3 existing subclasses". |
+| Owner, editor | Generation allowed in UI and API (200). |
+| Suggester below trusted rung | API allows generation (200) but refuses class creation, so subclass and sibling generation was offered for nothing. Fixed: those controls are disabled with the trust reason; annotation suggestions stay available. |
+| Signed-in non-member, public project | API: generate 403, Changes feed 200. Changes page readable. The tree first explained the disabled AI actions with the trust rung, as if earning trust would unlock them; fixed so "Your project role does not allow AI suggestions." wins. |
+| Anonymous visitor, public project | API: generate 401, Changes feed 200. Editor redirects to the read-only viewer; Changes page readable. |
+| Real 429 (role's daily call count set at the limit in Redis) | Fixed message: "You've reached today's AI request limit for your role. Try again tomorrow." Pending cards kept. |
+| Real 402 (project daily cap set to $0) | Fixed message names the daily cap and the admin who can raise it; the monthly budget gets its own message. Pending cards kept. The tree menu's status-based reason still said "AI budget has been exhausted" after a daily-cap refusal; it now names the spending limit without claiming which one (unit-tested; not re-walked). |
+
+**Scale.** 7,518 events on 3,018 entities from 40 authors over 30 days, inserted into the stack's database: the API paged all 3,018 entities in 16 pages of 200 with no duplicates and an unchanged summary on every page (median 150 ms a page); the digest feed and the summary agreed (2,974 added, 44 added then removed). In the browser the first 50 rows rendered in 0.6–1.2 s, each "Load more" in 0.2–0.6 s, and origin and author filters settled in under 0.7 s (one 10.6 s outlier under load did not recur in two reruns at 0.38 s). 300 loaded rows make about 11,700 DOM nodes; paging is user-driven, so no virtualization was added. A rejected cursor on "Load more" (the API's 422 after a server change) blanked the list and blamed the filters; it now reloads from the top, keeps the filters, and says "The list changed while you were reading. Reloaded from the top."
+
+**Wording and locales.** The app ships one locale (`en`), and no component reads the message catalog; every string in the app is inline English. New strings follow that convention rather than starting a catalog for one feature. Labels drop leading articles. Origin copy now says what the data shows: "classes from AI suggestions" (a person accepted each one), "added from an AI suggestion", Human as "saved by a person; not matched to an AI suggestion", and System including imports a member ran. That wording is built provisionally; the choice is on Damien's Decision Sheet `ontokit-web-2026-11-21-2211-ai-origin-wording`.
+
+**Gates.** Before each push: Vitest whole suite green (5,882 of 5,882 at `7b1b44e7`), type-check clean, lint 0 errors with the 21 pre-existing warnings. Two load-time flakes (a graph integration test and a project-viewer test) failed once under a load average near 28 and passed alone, twice each.
+
+**Still open.**
+- The digest credits a person's edit to an AI-created class as "modified by people" while the net-change strip counts it once as added, so the two show different "modified" totals by design (OC9).
+- Forty author buttons wrap into a long block; a project with hundreds of authors needs a searchable author picker.
+- Not walked in the browser: migration downgrade, pull-request merge attribution, remote sync.
+
 ## Verification Contract
 
 - API: `pytest --no-cov -q tests/unit` green against the 4115-passed baseline, `ruff check` and `ruff format --check` clean, and the migration upgrades and downgrades on a scratch database before the PR merges.
