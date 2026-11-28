@@ -1,0 +1,153 @@
+{
+  "target": "undici@6",
+  "lockSha256": "6de3c062e7dc5dfe253a7e7d83bac337e787a9ace2938e4d94a378662fdbc000",
+  "changes": [
+    {
+      "path": "node_modules/@actions/github/node_modules/undici",
+      "from": "6.28.0",
+      "to": "6.29.1"
+    },
+    {
+      "path": "node_modules/@actions/http-client/node_modules/undici",
+      "from": "6.28.0",
+      "to": "6.29.1"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/github/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-2m5v-pch6-74hx",
+      "range": ">=4.0.0 <6.29.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/github/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-3wwx-pv8p-q78v",
+      "range": ">=6.25.0 <6.28.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/github/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+      "range": ">=6.5.0 <6.29.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/github/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-9fm3-97px-rjf6",
+      "range": ">=5.15.0 <6.29.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/github/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-qrxm-fqhp-jwvm",
+      "range": ">=4.2.1 <6.29.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/github/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-r53p-7pc4-xj5r",
+      "range": "<6.28.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/github/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-rfgv-xxqx-mfg5",
+      "range": ">=6.7.0 <6.28.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/github/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+      "range": ">=6.23.0 <6.29.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/http-client/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-2m5v-pch6-74hx",
+      "range": ">=4.0.0 <6.29.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/http-client/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-3wwx-pv8p-q78v",
+      "range": ">=6.25.0 <6.28.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/http-client/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+      "range": ">=6.5.0 <6.29.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/http-client/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-9fm3-97px-rjf6",
+      "range": ">=5.15.0 <6.29.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/http-client/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-qrxm-fqhp-jwvm",
+      "range": ">=4.2.1 <6.29.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/http-client/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-r53p-7pc4-xj5r",
+      "range": "<6.28.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/http-client/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-rfgv-xxqx-mfg5",
+      "range": ">=6.7.0 <6.28.1"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/@actions/http-client/node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+      "range": ">=6.23.0 <6.29.1"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 5,
+    "critical": 0,
+    "total": 12
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 5,
+    "critical": 0,
+    "total": 12
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:39:15.128569+00:00",
+      "end": "2026-11-21T13:39:32.683030+00:00"
+    },
+    {
+      "command": [
+        "node",
+        "-e",
+        "const assert=require(\"node:assert/strict\"),{createRequire}=require(\"node:module\"),path=require(\"node:path\");(async()=>{for(const owner of [\"@actions/github\",\"@actions/http-client\"]){const r=createRequire(path.resolve(\"node_modules\",owner,\"package.json\"));const u=r(\"undici\"),mock=new u.MockAgent();mock.disableNetConnect();mock.get(\"https://example.invalid\").intercept({path:\"/health\"}).reply(200,{status:\"ok\"});const response=await u.request(\"https://example.invalid/health\",{dispatcher:mock});assert.equal(response.statusCode,200);assert.deepEqual(await response.body.json(),{status:\"ok\"});await mock.close();}console.log(\"Both Actions HTTP client paths pass in-memory request/response checks\")})()"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:39:26.363713+00:00",
+      "end": "2026-11-21T13:39:26.451088+00:00"
+    }
+  ]
+}

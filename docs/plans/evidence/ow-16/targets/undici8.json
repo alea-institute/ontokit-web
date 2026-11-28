@@ -1,0 +1,171 @@
+{
+  "target": "undici@8",
+  "lockSha256": "ee128cfd3179ca8401fb85d3b4388af4f68349b33af5ae783abed1a8b11ce9d0",
+  "changes": [
+    {
+      "path": "node_modules/undici",
+      "from": "8.10.0",
+      "to": "8.13.1"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-2gqq-gqf2-x968",
+      "range": ">=8.0.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-2jfj-6hjv-fm6j",
+      "range": ">=8.0.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-2m5v-pch6-74hx",
+      "range": ">=8.0.0 <8.12.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-3wwx-pv8p-q78v",
+      "range": ">=8.1.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-3xpg-4rpp-hhhm",
+      "range": ">=8.0.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-4qv8-2p9j-2685",
+      "range": ">=8.0.0 <8.12.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-4w7w-5xrc-9h26",
+      "range": ">=8.0.0 <8.12.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-55wc-3pg8-jfw6",
+      "range": ">=8.0.0 <8.12.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-8436-99hf-9mmv",
+      "range": ">=8.0.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-9fm3-97px-rjf6",
+      "range": ">=8.0.0 <8.12.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-f72v-6w45-q472",
+      "range": ">=8.0.0 <8.12.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-pmjh-fq2x-6v4x",
+      "range": ">=8.0.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-qrxm-fqhp-jwvm",
+      "range": ">=8.0.0 <8.12.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-r53p-7pc4-xj5r",
+      "range": ">=8.0.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-rfgv-xxqx-mfg5",
+      "range": ">=8.0.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-rx4f-c7p8-82vq",
+      "range": ">=8.0.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-vp8m-p9jh-q5pm",
+      "range": ">=8.10.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-w293-vg96-wgc3",
+      "range": ">=8.0.0 <8.10.2"
+    },
+    {
+      "package": "undici",
+      "path": "node_modules/undici",
+      "advisory": "https://github.com/advisories/GHSA-xjj6-f33q-929c",
+      "range": ">=8.0.0 <8.12.2"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 5,
+    "critical": 0,
+    "total": 12
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 4,
+    "critical": 0,
+    "total": 11
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "test",
+        "--",
+        "--run",
+        "__tests__/lib/vue-ssr-attributes.test.ts",
+        "__tests__/app/api-docs.integration.test.tsx",
+        "__tests__/components/editor/TurtleEditor.test.tsx",
+        "__tests__/components/editor/TurtleEditor.coverage.test.tsx"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:40:12.012255+00:00",
+      "end": "2026-11-21T13:40:13.201192+00:00"
+    },
+    {
+      "command": [
+        "node",
+        "-e",
+        "const assert=require(\"node:assert/strict\"),u=require(\"undici\");(async()=>{const mock=new u.MockAgent();mock.disableNetConnect();mock.get(\"https://example.invalid\").intercept({path:\"/health\"}).reply(200,{status:\"ok\"});const response=await u.request(\"https://example.invalid/health\",{dispatcher:mock});assert.equal(response.statusCode,200);assert.deepEqual(await response.body.json(),{status:\"ok\"});await mock.close();console.log(\"JSDOM HTTP client path passes in-memory request/response check\")})()"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:40:13.248251+00:00",
+      "end": "2026-11-21T13:40:13.313347+00:00"
+    }
+  ]
+}

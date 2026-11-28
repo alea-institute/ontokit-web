@@ -1,0 +1,74 @@
+{
+  "target": "browserslist",
+  "lockSha256": "951a1ac61796a91f0f9b0ce6d6f1b51e9e4ba32e2c042a165d47a59d2f853a4a",
+  "changes": [
+    {
+      "path": "node_modules/browserslist",
+      "from": "4.28.2",
+      "to": "4.29.6"
+    },
+    {
+      "path": "node_modules/caniuse-lite",
+      "from": "1.0.30001785",
+      "to": "1.0.30001826"
+    },
+    {
+      "path": "node_modules/electron-to-chromium",
+      "from": "1.5.331",
+      "to": "1.5.492"
+    },
+    {
+      "path": "node_modules/node-releases",
+      "from": "2.0.37",
+      "to": "2.0.65"
+    },
+    {
+      "path": "node_modules/update-browserslist-db",
+      "from": "1.2.3",
+      "to": "1.4.0"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "browserslist",
+      "path": "node_modules/browserslist",
+      "advisory": "https://github.com/advisories/GHSA-73wf-gq98-2v4g",
+      "range": "<=4.28.6"
+    },
+    {
+      "package": "browserslist",
+      "path": "node_modules/browserslist",
+      "advisory": "https://github.com/advisories/GHSA-c83g-rgw3-j3cx",
+      "range": "<=4.28.6"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 8,
+    "critical": 0,
+    "total": 15
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 0,
+    "moderate": 7,
+    "high": 7,
+    "critical": 0,
+    "total": 14
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:37:38.902477+00:00",
+      "end": "2026-11-21T13:37:55.909109+00:00"
+    }
+  ]
+}

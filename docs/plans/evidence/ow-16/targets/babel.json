@@ -1,0 +1,108 @@
+{
+  "target": "@babel/core",
+  "lockSha256": "e543111690379aa3bbc63c93e8e7147714ff31e3f7af1cc2e49dffbcb7a16c54",
+  "changes": [
+    {
+      "path": "node_modules/@babel/code-frame",
+      "from": "7.29.0",
+      "to": "7.29.7"
+    },
+    {
+      "path": "node_modules/@babel/compat-data",
+      "from": "7.29.0",
+      "to": "7.29.7"
+    },
+    {
+      "path": "node_modules/@babel/core",
+      "from": "7.29.0",
+      "to": "7.29.13"
+    },
+    {
+      "path": "node_modules/@babel/generator",
+      "from": "7.29.1",
+      "to": "7.29.15"
+    },
+    {
+      "path": "node_modules/@babel/helper-compilation-targets",
+      "from": "7.28.6",
+      "to": "7.29.13"
+    },
+    {
+      "path": "node_modules/@babel/helper-compilation-targets/node_modules/semver",
+      "from": "6.3.1",
+      "to": "6.3.2"
+    },
+    {
+      "path": "node_modules/@babel/helper-globals",
+      "from": "7.28.0",
+      "to": "7.29.7"
+    },
+    {
+      "path": "node_modules/@babel/helper-module-imports",
+      "from": "7.28.6",
+      "to": "7.29.7"
+    },
+    {
+      "path": "node_modules/@babel/helper-module-transforms",
+      "from": "7.28.6",
+      "to": "7.29.14"
+    },
+    {
+      "path": "node_modules/@babel/helper-validator-option",
+      "from": "7.27.1",
+      "to": "7.29.7"
+    },
+    {
+      "path": "node_modules/@babel/helpers",
+      "from": "7.29.2",
+      "to": "7.29.15"
+    },
+    {
+      "path": "node_modules/@babel/template",
+      "from": "7.28.6",
+      "to": "7.29.7"
+    },
+    {
+      "path": "node_modules/@babel/traverse",
+      "from": "7.29.0",
+      "to": "7.29.15"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "@babel/core",
+      "path": "node_modules/@babel/core",
+      "advisory": "https://github.com/advisories/GHSA-4x5r-pxfx-6jf8",
+      "range": "<=7.29.0"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 1,
+    "moderate": 8,
+    "high": 9,
+    "critical": 0,
+    "total": 18
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 0,
+    "moderate": 8,
+    "high": 9,
+    "critical": 0,
+    "total": 17
+  },
+  "verification": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "lint"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:35:42.741297+00:00",
+      "end": "2026-11-21T13:35:59.715540+00:00"
+    }
+  ]
+}

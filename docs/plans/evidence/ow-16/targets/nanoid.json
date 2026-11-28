@@ -1,0 +1,53 @@
+{
+  "target": "nanoid",
+  "lockSha256": "b1c283b636af866a0a4b1e996d8a342372f1080d37c51d06bc32cdacd2c6d151",
+  "changes": [
+    {
+      "path": "node_modules/next/node_modules/nanoid",
+      "from": "3.3.17",
+      "to": "3.3.20"
+    },
+    {
+      "path": "node_modules/postcss/node_modules/nanoid",
+      "from": "3.3.18",
+      "to": "3.3.20"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "nanoid",
+      "path": "node_modules/next/node_modules/nanoid",
+      "advisory": "https://github.com/advisories/GHSA-2v37-7h3g-55p8",
+      "range": "<3.3.18"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 8,
+    "moderate": 10,
+    "high": 13,
+    "critical": 0,
+    "total": 31
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 8,
+    "moderate": 10,
+    "high": 12,
+    "critical": 0,
+    "total": 30
+  },
+  "verification": [
+    {
+      "command": [
+        "node",
+        "-e",
+        "const assert=require(\"node:assert/strict\"); const {createRequire}=require(\"node:module\"); for(const p of [\"next/node_modules/postcss\",\"postcss\"]){const r=createRequire(require.resolve(p)); const n=r(\"nanoid\"); const ids=Array.from({length:1000},()=>n.nanoid()); assert.equal(new Set(ids).size,1000); assert(ids.every(v=>v.length===21));} console.log(\"Both PostCSS nanoid paths generate unique 21-character IDs\")"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:26:59.707625+00:00",
+      "end": "2026-11-21T13:26:59.732290+00:00"
+    }
+  ]
+}

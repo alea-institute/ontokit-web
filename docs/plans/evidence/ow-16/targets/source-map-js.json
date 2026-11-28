@@ -1,0 +1,48 @@
+{
+  "target": "source-map-js",
+  "lockSha256": "2b9ea5373ec598a80d87271f4fc56297242e692156909198eb6ba299933e1e56",
+  "changes": [
+    {
+      "path": "node_modules/source-map-js",
+      "from": "1.2.1",
+      "to": "1.2.4"
+    }
+  ],
+  "removedDirectAdvisoryPaths": [
+    {
+      "package": "source-map-js",
+      "path": "node_modules/source-map-js",
+      "advisory": "https://github.com/advisories/GHSA-68fv-2mgg-jv7q",
+      "range": ">=1.0.0 <1.2.2"
+    }
+  ],
+  "addedDirectAdvisoryPaths": [],
+  "countsBefore": {
+    "info": 0,
+    "low": 8,
+    "moderate": 10,
+    "high": 12,
+    "critical": 0,
+    "total": 30
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 8,
+    "moderate": 10,
+    "high": 11,
+    "critical": 0,
+    "total": 29
+  },
+  "verification": [
+    {
+      "command": [
+        "node",
+        "-e",
+        "const assert=require(\"node:assert/strict\"); const postcss=require(\"postcss\"); const r=postcss([]).process(\"a { color: red; }\",{from:\"input.css\",to:\"output.css\",map:{inline:false}});assert.match(r.css,/color: red/);assert.deepEqual(r.map.toJSON().sources,[\"input.css\"]);console.log(\"PostCSS source-map generation passes\")"
+      ],
+      "exit": 0,
+      "start": "2026-11-21T13:28:11.476370+00:00",
+      "end": "2026-11-21T13:28:11.507234+00:00"
+    }
+  ]
+}
